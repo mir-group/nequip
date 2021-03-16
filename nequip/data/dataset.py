@@ -90,7 +90,7 @@ class AtomicInMemoryDataset(AtomicDataset):
         force_fixed_keys = set(force_fixed_keys).union(
             getattr(type(self), "FORCE_FIXED_KEYS", [])
         )
-        self.url = getattr(type(self), "URL", None)
+        self.url = getattr(type(self), "URL", url)
 
         self.force_fixed_keys = force_fixed_keys
         self.extra_fixed_fields = extra_fixed_fields

@@ -180,7 +180,7 @@ class TestGradient:
         iatom = 1
         for idir in range(3):
             pos = data[AtomicDataDict.POSITIONS_KEY][iatom, idir]
-            data[AtomicDataDict.POSITIONS_KEY][iatom, idir] = pos+epsilon
+            data[AtomicDataDict.POSITIONS_KEY][iatom, idir] = pos + epsilon
             output = model(AtomicData.to_AtomicDataDict(data.to(device)))
             e_plus = output[AtomicDataDict.TOTAL_ENERGY_KEY]
 
