@@ -57,7 +57,7 @@ devices = (
 )
 
 
-@pytest.fixture(scope="class", params=[minimal_config1, minimal_config2])
+@pytest.fixture(scope="module", params=[minimal_config1, minimal_config2])
 def config(request):
     return request.param
 
@@ -76,7 +76,7 @@ def model(request, config):
 
 
 @pytest.fixture(
-    scope="class",
+    scope="module",
     params=(
         [torch.device("cuda"), torch.device("cpu")]
         if torch.cuda.is_available()
@@ -87,7 +87,7 @@ def device(request):
     return request.param
 
 
-@pytest.fixture(scope="class")
+@pytest.fixture(scope="module")
 def data(float_tolerance):
     torch.manual_seed(0)
     np.random.seed(0)
@@ -95,7 +95,7 @@ def data(float_tolerance):
     return data
 
 
-@pytest.fixture(scope="class")
+@pytest.fixture(scope="module")
 def batch(data, float_tolerance):
     torch.manual_seed(0)
     np.random.seed(0)
