@@ -1,0 +1,124 @@
+# general
+
+# Two folders will be used during the training: 'root'/process and 'root'/'project'
+# project contains logfiles and saved models
+# process contains processed data sets
+# if 'root'/'project' exists, 'root'/'project'_'year'-'month'-'day'-'hour'-'min'-'s' will be used instead.
+root: results/aspirin
+project: maximal
+seed: 0                                                                           # random number seed for numpy and torch
+restart: false                                                                    # set True for a restarted run
+append: false                                                                     # set True if a restarted run should append to the previous log file
+
+# network
+compile_model: False                                                              # whether to compile the constructed model to TorchScript
+num_basis: 8                                                                      # number of basis functions
+r_max: 4.0                                                                        # cutoff radius
+irreps_edge_sh: 0e + 1o + 2e                                                      # irreps of the spherical harmonics used for edges. If a single integer, indicates the full SH up to L_max=that_integer
+conv_to_output_hidden_irreps_out: 16x0e                                           # irreps used in hidden layer of output block
+feature_irreps_hidden: 16x0o + 16x0e + 16x1o + 16x1e + 16x2o + 16x2e              # irreps used for hidden features, here we go up to lmax=2, with even and odd parities
+BesselBasis_trainable: true                                                       # set true to train the bessel weights
+nonlinearity_type: gate                                                           # may be 'gate' or 'norm', 'gate' is recommended
+num_layers: 6                                                                     # number of interaction blocks, we found 5-6 to work best
+resnet: false                                                                     # set True to make interaction block a resnet-style update
+PolynomialCutoff_p: 6                                                             # p-value used in polynomial cutoff function
+convolution_kwargs:                                                               # 
+  invariant_layers: 1                                                             # number of radial layers, we found it important to keep this small, 1 or 2
+  invariant_neurons: 8                                                            # number of hidden neurons in radial function, again keep this small for MD applications, 8 - 32, smaller is faster
+  avg_num_neighbors: null                                                         # number of neighbors to divide by, None => no normalization.
+  use_sc: true                                                                    # use self-connection or not, usually gives big improvement
+
+# data set
+# the keys used need to be stated at least once in key_mapping, npz_fixed_field_keys or npz_keys
+# key_mapping is used to map the key in the npz file to the NequIP default values (see data/_key.py)
+# all arrays are expected to have the shape of (nframe, natom, ?) except the fixed fields
+dataset: npz                                                                       # type of data set, can be npz or ase
+dataset_file_name: ./benchmark_data/aspirin_dft.npz                                # path to data set file
+key_mapping:
+  z: atomic_numbers                                                                # atomic species, integers
+  E: total_energy                                                                  # total potential eneriges to train to
+  F: forces                                                                        # atomic forces to train to
+  R: pos                                                                           # raw atomic positions
+npz_fixed_field_keys:                                                              # fields that are repeated across different examples
+  - atomic_numbers
+
+# As an alternative option to npz, you can also pass data ase ASE Atoms-bojects
+# dataset: ase
+# dataset_file_name: xxx.xyz                                                       # need to be a format accepted by ase.io.read
+# ase_args:                                                                        # any arguments needed by ase.io.read
+#   format: extxyz
+
+# logging
+wandb: true                                                                        # we recommend using wandb for logging
+verbose: info                                                                      # the same as python logging, e.g. warning, info, debug, error. case insensitive
+log_batch_freq: 1                                                                  # batch frequency, how often to print training errors withinin the same epoch
+log_epoch_freq: 1                                                                  # epoch frequency, how often to print and save the model
+
+# training
+n_train: 975                                                                       # number of training data
+n_val: 25                                                                          # number of validation data
+learning_rate: 0.01                                                                # learning rate, we found 0.01 to work best - this is often one of the most important hyperparameters to tune
+batch_size: 5                                                                      # batch size
+max_epochs: 1000000                                                                # stop training after _ number of epochs
+train_val_split: random                                                            # can be random or sequential. if sequential, first n_train elements are training, next n_val are val, else random 
+shuffle: true                                                                      # If true, the data loader will shuffle the data
+metrics_key: loss                                                                  # metrics used for scheduling and saving best model. Options: loss, or anything appear in the
+                                                                                   # validation batch step header, such as f_mae, f_rmse, e_mae, e_rmse
+
+# loss function
+loss_coeffs:                                                                       # different weights to use in a weighted loss functions
+  forces: 1.0                                                                      # for MD applications, we recommed a force weight of 1
+  total_energy: 0.0                                                                # and an energy weight of 0., this usually gives the best errors in the forces
+
+# # default loss function is MSELoss, the name has to be exactly the same as those in torch.nn. 
+# the only supprted targets are forces and total_energy
+
+# here are some example of more ways to declare different types of loss functions, depending on your application:
+# loss_coeffs:
+#   total_energy: MSELoss
+# 
+# loss_coeffs:
+#   total_energy:
+#   - 3.0
+#   - MSELoss
+# 
+# loss_coeffs:
+#   forces: 
+#   - 1.0
+#   - PerSpeciesL1Loss
+# 
+# loss_coeffs: total_energy
+# 
+# loss_coeffs:
+#   total_energy:
+#   - 3.0
+#   - L1Loss
+#   forces: 1.0
+
+# optional keys
+# if true and weights_forces defined in the dataset, the loss function will be weighted
+atomic_weight_on: false
+
+# optimizer, may be any optimizer defined in torch.optim
+# the name `optimizer_name`is case sensitive
+optimizer_name: Adam                                                               # default optimizer is Adam in the amsgrad mode
+optimzer_params:                                                                   # any params taken by the torch.optim.xxx constructor
+  amsgrad: true
+  betas: !!python/tuple
+  - 0.9
+  - 0.999
+  eps: 1.0e-08
+  weight_decay: 0
+
+# lr scheduler, currently only supports the two options listed below, if you need more please file an issue
+# first open, consine annealing with warm restart
+lr_scheduler_name: CosineAnnealingWarmRestarts
+lr_scheduler_params:
+  T_0: 10000
+  T_mult: 2
+  eta_min: 0
+  last_epoch: -1
+
+# alternative option, on-plateau
+# lr_scheduler_name: ReduceLROnPlateau
+# lr_patience: 1000

@@ -1,0 +1,35 @@
+# general
+root: results/aspirin
+project: minimal
+seed: 0
+
+# network
+num_basis: 8
+r_max: 4.0
+irreps_edge_sh: 0e + 1o
+conv_to_output_hidden_irreps_out: 16x0o + 16x0e + 16x1o + 16x1e + 16x2o + 16x2e
+feature_irreps_hidden: 16x0o + 16x0e 
+
+# data
+dataset: aspirin
+
+# logging
+wandb: false
+
+# training
+n_train: 5
+n_val: 5
+batch_size: 1
+max_epochs: 10
+metrics_key: f_mae
+
+# loss function
+loss_coeffs: forces
+
+# optimizer
+optimizer_name: Adam
+
+# lr scheduler
+lr_scheduler_name: CosineAnnealingWarmRestarts
+learning_rate: 0.01
+lr_T_0: 10000

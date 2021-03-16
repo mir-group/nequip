@@ -1,0 +1,9 @@
+# # python script/restart.py xxx/trainer.pth config/restart.yaml(optional)
+
+# general
+root: results/aspirin
+project: new_minimal
+seed: 0
+restart: true
+append: false
+verbose: debug
