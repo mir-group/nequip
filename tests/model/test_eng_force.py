@@ -57,7 +57,7 @@ devices = (
 )
 
 
-@pytest.fixture(scope="module", params=[minimal_config1, minimal_config2])
+@pytest.fixture(scope="class", params=[minimal_config1, minimal_config2])
 def config(request):
     return request.param
 
@@ -76,7 +76,7 @@ def model(request, config):
 
 
 @pytest.fixture(
-    scope="module",
+    scope="class",
     params=(
         [torch.device("cuda"), torch.device("cpu")]
         if torch.cuda.is_available()
@@ -87,7 +87,7 @@ def device(request):
     return request.param
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="class")
 def data(float_tolerance):
     torch.manual_seed(0)
     np.random.seed(0)
@@ -95,8 +95,8 @@ def data(float_tolerance):
     return data
 
 
-@pytest.fixture(scope="module")
-def batch(data):
+@pytest.fixture(scope="class")
+def batch(data, float_tolerance):
     torch.manual_seed(0)
     np.random.seed(0)
     data1 = AtomicData.from_ase(get_atoms(), r_max=3)
@@ -179,7 +179,8 @@ class TestGradient:
         epsilon2 = torch.as_tensor(2e-3)
         iatom = 1
         for idir in range(3):
-            data[AtomicDataDict.POSITIONS_KEY][iatom, idir] += epsilon
+            pos = data[AtomicDataDict.POSITIONS_KEY][iatom, idir]
+            data[AtomicDataDict.POSITIONS_KEY][iatom, idir] = pos+epsilon
             output = model(AtomicData.to_AtomicDataDict(data.to(device)))
             e_plus = output[AtomicDataDict.TOTAL_ENERGY_KEY]
 
