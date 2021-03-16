@@ -2,6 +2,9 @@
 
 NequIP is an open-source deep learning package for learning interatomic potentials using E(3)-equivariant convolutions.
 
+
+![nequip](./nequip.png)
+
 ### Requirements
 
 * Python, v3.8+
