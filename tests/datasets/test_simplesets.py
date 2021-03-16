@@ -10,7 +10,7 @@ from nequip.utils.auto_init import dataset_from_config
 include_frames = [0, 1]
 
 
-@pytest.mark.parametrize("name", ["aspirin", "chengwater"])
+@pytest.mark.parametrize("name", ["aspirin"])
 def test_simple(name, temp_data):
 
     config = Config(
