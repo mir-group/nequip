@@ -99,6 +99,11 @@ NequIP is being developed by:
 under the guidance of Boris Kozinsky at Harvard.
 
 
+### Contact
+
+If you have questions, please don't hesitate to reach out at batzner[at]g[dot]harvard[dot]edu. 
+
+
 ### Citing
 
 If you use this repository in your work, plase consider citing us with the following pre-print: 
