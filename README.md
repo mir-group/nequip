@@ -46,7 +46,9 @@ pip install wandb
 * Install NequIP
 
 ```
-pip install git+https://github.com/mir-group/nequip.git
+git clone https://github.com/mir-group/nequip.git
+cd nequip
+pip install -e . 
 ```
 
 ### Installation Issues
