@@ -14,8 +14,22 @@ In particular, please be sure to install Python 3.8 and Pytorch 1.8.
 
 ### Installation
 
-* Install [PyTorch Geometric](https://github.com/rusty1s/pytorch_geometric), make sure to install this with your correct version of CUDA/CPU. 
-* Install [e3nn](https://github.com/e3nn/e3nn) - it is important to install the ```main``` branch and not the ```master```
+* Install [PyTorch Geometric](https://github.com/rusty1s/pytorch_geometric), make sure to install this with your correct version of CUDA/CPU: 
+
+```
+pip install torch-scatter -f https://pytorch-geometric.com/whl/torch-1.8.0+${CUDA}.html
+pip install torch-sparse -f https://pytorch-geometric.com/whl/torch-1.8.0+${CUDA}.html
+pip install torch-cluster -f https://pytorch-geometric.com/whl/torch-1.8.0+${CUDA}.html
+pip install torch-spline-conv -f https://pytorch-geometric.com/whl/torch-1.8.0+${CUDA}.html
+```
+
+Then install Pytorch-Geometric from source (do not install it via ```pip install torch-geometric```)
+
+```
+pip install git+https://github.com/rusty1s/pytorch_geometric.git
+```
+
+* Install [e3nn](https://github.com/e3nn/e3nn): 
 
 ```
 pip install git+https://github.com/e3nn/e3nn.git 
