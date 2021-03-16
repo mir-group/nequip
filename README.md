@@ -92,10 +92,10 @@ The theory behind NequIP is described in our preprint [1]. NequIP's backend buil
 NequIP is being developed by:
 
     - Simon Batzner
-    - Anders Johansson
     - Albert Musaelian
     - Lixin Sun
     - Mario Geiger
+    - Anders Johansson
     - Tess Smidt
 
 under the guidance of Boris Kozinsky at Harvard.
