@@ -53,7 +53,7 @@ pip install -e .
 
 ### Installation Issues
 
-We recommend running the tests using ```pytest```: 
+We recommend running the tests using ```pytest``` on a CPU: 
 
 ```
 pip install pytest
