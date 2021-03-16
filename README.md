@@ -4,7 +4,7 @@ NequIP is an open-source deep learning package for learning interatomic potentia
 
 ### Requirements
 
-* Python, v3.8
+* Python, v3.8+
 * PyTorch, v1.8
 * Numpy, v1.19.5
 * Scipy, v1.6.0
