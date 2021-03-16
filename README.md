@@ -23,6 +23,8 @@ pip install torch-cluster -f https://pytorch-geometric.com/whl/torch-1.8.0+${CUD
 pip install torch-spline-conv -f https://pytorch-geometric.com/whl/torch-1.8.0+${CUDA}.html
 ```
 
+where ```${CUDA}``` should be replaced by either ```cpu```, ```cu101```, ```cu102```, or ```cu111``` depending on your PyTorch installation, for details see [here](https://github.com/rusty1s/pytorch_geometric). 
+
 Then install Pytorch-Geometric from source (do not install it via ```pip install torch-geometric```)
 
 ```
