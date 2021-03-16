@@ -22,7 +22,7 @@ nonlinearity_type: gate                                                         
 num_layers: 6                                                                     # number of interaction blocks, we found 5-6 to work best
 resnet: false                                                                     # set True to make interaction block a resnet-style update
 PolynomialCutoff_p: 6                                                             # p-value used in polynomial cutoff function
-convolution_kwargs:                                                               # 
+convolution_kwargs:                                                               
   invariant_layers: 1                                                             # number of radial layers, we found it important to keep this small, 1 or 2
   invariant_neurons: 8                                                            # number of hidden neurons in radial function, again keep this small for MD applications, 8 - 32, smaller is faster
   avg_num_neighbors: null                                                         # number of neighbors to divide by, None => no normalization.
@@ -50,7 +50,7 @@ npz_fixed_field_keys:                                                           
 #   format: extxyz
 
 # logging
-wandb: true                                                                        # we recommend using wandb for logging
+wandb: false                                                                       # we recommend using wandb for logging, we'll turn it off here as it's optional
 verbose: info                                                                      # the same as python logging, e.g. warning, info, debug, error. case insensitive
 log_batch_freq: 1                                                                  # batch frequency, how often to print training errors withinin the same epoch
 log_epoch_freq: 1                                                                  # epoch frequency, how often to print and save the model
@@ -59,7 +59,7 @@ log_epoch_freq: 1                                                               
 n_train: 975                                                                       # number of training data
 n_val: 25                                                                          # number of validation data
 learning_rate: 0.01                                                                # learning rate, we found 0.01 to work best - this is often one of the most important hyperparameters to tune
-batch_size: 5                                                                      # batch size
+batch_size: 5                                                                      # batch size, we found it important to keep this small for most applications 
 max_epochs: 1000000                                                                # stop training after _ number of epochs
 train_val_split: random                                                            # can be random or sequential. if sequential, first n_train elements are training, next n_val are val, else random 
 shuffle: true                                                                      # If true, the data loader will shuffle the data
