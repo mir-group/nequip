@@ -1,3 +1,5 @@
+from typing import List
+
 import torch
 
 from e3nn.o3 import Irreps
@@ -52,7 +54,9 @@ class GradientOutput(GraphModuleMixin, torch.nn.Module):
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
         # set req grad
         wrt_tensors = []
+        old_requires_grad: List[bool] = []
         for k in self.wrt:
+            old_requires_grad.append(data[k].requires_grad)
             data[k].requires_grad_(True)
             wrt_tensors.append(data[k])
         # run func
@@ -75,5 +79,9 @@ class GradientOutput(GraphModuleMixin, torch.nn.Module):
                 raise RuntimeError("Something is wrong, gradient couldn't be computed")
             else:
                 data[out] = self.sign * grad
+
+        # unset requires_grad_
+        for req_grad, k in zip(old_requires_grad, self.wrt):
+            data[k].requires_grad_(req_grad)
 
         return data
