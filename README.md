@@ -66,7 +66,7 @@ That should fix it.
 
 ### Tutorial 
 
-The best way to learn how to use NequIP is through the tutorial notebook in ```tutorials```. 
+The best way to learn how to use NequIP is [through the tutorial notebook hosted here](https://deepnote.com/project/2412ca93-7ad1-4458-972c-5d5add5a667e) 
 
 ### Training a network
 
