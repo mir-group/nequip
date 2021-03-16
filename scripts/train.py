@@ -51,8 +51,10 @@ def main():
         modes=["rms", "mean_std", "count"],
     )
 
+    config.update(dict(allowed_species=allowed_species))
+
     # Build a model
-    energy_model = EnergyModel(allowed_species=allowed_species, **dict(config))
+    energy_model = EnergyModel(**dict(config))
     force_model = ForceModel(energy_model)
 
     logging.info("Successfully built the network...")

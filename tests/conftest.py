@@ -23,10 +23,3 @@ BENCHMARK_ROOT = pathlib.Path(__file__).parent / "../benchmark_data/"
 def temp_data():
     with tempfile.TemporaryDirectory() as tmpdirname:
         yield tmpdirname
-
-
-@pytest.fixture(scope="session")
-def aspirin_molecule(float_tolerance):
-    # We need to explicitly depend on float_tolerance in order to load the data with both float32 and float64 precision. This is because of the fixture scoping
-    atoms = ase.io.read(BENCHMARK_ROOT / "aspirin.xyz")
-    return AtomicData.from_ase(atoms, r_max=4.0)

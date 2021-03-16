@@ -4,7 +4,7 @@ NequIP is an open-source deep learning package for learning interatomic potentia
 
 ### Requirements
 
-* Python, v3.8
+* Python, v3.8+
 * PyTorch, v1.8
 * Numpy, v1.19.5
 * Scipy, v1.6.0
@@ -14,8 +14,24 @@ In particular, please be sure to install Python 3.8 and Pytorch 1.8.
 
 ### Installation
 
-* Install [PyTorch Geometric](https://github.com/rusty1s/pytorch_geometric), make sure to install this with your correct version of CUDA/CPU. 
-* Install [e3nn](https://github.com/e3nn/e3nn) - it is important to install the ```main``` branch and not the ```master```
+* Install [PyTorch Geometric](https://github.com/rusty1s/pytorch_geometric), make sure to install this with your correct version of CUDA/CPU: 
+
+```
+pip install torch-scatter -f https://pytorch-geometric.com/whl/torch-1.8.0+${CUDA}.html
+pip install torch-sparse -f https://pytorch-geometric.com/whl/torch-1.8.0+${CUDA}.html
+pip install torch-cluster -f https://pytorch-geometric.com/whl/torch-1.8.0+${CUDA}.html
+pip install torch-spline-conv -f https://pytorch-geometric.com/whl/torch-1.8.0+${CUDA}.html
+```
+
+where ```${CUDA}``` should be replaced by either ```cpu```, ```cu101```, ```cu102```, or ```cu111``` depending on your PyTorch installation, for details see [here](https://github.com/rusty1s/pytorch_geometric). 
+
+Then install Pytorch-Geometric from source (do not install it via ```pip install torch-geometric```)
+
+```
+pip install git+https://github.com/rusty1s/pytorch_geometric.git
+```
+
+* Install [e3nn](https://github.com/e3nn/e3nn): 
 
 ```
 pip install git+https://github.com/e3nn/e3nn.git 
@@ -52,7 +68,7 @@ That should fix it.
 
 ### Tutorial 
 
-The best way to learn how to use NequIP is through the tutorial notebook in ```tutorials```. 
+The best way to learn how to use NequIP is [through the tutorial notebook hosted here](https://deepnote.com/project/2412ca93-7ad1-4458-972c-5d5add5a667e) 
 
 ### Training a network
 
@@ -81,6 +97,11 @@ NequIP is being developed by:
     - Tess Smidt
 
 under the guidance of Boris Kozinsky at Harvard.
+
+
+### Contact
+
+If you have questions, please don't hesitate to reach out at batzner[at]g[dot]harvard[dot]edu. 
 
 
 ### Citing
