@@ -575,15 +575,14 @@ class Trainer:
         self.model.train()
 
         # Do any target rescaling
-        with torch.no_grad():
-            data = data.to(self.device)
-            data = AtomicData.to_AtomicDataDict(data)
-            if hasattr(self.model, "unscale"):
-                # This means that self.model is RescaleOutputs
-                # this will normalize the targets
-                # in validation (eval mode), it does nothing
-                # in train mode, if normalizes the targets
-                data = self.model.unscale(data)
+        data = data.to(self.device)
+        data = AtomicData.to_AtomicDataDict(data)
+        if hasattr(self.model, "unscale"):
+            # This means that self.model is RescaleOutputs
+            # this will normalize the targets
+            # in validation (eval mode), it does nothing
+            # in train mode, if normalizes the targets
+            data = self.model.unscale(data)
 
         # Run model
         out = self.model(data)
