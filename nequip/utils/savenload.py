@@ -87,7 +87,7 @@ def load_file(supported_formats: dict, filename: str, enforced_format: str = Non
         import yaml
 
         with open(filename) as fin:
-            return yaml.load(fin, Loader=yaml.FullLoader)
+            return yaml.load(fin, Loader=yaml.Loader)
 
     elif format == "torch":
         import torch
