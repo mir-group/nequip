@@ -574,6 +574,7 @@ class Trainer:
 
         self.model.train()
 
+        # Do any target rescaling
         with torch.no_grad():
             data = data.to(self.device)
             data = AtomicData.to_AtomicDataDict(data)
@@ -584,7 +585,8 @@ class Trainer:
                 # in train mode, if normalizes the targets
                 data = self.model.unscale(data)
 
-            out = self.model(data)
+        # Run model
+        out = self.model(data)
 
         # If we're in evaluation mode (i.e. validation), then
         # data's target prop is unnormalized, and out's has been rescaled to be in the same units
