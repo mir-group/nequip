@@ -52,23 +52,6 @@ def main():
     )
 
     config.update(dict(allowed_species=allowed_species))
-    # Get statistics of training dataset
-    (
-        (forces_std),
-        (energies_mean, energies_std),
-        (allowed_species, Z_count),
-    ) = trainer.dataset_train.statistics(
-        fields=[
-            AtomicDataDict.FORCE_KEY,
-            AtomicDataDict.TOTAL_ENERGY_KEY,
-            AtomicDataDict.ATOMIC_NUMBERS_KEY,
-        ],
-        modes=["rms", "mean_std", "count"],
-    )
-
-    config.update(dict(allowed_species=allowed_species))
-
-    return
 
     # Build a model
     energy_model = EnergyModel(**dict(config))
