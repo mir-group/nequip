@@ -51,17 +51,22 @@ class SphericalHarmonicEdgeAttrs(GraphModuleMixin, torch.nn.Module):
 
 @compile_mode("script")
 class RadialBasisEdgeEncoding(GraphModuleMixin, torch.nn.Module):
-    def __init__(self, basis, cutoff, irreps_in=None):
+    out_field: str
+
+    def __init__(
+        self,
+        basis,
+        cutoff,
+        out_field: str = AtomicDataDict.EDGE_EMBEDDING_KEY,
+        irreps_in=None,
+    ):
         super().__init__()
         self.basis = basis
         self.cutoff = cutoff
+        self.out_field = out_field
         self._init_irreps(
             irreps_in=irreps_in,
-            irreps_out={
-                AtomicDataDict.EDGE_EMBEDDING_KEY: o3.Irreps(
-                    [(basis.num_basis, (0, 1))]
-                )
-            },
+            irreps_out={self.out_field: o3.Irreps([(basis.num_basis, (0, 1))])},
         )
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
@@ -71,5 +76,5 @@ class RadialBasisEdgeEncoding(GraphModuleMixin, torch.nn.Module):
         edge_length_embedded = (
             self.basis(edge_length) * self.cutoff(edge_length)[:, None]
         )
-        data[AtomicDataDict.EDGE_EMBEDDING_KEY] = edge_length_embedded
+        data[self.out_field] = edge_length_embedded
         return data

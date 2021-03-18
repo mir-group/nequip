@@ -2,7 +2,6 @@ import pathlib
 import pytest
 import tempfile
 
-import ase.io
 from nequip.data import AtomicData
 
 # For good practice, we *should* do this:

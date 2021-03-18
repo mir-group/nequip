@@ -574,6 +574,7 @@ class Trainer:
 
         self.model.train()
 
+        # Do any target rescaling
         data = data.to(self.device)
         data = AtomicData.to_AtomicDataDict(data)
         if hasattr(self.model, "unscale"):
@@ -583,6 +584,7 @@ class Trainer:
             # in train mode, if normalizes the targets
             data = self.model.unscale(data)
 
+        # Run model
         out = self.model(data)
 
         # If we're in evaluation mode (i.e. validation), then
@@ -593,7 +595,6 @@ class Trainer:
         loss, loss_contrib = self.loss(pred=out, ref=data)
 
         if not validation:
-
             self.optim.zero_grad()
             loss.backward()
             self.optim.step()
@@ -601,30 +602,24 @@ class Trainer:
             if self.lr_scheduler_name == "CosineAnnealingWarmRestarts":
                 self.lr_sched.step(self.iepoch + self.ibatch / n_batches)
 
-        mae, mae_contrib = self.loss.mae(pred=out, ref=data)
-        scaled_loss_contrib = {}
-        if hasattr(self.model, "scale"):
+        # save loss stats
+        with torch.no_grad():
+            mae, mae_contrib = self.loss.mae(pred=out, ref=data)
+            scaled_loss_contrib = {}
+            if hasattr(self.model, "scale"):
 
-            for key in mae_contrib:
-                mae_contrib[key] = self.model.scale(
-                    mae_contrib[key], force_process=True, do_shift=False
-                )
+                for key in mae_contrib:
+                    mae_contrib[key] = self.model.scale(
+                        mae_contrib[key], force_process=True, do_shift=False
+                    )
 
-            # TO DO, this evetually needs to be removed. no guarantee that a loss is MSE
-            for key in loss_contrib:
+                # TO DO, this evetually needs to be removed. no guarantee that a loss is MSE
+                for key in loss_contrib:
 
-                scaled_loss_contrib[key] = {
-                    k: torch.clone(v) for k, v in loss_contrib[key].items()
-                }
+                    scaled_loss_contrib[key] = {
+                        k: torch.clone(v) for k, v in loss_contrib[key].items()
+                    }
 
-                scaled_loss_contrib[key] = self.model.scale(
-                    scaled_loss_contrib[key],
-                    force_process=True,
-                    do_shift=False,
-                    do_scale=True,
-                )
-
-                if "mse" in type(self.loss.funcs[key].func).__name__.lower():
                     scaled_loss_contrib[key] = self.model.scale(
                         scaled_loss_contrib[key],
                         force_process=True,
@@ -632,15 +627,34 @@ class Trainer:
                         do_scale=True,
                     )
 
-        self.batch_loss = loss
-        self.batch_scaled_loss_contrib = scaled_loss_contrib
-        self.batch_loss_contrib = loss_contrib
-        self.batch_mae = mae
-        self.batch_mae_contrib = mae_contrib
+                    keys = [k for k in scaled_loss_contrib[key] if k in self.loss.funcs]
+                    keys = [k for k in keys if "mse" in type(self.loss.funcs[k].func).__name__.lower()]
+                    if len(keys) > 0:
+                        scaled_loss_contrib[key] = self.model.scale(
+                            scaled_loss_contrib[key],
+                            force_process=True,
+                            do_shift=False,
+                            do_scale=True,
+                        )
 
-        self.end_of_batch_log(validation)
-        for callback in self.end_of_batch_callbacks:
-            callback(self)
+            self.batch_loss = loss.detach()
+            self.batch_scaled_loss_contrib = {
+                k1: {k2: v2.detach() for k2, v2 in v1.items()}
+                for k1, v1 in scaled_loss_contrib.items()
+            }
+            self.batch_loss_contrib = {
+                k1: {k2: v2.detach() for k2, v2 in v1.items()}
+                for k1, v1 in loss_contrib.items()
+            }
+            self.batch_mae = mae.detach()
+            self.batch_mae_contrib = {
+                k1: {k2: v2.detach() for k2, v2 in v1.items()}
+                for k1, v1 in mae_contrib.items()
+            }
+
+            self.end_of_batch_log(validation)
+            for callback in self.end_of_batch_callbacks:
+                callback(self)
 
     @property
     def early_stop_cond(self):
@@ -744,7 +758,7 @@ class Trainer:
                         store_key += f"_{ABBREV.get(attr, attr)}"
                         print_key += f"_{ABBREV.get(attr, attr)}"
 
-                    if "mse" in type(self.loss.funcs[key].func).__name__.lower() and (
+                    if "mse" in type(self.loss.funcs[attr].func).__name__.lower() and (
                         name == RMSE_LOSS_KEY
                     ):
                         value = torch.sqrt(value)

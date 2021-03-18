@@ -2,6 +2,9 @@
 
 NequIP is an open-source deep learning package for learning interatomic potentials using E(3)-equivariant convolutions.
 
+
+![nequip](./nequip.png)
+
 ### Requirements
 
 * Python, v3.8+
@@ -53,7 +56,7 @@ pip install -e .
 
 ### Installation Issues
 
-We recommend running the tests using ```pytest```: 
+We recommend running the tests using ```pytest``` on a CPU: 
 
 ```
 pip install pytest
@@ -108,7 +111,8 @@ If you have questions, please don't hesitate to reach out at batzner[at]g[dot]ha
 
 ### Citing
 
-If you use this repository in your work, plase consider citing us with the following pre-print: 
+If you use this repository in your work, plase consider citing NequIP (1) and e3nn (2): 
 
     [1] https://arxiv.org/abs/2101.03164
+    [2] https://zenodo.org/record/4557591#.YFDmoZNKi3I
 

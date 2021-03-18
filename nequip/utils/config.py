@@ -87,20 +87,12 @@ class Config(object):
 
     def get_type(self, key):
         """Get Typehint from item_types dict or previous defined value
-
-        If there's a value already stored in the list, get the type from the value.
-        But this can be overwritten by the typehint that were explicitely
-        stated
-
         Args:
 
             key: name of the variable
         """
 
-        ori_val = self._items.get(key, None)
-        typehint = type(ori_val) if ori_val is not None else None
-        typehint = self._item_types.get(key, typehint)
-        return typehint
+        return self._item_types.get(key, None)
 
     def set_type(self, key, typehint):
         """set typehint for a variable

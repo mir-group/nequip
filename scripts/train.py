@@ -39,7 +39,7 @@ def main():
 
     # Get statistics of training dataset
     (
-        (forces_std),
+        (forces_std,),
         (energies_mean, energies_std),
         (allowed_species, Z_count),
     ) = trainer.dataset_train.statistics(
