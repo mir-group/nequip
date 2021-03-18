@@ -61,7 +61,6 @@ class ConvNet(GraphModuleMixin, torch.nn.Module):
                 AtomicDataDict.NODE_FEATURES_KEY,
                 AtomicDataDict.NODE_ATTRS_KEY,
                 AtomicDataDict.EDGE_ATTRS_KEY,
-                AtomicDataDict.EDGE_EMBEDDING_KEY,
             ],
         )
 
