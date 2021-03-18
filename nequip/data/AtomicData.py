@@ -205,13 +205,7 @@ class AtomicData(Data):
         elif "force" in atoms.arrays:
             add_fields[AtomicDataDict.FORCE_KEY] = atoms.arrays["force"]
 
-        add_fields[AtomicDataDict.ATOMIC_NUMBERS_KEY] = torch.as_tensor(
-            atoms.get_atomic_numbers()
-        )
-        if AtomicDataDict.FORCE_KEY in add_fields:
-            add_fields[AtomicDataDict.FORCE_KEY] = torch.as_tensor(
-                add_fields[AtomicDataDict.FORCE_KEY]
-            )
+        add_fields[AtomicDataDict.ATOMIC_NUMBERS_KEY] = atoms.get_atomic_numbers()
 
         return cls.from_points(
             pos=atoms.positions,
