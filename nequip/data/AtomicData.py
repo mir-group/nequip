@@ -199,6 +199,14 @@ class AtomicData(Data):
                         "free_energy"
                     ]
                     add_fields.pop("free_energy")
+
+                elif "energy" in add_fields:
+                    add_fields[AtomicDataDict.TOTAL_ENERGY_KEY] = add_fields[
+                        "energy"
+                    ]
+
+                    add_fields.pop("energy")
+
                 add_fields[AtomicDataDict.FORCE_KEY] = atoms.get_forces()
         elif "forces" in atoms.arrays:
             add_fields[AtomicDataDict.FORCE_KEY] = atoms.arrays["forces"]
