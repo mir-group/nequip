@@ -113,6 +113,7 @@ class TestConfigUpdate:
     @config_testlist
     def test_update_difftype(self, config):
 
+        config._new_intv_type = int
         config.update({"new_intv": 3.6})
         assert config.new_intv == 3
 
@@ -121,7 +122,7 @@ class TestConfigUpdate:
 
         with pytest.raises(TypeError) as excinfo:
 
-            config.intv = 3
+            config._intv_type = int
             newdict = {"intv": "3x0e"}
             config.update(newdict)
 
