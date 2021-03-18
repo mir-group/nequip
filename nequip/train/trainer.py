@@ -627,7 +627,9 @@ class Trainer:
                         do_scale=True,
                     )
 
-                    if "mse" in type(self.loss.funcs[key].func).__name__.lower():
+                    keys = [k for k in scaled_loss_contrib[key] if k in self.loss.funcs]
+                    keys = [k for k in keys if "mse" in type(self.loss.funcs[k].func).__name__.lower()]
+                    if len(keys) > 0:
                         scaled_loss_contrib[key] = self.model.scale(
                             scaled_loss_contrib[key],
                             force_process=True,
@@ -756,7 +758,7 @@ class Trainer:
                         store_key += f"_{ABBREV.get(attr, attr)}"
                         print_key += f"_{ABBREV.get(attr, attr)}"
 
-                    if "mse" in type(self.loss.funcs[key].func).__name__.lower() and (
+                    if "mse" in type(self.loss.funcs[attr].func).__name__.lower() and (
                         name == RMSE_LOSS_KEY
                     ):
                         value = torch.sqrt(value)
