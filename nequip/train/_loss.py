@@ -82,6 +82,7 @@ class PerSpeciesLoss(SimpleLoss):
             int(all_species[i]): {key: per_species_loss[i]}
             for i in range(len(per_species_loss))
         }
+        contrib["all"] = {key:total_loss}
         return total_loss, contrib
 
 

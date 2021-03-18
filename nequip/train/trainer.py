@@ -745,7 +745,7 @@ class Trainer:
                 stat[name][VALUE_KEY] += [value]
                 mat_str += f" {value:8.3f}"
                 header += f"\n# {name}"
-                log_str += f" {value:16.3f}"
+                log_str += f" {value:16.3g}"
                 log_header += f" {short_name:>16s}"
 
             for key, d in contrib.items():
@@ -833,10 +833,10 @@ class Trainer:
 
         header = "# Epoch\n# wall\n# LR"
         log_header = {
-            TRAIN: "# Epoch     wall       LR",
-            VALIDATION: "# Epoch     wall       LR",
+            TRAIN: "# Epoch         wall       LR",
+            VALIDATION: "# Epoch         wall       LR",
         }
-        mat_str = f"{self.iepoch+1:7d} {wall:8.3f} {lr:8.3g}"
+        mat_str = f"{self.iepoch+1:7d} {wall:12.3f} {lr:8.3g}"
         log_str = {TRAIN: f"{mat_str}", VALIDATION: f"{mat_str}"}
 
         for category in [TRAIN, VALIDATION]:
@@ -856,8 +856,8 @@ class Trainer:
                     mat_str += f" {mean:8.3f} {std:8.3f}"
                     header += f"\n# {category}_{short_name}_mean\n# {category}_{short_name}_std"
 
-                    log_header[category] += f" {short_name:>8s}"
-                    log_str[category] += f" {mean:8.3f}"
+                    log_header[category] += f" {short_name:>16s}"
+                    log_str[category] += f" {mean:16.3g}"
                     self.mae_dict[f"{category}_{short_name}"] = mean
 
                 for key in stat[CONTRIB]:
@@ -868,8 +868,8 @@ class Trainer:
                     header += f"\n# {category}_{item_name}"
 
                     if name != LOSS_KEY:
-                        log_str[category] += f" {mean:8.3f}"
-                        log_header[category] += f" {item_name:>8s}"
+                        log_str[category] += f" {mean:12.3f}"
+                        log_header[category] += f" {item_name:>12s}"
                     self.mae_dict[f"{category}_{item_name}"] = mean
 
         if not self.epoch_header_print:
