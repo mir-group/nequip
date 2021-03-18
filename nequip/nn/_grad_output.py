@@ -69,7 +69,7 @@ class GradientOutput(GraphModuleMixin, torch.nn.Module):
             # This should work for any gradient of energy, but could act suspiciously and unexpectedly for arbitrary gradient outputs, if they ever come up
             [data[self.of].sum()],
             wrt_tensors,
-            create_graph=True,  # needed to allow gradients of this output
+            create_graph=self.training,  # needed to allow gradients of this output during training
         )
         # return
         # grad is optional[tensor]?
