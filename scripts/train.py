@@ -68,8 +68,6 @@ def main():
 
     config.update(dict(allowed_species=allowed_species))
 
-    return
-
     # Build a model
     energy_model = EnergyModel(**dict(config))
     force_model = ForceModel(energy_model)
