@@ -201,9 +201,7 @@ class AtomicData(Data):
                     add_fields.pop("free_energy")
 
                 elif "energy" in add_fields:
-                    add_fields[AtomicDataDict.TOTAL_ENERGY_KEY] = add_fields[
-                        "energy"
-                    ]
+                    add_fields[AtomicDataDict.TOTAL_ENERGY_KEY] = add_fields["energy"]
 
                     add_fields.pop("energy")
 

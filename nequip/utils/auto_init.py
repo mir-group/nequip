@@ -17,19 +17,24 @@ def dataset_from_config(config):
     and tests/datasets/test_simplest.py
     """
 
-    dataset_name = config.dataset.lower()
+    if inspect.isclass(config.dataset):
+        # user define class
+        class_name = config.dataset
+    else:
+        # default class defined in nequip.data or nequip.dataset
+        dataset_name = config.dataset.lower()
 
-    class_name = None
-    for k, v in inspect.getmembers(data, inspect.isclass) + inspect.getmembers(
-        datasets, inspect.isclass
-    ):
-        if k.endswith("Dataset"):
-            if k.lower() == dataset_name:
+        class_name = None
+        for k, v in inspect.getmembers(data, inspect.isclass) + inspect.getmembers(
+            datasets, inspect.isclass
+        ):
+            if k.endswith("Dataset"):
+                if k.lower() == dataset_name:
+                    class_name = v
+                if k[:-7].lower() == dataset_name:
+                    class_name = v
+            elif k.lower() == dataset_name:
                 class_name = v
-            if k[:-7].lower() == dataset_name:
-                class_name = v
-        elif k.lower() == dataset_name:
-            class_name = v
 
     if class_name is None:
         raise NameError(f"dataset {dataset_name} does not exists")

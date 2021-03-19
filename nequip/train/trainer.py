@@ -628,7 +628,11 @@ class Trainer:
                     )
 
                     keys = [k for k in scaled_loss_contrib[key] if k in self.loss.funcs]
-                    keys = [k for k in keys if "mse" in type(self.loss.funcs[k].func).__name__.lower()]
+                    keys = [
+                        k
+                        for k in keys
+                        if "mse" in type(self.loss.funcs[k].func).__name__.lower()
+                    ]
                     if len(keys) > 0:
                         scaled_loss_contrib[key] = self.model.scale(
                             scaled_loss_contrib[key],
