@@ -243,7 +243,7 @@ class AtomicData(Data):
         return self.__irreps__
 
     def __cat_dim__(self, key, value):
-        if key in (AtomicDataDict.CELL_KEY, AtomicDataDict.PBC_KEY):
+        if key in (AtomicDataDict.CELL_KEY, AtomicDataDict.PBC_KEY, AtomicDataDict.TOTAL_ENERGY_KEY):
             # the cell and PBC are graph-level properties and so need a new batch dimension
             return None
         else:
