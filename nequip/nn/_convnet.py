@@ -83,7 +83,7 @@ class ConvNet(GraphModuleMixin, torch.nn.Module):
                 ]
             )
 
-            irreps_nonscalars = o3.Irreps(
+            irreps_gated = o3.Irreps(
                 [
                     (mul, ir)
                     for mul, ir in self.feature_irreps_hidden
@@ -92,7 +92,7 @@ class ConvNet(GraphModuleMixin, torch.nn.Module):
                 ]
             )
 
-            irreps_layer_out = irreps_scalars + irreps_nonscalars
+            irreps_layer_out = irreps_scalars + irreps_gated
 
             if nonlinearity_type == "gate":
                 ir = (
@@ -100,7 +100,7 @@ class ConvNet(GraphModuleMixin, torch.nn.Module):
                     if tp_path_exists(irreps_layer_out_prev, edge_attr_irreps, "0e")
                     else "0o"
                 )
-                irreps_gates = o3.Irreps([(mul, ir) for mul, _ in irreps_nonscalars])
+                irreps_gates = o3.Irreps([(mul, ir) for mul, _ in irreps_gated])
 
                 # TO DO, it's not that safe to directly use the
                 # dictionary
@@ -109,7 +109,7 @@ class ConvNet(GraphModuleMixin, torch.nn.Module):
                     act_scalars=[act[ir.p] for _, ir in irreps_scalars],
                     irreps_gates=irreps_gates,
                     act_gates=[act_gates[ir.p] for _, ir in irreps_gates],
-                    irreps_nonscalars=irreps_nonscalars,
+                    irreps_gated=irreps_gated,
                     **nonlinearity_kwargs,
                 )
 
