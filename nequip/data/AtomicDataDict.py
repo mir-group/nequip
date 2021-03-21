@@ -92,6 +92,7 @@ def with_edge_vectors(data: Type) -> Type:
                     cell.squeeze(0),  # remove batch dimension
                 )
         data[_keys.EDGE_VECTORS_KEY] = edge_vec
+        data[_keys.EDGE_LENGTH_KEY] = torch.linalg.norm(edge_vec, dim=-1)
         return data
 
 

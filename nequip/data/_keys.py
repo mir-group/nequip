@@ -16,6 +16,8 @@ EDGE_INDEX_KEY: Final[str] = "edge_index"
 EDGE_CELL_SHIFT_KEY: Final[str] = "edge_cell_shift"
 # A [n_edge, 3] tensor of displacement vectors associated to edges
 EDGE_VECTORS_KEY: Final[str] = "edge_vectors"
+# A [n_edge] tensor of the lengths of EDGE_VECTORS
+EDGE_LENGTH_KEY: Final[str] = "edge_lengths"
 # [n_edge, dim] (possibly equivariant) attributes of each edge
 EDGE_ATTRS_KEY: Final[str] = "edge_attrs"
 # [n_edge, dim] invariant embedding of the edges
