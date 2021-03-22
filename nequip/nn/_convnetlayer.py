@@ -77,7 +77,7 @@ class ConvNetLayer(GraphModuleMixin, torch.nn.Module):
             ]
         )
 
-        irreps_layer_out = irreps_scalars + irreps_gated
+        irreps_layer_out = (irreps_scalars + irreps_gated).simplify()
 
         if nonlinearity_type == "gate":
             ir = (
@@ -98,10 +98,10 @@ class ConvNetLayer(GraphModuleMixin, torch.nn.Module):
                 **nonlinearity_kwargs,
             )
 
-            conv_irreps_out = equivariant_nonlin.irreps_in
+            conv_irreps_out = equivariant_nonlin.irreps_in.simplify()
 
         else:
-            conv_irreps_out = irreps_layer_out
+            conv_irreps_out = irreps_layer_out.simplify()
 
             equivariant_nonlin = NormActivation(
                 irreps_in=conv_irreps_out,
@@ -111,6 +111,7 @@ class ConvNetLayer(GraphModuleMixin, torch.nn.Module):
                 bias=False,
                 **nonlinearity_kwargs,
             )
+
         self.equivariant_nonlin = equivariant_nonlin
 
         # TODO: partial resnet?
