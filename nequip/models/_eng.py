@@ -28,7 +28,7 @@ def EnergyModel(**shared_params):
       - SphericalHarmonicEdgeAttrs {'set_node_features': False, 'l_max': 1}
       - RadialBasisEdgeEncoding {'basis': BesselBasis(), 'cutoff': PolynomialCutoff()}
       - AtomwiseLinear {'field': 'node_features', 'out_field': None, 'irreps_out': '1x0e'}
-      - ConvNet {'convolution': <class 'nequip.nn._interaction_block.InteractionBlock'>, 'num_layers': 2,
+      - ConvNetLayer {'convolution': <class 'nequip.nn._interaction_block.InteractionBlock'>, 'num_layers': 2,
         'resnet': False, 'nonlinearity_type': 'norm', 'nonlinearity_kwargs': {},
         'feature_irreps_hidden': '16x0o + 16x0e + 16x1o + 16x1e + 16x2o + 16x2e',}
       - AtomwiseLinear

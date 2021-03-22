@@ -3,5 +3,4 @@ from ._atomwise import AtomwiseOperation, AtomwiseReduce, AtomwiseLinear  # noqa
 from ._interaction_block import InteractionBlock  # noqa: F401
 from ._grad_output import GradientOutput  # noqa: F401
 from ._rescale import RescaleOutput  # noqa: F401
-from ._convnet import ConvNet  # noqa: F401
 from ._convnetlayer import ConvNetLayer  # noqa: F401
