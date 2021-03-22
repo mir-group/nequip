@@ -1,1 +1,1 @@
-from ._eng import ConvNet, EnergyModel, ForceModel  # noqa: F401
+from ._eng import EnergyModel, ForceModel  # noqa: F401

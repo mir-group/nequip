@@ -6,7 +6,7 @@ from nequip.nn import (
     AtomwiseLinear,
     AtomwiseReduce,
     GradientOutput,
-    ConvNet,
+    ConvNetLayer,
 )
 from nequip.nn.embedding import (
     OneHotAtomEncoding,
@@ -50,23 +50,30 @@ def EnergyModel(**shared_params):
         all_args=shared_params,
     )
 
-    return SequentialGraphNetwork.from_parameters(
-        shared_params=shared_params,
-        layers={
-            # -- Encode --
-            "one_hot": OneHotAtomEncoding,
-            "spharm_edges": SphericalHarmonicEdgeAttrs,
-            "radial_basis": (
-                RadialBasisEdgeEncoding,
-                dict(
-                    basis=basis,
-                    cutoff=cutoff,
-                ),
+    num_layers = shared_params.pop("num_layers", 3)
+
+    layers = {
+        # -- Encode --
+        "one_hot": OneHotAtomEncoding,
+        "spharm_edges": SphericalHarmonicEdgeAttrs,
+        "radial_basis": (
+            RadialBasisEdgeEncoding,
+            dict(
+                basis=basis,
+                cutoff=cutoff,
             ),
-            # -- Embed features --
-            "feature_embedding": AtomwiseLinear,
-            # -- ConvNet --
-            "convnet": ConvNet,
+        ),
+        # -- Embed features --
+        "feature_embedding": AtomwiseLinear,
+    }
+
+    # add convnet layers
+    for layer_i in range(num_layers):
+        layers.update({f"convnetlayer{layer_i}": ConvNetLayer})
+
+    # .update also maintains insertion order
+    layers.update(
+        {
             # TODO: the next linear throws out all L > 0, don't create them in the last layer of convnet
             # -- output block --
             "conv_to_output_hidden": AtomwiseLinear,
@@ -82,7 +89,11 @@ def EnergyModel(**shared_params):
                     out_field=AtomicDataDict.TOTAL_ENERGY_KEY,
                 ),
             ),
-        },
+        }
+    )
+
+    return SequentialGraphNetwork.from_parameters(
+        shared_params=shared_params, layers=layers
     )
 
 
