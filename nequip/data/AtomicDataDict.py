@@ -48,7 +48,7 @@ def _irreps_compatible(ir1: Dict[str, o3.Irreps], ir2: Dict[str, o3.Irreps]):
 
 
 @torch.jit.script
-def with_edge_vectors(data: Type) -> Type:
+def with_edge_vectors(data: Type, with_lengths: bool = True) -> Type:
     """Compute the edge displacement vectors for a graph.
 
     If ``data.pos.requires_grad`` and/or ``data.cell.requires_grad``, this
@@ -58,6 +58,10 @@ def with_edge_vectors(data: Type) -> Type:
         Tensor [n_edges, 3] edge displacement vectors
     """
     if _keys.EDGE_VECTORS_KEY in data:
+        if with_lengths and _keys.EDGE_LENGTH_KEY not in data:
+            data[_keys.EDGE_LENGTH_KEY] = torch.linalg.norm(
+                data[_keys.EDGE_VECTORS_KEY], dim=-1
+            )
         return data
     else:
         # Build it dynamically
@@ -92,7 +96,8 @@ def with_edge_vectors(data: Type) -> Type:
                     cell.squeeze(0),  # remove batch dimension
                 )
         data[_keys.EDGE_VECTORS_KEY] = edge_vec
-        data[_keys.EDGE_LENGTH_KEY] = torch.linalg.norm(edge_vec, dim=-1)
+        if with_lengths:
+            data[_keys.EDGE_LENGTH_KEY] = torch.linalg.norm(edge_vec, dim=-1)
         return data
 
 
