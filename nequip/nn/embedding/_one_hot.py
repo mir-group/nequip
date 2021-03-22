@@ -65,6 +65,7 @@ class OneHotAtomEncoding(GraphModuleMixin, torch.nn.Module):
             type_numbers = self.index_for_atomic_numbers(
                 data[AtomicDataDict.ATOMIC_NUMBERS_KEY]
             )
+            data[AtomicDataDict.SPECIES_INDEX_KEY] = type_numbers
         else:
             raise ValueError(
                 "Nothing in this `data` to encode, need either species index or atomic numbers"
