@@ -148,7 +148,7 @@ class TestWorkflow:
         )
         # Make sure it propagates
         assert (
-            model.convnetlayer0.irreps_in[model.feature_embedding.out_field]
+            model.layer0_convnet.irreps_in[model.feature_embedding.out_field]
             == true_irreps
         )
 
