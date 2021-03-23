@@ -103,7 +103,10 @@ class PerSpeciesShift(GraphModuleMixin, torch.nn.Module):
             if shifts is None
             else torch.as_tensor(shifts, dtype=torch.get_default_dtype())
         )
-        self.shifts = torch.nn.Parameter(shifts) if trainable else shifts
+        if trainable:
+            self.shifts = torch.nn.Parameter(shifts)
+        else:
+            self.register_buffer("shifts", shifts)
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
         counts = torch.bincount(
