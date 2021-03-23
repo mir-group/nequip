@@ -94,6 +94,7 @@ class PerSpeciesShift(GraphModuleMixin, torch.nn.Module):
         self.out_field = f"shifted_{field}" if out_field is None else out_field
         self._init_irreps(
             irreps_in=irreps_in,
+            my_irreps_in={self.field: "0e"},  # input to shift must be a single scalar
             irreps_out={self.out_field: irreps_in[self.field]}
             if self.field in irreps_in
             else {},
