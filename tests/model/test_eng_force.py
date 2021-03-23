@@ -17,6 +17,7 @@ from e3nn.util.jit import script
 from nequip.data import AtomicDataDict, AtomicData
 from nequip.models import EnergyModel, ForceModel
 from nequip.nn import GraphModuleMixin, AtomwiseLinear
+from nequip.utils.test import assert_AtomicData_equivariant
 
 # from nequip.utils.test import assert_AtomicData_equivariant
 
@@ -220,36 +221,7 @@ class TestAutoGradient:
         assert in_frame_grad.abs().max().item() > 0
 
 
-# class TestEquivariance:
-# @loop_energy1
-# @loop_cpu
-# def test_energy(self, energy_model, device):
-
-#     energy_model.to(device)
-
-#     for i in range(2):
-#         data = AtomicData.from_ase(get_atoms(), r_max=3)
-#         data = AtomicData.to_AtomicDataDict(data.to(device))
-#         assert_AtomicData_equivariant(
-#             func=energy_model,
-#             data_in=data,
-#             func_irreps_out="1x0e",
-#             out_field=AtomicDataDict.TOTAL_ENERGY_KEY,
-#             randomize_features=True,
-#         )
-
-# @loop_force1
-# @loop_cpu
-# def test_force(self, force_model, device):
-
-#     force_model.to(device)
-#     for i in range(2):
-#         data = AtomicData.from_ase(get_atoms(), r_max=3)
-#         data = AtomicData.to_AtomicDataDict(data.to(device))
-#         assert_AtomicData_equivariant(
-#             func=force_model,
-#             data_in=data,
-#             func_irreps_out="1x1o",
-#             out_field=AtomicDataDict.FORCE_KEY,
-#             randomize_features=True,
-#         )
+class TestEquivariance:
+    def test_forward(self, model, data):
+        instance, out_field = model
+        assert_AtomicData_equivariant(func=instance, data_in=data)
