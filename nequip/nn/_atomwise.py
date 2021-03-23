@@ -77,3 +77,37 @@ class AtomwiseReduce(GraphModuleMixin, torch.nn.Module):
             data[self.field], data[AtomicDataDict.BATCH_KEY], dim=0, reduce=self.reduce
         )
         return data
+
+
+class PerSpeciesShift(GraphModuleMixin, torch.nn.Module):
+    def __init__(
+        self,
+        field: str,
+        allowed_species: list,
+        shifts: Optional[list] = None,
+        out_field: Optional[str] = None,
+        irreps_in={},
+        trainable: Optional[bool] = True,
+    ):
+        super().__init__()
+        self.field = field
+        self.out_field = f"shifted_{field}" if out_field is None else out_field
+        self._init_irreps(
+            irreps_in=irreps_in,
+            irreps_out={self.out_field: irreps_in[self.field]}
+            if self.field in irreps_in
+            else {},
+        )
+        shifts = (
+            torch.zeros(len(allowed_species))
+            if shifts is None
+            else torch.as_tensor(shifts, dtype=torch.get_default_dtype())
+        )
+        self.shifts = torch.nn.Parameter(shifts) if trainable else shifts
+
+    def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
+        counts = torch.bincount(
+            data[AtomicDataDict.SPECIES_INDEX_KEY], minlength=len(self.shifts)
+        )
+        data[self.out_field] = data[self.field] + torch.sum(self.shifts * counts)
+        return data

@@ -25,14 +25,6 @@ class TrainerWandB(Trainer):
 
     def init_model(self):
 
-        wandb.login()
-
-        config = self.as_dict(state_dict=False, training_progress=False)
-        kwargs = config.pop("kwargs", {})
-        config.update(kwargs)
-        config.pop("project", None)
-
-        wandb.init(project=self.project, config=config)
         Trainer.init_model(self)
 
         # TO DO, this will trigger pickel failure

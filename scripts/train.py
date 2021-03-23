@@ -21,10 +21,18 @@ def main():
 
     # Make the trainer
     if config.wandb:
+        _config = dict(config)
+        project = _config.pop("project", "NequIP")
+        _config.pop("wandb", False)
+
+        import wandb
+
+        wandb.init(project=project, config=_config)
+        config.update(dict(wandb.config))
+
         from nequip.train.trainer_wandb import TrainerWandB
 
         trainer = TrainerWandB(model=None, **dict(config))
-
     else:
         from nequip.train.trainer import Trainer
 

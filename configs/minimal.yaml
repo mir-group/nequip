@@ -24,7 +24,8 @@ max_epochs: 10
 metrics_key: f_mae
 
 # loss function
-loss_coeffs: forces
+loss_coeffs: 
+  forces: PerSpecieMSELoss
 
 # optimizer
 optimizer_name: Adam

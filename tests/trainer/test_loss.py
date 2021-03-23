@@ -96,7 +96,7 @@ class TestWeight:
 
         for c in [w_contb, contb]:
             for key, value in c.items():
-                assert key in [0, 1, 'all']
+                assert key in [0, 1, "all"]
                 assert "forces" in value
 
         assert torch.allclose(w_contb[0]["forces"], contb[0]["forces"])

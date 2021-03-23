@@ -46,9 +46,17 @@ def main():
             dictionary["max_epochs"] *= 2
 
     if config.wandb:
-        from nequip.train.trainer_wandb import TrainerWandB
 
+        from nequip.train.trainer_wandb import TrainerWandB
         trainer = TrainerWandB.from_dict(dictionary)
+
+        import wandb
+        _config = trainer.as_dict(state_dict=False, training_progress=False)
+        project = _config.pop("project", "NequIP")
+        _config.pop("wandb", False)
+        wandb.init(project=project, config=_config)
+        config.update(dict(wandb.config))
+
     else:
         from nequip.train.trainer import Trainer
 
