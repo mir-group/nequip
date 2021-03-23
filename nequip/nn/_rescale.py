@@ -100,6 +100,7 @@ class RescaleOutput(GraphModuleMixin, torch.nn.Module):
         Returns:
             ``data``, modified in place
         """
+        data = data.copy()
         if self.training and not force_process:
             return data
         else:
@@ -129,8 +130,9 @@ class RescaleOutput(GraphModuleMixin, torch.nn.Module):
             data (map-like): a dict, ``AtomicDataDict``, ``AtomicData``, ``torch_geometric.data.Batch``, or anything else dictionary-like
             force_process (bool)
         Returns:
-            ``data``, modified in place
+            ``data``
         """
+        data = data.copy()
         if self.training or force_process:
             # To invert, -shift then divide by scale
             if do_shift:
