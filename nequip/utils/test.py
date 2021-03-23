@@ -11,7 +11,7 @@ def assert_AtomicData_equivariant(
     func: GraphModuleMixin, data_in: Union[AtomicData, AtomicDataDict.Type], **kwargs
 ):
     # Prevent pytest from showing this function in the traceback
-    # __tracebackhide__ = True
+    __tracebackhide__ = True
 
     irreps_in = {k: None for k in AtomicDataDict.ALLOWED_KEYS}
     irreps_in.update(
