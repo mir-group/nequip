@@ -6,6 +6,7 @@ Authors: Albert Musaelian
 import warnings
 from copy import deepcopy
 from typing import Union, Tuple, Dict
+from collections.abc import Mapping
 
 import numpy as np
 import ase.neighborlist
@@ -118,7 +119,7 @@ class AtomicData(Data):
         strict_self_interaction: bool = True,
         cell=None,
         pbc: PBC = False,
-        **kwargs
+        **kwargs,
     ):
         """Build neighbor graph from points, optionally with PBC.
 
@@ -219,7 +220,7 @@ class AtomicData(Data):
             cell=atoms.get_cell(),
             pbc=atoms.pbc,
             **kwargs,
-            **add_fields
+            **add_fields,
         )
 
     def get_edge_vectors(data: Data) -> torch.Tensor:
@@ -227,11 +228,17 @@ class AtomicData(Data):
         return data[AtomicDataDict.EDGE_VECTORS_KEY]
 
     @staticmethod
-    def to_AtomicDataDict(data: Data, exclude_keys=tuple()) -> AtomicDataDict.Type:
+    def to_AtomicDataDict(
+        data: Union[Data, Mapping], exclude_keys=tuple()
+    ) -> AtomicDataDict.Type:
+        if isinstance(data, Data):
+            keys = data.keys
+        elif isinstance(data, Mapping):
+            keys = data.keys()
+        else:
+            raise ValueError(f"Invalid data `{data:r}`")
         return {
-            k: data[k]
-            for k in data.keys
-            if (k not in exclude_keys and data[k] is not None)
+            k: data[k] for k in keys if (k not in exclude_keys and data[k] is not None)
         }
 
     @classmethod
