@@ -80,20 +80,23 @@ class AtomwiseReduce(GraphModuleMixin, torch.nn.Module):
 
 
 class PerSpeciesShift(GraphModuleMixin, torch.nn.Module):
+
     def __init__(
         self,
         field: str,
         allowed_species: list,
         shifts: Optional[list] = None,
+        total_shift: Optional[float] = None,
         out_field: Optional[str] = None,
         irreps_in={},
-        trainable: Optional[bool] = True,
+        trainable: Optional[bool] = False,
     ):
         super().__init__()
         self.field = field
         self.out_field = f"shifted_{field}" if out_field is None else out_field
         self._init_irreps(
             irreps_in=irreps_in,
+            my_irreps_in={self.field: "0e"},  # input to shift must be a single scalar
             irreps_out={self.out_field: irreps_in[self.field]}
             if self.field in irreps_in
             else {},
@@ -103,12 +106,23 @@ class PerSpeciesShift(GraphModuleMixin, torch.nn.Module):
             if shifts is None
             else torch.as_tensor(shifts, dtype=torch.get_default_dtype())
         )
-        self.shifts = torch.nn.Parameter(shifts) if trainable else shifts
-        self.total_shift = torch.nn.Parameter(torch.zeros(1))
+        total_shift = (
+            torch.zeros(1)
+            if total_shift is None
+            else torch.as_tensor(total_shift, dtype=torch.get_default_dype())
+        )
+        if trainable:
+            self.shifts = torch.nn.Parameter(shifts)
+            self.total_shift = total_shift
+        else:
+            self.register_buffer("shifts", shifts)
+            self.register_buffer("total_shift", total_shifts)
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
         counts = torch.bincount(
             data[AtomicDataDict.SPECIES_INDEX_KEY], minlength=len(self.shifts)
         )
-        data[self.out_field] = data[self.field] + torch.sum(self.shifts * counts) + self.total_shift
+        data[self.out_field] = (
+            data[self.field] + torch.sum(self.shifts * counts) + self.total_shift
+        )
         return data

@@ -79,8 +79,18 @@ def EnergyModel(**shared_params):
                 dict(
                     reduce="sum",
                     field="atomic_energy",
+                    out_field="raw_total_energy",
+
+                ),
+
+            ),
+            "per_specie_energy_shift": (
+                PerSpeciesShift,
+                dict(
+                    field="raw_total_energy",
                     out_field=AtomicDataDict.TOTAL_ENERGY_KEY,
                 ),
+
             ),
         },
     )
