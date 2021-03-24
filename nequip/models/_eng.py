@@ -6,7 +6,7 @@ from nequip.nn import (
     AtomwiseLinear,
     AtomwiseReduce,
     GradientOutput,
-    ConvNet,
+    ConvNetLayer,
 )
 from nequip.nn.embedding import (
     OneHotAtomEncoding,
@@ -28,7 +28,7 @@ def EnergyModel(**shared_params):
       - SphericalHarmonicEdgeAttrs {'set_node_features': False, 'l_max': 1}
       - RadialBasisEdgeEncoding {'basis': BesselBasis(), 'cutoff': PolynomialCutoff()}
       - AtomwiseLinear {'field': 'node_features', 'out_field': None, 'irreps_out': '1x0e'}
-      - ConvNet {'convolution': <class 'nequip.nn._interaction_block.InteractionBlock'>, 'num_layers': 2,
+      - ConvNetLayer {'convolution': <class 'nequip.nn._interaction_block.InteractionBlock'>, 'num_layers': 2,
         'resnet': False, 'nonlinearity_type': 'norm', 'nonlinearity_kwargs': {},
         'feature_irreps_hidden': '16x0o + 16x0e + 16x1o + 16x1e + 16x2o + 16x2e',}
       - AtomwiseLinear
@@ -50,23 +50,40 @@ def EnergyModel(**shared_params):
         all_args=shared_params,
     )
 
-    return SequentialGraphNetwork.from_parameters(
-        shared_params=shared_params,
-        layers={
-            # -- Encode --
-            "one_hot": OneHotAtomEncoding,
-            "spharm_edges": SphericalHarmonicEdgeAttrs,
-            "radial_basis": (
-                RadialBasisEdgeEncoding,
-                dict(
-                    basis=basis,
-                    cutoff=cutoff,
-                ),
+    num_layers = shared_params.pop("num_layers", 3)
+
+    layers = {
+        # -- Encode --
+        "one_hot": OneHotAtomEncoding,
+        "spharm_edges": SphericalHarmonicEdgeAttrs,
+        "radial_basis": (
+            RadialBasisEdgeEncoding,
+            dict(
+                basis=basis,
+                cutoff=cutoff,
             ),
-            # -- Embed features --
-            "feature_embedding": AtomwiseLinear,
-            # -- ConvNet --
-            "convnet": ConvNet,
+        ),
+        # -- Embed features --
+        "feature_embedding": AtomwiseLinear,
+    }
+
+    # add convnet layers
+    # we get any before and after layers:
+    before_layer = shared_params.pop("before_layer", {})
+    after_layer = shared_params.pop("after_layer", {})
+    if len(set(before_layer.keys()).union(after_layer.keys())) > 1:
+        raise ValueError(
+            "before_layer and after_layer may not have common module names"
+        )
+    # insertion preserves order
+    for layer_i in range(num_layers):
+        layers.update({f"layer{layer_i}_{bk}": v for bk, v in before_layer.items()})
+        layers[f"layer{layer_i}_convnet"] = ConvNetLayer
+        layers.update({f"layer{layer_i}_{ak}": v for ak, v in after_layer.items()})
+
+    # .update also maintains insertion order
+    layers.update(
+        {
             # TODO: the next linear throws out all L > 0, don't create them in the last layer of convnet
             # -- output block --
             "conv_to_output_hidden": AtomwiseLinear,
@@ -82,7 +99,11 @@ def EnergyModel(**shared_params):
                     out_field=AtomicDataDict.TOTAL_ENERGY_KEY,
                 ),
             ),
-        },
+        }
+    )
+
+    return SequentialGraphNetwork.from_parameters(
+        shared_params=shared_params, layers=layers
     )
 
 

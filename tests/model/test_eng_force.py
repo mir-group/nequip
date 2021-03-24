@@ -148,7 +148,10 @@ class TestWorkflow:
             == true_irreps
         )
         # Make sure it propagates
-        assert model.convnet.irreps_in[model.feature_embedding.out_field] == true_irreps
+        assert (
+            model.layer0_convnet.irreps_in[model.feature_embedding.out_field]
+            == true_irreps
+        )
 
     def test_forward(self, model, data, device):
         instance, out_field = model
