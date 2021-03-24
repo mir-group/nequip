@@ -90,6 +90,7 @@ class PerSpeciesShift(GraphModuleMixin, torch.nn.Module):
         irreps_in={},
         trainable: Optional[bool] = False,
     ):
+
         super().__init__()
         self.field = field
         self.out_field = f"shifted_{field}" if out_field is None else out_field
@@ -100,13 +101,20 @@ class PerSpeciesShift(GraphModuleMixin, torch.nn.Module):
             if self.field in irreps_in
             else {},
         )
+        self.skip = False
+        PerSpeciesShift.forward = self.skip else PerSpeciesShift._forward
+        if shifts is None and total_shift is None and not trainable:
+            self.skip = True
+            PerSpeciesShift.forward = PerSpeciesShift._skip_forward
+            return
+
         shifts = (
             torch.zeros(len(allowed_species))
             if shifts is None
             else torch.as_tensor(shifts, dtype=torch.get_default_dtype())
         )
         total_shift = (
-            torch.zeros(1)
+            torch.as_tensor(0, dtype=torch.get_default_dtype())
             if total_shift is None
             else torch.as_tensor(total_shift, dtype=torch.get_default_dype())
         )
@@ -115,9 +123,16 @@ class PerSpeciesShift(GraphModuleMixin, torch.nn.Module):
             self.total_shift = total_shift
         else:
             self.register_buffer("shifts", shifts)
-            self.register_buffer("total_shift", total_shifts)
+            self.register_buffer("total_shift", total_shift)
 
-    def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
+
+    def _skip_forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
+
+        data[self.out_field] = data[self.field]
+        return data
+
+    def _forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
+
         counts = torch.bincount(
             data[AtomicDataDict.SPECIES_INDEX_KEY], minlength=len(self.shifts)
         )

@@ -7,6 +7,7 @@ from nequip.nn import (
     AtomwiseReduce,
     GradientOutput,
     ConvNet,
+    PerSpeciesShift
 )
 from nequip.nn.embedding import (
     OneHotAtomEncoding,
