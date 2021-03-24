@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, List
 
 import torch
 import torch.nn.functional
@@ -80,62 +80,56 @@ class AtomwiseReduce(GraphModuleMixin, torch.nn.Module):
 
 
 class PerSpeciesShift(GraphModuleMixin, torch.nn.Module):
+    enabled: bool
+    field: str
+    out_field: str
+    trainable: bool
+
     def __init__(
         self,
         field: str,
-        allowed_species: list,
-        shifts: Optional[list] = None,
-        total_shift: Optional[float] = None,
+        allowed_species: List[int],
         out_field: Optional[str] = None,
+        shifts: Optional[list] = None,
+        total_shift: float = 0,
+        trainable: bool = False,
+        enabled: bool = True,
         irreps_in={},
-        trainable: Optional[bool] = False,
     ):
-
         super().__init__()
         self.field = field
         self.out_field = f"shifted_{field}" if out_field is None else out_field
         self._init_irreps(
             irreps_in=irreps_in,
             my_irreps_in={self.field: "0e"},  # input to shift must be a single scalar
-            irreps_out={self.out_field: irreps_in[self.field]}
-            if self.field in irreps_in
-            else {},
+            irreps_out={self.out_field: irreps_in[self.field]},
         )
-        self.skip = False
-        PerSpeciesShift.forward = PerSpeciesShift._forward
-        if shifts is None and total_shift is None and not trainable:
-            self.skip = True
-            PerSpeciesShift.forward = PerSpeciesShift._skip_forward
-            return
+
+        self.enabled = enabled
+        self.trainable = trainable
 
         shifts = (
             torch.zeros(len(allowed_species))
             if shifts is None
             else torch.as_tensor(shifts, dtype=torch.get_default_dtype())
         )
-        total_shift = (
-            torch.as_tensor(0, dtype=torch.get_default_dtype())
-            if total_shift is None
-            else torch.as_tensor(total_shift, dtype=torch.get_default_dype())
-        )
+        total_shift = torch.as_tensor(total_shift, dtype=torch.get_default_dtype())
+
         if trainable:
             self.shifts = torch.nn.Parameter(shifts)
-            self.total_shift = total_shift
+            self.total_shift = torch.nn.Parameter(total_shift)
         else:
             self.register_buffer("shifts", shifts)
             self.register_buffer("total_shift", total_shift)
 
-    def _skip_forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
-
-        data[self.out_field] = data[self.field]
-        return data
-
-    def _forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
-
-        counts = torch.bincount(
-            data[AtomicDataDict.SPECIES_INDEX_KEY], minlength=len(self.shifts)
-        )
-        data[self.out_field] = (
-            data[self.field] + torch.sum(self.shifts * counts) + self.total_shift
-        )
+    def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
+        if self.enabled:
+            counts = torch.bincount(
+                data[AtomicDataDict.SPECIES_INDEX_KEY], minlength=len(self.shifts)
+            )
+            data[self.out_field] = (
+                data[self.field] + torch.sum(self.shifts * counts) + self.total_shift
+            )
+        else:
+            data[self.out_field] = data[self.field]
         return data
