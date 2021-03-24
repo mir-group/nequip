@@ -102,7 +102,7 @@ class PerSpeciesShift(GraphModuleMixin, torch.nn.Module):
             else {},
         )
         self.skip = False
-        PerSpeciesShift.forward = self.skip else PerSpeciesShift._forward
+        PerSpeciesShift.forward = PerSpeciesShift._forward
         if shifts is None and total_shift is None and not trainable:
             self.skip = True
             PerSpeciesShift.forward = PerSpeciesShift._skip_forward
@@ -124,7 +124,6 @@ class PerSpeciesShift(GraphModuleMixin, torch.nn.Module):
         else:
             self.register_buffer("shifts", shifts)
             self.register_buffer("total_shift", total_shift)
-
 
     def _skip_forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
 

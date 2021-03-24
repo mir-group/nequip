@@ -7,7 +7,7 @@ from nequip.nn import (
     AtomwiseReduce,
     GradientOutput,
     ConvNet,
-    PerSpeciesShift
+    PerSpeciesShift,
 )
 from nequip.nn.embedding import (
     OneHotAtomEncoding,
@@ -83,7 +83,7 @@ def EnergyModel(**shared_params):
                     out_field="raw_total_energy",
                 ),
             ),
-            "per_specie_energy_shift": (
+            "energy_shift": (
                 PerSpeciesShift,
                 dict(
                     field="raw_total_energy",
