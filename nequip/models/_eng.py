@@ -80,9 +80,7 @@ def EnergyModel(**shared_params):
                     reduce="sum",
                     field="atomic_energy",
                     out_field="raw_total_energy",
-
                 ),
-
             ),
             "per_specie_energy_shift": (
                 PerSpeciesShift,
@@ -90,7 +88,6 @@ def EnergyModel(**shared_params):
                     field="raw_total_energy",
                     out_field=AtomicDataDict.TOTAL_ENERGY_KEY,
                 ),
-
             ),
         },
     )

@@ -80,7 +80,6 @@ class AtomwiseReduce(GraphModuleMixin, torch.nn.Module):
 
 
 class PerSpeciesShift(GraphModuleMixin, torch.nn.Module):
-
     def __init__(
         self,
         field: str,
