@@ -93,7 +93,7 @@ class PerSpeciesShift(GraphModuleMixin, torch.nn.Module):
         shifts: Optional[list] = None,
         total_shift: float = 0,
         trainable: bool = False,
-        enabled: bool = True,
+        enabled: bool = False,
         irreps_in={},
     ):
         super().__init__()
