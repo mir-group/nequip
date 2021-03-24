@@ -104,10 +104,11 @@ class PerSpeciesShift(GraphModuleMixin, torch.nn.Module):
             else torch.as_tensor(shifts, dtype=torch.get_default_dtype())
         )
         self.shifts = torch.nn.Parameter(shifts) if trainable else shifts
+        self.total_shift = torch.nn.Parameter(torch.zeros(1))
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
         counts = torch.bincount(
             data[AtomicDataDict.SPECIES_INDEX_KEY], minlength=len(self.shifts)
         )
-        data[self.out_field] = data[self.field] + torch.sum(self.shifts * counts)
+        data[self.out_field] = data[self.field] + torch.sum(self.shifts * counts) + self.total_shift
         return data
