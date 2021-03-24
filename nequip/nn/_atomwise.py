@@ -81,6 +81,9 @@ class AtomwiseReduce(GraphModuleMixin, torch.nn.Module):
 
 class PerSpeciesShift(GraphModuleMixin, torch.nn.Module):
     enabled: bool
+    field: str
+    out_field: str
+    trainable: bool
 
     def __init__(
         self,
@@ -89,7 +92,7 @@ class PerSpeciesShift(GraphModuleMixin, torch.nn.Module):
         out_field: Optional[str] = None,
         shifts: Optional[list] = None,
         total_shift: float = 0,
-        trainable: Optional[bool] = False,
+        trainable: bool = False,
         enabled: bool = True,
         irreps_in={},
     ):
@@ -103,6 +106,7 @@ class PerSpeciesShift(GraphModuleMixin, torch.nn.Module):
         )
 
         self.enabled = enabled
+        self.trainable = trainable
 
         shifts = (
             torch.zeros(len(allowed_species))
