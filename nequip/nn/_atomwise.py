@@ -99,9 +99,7 @@ class PerSpeciesShift(GraphModuleMixin, torch.nn.Module):
         self._init_irreps(
             irreps_in=irreps_in,
             my_irreps_in={self.field: "0e"},  # input to shift must be a single scalar
-            irreps_out={self.out_field: irreps_in[self.field]}
-            if self.field in irreps_in
-            else {},
+            irreps_out={self.out_field: irreps_in[self.field]},
         )
 
         self.enabled = enabled
@@ -111,7 +109,7 @@ class PerSpeciesShift(GraphModuleMixin, torch.nn.Module):
             if shifts is None
             else torch.as_tensor(shifts, dtype=torch.get_default_dtype())
         )
-        total_shift = torch.as_tensor(total_shift, dtype=torch.get_default_dype())
+        total_shift = torch.as_tensor(total_shift, dtype=torch.get_default_dtype())
 
         if trainable:
             self.shifts = torch.nn.Parameter(shifts)
