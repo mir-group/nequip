@@ -6,13 +6,13 @@ from nequip.train import Loss
 # all the config to test init
 # only the last one will be used to test the loss and mae
 dicts = (
-    {"energy": (3.0, "MSELoss")},
-    {"energy": "MSELoss"},
-    ["forces", "energy"],
-    {"forces": (1.0, "PerSpeciesMSELoss")},
-    {"forces": (1.0), "k": (1.0, torch.nn.L1Loss())},
-    "energy",
-    {"energy": (3.0, "L1Loss"), "forces": (1.0), "k": 1.0},
+    {AtomicDataDict.TOTAL_ENERGY_KEY: (3.0, "MSELoss")},
+    {AtomicDataDict.TOTAL_ENERGY_KEY: "MSELoss"},
+    [AtomicDataDict.FORCE_KEY, AtomicDataDict.TOTAL_ENERGY_KEY],
+    {AtomicDataDict.FORCE_KEY: (1.0, "PerSpeciesMSELoss")},
+    {AtomicDataDict.FORCE_KEY: (1.0), "k": (1.0, torch.nn.L1Loss())},
+    AtomicDataDict.TOTAL_ENERGY_KEY,
+    {AtomicDataDict.TOTAL_ENERGY_KEY: (3.0, "L1Loss"), AtomicDataDict.FORCE_KEY: (1.0), "k": 1.0},
 )
 
 
@@ -55,13 +55,13 @@ class TestWeight:
 
         assert isinstance(w_l, torch.Tensor)
         assert not torch.isclose(w_l, l)
-        assert torch.isclose(w_contb["forces"], contb["forces"])
+        assert torch.isclose(w_contb[AtomicDataDict.FORCE_KEY], contb[AtomicDataDict.FORCE_KEY])
 
     def test_per_specie(self, data):
 
         pred, ref = data
 
-        config = {"forces": (1.0, "PerSpeciesMSELoss")}
+        config = {AtomicDataDict.FORCE_KEY: (1.0, "PerSpeciesMSELoss")}
         loss = Loss(coeffs=config, atomic_weight_on=False)
         w_loss = Loss(coeffs=config, atomic_weight_on=True)
 
@@ -69,8 +69,8 @@ class TestWeight:
         l, contb = loss(pred, ref)
 
         # first half data are specie 1
-        # loss_ref_1 = torch.square(pred["forces"][:5] - ref["forces"][:5]).mean()
-        # loss_ref_0 = torch.square(pred["forces"][5:] - ref["forces"][5:]).mean()
+        # loss_ref_1 = torch.square(pred[AtomicDataDict.FORCE_KEY][:5] - ref[AtomicDataDict.FORCE_KEY][:5]).mean()
+        # loss_ref_0 = torch.square(pred[AtomicDataDict.FORCE_KEY][5:] - ref[AtomicDataDict.FORCE_KEY][5:]).mean()
 
         # since atomic weights are all the same value,
         # the two loss should have the same result
@@ -81,11 +81,11 @@ class TestWeight:
 
         for c in [w_contb, contb]:
             for key, value in c.items():
-                assert key in ["forces"]
+                assert key in [AtomicDataDict.FORCE_KEY]
 
-        assert torch.allclose(w_contb["forces"], contb["forces"])
-        # assert torch.isclose(w_contb[1]["forces"], loss_ref_1)
-        # assert torch.isclose(w_contb[0]["forces"], loss_ref_0)
+        assert torch.allclose(w_contb[AtomicDataDict.FORCE_KEY], contb[AtomicDataDict.FORCE_KEY])
+        # assert torch.isclose(w_contb[1][AtomicDataDict.FORCE_KEY], loss_ref_1)
+        # assert torch.isclose(w_contb[0][AtomicDataDict.FORCE_KEY], loss_ref_0)
 
 
 @pytest.fixture(scope="class")
@@ -107,16 +107,16 @@ def w_loss():
 def data(float_tolerance):
     """"""
     pred = {
-        "forces": torch.rand(10, 3),
-        "energy": torch.rand((2, 1)),
+        AtomicDataDict.FORCE_KEY: torch.rand(10, 3),
+        AtomicDataDict.TOTAL_ENERGY_KEY: torch.rand((2, 1)),
         "k": torch.rand((2, 1)),
     }
     ref = {
-        "forces": torch.rand(10, 3),
-        "energy": torch.rand((2, 1)),
+        AtomicDataDict.FORCE_KEY: torch.rand(10, 3),
+        AtomicDataDict.TOTAL_ENERGY_KEY: torch.rand((2, 1)),
         "k": torch.rand((2, 1)),
         AtomicDataDict.SPECIES_INDEX_KEY: torch.as_tensor([1, 1, 1, 1, 1, 0, 0, 0, 0, 0]),
     }
-    ref[AtomicDataDict.WEIGHTS_KEY + "forces"] = 2 * torch.ones((10, 1))
-    ref[AtomicDataDict.WEIGHTS_KEY + "energy"] = torch.rand((2, 1))
+    ref[AtomicDataDict.WEIGHTS_KEY + AtomicDataDict.FORCE_KEY] = 2 * torch.ones((10, 1))
+    ref[AtomicDataDict.WEIGHTS_KEY + AtomicDataDict.TOTAL_ENERGY_KEY] = torch.rand((2, 1))
     yield pred, ref

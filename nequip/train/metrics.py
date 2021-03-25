@@ -4,47 +4,52 @@ from typing import Union, List
 import torch.nn
 from ._loss import find_loss_function
 
-# loss_to_metrics = {"l1loss": "mae", "perspeciesl1loss":"mae"}
-# metrics_to_loss = {"mae": "L1Loss", "perspecies_mae":}
-
+metric_names = ["error"]
+loss_funcs = ["L1Loss"]
+headers = ["PerSpecies"]
 
 class Metrics:
+    """ Only scalar errors are supported atm. 
+    """
     def __init__(
         self,
         funcs: dict,
         atomic_weight_on: bool = False,
     ):
-        for key, func_list in funcs.items():
-            for func in func_list:
-                assert func.lower() in [
-                    "mseloss",
-                    "l1loss",
-                    "mae",
-                    "rmse",
-                ], "other metrics are not implemented yet"
 
         self.atomic_weight_on = atomic_weight_on
         self.funcs = {}
-        for key, func_list in funcs.items():
-            self.funcs[key] = {}
-            for name in func_list:
-                metric_name = loss_to_metrics.get(name.lower(), name.lower())
-                func_name = metrics_to_loss.get(name.lower(), name)
-                self.funcs[key][metric_name] = find_loss_function(func_name, {})
+        for key, func in funcs.items():
+            # TO DO: classification
+
+            # strip off headers
+            header = ""
+            for h in headers:
+                if func.startswith(h):
+                    func = func[len(h):]
+                    header = h
+
+            if func in metric_names:
+                idx = metric_names.index(func)
+            elif func in loss_funcs:
+                idx = loss_funcs.index(func)
+            else:
+                raise NotImplementedError("other metrics are not implemented yet")
+
+            loss_name = header + loss_funcs[idx]
+
+            self.funcs[key] = find_loss_function(loss_name, {})
 
     def __call__(self, pred: dict, ref: dict):
 
         metrics = {}
-        for key, funcs in self.funcs.items():
-            metrics[key] = {
-                name: func(
+        for key, func in self.funcs.items():
+            metrics[key] = func(
                     pred=pred,
                     ref=ref,
                     key=key,
                     atomic_weight_on=self.atomic_weight_on,
-                    mean=False,
+                    reduction="sum",
                 )
-                for name, func in funcs.items()
-            }
 
         return metrics
