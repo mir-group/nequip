@@ -6,6 +6,7 @@ import enum
 import numbers
 
 import torch
+from torch_scatter import scatter
 
 
 class Reduction(enum.Enum):
@@ -47,7 +48,7 @@ class RunningStats:
         self.reset()
 
     def accumulate_batch(
-        self, batch: torch.Tensor, weights: Optional[torch.Tensor] = None
+        self, batch: torch.Tensor, accumulate_by: Optional[torch.Tensor] = None
     ) -> torch.Tensor:
         """Accumulate a batch of samples into running statistics.
 
@@ -58,41 +59,68 @@ class RunningStats:
             the aggregated statistics _for this batch_. Accumulated statistics up to this point can be retreived with ``current_result()``.
         """
         assert batch.shape[1:] == self._dim
-        N = batch.shape[0]
 
         if self._reduction == Reduction.COUNT:
             raise NotImplementedError
         else:
-            if self._reduction == Reduction.MEAN:
-                new_sum = batch.sum(dim=0)
-            elif self._reduction == Reduction.RMS:
-                new_sum = torch.square(batch).sum(dim=0)
+            if accumulate_by is None:
+                # accumulate everything into the first bin
+                N = batch.shape[0]
+                if self._reduction == Reduction.MEAN:
+                    new_sum = batch.sum(dim=0)
+                elif self._reduction == Reduction.RMS:
+                    new_sum = torch.square(batch).sum(dim=0)
 
-            # weight = weights.sum(dim=0) if self.weighted else None
-            #  if self.weight:
-            #     self._weight += (weight - N * self._state) / (self._n + N)
+                # accumulate
+                self._state[0:1] += (new_sum - N * self._state) / (self._n[0] + N)
+                self._n[0] += N
 
-            # accumulate
-            self._state += (new_sum - N * self._state) / (self._n + N)
-            self._n += N
+                # for the batch
+                new_sum /= N
 
-            # for the batch
-            new_sum /= N
+                if self._reduction == Reduction.RMS:
+                    new_sum.sqrt_()
 
-            if self._reduction == Reduction.RMS:
-                new_sum.sqrt_()
+                return new_sum
+            else:
+                if self._reduction == Reduction.MEAN:
+                    new_sum = scatter(batch, accumulate_by, dim=0)
+                elif self._reduction == Reduction.RMS:
+                    new_sum = scatter(torch.square(batch), accumulate_by, dim=0)
 
-            return new_sum
+                if new_sum.shape[0] > self._n_bins:
+                    # time to expand
+                    N_to_add = new_sum.shape[0] - self._n_bins
+                    self._state = torch.cat(
+                        (self._state, self._state.new_zeros((N_to_add,) + self._dim)),
+                        dim=0,
+                    )
+                    self._n = torch.cat((self._n, self._n.new_zeros(N_to_add)), dim=0)
+                    assert len(self._state) == self._n_bins + N_to_add
+
+                N = torch.bincount(accumulate_by)
+
+                self._state[: new_sum.shape[0]] += (
+                    new_sum - N * self._state[: new_sum.shape[0]]
+                ) / (self._n + N)
+                self._n += N
+
+                new_sum /= N
+
+                if self._reduction == Reduction.RMS:
+                    new_sum.sqrt_()
+
+                return new_sum
 
     def reset(self) -> None:
         """Forget all previously accumulated state."""
-        self._n = 0
         if hasattr(self, "_state"):
             self._state.fill_(0.0)
-            self._weight.fill_(0.0)
+            self._n.fill_(0)
         else:
-            self._state = torch.zeros(self._dim)
-            self._weight = torch.zeros(self._dim)
+            self._n_bins = 1
+            self._n = torch.zeros(self._n_bins, dtype=torch.long)
+            self._state = torch.zeros((self._n_bins,) + self._dim)
 
     def current_result(self):
         """Get the current value of the running statistc."""
@@ -102,8 +130,8 @@ class RunningStats:
             return torch.sqrt(self._state)
 
     @property
-    def n(self) -> int:
-        return self._n
+    def n(self) -> torch.Tensor:
+        return self._n.squeeze(0)
 
     @property
     def dim(self) -> int:
