@@ -42,7 +42,7 @@ class SimpleLoss:
         else:
             loss = loss.mean()
 
-        return loss, {key: {key: loss}}  # torch.clone(loss)}}
+        return loss
 
 
 class PerSpeciesLoss(SimpleLoss):
@@ -78,12 +78,7 @@ class PerSpeciesLoss(SimpleLoss):
             )
 
         total_loss = per_species_loss.mean()
-        contrib = {
-            int(all_species[i]): {key: per_species_loss[i]}
-            for i in range(len(per_species_loss))
-        }
-        contrib["all"] = {key: total_loss}
-        return total_loss, contrib
+        return total_loss
 
 
 def find_loss_function(name: str, params: dict = {}):
@@ -91,18 +86,15 @@ def find_loss_function(name: str, params: dict = {}):
     wrapper_list = dict(
         PerSpecies=PerSpeciesLoss,
     )
-    mae_func = SimpleLoss("L1Loss")
 
     if isinstance(name, str):
         for key in wrapper_list:
             if name.startswith(key):
                 logging.debug(f"create loss instance {wrapper_list[key]}")
-                return wrapper_list[key](name[len(key) :], params), wrapper_list[key](
-                    "L1Loss"
-                )
+                return wrapper_list[key](name[len(key) :], params)
 
         return SimpleLoss(name, params), mae_func
     elif callable(name):
-        return name, mae_func
+        return name
     else:
         raise NotImplementedError(f"{name} Loss is not implemented")

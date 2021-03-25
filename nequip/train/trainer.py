@@ -125,7 +125,6 @@ class Trainer:
         append (bool): If true, the preexisted workfolder and files will be overwritten. And log files will be appended
 
         loss_coeffs (dict): dictionary to store coefficient and loss functions
-        atomic_weight_on (dict): if true, the weights in dataset will be used for loss/mae calculations.
 
         max_epochs (int): maximum number of epochs
 
@@ -209,7 +208,6 @@ class Trainer:
         append: bool = False,
         loss_coeffs: Union[dict, str] = AtomicDataDict.TOTAL_ENERGY_KEY,
         metrics_key: str = ABBREV.get(LOSS_KEY, LOSS_KEY),
-        atomic_weight_on: bool = False,
         max_epochs: int = 1000000,
         lr_sched=None,
         learning_rate: float = 1e-2,
@@ -515,7 +513,12 @@ class Trainer:
                 all_args=self.kwargs,
             )
 
-        self.loss = Loss(self.loss_coeffs, atomic_weight_on=self.atomic_weight_on)
+        self.loss, _ = instantiate_from_cls_name(
+                class_name=Loss,
+                prefix="loss",
+                positional_args=dict(coeffs=self.loss_coeffs),
+                all_args=self.kwargs,
+            )
         self._initialized = True
 
     def init_model(self):
