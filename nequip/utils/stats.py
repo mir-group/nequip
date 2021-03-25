@@ -26,8 +26,10 @@ class RunningStats:
     """
 
     def __init__(
-        self, dim: Union[int, Tuple[int]] = 1, reduction: Reduction = Reduction.MEAN,
-        weight: str =False
+        self,
+        dim: Union[int, Tuple[int]] = 1,
+        reduction: Reduction = Reduction.MEAN,
+        weight: str = False,
     ):
         if isinstance(dim, numbers.Integral):
             self._dim = (dim,)
@@ -42,7 +44,9 @@ class RunningStats:
         self._reduction = reduction
         self.reset()
 
-    def accumulate_batch(self, batch: torch.Tensor, weights:Optional[torch.Tensor]=None) -> torch.Tensor:
+    def accumulate_batch(
+        self, batch: torch.Tensor, weights: Optional[torch.Tensor] = None
+    ) -> torch.Tensor:
         """Accumulate a batch of samples into running statistics.
 
         Args:
@@ -60,7 +64,7 @@ class RunningStats:
             new = batch.sum(dim=0)
         elif self._reduction == Reduction.RMS:
             new = torch.square(batch).sum(dim=0)
-        
+
         weight = weights.sum(dim=0) if self.weight else None
 
         return self.accumulate_sum(new_sum=new, N=N, weight=weight)

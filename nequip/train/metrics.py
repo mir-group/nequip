@@ -18,11 +18,14 @@ class Metrics:
         for component in components:
 
             # parse the input list
+            dim = 1
             mode = "average"
             functional = "L1Loss"
             reduction = Reduction.MEAN
 
-            if len(component) == 2:
+            if len(component) == 1:
+                key = component
+            elif len(component) == 2:
                 key, dim = component
             elif len(component) == 3:
                 key, dim, reduction = component
@@ -50,9 +53,14 @@ class Metrics:
                 reduction="sum",
             )
             for reduction, stat in self.running_stats.items():
-                metrics[(key, reduction)] = self.running_stats[key][
-                    reduction
-                ].accumulate_batch(error)
+
+                rs = self.running_stats[key][reduction]
+                if rs.per_species:
+                    metrics[(key, reduction)] = rs.accumulate_batch(
+                        error.mean(dim=(i for i in range(1, len(error.shape))))
+                    )
+                else:
+                    metrics[(key, reduction)] = rs.accumulate_batch(error)
         return metrics
 
     def reset(self):
