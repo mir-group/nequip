@@ -26,8 +26,10 @@ class RunningStats:
     """
 
     def __init__(
-        self, dim: Union[int, Tuple[int]] = 1, reduction: Reduction = Reduction.MEAN
-        weight: str =False
+        self,
+        dim: Union[int, Tuple[int]] = 1,
+        reduction: Reduction = Reduction.MEAN,
+        weighted: bool = False,
     ):
         if isinstance(dim, numbers.Integral):
             self._dim = (dim,)
@@ -38,11 +40,15 @@ class RunningStats:
 
         if reduction not in (Reduction.MEAN, Reduction.RMS):
             raise NotImplementedError(f"Reduction {reduction} not yet implimented")
-        self.weight = weight
         self._reduction = reduction
+        self.weighted = weighted
+        if weighted:
+            raise NotImplementedError
         self.reset()
 
-    def accumulate_batch(self, batch: torch.Tensor, weights:Optional[torch.Tensor]=None) -> torch.Tensor:
+    def accumulate_batch(
+        self, batch: torch.Tensor, weights: Optional[torch.Tensor] = None
+    ) -> torch.Tensor:
         """Accumulate a batch of samples into running statistics.
 
         Args:
@@ -51,46 +57,32 @@ class RunningStats:
         Returns:
             the aggregated statistics _for this batch_. Accumulated statistics up to this point can be retreived with ``current_result()``.
         """
-
         assert batch.shape[1:] == self._dim
-
         N = batch.shape[0]
 
-        if self._reduction == Reduction.MEAN:
-            new = batch.sum(dim=0)
-        elif self._reduction == Reduction.RMS:
-            new = torch.square(batch).sum(dim=0)
-        
-        weight = weights.sum(dim=0) if self.weight else None
-
-        return self.accumulate_sum(new_sum=new, N=N, weight=weight)
-
-    def accumulate_sum(self, new_sum, N, weight=None) -> torch.Tensor:
-        """Accumulate a tally of samples into running statistics.
-
-        Args:
-            new_sum : the sum to tally up
-            N: the corresponding number of samples
-            weights
-
-        Returns:
-            the aggregated statistics _for this batch_. Accumulated statistics up to this point can be retreived with ``current_result()``.
-        """
-        self._state += (new_sum - N * self._state) / (self._n + N)
-        if self.weight:
-            self._weight += (weight - N * self._state) / (self._n + N)
-        self._n += N
-
-        # for the batch
-        if self.weight:
-            new_sum /= weight
+        if self._reduction == Reduction.COUNT:
+            raise NotImplementedError
         else:
+            if self._reduction == Reduction.MEAN:
+                new_sum = batch.sum(dim=0)
+            elif self._reduction == Reduction.RMS:
+                new_sum = torch.square(batch).sum(dim=0)
+
+            # weight = weights.sum(dim=0) if self.weighted else None
+            #  if self.weight:
+            #     self._weight += (weight - N * self._state) / (self._n + N)
+
+            # accumulate
+            self._state += (new_sum - N * self._state) / (self._n + N)
+            self._n += N
+
+            # for the batch
             new_sum /= N
 
-        if self._reduction == Reduction.RMS:
-            new_sum = new_sum.sqrt()
+            if self._reduction == Reduction.RMS:
+                new_sum.sqrt_()
 
-        return new_sum
+            return new_sum
 
     def reset(self) -> None:
         """Forget all previously accumulated state."""
