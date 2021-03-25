@@ -105,7 +105,7 @@ class Loss:
                 ref=ref,
                 key=key,
                 atomic_weight_on=self.atomic_weight_on,
-                reduction="mean",
+                mean=True,
             )
             contrib[key] = _loss
             loss = loss + self.coeffs[key] * _loss

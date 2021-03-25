@@ -50,7 +50,7 @@ class Metrics:
                 reduction="sum",
             )
             for reduction, stat in self.running_stats.items():
-                metrics[f"{key}_{reduction}"] = self.running_stats[key][
+                metrics[(key, reduction)] = self.running_stats[key][
                     reduction
                 ].accumulate_batch(error)
         return metrics
@@ -65,7 +65,7 @@ class Metrics:
         metrics = {}
         for key, func in self.funcs.items():
             for reduction, stat in self.running_stats.items():
-                metrics[f"{key}_{reduction}"] = self.running_stats[key][
+                metrics[(key, reduction)] = self.running_stats[key][
                     reduction
                 ].current_result()
         return metrics

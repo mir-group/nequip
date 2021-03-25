@@ -26,7 +26,8 @@ class RunningStats:
     """
 
     def __init__(
-        self, dim: Union[int, Tuple[int]] = 1, reduction: Reduction = Reduction.MEAN
+        self, dim: Union[int, Tuple[int]] = 1, reduction: Reduction = Reduction.MEAN,
+        weight: str =False
     ):
         if isinstance(dim, numbers.Integral):
             self._dim = (dim,)
@@ -41,9 +42,7 @@ class RunningStats:
         self._reduction = reduction
         self.reset()
 
-    def accumulate_batch(
-        self, batch: torch.Tensor, weights: Optional[torch.Tensor] = None
-    ) -> torch.Tensor:
+    def accumulate_batch(self, batch: torch.Tensor, weights:Optional[torch.Tensor]=None) -> torch.Tensor:
         """Accumulate a batch of samples into running statistics.
 
         Args:
@@ -61,38 +60,10 @@ class RunningStats:
             new = batch.sum(dim=0)
         elif self._reduction == Reduction.RMS:
             new = torch.square(batch).sum(dim=0)
-
+        
         weight = weights.sum(dim=0) if self.weight else None
 
         return self.accumulate_sum(new_sum=new, N=N, weight=weight)
-
-        species_index = ref[AtomicDataDict.SPECIES_INDEX_KEY]
-        _, inverse_species_index, counts = torch.unique(
-            species_index, return_inverse=True, return_counts=True
-        )
-
-        if atomic_weight_on:
-            # TO DO
-            per_species_weight = scatter(weights, inverse_species_index, dim=0)
-            per_species_loss = scatter(per_atom_loss, inverse_species_index, dim=0)
-            if reduction == "mean":
-                return (per_species_loss / per_species_weight).mean()
-            elif reduction == "sum":
-                return per_species_loss, counts, per_species_weight
-            else:
-                raise NotImplementedError("cannot handle this yet")
-        else:
-            if reduction == "mean":
-                return scatter(
-                    per_atom_loss, inverse_species_index, reduce="mean", dim=0
-                ).mean()
-            elif reduction == "sum":
-                per_species_loss = scatter(
-                    per_atom_loss, inverse_species_index, reduce="sum", dim=0
-                )
-                return per_atom_loss, counts, None
-            else:
-                raise NotImplementedError("cannot handle this yet")
 
     def accumulate_sum(self, new_sum, N, weight=None) -> torch.Tensor:
         """Accumulate a tally of samples into running statistics.
