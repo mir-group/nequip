@@ -35,26 +35,9 @@ class TestLoss:
 
         loss_value, contrib = loss_value
         assert len(contrib) > 0
-        for key, d in contrib.items():
-            assert isinstance(d, dict)
-            for attr, value in d.items():
-                assert isinstance(value, torch.Tensor)
-
-        assert isinstance(loss_value, torch.Tensor)
-
-    @pytest.mark.parametrize("loss", dicts[-2:], indirect=True)
-    def test_mae(self, loss, data):
-
-        pred, ref = data
-
-        loss_value = loss.mae(pred, ref)
-
-        loss_value, contrib = loss_value
-        assert len(contrib) > 0
-        for key, d in contrib.items():
-            assert isinstance(d, dict)
-            for attr, value in d.items():
-                assert isinstance(value, torch.Tensor)
+        assert isinstance(contrib, dict)
+        for key, value in contrib.items():
+            assert isinstance(value, torch.Tensor)
 
         assert isinstance(loss_value, torch.Tensor)
 
@@ -64,30 +47,30 @@ class TestWeight:
 
         pred, ref = data
 
-        loss = Loss(keys=dicts[-1], atomic_weight_on=False)
-        w_loss = Loss(keys=dicts[-1], atomic_weight_on=True)
+        loss = Loss(coeffs=dicts[-1], atomic_weight_on=False)
+        w_loss = Loss(coeffs=dicts[-1], atomic_weight_on=True)
 
         w_l, w_contb = w_loss(pred, ref)
         l, contb = loss(pred, ref)
 
         assert isinstance(w_l, torch.Tensor)
         assert not torch.isclose(w_l, l)
-        assert torch.isclose(w_contb["forces"]["forces"], contb["forces"]["forces"])
+        assert torch.isclose(w_contb["forces"], contb["forces"])
 
     def test_per_specie(self, data):
 
         pred, ref = data
 
         config = {"forces": (1.0, "PerSpeciesMSELoss")}
-        loss = Loss(keys=config, atomic_weight_on=False)
-        w_loss = Loss(keys=config, atomic_weight_on=True)
+        loss = Loss(coeffs=config, atomic_weight_on=False)
+        w_loss = Loss(coeffs=config, atomic_weight_on=True)
 
         w_l, w_contb = w_loss(pred, ref)
         l, contb = loss(pred, ref)
 
         # first half data are specie 1
-        loss_ref_1 = torch.square(pred["forces"][:5] - ref["forces"][:5]).mean()
-        loss_ref_0 = torch.square(pred["forces"][5:] - ref["forces"][5:]).mean()
+        # loss_ref_1 = torch.square(pred["forces"][:5] - ref["forces"][:5]).mean()
+        # loss_ref_0 = torch.square(pred["forces"][5:] - ref["forces"][5:]).mean()
 
         # since atomic weights are all the same value,
         # the two loss should have the same result
@@ -96,27 +79,25 @@ class TestWeight:
 
         for c in [w_contb, contb]:
             for key, value in c.items():
-                assert key in [0, 1, "all"]
-                assert "forces" in value
+                assert key in ["forces"]
 
-        assert torch.allclose(w_contb[0]["forces"], contb[0]["forces"])
-        assert torch.allclose(w_contb[1]["forces"], contb[1]["forces"])
-        assert torch.isclose(w_contb[1]["forces"], loss_ref_1)
-        assert torch.isclose(w_contb[0]["forces"], loss_ref_0)
+        assert torch.allclose(w_contb["forces"], contb["forces"])
+        # assert torch.isclose(w_contb[1]["forces"], loss_ref_1)
+        # assert torch.isclose(w_contb[0]["forces"], loss_ref_0)
 
 
 @pytest.fixture(scope="class")
 def loss(request):
     """"""
     d = request.param
-    instance = Loss(keys=d, atomic_weight_on=False)
+    instance = Loss(coeffs=d, atomic_weight_on=False)
     yield instance
 
 
 @pytest.fixture(scope="class")
 def w_loss():
     """"""
-    instance = Loss(keys=dicts[-1], atomic_weight_on=True)
+    instance = Loss(coeffs=dicts[-1], atomic_weight_on=True)
     yield instance
 
 

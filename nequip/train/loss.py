@@ -47,7 +47,7 @@ class Loss:
         self.coeffs = {}
         self.funcs = {}
 
-        mseloss = find_loss_function("MSELoss")
+        mseloss = find_loss_function("MSELoss", {})
         if isinstance(coeffs, str):
             self.coeffs[coeffs] = 1.0
             self.funcs[coeffs] = mseloss
