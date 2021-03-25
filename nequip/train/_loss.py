@@ -48,7 +48,7 @@ class SimpleLoss:
             if mean:
                 return (loss * weights).mean() / weights.mean()
             else:
-                return loss*weights, weights
+                return loss * weights, weights
         else:
             if mean:
                 return loss.mean()
