@@ -11,7 +11,6 @@ class Loss:
 
     Args:
         coeffs (dict, str): keys with coefficient and loss function name
-        reduction (str): whether the loss is weighted or not
         weight (bool): if True, the results will be weighted with the key: AtomicDataDict.WEIGHTS_KEY+key
 
     Example input dictionaries
@@ -48,38 +47,46 @@ class Loss:
         self.coeffs = {}
         self.funcs = {}
 
+        mseloss = find_loss_function("MSELoss")
         if isinstance(coeffs, str):
             self.coeffs[coeffs] = 1.0
-            mseloss = find_loss_function("MSELoss")
             self.funcs[coeffs] = mseloss
         elif isinstance(coeffs, list):
-            mseloss = find_loss_function("MSELoss")
             for key in coeffs:
                 self.coeffs[key] = 1.0
                 self.funcs[key] = mseloss
         elif isinstance(coeffs, dict):
             for key, value in coeffs.items():
                 logging.debug(f" parsing {key} {value}")
-                func = ["MSELoss"]
+                coeff = 1.0
+                func = "MSELoss"
+                func_params = {}
                 if isinstance(value, (float, int)):
                     coeff = value
                 elif isinstance(value, str) or callable(value):
-                    coeff = 1.0
-                    func = [value]
+                    func = value
                 elif isinstance(value, (list, tuple)):
+                    # list of [func], [func, param], [coeff, func], [coeff, func, params]
                     if isinstance(value[0], (float, int)):
                         coeff = value[0]
-                        func = ["MSELoss"] if len(value) == 1 else value[1:]
+                        if len(value) > 1:
+                            func = value[1]
+                        if len(value) > 2:
+                            func_params = value[2]
                     else:
-                        coeff = 1.0
-                        func = value
+                        func = value[0]
+                        if len(value) > 1:
+                            func_params = value[1]
                 else:
                     raise NotImplementedError(
                         f"expected float, list or tuple, but get {type(value)}"
                     )
                 logging.debug(f" parsing {coeff} {func}")
                 self.coeffs[key] = coeff
-                self.funcs[key] = find_loss_function(*func)
+                self.funcs[key] = find_loss_function(
+                    func,
+                    func_params,
+                )
         else:
             raise NotImplementedError(
                 f"loss_coeffs can only be str, list and dict. got {type(coeffs)}"
@@ -93,11 +100,14 @@ class Loss:
         loss = 0.0
         contrib = {}
         for key in self.coeffs:
-            l = self.funcs[key](
-                pred=pred, ref=ref, key=key, atomic_weight_on=self.atomic_weight_on
+            _loss = self.funcs[key](
+                pred=pred,
+                ref=ref,
+                key=key,
+                atomic_weight_on=self.atomic_weight_on,
+                mean=True,
             )
-
-            contrib.update(c)
-            loss = loss + self.coeffs[key] * l
+            contrib[key] = _loss
+            loss = loss + self.coeffs[key] * _loss
 
         return loss, contrib
