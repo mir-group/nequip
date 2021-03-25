@@ -29,6 +29,7 @@ from nequip.utils import (
 )
 
 from .loss import Loss
+from .metrics import Metrics
 from ._key import *
 
 
@@ -125,7 +126,6 @@ class Trainer:
         append (bool): If true, the preexisted workfolder and files will be overwritten. And log files will be appended
 
         loss_coeffs (dict): dictionary to store coefficient and loss functions
-        atomic_weight_on (dict): if true, the weights in dataset will be used for loss/mae calculations.
 
         max_epochs (int): maximum number of epochs
 
@@ -208,8 +208,8 @@ class Trainer:
         restart: bool = False,
         append: bool = False,
         loss_coeffs: Union[dict, str] = AtomicDataDict.TOTAL_ENERGY_KEY,
+        metrics_funcs: Optional[Union[dict, str]] = None,
         metrics_key: str = ABBREV.get(LOSS_KEY, LOSS_KEY),
-        atomic_weight_on: bool = False,
         max_epochs: int = 1000000,
         lr_sched=None,
         learning_rate: float = 1e-2,
@@ -515,7 +515,22 @@ class Trainer:
                 all_args=self.kwargs,
             )
 
-        self.loss = Loss(self.loss_coeffs, atomic_weight_on=self.atomic_weight_on)
+        self.loss, _ = instantiate_from_cls_name(
+            class_name=Loss,
+            prefix="loss",
+            positional_args=dict(coeffs=self.loss_coeffs),
+            all_args=self.kwargs,
+        )
+        if self.metrics_funcs is None:
+            self.metrics_funcs = {
+                key: type(func).__name__ for key, func in self.loss.funcs.items()
+            }
+        self.metrics, _ = instantiate_from_cls_name(
+            class_name=Metrics,
+            prefix="metrics",
+            positional_args=dict(funcs=self.metrics_funcs),
+            all_args=self.kwargs,
+        )
         self._initialized = True
 
     def init_model(self):
@@ -602,59 +617,18 @@ class Trainer:
             if self.lr_scheduler_name == "CosineAnnealingWarmRestarts":
                 self.lr_sched.step(self.iepoch + self.ibatch / n_batches)
 
-        # save loss stats
         with torch.no_grad():
-            mae, mae_contrib = self.loss.mae(pred=out, ref=data)
-            scaled_loss_contrib = {}
+
+            self.model.val()
             if hasattr(self.model, "scale"):
-
-                for key in mae_contrib:
-                    mae_contrib[key] = self.model.scale(
-                        mae_contrib[key], force_process=True, do_shift=False
-                    )
-
-                # TO DO, this evetually needs to be removed. no guarantee that a loss is MSE
-                for key in loss_contrib:
-
-                    scaled_loss_contrib[key] = {
-                        k: torch.clone(v) for k, v in loss_contrib[key].items()
-                    }
-
-                    scaled_loss_contrib[key] = self.model.scale(
-                        scaled_loss_contrib[key],
-                        force_process=True,
-                        do_shift=False,
-                        do_scale=True,
-                    )
-
-                    keys = [k for k in scaled_loss_contrib[key] if k in self.loss.funcs]
-                    keys = [
-                        k
-                        for k in keys
-                        if "mse" in type(self.loss.funcs[k].func).__name__.lower()
-                    ]
-                    if len(keys) > 0:
-                        scaled_loss_contrib[key] = self.model.scale(
-                            scaled_loss_contrib[key],
-                            force_process=True,
-                            do_shift=False,
-                            do_scale=True,
-                        )
+                data = self.model.scale(data)
 
             self.batch_loss = loss.detach()
-            self.batch_scaled_loss_contrib = {
-                k1: {k2: v2.detach() for k2, v2 in v1.items()}
-                for k1, v1 in scaled_loss_contrib.items()
-            }
-            self.batch_loss_contrib = {
-                k1: {k2: v2.detach() for k2, v2 in v1.items()}
-                for k1, v1 in loss_contrib.items()
-            }
-            self.batch_mae = mae.detach()
-            self.batch_mae_contrib = {
-                k1: {k2: v2.detach() for k2, v2 in v1.items()}
-                for k1, v1 in mae_contrib.items()
-            }
+            self.batch_loss_contrib = {k: v.detach() for k, v in loss_contrib.items()}
+
+            # save metrics stats
+            metrics_stat = self.metrics(pred=out, ref=data)
+            self.batch_metrics = {k: v.detach() for k, v in metrics_stat.items()}
 
             self.end_of_batch_log(validation)
             for callback in self.end_of_batch_callbacks:
@@ -712,21 +686,9 @@ class Trainer:
 
         if self.ibatch == 0:
             # initialization
-            stat = {
-                RMSE_LOSS_KEY: {VALUE_KEY: [], CONTRIB: {}},
-                MAE_KEY: {VALUE_KEY: [], CONTRIB: {}},
-                LOSS_KEY: {VALUE_KEY: [], CONTRIB: {}},
-            }
-
-            for key, d in self.batch_mae_contrib.items():
-                for attr, value in d.items():
-                    if key != attr:
-                        store_key = f"{key}_{ABBREV.get(attr, attr)}"
-                    else:
-                        store_key = f"{key}"
-                    for name, d_cat in stat.items():
-                        d_cat[CONTRIB][store_key] = []
-
+            stat = {}
+            for key, value in self.batch_mae_contrib.items():
+                stat[key] = []
             self.statistics[category] = stat
         else:
             stat = self.statistics[category]

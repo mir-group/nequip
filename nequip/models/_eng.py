@@ -5,6 +5,7 @@ from nequip.nn import (
     SequentialGraphNetwork,
     AtomwiseLinear,
     AtomwiseReduce,
+    PerSpeciesShift,
     GradientOutput,
     ConvNet,
 )
@@ -18,7 +19,6 @@ from nequip.nn.cutoffs import PolynomialCutoff
 from nequip.utils import instantiate
 
 
-# TODO: no allowed_speces?
 def EnergyModel(**shared_params):
     """
     The model that predicts total energy.
@@ -79,6 +79,13 @@ def EnergyModel(**shared_params):
                 dict(
                     reduce="sum",
                     field="atomic_energy",
+                    out_field="raw_total_energy",
+                ),
+            ),
+            "per_specie_energy_shift": (
+                PerSpeciesShift,
+                dict(
+                    field="raw_total_energy",
                     out_field=AtomicDataDict.TOTAL_ENERGY_KEY,
                 ),
             ),
