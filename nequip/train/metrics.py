@@ -6,7 +6,6 @@ from ._loss import find_loss_function
 
 metric_names = ["error"]
 loss_funcs = ["L1Loss"]
-headers = ["PerSpecies"]
 
 class Metrics:
     """ Only scalar errors are supported atm. 
@@ -22,13 +21,6 @@ class Metrics:
         for key, func in funcs.items():
             # TO DO: classification
 
-            # strip off headers
-            header = ""
-            for h in headers:
-                if func.startswith(h):
-                    func = func[len(h):]
-                    header = h
-
             if func in metric_names:
                 idx = metric_names.index(func)
             elif func in loss_funcs:
@@ -36,7 +28,7 @@ class Metrics:
             else:
                 raise NotImplementedError("other metrics are not implemented yet")
 
-            loss_name = header + loss_funcs[idx]
+            loss_name = loss_funcs[idx]
 
             self.funcs[key] = find_loss_function(loss_name, {})
 
