@@ -48,12 +48,15 @@ class SimpleLoss:
             if mean:
                 return (loss * weights).mean() / weights.mean()
             else:
+                raise NotImplementedError(
+                    "metrics and running stat needs to be compatible with this"
+                )
                 return loss * weights, weights
         else:
             if mean:
                 return loss.mean()
             else:
-                return loss, None
+                return loss
 
         return loss
 

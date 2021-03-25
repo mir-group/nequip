@@ -1,3 +1,4 @@
+from typing import Union
 from ._loss import find_loss_function
 from nequip.utils import RunningStats
 from nequip.utils.stats import Reduction
@@ -10,7 +11,7 @@ class Metrics:
 
     def __init__(
         self,
-        components: dict,
+        components: Union[list, tuple],
     ):
 
         self.running_stats = {}
@@ -18,28 +19,33 @@ class Metrics:
         for component in components:
 
             # parse the input list
-            dim = 1
-            mode = "average"
-            functional = "L1Loss"
             reduction = Reduction.MEAN
+            params = {}
 
             if len(component) == 1:
                 key = component
             elif len(component) == 2:
-                key, dim = component
+                key, reduction = component
             elif len(component) == 3:
-                key, dim, reduction = component
-            elif len(component) == 4:
-                key, dim, reduction, mode = component
+                key, reduction, params = component
             else:
-                key, dim, reduction, mode, functional = component
+                raise ValueError(
+                    f"tuple should have a max length of 3 but {len(component)} is given"
+                )
+
+            functional = params.pop("functional", "L1Loss")
+            dim = params.pop("dim", 1)
 
             if key not in self.running_stats:
                 self.running_stats[key] = {}
                 self.funcs[key] = find_loss_function(functional, {})
+
             self.running_stats[key][reduction] = RunningStats(
-                dim=dim, reduction=metrics_to_reduction.get(reduction, reduction)
+                dim=dim,
+                reduction=metrics_to_reduction.get(reduction, reduction),
+                **params,
             )
+        print(self.running_stats)
 
     def __call__(self, pred: dict, ref: dict):
 
@@ -49,18 +55,30 @@ class Metrics:
                 pred=pred,
                 ref=ref,
                 key=key,
-                atomic_weight_on=self.atomic_weight_on,
-                reduction="sum",
+                atomic_weight_on=False,
+                mean=False,
             )
-            for reduction, stat in self.running_stats.items():
+            for reduction, stat in self.running_stats[key].items():
+                print("---")
+                print(error.shape, stat._dim)
 
-                rs = self.running_stats[key][reduction]
-                if rs.per_species:
-                    metrics[(key, reduction)] = rs.accumulate_batch(
-                        error.mean(dim=(i for i in range(1, len(error.shape))))
+                # if stat.per_species:
+                #     metrics[(key, reduction)] = stat.accumulate_batch(
+                #         error.mean(dim=tuple(i for i in range(1, len(error.shape))))
+                #     )
+                if stat._dim != error.shape[1:]:
+                    res_dim = tuple(
+                        (i for i in range(1 + len(stat._dim), len(error.shape)))
+                    )
+                    squeeze_mat = error.mean(dim=res_dim)
+                    print("squeeze", error.shape, stat._dim, res_dim)
+                    print("squeeze", error.mean(dim=res_dim).shape, stat._dim)
+                    metrics[(key, reduction)] = stat.accumulate_batch(
+                        error.mean(dim=res_dim)
                     )
                 else:
-                    metrics[(key, reduction)] = rs.accumulate_batch(error)
+                    print("un squeeze", error.shape, stat._dim)
+                    metrics[(key, reduction)] = stat.accumulate_batch(error)
         return metrics
 
     def reset(self):
