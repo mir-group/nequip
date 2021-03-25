@@ -75,6 +75,8 @@ class TestWeight:
         # since atomic weights are all the same value,
         # the two loss should have the same result
         assert isinstance(w_l, torch.Tensor)
+        print(w_l)
+        print(l)
         assert torch.isclose(w_l, l)
 
         for c in [w_contb, contb]:
@@ -113,7 +115,7 @@ def data(float_tolerance):
         "forces": torch.rand(10, 3),
         "energy": torch.rand((2, 1)),
         "k": torch.rand((2, 1)),
-        "atomic_numbers": torch.as_tensor([1, 1, 1, 1, 1, 0, 0, 0, 0, 0]),
+        AtomicDataDict.SPECIES_INDEX_KEY: torch.as_tensor([1, 1, 1, 1, 1, 0, 0, 0, 0, 0]),
     }
     ref[AtomicDataDict.WEIGHTS_KEY + "forces"] = 2 * torch.ones((10, 1))
     ref[AtomicDataDict.WEIGHTS_KEY + "energy"] = torch.rand((2, 1))

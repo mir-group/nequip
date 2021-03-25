@@ -4,8 +4,8 @@ from typing import Union, List
 import torch.nn
 from ._loss import find_loss_function
 
-loss_to_metrics = {"mseloss": "rmse", "l1loss": "mae"}
-metrics_to_loss = {"rmse": "MSELoss", "mae": "L1Loss"}
+# loss_to_metrics = {"l1loss": "mae", "perspeciesl1loss":"mae"}
+# metrics_to_loss = {"mae": "L1Loss", "perspecies_mae":}
 
 
 class Metrics:
@@ -30,7 +30,7 @@ class Metrics:
             for name in func_list:
                 metric_name = loss_to_metrics.get(name.lower(), name.lower())
                 func_name = metrics_to_loss.get(name.lower(), name)
-                self.funcs[key][metric_name] = find_loss_function(func_name)
+                self.funcs[key][metric_name] = find_loss_function(func_name, {})
 
     def __call__(self, pred: dict, ref: dict):
 

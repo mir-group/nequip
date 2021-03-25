@@ -38,20 +38,27 @@ class SimpleLoss:
         ref: dict,
         key: str,
         atomic_weight_on: bool = False,
-        mean: bool = True,
+        reduction: str = "mean",
     ):
 
         loss = self.func(pred[key], ref[key])
         weights_key = AtomicDataDict.WEIGHTS_KEY + key
         if weights_key in ref and atomic_weight_on:
-            # TO DO
-            if not mean:
-                raise NotImplementedError("cannot handle this yet")
             weights = ref[weights_key]
-            loss = (loss * weights).mean() / weights.mean()
+            # TO DO
+            if reduction == "mean":
+                return (loss * weights).mean() / weights.mean()
+            elif reduction == "sum":
+                return (loss*weights).sum(dim=0), loss.shape[0], weights.sum(dim=0)
+            else:
+                raise NotImplementedError("cannot handle this yet")
         else:
-            if mean:
-                loss = loss.mean()
+            if reduction == "mean":
+                return loss.mean()
+            elif reduction == "sum":
+                return loss.sum(dim=0), loss.shape[0], None
+            else:
+                raise NotImplementedError("cannot handle this yet")
 
         return loss
 
@@ -69,7 +76,7 @@ class PerSpeciesLoss(SimpleLoss):
         ref: dict,
         key: str,
         atomic_weight_on: bool = False,
-        mean: bool = True,
+        reduction: str = "mean"
     ):
 
         per_atom_loss = self.func(pred[key], ref[key])
@@ -83,29 +90,31 @@ class PerSpeciesLoss(SimpleLoss):
         else:
             atomic_weight_on = False
 
-        atomic_number = ref[AtomicDataDict.ATOMIC_NUMBERS_KEY]
-        all_species, species_index = torch.unique(atomic_number, return_inverse=True)
+        species_index = ref[AtomicDataDict.SPECIES_INDEX_KEY]
+        _, inverse_species_index, counts = torch.unique(species_index, return_inverse=True, return_counts=True)
 
         if atomic_weight_on:
             # TO DO
-            if not mean:
-                raise NotImplementedError("cannot handle this yet")
-            per_species_weight = scatter(weights, species_index, dim=0)
-            per_species_loss = scatter(per_atom_loss, species_index, dim=0)
-            per_species_loss = per_species_loss / per_species_weight
-        else:
-            if mean:
-                per_species_loss = scatter(
-                    per_atom_loss, species_index, reduce="mean", dim=0
-                )
+            per_species_weight = scatter(weights, inverse_species_index, dim=0)
+            per_species_loss = scatter(per_atom_loss, inverse_species_index, dim=0)
+            if reduction == "mean":
+                return (per_species_loss / per_species_weight).mean()
+            elif reduction == "sum":
+                return per_species_loss, counts, per_species_weight
             else:
+                raise NotImplementedError("cannot handle this yet")
+        else:
+            if reduction == "mean":
+                return scatter(
+                    per_atom_loss, inverse_species_index, reduce="mean", dim=0
+                ).mean()
+            elif reduction == "sum":
                 per_species_loss = scatter(
-                    per_atom_loss, species_index, reduce="none", dim=0
+                    per_atom_loss, inverse_species_index, reduce="sum", dim=0
                 )
-
-        if mean:
-            total_loss = per_species_loss.mean()
-        return total_loss
+                return per_atom_loss, counts, None
+            else:
+                raise NotImplementedError("cannot handle this yet")
 
 
 def find_loss_function(name: str, params):

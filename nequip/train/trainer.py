@@ -29,6 +29,7 @@ from nequip.utils import (
 )
 
 from .loss import Loss
+from .metrics import Metrics
 from ._key import *
 
 
