@@ -126,6 +126,7 @@ class LossStat:
         for k, v in loss_contrib.items():
             if k not in self.loss_stat:
                 self.loss_stat[k] = RunningStats(dim=tuple(), reduction=Reduction.MEAN)
+                self.loss_stat[k].to(v.get_device())
             if k != "total":
                 results["loss_" + ABBREV.get(k, k)] = self.loss_stat[
                     k
@@ -137,6 +138,10 @@ class LossStat:
     def reset(self):
         for v in self.loss_stat.values():
             v.reset()
+
+    def to(self, device):
+        for v in self.loss_stat.values():
+            v.to(device)
 
     def current_result(self):
         results = {

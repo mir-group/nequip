@@ -2,7 +2,7 @@ import pathlib
 import pytest
 import tempfile
 
-from nequip.data import AtomicData
+from nequip.utils.test import set_irreps_debug
 
 # For good practice, we *should* do this:
 # See https://docs.pytest.org/en/stable/fixture.html#using-fixtures-from-other-projects
@@ -22,3 +22,7 @@ BENCHMARK_ROOT = pathlib.Path(__file__).parent / "../benchmark_data/"
 def temp_data():
     with tempfile.TemporaryDirectory() as tmpdirname:
         yield tmpdirname
+
+
+# Use debug mode
+set_irreps_debug(True)

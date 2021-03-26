@@ -73,9 +73,10 @@ class Metrics:
 
                 params = {}
                 if self.per_species[key][reduction]:
-                    params = {"accumulate_by": ref[AtomicDataDict.SPECIES_INDEX_KEY]}
+                    # TO DO, this needs OneHot component. will need to be decoupled
+                    params = {"accumulate_by": pred[AtomicDataDict.SPECIES_INDEX_KEY]}
 
-                if stat._dim == ():
+                if stat.dim == ():
                     metrics[(key, reduction)] = stat.accumulate_batch(
                         error.flatten(), **params
                     )
@@ -89,12 +90,17 @@ class Metrics:
             for stat in stats.values():
                 stat.reset()
 
+    def to(self, device):
+        for stats in self.running_stats.values():
+            for stat in stats.values():
+                stat.to(device)
+
     def current_result(self):
 
         metrics = {}
         for key, stats in self.running_stats.items():
             for reduction, stat in stats.items():
-                if stat._dim == tuple() or stat._dim == (1,):
+                if stat.dim == tuple() or stat.dim == (1,):
                     metrics[(key, reduction)] = stat.current_result().item()
                 else:
                     metrics[(key, reduction)] = stat.current_result()
@@ -121,7 +127,7 @@ class Metrics:
                     else list(allowed_species.keys())
                 )
 
-                if stat._dim == tuple():
+                if stat.dim == tuple():
                     for id_ele, v in enumerate(value):
                         flat_dict[f"{element_name[id_ele]}_{item_name}"] = v
 
@@ -135,7 +141,7 @@ class Metrics:
                             skip_keys.append(name)
 
             else:
-                if stat._dim == tuple():
+                if stat.dim == tuple():
                     # a scalar
                     flat_dict[item_name] = value
                 else:

@@ -118,6 +118,9 @@ def data(float_tolerance):
         AtomicDataDict.FORCE_KEY: torch.rand(10, 3),
         AtomicDataDict.TOTAL_ENERGY_KEY: torch.rand((2, 1)),
         "k": torch.rand((2, 1)),
+        AtomicDataDict.SPECIES_INDEX_KEY: torch.as_tensor(
+            [1, 1, 1, 1, 1, 0, 0, 0, 0, 0]
+        ),
     }
     ref = {
         AtomicDataDict.FORCE_KEY: torch.rand(10, 3),
