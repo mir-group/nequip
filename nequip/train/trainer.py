@@ -652,7 +652,9 @@ class Trainer:
     def epoch_step(self):
 
         self.loss_stat.reset()
+        self.loss_stat.to(self.device)
         self.metrics.reset()
+        self.metrics.to(self.device)
         for self.ibatch, batch in enumerate(self.dl_train):
             self.batch_step(
                 data=batch,
@@ -666,7 +668,9 @@ class Trainer:
             callback(self)
 
         self.loss_stat.reset()
+        self.loss_stat.to(self.device)
         self.metrics.reset()
+        self.metrics.to(self.device)
         for self.ibatch, batch in enumerate(self.dl_val):
             self.batch_step(data=batch, n_batches=self.n_val_batches, validation=True)
         self.val_metrics = self.metrics.current_result()

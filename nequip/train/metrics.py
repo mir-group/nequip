@@ -90,6 +90,11 @@ class Metrics:
             for stat in stats.values():
                 stat.reset()
 
+    def to(self, device):
+        for stats in self.running_stats.values():
+            for stat in stats.values():
+                stat.to(device)
+
     def current_result(self):
 
         metrics = {}
