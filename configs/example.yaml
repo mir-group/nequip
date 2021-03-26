@@ -27,6 +27,10 @@ convolution_kwargs:
   invariant_neurons: 8                                                            # number of hidden neurons in radial function, again keep this small for MD applications, 8 - 32, smaller is faster
   avg_num_neighbors: null                                                         # number of neighbors to divide by, None => no normalization.
   use_sc: true                                                                    # use self-connection or not, usually gives big improvement
+energy_shift_enable: true                                                         # whether shift the energy
+energy_shift_shifts: [0, 0, 0]                                                    # atomic energy shift for each specie. ordered with atomic number
+energy_shift_total_shift: 1.0                                                     # total energy shift
+energy_shift_trainable: true                                                      # whether the shifts are trainable
 
 # data set
 # the keys used need to be stated at least once in key_mapping, npz_fixed_field_keys or npz_keys

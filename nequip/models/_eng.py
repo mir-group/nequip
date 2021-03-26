@@ -6,6 +6,7 @@ from nequip.nn import (
     AtomwiseLinear,
     AtomwiseReduce,
     GradientOutput,
+    PerSpeciesShift,
     ConvNetLayer,
 )
 from nequip.nn.embedding import (
@@ -96,6 +97,13 @@ def EnergyModel(**shared_params):
                 dict(
                     reduce="sum",
                     field="atomic_energy",
+                    out_field="raw_total_energy",
+                ),
+            ),
+            "energy_shift": (
+                PerSpeciesShift,
+                dict(
+                    field="raw_total_energy",
                     out_field=AtomicDataDict.TOTAL_ENERGY_KEY,
                 ),
             ),

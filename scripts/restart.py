@@ -48,9 +48,11 @@ def main():
     if config.wandb:
 
         from nequip.train.trainer_wandb import TrainerWandB
+
         trainer = TrainerWandB.from_dict(dictionary)
 
         import wandb
+
         _config = trainer.as_dict(state_dict=False, training_progress=False)
         project = _config.pop("project", "NequIP")
         _config.pop("wandb", False)
