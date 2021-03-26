@@ -1,7 +1,6 @@
 """Batched running statistics for PyTorch."""
 
 from typing import Union, Tuple, Optional
-from collections import Counter
 import enum
 import numbers
 
@@ -72,8 +71,8 @@ class RunningStats:
                     new_sum = torch.square(batch).sum(dim=0)
 
                 # accumulate
-                self._state[0:1] += (new_sum - N * self._state) / (self._n[0:1] + N)
-                self._n[0:1] += N
+                self._state[0] += (new_sum - N * self._state[0]) / (self._n[0, 0] + N)
+                self._n[0, 0] += N
 
                 # for the batch
                 new_sum /= N
@@ -96,26 +95,26 @@ class RunningStats:
                         dim=0,
                     )
                     self._n = torch.cat(
-                        (
-                            self._n,
-                            self._n.new_zeros(
-                                (N_to_add,) + tuple(1 for i in self._dim)
-                            ),
-                        ),
-                        dim=0,
+                        (self._n, self._n.new_zeros((N_to_add, 1))), dim=0
                     )
-                    assert len(self._state) == self._n_bins + N_to_add
+                    assert self._state.shape == (self._n_bins + N_to_add,) + self._dim
+                    self._n_bins += N_to_add
 
                 N = torch.bincount(accumulate_by).reshape([-1, 1])
 
                 N_bins_new = new_sum.shape[0]
+                bshape = (N_bins_new,) + (1,) * len(self._dim)
 
-                self._state[:N_bins_new] += (new_sum - N * self._state[:N_bins_new]) / (
-                    self._n[:N_bins_new] + N
-                )
+                self._state[:N_bins_new] += (
+                    new_sum - N.reshape(bshape) * self._state[:N_bins_new]
+                ) / (self._n[:N_bins_new] + N).reshape(bshape)
                 self._n[:N_bins_new] += N
+                # Make div by zero 0
+                torch.nan_to_num_(self._state, nan=0.0)
 
-                new_sum /= N
+                new_sum /= N.reshape(bshape)
+                # Make div by zero 0
+                torch.nan_to_num_(new_sum, nan=0.0)
 
                 if self._reduction == Reduction.RMS:
                     new_sum.sqrt_()
@@ -129,13 +128,12 @@ class RunningStats:
             self._n.fill_(0)
         else:
             self._n_bins = 1
-            self._n = torch.zeros(
-                (self._n_bins,) + tuple(1 for i in self._dim), dtype=torch.long
-            )
+            self._n = torch.zeros((self._n_bins, 1), dtype=torch.long)
             self._state = torch.zeros((self._n_bins,) + self._dim)
 
     def current_result(self):
         """Get the current value of the running statistc."""
+        assert self._state.shape == (self._n_bins,) + self._dim
         if self._reduction == Reduction.MEAN:
             return self._state.clone()
         elif self._reduction == Reduction.RMS:
