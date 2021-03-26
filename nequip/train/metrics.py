@@ -111,7 +111,11 @@ class Metrics:
             per_species = self.per_species[key][reduction]
             if per_species:
 
-                element_names = list(range(value.shape[0])) if allowed_species is None else list(allowed_species.keys()) 
+                element_names = (
+                    list(range(value.shape[0]))
+                    if allowed_species is None
+                    else list(allowed_species.keys())
+                )
 
                 if stat._dim == tuple():
                     for id_ele, v in enumerate(value.item()):
@@ -124,7 +128,7 @@ class Metrics:
                         for idx, v in enumerate(vec):
                             flat_dict[f"{ele}_{item_name}_{idx}"] = v
 
-            else: 
+            else:
                 if stat._dim == tuple():
                     # a scalar
                     flat_dict[item_name] = value.item()
@@ -133,4 +137,3 @@ class Metrics:
                     for idx, v in enumerate(value.item()):
                         flat_dict["{item_name}_{idx}"] = v
         return flat_dict
-

@@ -67,7 +67,7 @@ def EnergyModel(**shared_params):
             # -- Embed features --
             "feature_embedding": AtomwiseLinear,
             # -- ConvNet --
-            "convnet": ConvNet,
+            "convnet": ConvNetLayer,
             # TODO: the next linear throws out all L > 0, don't create them in the last layer of convnet
             # -- output block --
             "conv_to_output_hidden": AtomwiseLinear,
