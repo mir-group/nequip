@@ -69,11 +69,13 @@ def test_runstats(dim, reduction, do_accumulate_by):
                 accumulate_by = torch.randint(
                     0, random.randint(1, 5), size=(batch.shape[0],)
                 )
+                print("batch", batch.shape, accumulate_by)
                 truth = truth_obj.accumulate_batch(batch, accumulate_by=accumulate_by)
                 res = runstats.accumulate_batch(batch, accumulate_by=accumulate_by)
             else:
                 truth = truth_obj.accumulate_batch(batch)
                 res = runstats.accumulate_batch(batch)
+            print(dim, reduction, truth, res)
             assert torch.allclose(truth, res)
         assert torch.allclose(truth_obj.current_result(), runstats.current_result())
         truth_obj.reset()
