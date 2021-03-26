@@ -134,4 +134,6 @@ class LossStat:
             v.reset()
 
     def current_result(self):
-        return {"loss_" + ABBREV.get(k, k): v.current_result().item() for k, v in self.loss_stat.items()}
+        results =  {"loss_" + ABBREV.get(k, k): v.current_result().item() for k, v in self.loss_stat.items() if k != "total"}
+        results["loss"] = self.loss_stat["total"].current_result().item()
+        return results

@@ -23,11 +23,13 @@ class Metrics:
         for component in components:
 
             # parse the input list
-            reduction = Reduction.MEAN
+            reduction = "mae"
             params = {}
 
-            if len(component) == 1:
+            if isinstance(component, str):
                 key = component
+            elif len(component) == 1:
+                key = component[0]
             elif len(component) == 2:
                 key, reduction = component
             elif len(component) == 3:
@@ -92,12 +94,16 @@ class Metrics:
         metrics = {}
         for key, stats in self.running_stats.items():
             for reduction, stat in stats.items():
-                metrics[(key, reduction)] = stat.current_result().item()
+                if stat._dim == tuple() or stat._dim == (1,):
+                    metrics[(key, reduction)] = stat.current_result().item()
+                else:
+                    metrics[(key, reduction)] = stat.current_result()
         return metrics
 
     def flatten_metrics(self, metrics, allowed_species=None):
 
         flat_dict = {}
+        skip_keys = []
         for k, value in metrics.items():
 
             key, reduction = k
@@ -124,7 +130,9 @@ class Metrics:
                     for id_ele, vec in enumerate(value):
                         ele = element_names[id_ele]
                         for idx, v in enumerate(vec):
-                            flat_dict[f"{ele}_{item_name}_{idx}"] = v
+                            name = f"{ele}_{item_name}_{idx}"
+                            flat_dict[name] = v
+                            skip_keys.append(name)
 
             else:
                 if stat._dim == tuple():
@@ -133,5 +141,5 @@ class Metrics:
                 else:
                     # a vector
                     for idx, v in enumerate(value):
-                        flat_dict["{item_name}_{idx}"] = v
-        return flat_dict
+                        flat_dict[f"{item_name}_{idx}"] = v
+        return flat_dict, skip_keys

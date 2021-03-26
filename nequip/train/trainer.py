@@ -629,10 +629,7 @@ class Trainer:
 
             # save metrics stats
             self.batch_losses = self.loss_stat(loss, loss_contrib)
-            self.batch_metrics = self.metrics.flatten_metrics(
-                metrics=self.metrics(pred=out, ref=data),
-                allowed_species=self.kwargs.get("allowed_species", None),
-            )
+            self.batch_metrics = self.metrics(pred=out, ref=data)
 
             self.end_of_batch_log(validation)
             for callback in self.end_of_batch_callbacks:
@@ -709,11 +706,17 @@ class Trainer:
             log_header += f" {name:>16s}"
 
         # append details from metrics
-        for key, value in self.batch_metrics.items():
+        metrics, skip_keys = self.metrics.flatten_metrics(
+            metrics=self.batch_metrics,
+            allowed_species=self.kwargs.get("allowed_species", None),
+        )
+        for key, value in metrics.items():
+
             mat_str += f" {value:16.3g}"
-            log_str += f" {value:16.3g}"
             header += f"\n# {key}"
-            log_header += f" {key:>16s}"
+            if key not in skip_keys:
+                log_str += f" {value:16.3g}"
+                log_header += f" {key:>16s}"
 
         batch_logger = logging.getLogger(self.batch_log[batch_type])
         if not self.batch_header_print[batch_type]:
@@ -782,13 +785,14 @@ class Trainer:
         mat_str = f"{self.iepoch+1:7d} {wall:12.3f} {lr:8.3g}"
         log_str = {TRAIN: f"{mat_str}", VALIDATION: f"{mat_str}"}
 
-        metrics = [self.metrics.flatten_metrics(self.train_metrics), self.metrics.flatten_metrics(self.val_metrics)]
+        metrics = [self.train_metrics, self.val_metrics]
         losses = [self.train_loss, self.val_loss]
         categories = [TRAIN, VALIDATION]
 
         for icat in range(2):
 
             category = categories[icat]
+            met, skip_keys = self.metrics.flatten_metrics(metrics[icat])
 
             # append details from loss
             for key, value in losses[icat].items():
@@ -799,11 +803,12 @@ class Trainer:
                 self.mae_dict[f"{category}_{key}"] = value
 
             # append details from metrics
-            for key, value in metrics[icat].items():
+            for key, value in met.items():
                 mat_str += f" {value:16.3g}"
                 header += f"\n# {category}_{key}"
-                log_str[category] += f" {value:16.3g}"
-                log_header[category] += f" {key:>16s}"
+                if key not in skip_keys:
+                    log_str[category] += f" {value:16.3g}"
+                    log_header[category] += f" {key:>16s}"
                 self.mae_dict[f"{category}_{key}"] = value
 
         if not self.epoch_header_print:

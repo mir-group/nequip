@@ -22,12 +22,18 @@ n_train: 5
 n_val: 5
 batch_size: 1
 max_epochs: 10
-metrics_key: f_mae
+metrics_key: e_mae
 
 # loss function
 loss_coeffs: 
-  - forces
-  - total_energy
+  forces: PerSpeciesMSELoss
+metrics_components:
+  - - forces
+    - rmse
+    - PerSpecies: true
+      dim: 3
+  - - total_energy
+
 
 # optimizer
 optimizer_name: Adam
