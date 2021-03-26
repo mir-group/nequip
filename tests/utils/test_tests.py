@@ -21,8 +21,25 @@ class BadModule(GraphModuleMixin, torch.nn.Module):
         return data
 
 
+class BadIrrepsModule(GraphModuleMixin, torch.nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self._init_irreps(irreps_out={"x": o3.Irreps("4x2e")})
+
+    def forward(self):
+        return {"x": torch.randn(3, 5, 2)}  # wrong dims!
+
+
 def test_equivar_test():
     badmod = BadModule()
     inp = {"x": badmod.irreps_in["x"].randn(2, -1)}
     with pytest.raises(AssertionError):
         assert_AtomicData_equivariant(badmod, data_in=inp)
+
+
+def test_debug_mode():
+    # Note that debug mode is enabled by default in the tests,
+    # so there's nothing to enable
+    badmod = BadIrrepsModule()
+    with pytest.raises(ValueError):
+        badmod()

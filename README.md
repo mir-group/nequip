@@ -40,6 +40,14 @@ pip install git+https://github.com/rusty1s/pytorch_geometric.git
 pip install git+https://github.com/e3nn/e3nn.git 
 ```
 
+* Install [`opt_einsum_fx`](https://github.com/Linux-cpp-lisp/opt_einsum_fx) for optimized `e3nn` operations:
+
+```bash
+$ git clone https://github.com/Linux-cpp-lisp/opt_einsum_fx.git
+$ cd opt_einsum_fx/
+$ pip install .
+```
+
 * We use [Weights&Biases](https://wandb.ai) to keep track of experiments. This is not a strict requirement, you can use our software without this, but it may make your life easier. If you want to use it, create an account [here](https://wandb.ai) and install it: 
 
 ```

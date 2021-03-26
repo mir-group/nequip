@@ -1,6 +1,7 @@
 from typing import Union
 
 import torch
+from e3nn import o3
 from e3nn.util.test import assert_equivariant
 
 from nequip.nn import GraphModuleMixin
@@ -55,5 +56,83 @@ def assert_AtomicData_equivariant(
         args_in=args_in,
         irreps_in=list(irreps_in.values()),
         irreps_out=list(func.irreps_out.values()),
-        **kwargs
+        **kwargs,
     )
+
+
+_DEBUG_HOOKS = None
+
+
+def set_irreps_debug(enabled: bool = False):
+    """Add debugging hooks to ``forward()`` that check data-irreps consistancy."""
+    global _DEBUG_HOOKS
+    if _DEBUG_HOOKS is None and not enabled:
+        return
+    elif _DEBUG_HOOKS is not None and enabled:
+        return
+    elif _DEBUG_HOOKS is not None and not enabled:
+        for hook in _DEBUG_HOOKS:
+            hook.remove()
+        _DEBUG_HOOKS = None
+        return
+    else:
+        pass
+
+    import torch.nn.modules
+    from torch_geometric.data import Data
+
+    def pre_hook(mod: GraphModuleMixin, inp):
+        if not isinstance(mod, GraphModuleMixin):
+            return
+        mname = type(mod).__name__
+        if len(inp) > 1:
+            raise ValueError(
+                f"Module {mname} should have received a single argument, but got {len(inp)}"
+            )
+        elif len(inp) == 0:
+            raise ValueError(
+                f"Module {mname} didn't get any arguments; this case is correctly handled with an empty dict."
+            )
+        inp = inp[0]
+        if not (isinstance(inp, dict) or isinstance(inp, Data)):
+            raise TypeError(
+                f"Module {mname} should have received a dict or a torch_geometric Data, instead got a {type(inp).__name__}"
+            )
+        for k, ir in mod.irreps_in.items():
+            if k not in inp:
+                raise KeyError(
+                    f"Field {k} with irreps {ir} expected to be input to {mname}; not present"
+                )
+            elif isinstance(inp[k], torch.Tensor) and isinstance(ir, o3.Irreps):
+                if inp[k].shape[-1] != ir.dim:
+                    raise ValueError(
+                        f"Field {k} in input to module {mname} has last dimension {inp[k].shape[-1]} but its irreps {ir} indicate last dimension {ir.dim}"
+                    )
+        return
+
+    h1 = torch.nn.modules.module.register_module_forward_pre_hook(pre_hook)
+
+    def post_hook(mod: GraphModuleMixin, _, out):
+        if not isinstance(mod, GraphModuleMixin):
+            return
+        mname = type(mod).__name__
+        if not (isinstance(out, dict) or isinstance(out, Data)):
+            raise TypeError(
+                f"Module {mname} should have returned a dict or a torch_geometric Data, instead got a {type(out).__name__}"
+            )
+        for k, ir in mod.irreps_out.items():
+            if k not in out:
+                raise KeyError(
+                    f"Field {k} with irreps {ir} expected to be in output from {mname}; not present"
+                )
+            elif isinstance(out[k], torch.Tensor) and isinstance(ir, o3.Irreps):
+                if out[k].shape[-1] != ir.dim:
+                    raise ValueError(
+                        f"Field {k} in output from {mname} has last dimension {out[k].shape[-1]} but its irreps {ir} indicate last dimension {ir.dim}"
+                    )
+        return
+
+    h2 = torch.nn.modules.module.register_module_forward_hook(post_hook)
+
+    _DEBUG_HOOKS = (h1, h2)
+    return
