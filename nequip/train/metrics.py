@@ -1,7 +1,10 @@
 from typing import Union
-from ._loss import find_loss_function
+
+from nequip.data import AtomicDataDict
 from nequip.utils import RunningStats
 from nequip.utils.stats import Reduction
+
+from ._loss import find_loss_function
 
 metrics_to_reduction = {"mae": Reduction.MEAN, "rmse": Reduction.RMS}
 
@@ -15,6 +18,7 @@ class Metrics:
     ):
 
         self.running_stats = {}
+        self.per_species = {}
         self.funcs = {}
         for component in components:
 
@@ -34,10 +38,14 @@ class Metrics:
                 )
 
             functional = params.pop("functional", "L1Loss")
-            dim = params.pop("dim", 1)
+
+            # default is to flatten the array
+            per_species = params.pop("PerSpecies", False)
+            dim = params.pop("dim", tuple())
 
             if key not in self.running_stats:
                 self.running_stats[key] = {}
+                self.per_species[key] = {}
                 self.funcs[key] = find_loss_function(functional, {})
 
             self.running_stats[key][reduction] = RunningStats(
@@ -45,7 +53,7 @@ class Metrics:
                 reduction=metrics_to_reduction.get(reduction, reduction),
                 **params,
             )
-        print(self.running_stats)
+            self.per_species[key][reduction] = per_species
 
     def __call__(self, pred: dict, ref: dict):
 
@@ -58,27 +66,20 @@ class Metrics:
                 atomic_weight_on=False,
                 mean=False,
             )
-            for reduction, stat in self.running_stats[key].items():
-                print("---")
-                print(error.shape, stat._dim)
 
-                # if stat.per_species:
-                #     metrics[(key, reduction)] = stat.accumulate_batch(
-                #         error.mean(dim=tuple(i for i in range(1, len(error.shape))))
-                #     )
-                if stat._dim != error.shape[1:]:
-                    res_dim = tuple(
-                        (i for i in range(1 + len(stat._dim), len(error.shape)))
-                    )
-                    squeeze_mat = error.mean(dim=res_dim)
-                    print("squeeze", error.shape, stat._dim, res_dim)
-                    print("squeeze", error.mean(dim=res_dim).shape, stat._dim)
+            for reduction, stat in self.running_stats[key].items():
+
+                params = {}
+                if self.per_species[key][reduction]:
+                    params = {"accumulate_by": ref[AtomicDataDict.SPECIES_INDEX_KEY]}
+
+                if stat._dim == ():
                     metrics[(key, reduction)] = stat.accumulate_batch(
-                        error.mean(dim=res_dim)
+                        error.flatten(), **params
                     )
                 else:
-                    print("un squeeze", error.shape, stat._dim)
-                    metrics[(key, reduction)] = stat.accumulate_batch(error)
+                    metrics[(key, reduction)] = stat.accumulate_batch(error, **params)
+
         return metrics
 
     def reset(self):
