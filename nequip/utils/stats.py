@@ -72,8 +72,8 @@ class RunningStats:
                     new_sum = torch.square(batch).sum(dim=0)
 
                 # accumulate
-                self._state[0:1] += (new_sum - N * self._state) / (self._n[0] + N)
-                self._n[0] += N
+                self._state[0:1] += (new_sum - N * self._state) / (self._n[0:1] + N)
+                self._n[0:1] += N
 
                 # for the batch
                 new_sum /= N
@@ -99,11 +99,14 @@ class RunningStats:
                     assert len(self._state) == self._n_bins + N_to_add
 
                 N = torch.bincount(accumulate_by)
+                print(N)
 
-                self._state[: new_sum.shape[0]] += (
-                    new_sum - N * self._state[: new_sum.shape[0]]
-                ) / (self._n + N)
-                self._n += N
+                N_bins_new = new_sum.shape[0]
+
+                self._state[:N_bins_new] += (new_sum - N * self._state[:N_bins_new]) / (
+                    self._n[:N_bins_new] + N
+                )
+                self._n[:N_bins_new] += N
 
                 new_sum /= N
 
