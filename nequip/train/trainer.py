@@ -26,9 +26,11 @@ from nequip.utils import (
     instantiate,
     save_file,
     load_file,
+    RunningStats,
+    Reduction
 )
 
-from .loss import Loss
+from .loss import Loss, LossStat
 from .metrics import Metrics
 from ._key import *
 
@@ -208,7 +210,7 @@ class Trainer:
         restart: bool = False,
         append: bool = False,
         loss_coeffs: Union[dict, str] = AtomicDataDict.TOTAL_ENERGY_KEY,
-        metrics_funcs: Optional[Union[dict, str]] = None,
+        metrics_components: Optional[Union[dict, str]] = None,
         metrics_key: str = ABBREV.get(LOSS_KEY, LOSS_KEY),
         max_epochs: int = 1000000,
         lr_sched=None,
@@ -521,14 +523,16 @@ class Trainer:
             positional_args=dict(coeffs=self.loss_coeffs),
             all_args=self.kwargs,
         )
-        if self.metrics_funcs is None:
-            self.metrics_funcs = {
-                key: type(func).__name__ for key, func in self.loss.funcs.items()
-            }
+        self.loss_stat = LossStat(keys=list(self.loss.funcs.keys()))
+
+        if self.metrics_components is None:
+            self.metrics_components = []
+            for key, func in self.loss.funcs.items():
+                self.metrics_components.append((key, "mae"))
         self.metrics, _ = instantiate_from_cls_name(
             class_name=Metrics,
             prefix="metrics",
-            positional_args=dict(funcs=self.metrics_funcs),
+            positional_args=dict(components=self.metrics_components),
             all_args=self.kwargs,
         )
         self._initialized = True
@@ -623,12 +627,11 @@ class Trainer:
             if hasattr(self.model, "scale"):
                 data = self.model.scale(data)
 
-            self.batch_loss = loss.detach()
-            self.batch_loss_contrib = {k: v.detach() for k, v in loss_contrib.items()}
 
             # save metrics stats
-            metrics_stat = self.metrics(pred=out, ref=data)
-            self.batch_metrics = {k: v.detach() for k, v in metrics_stat.items()}
+            self.batch_losses = self.loss_stat(loss, loss_contrib)
+            self.batch_metrics = self.metrics.flatten_metrics(metrics=self.metrics(pred=out, ref=data),
+            allowed_species=self.kwargs.get("allowed_species", None))
 
             self.end_of_batch_log(validation)
             for callback in self.end_of_batch_callbacks:
@@ -642,18 +645,26 @@ class Trainer:
 
     def epoch_step(self):
 
+        self.loss_stat.reset()
+        self.metrics.reset()
         for self.ibatch, batch in enumerate(self.dl_train):
             self.batch_step(
                 data=batch,
                 n_batches=self.n_train_batches,
                 validation=False,
             )
+        self.train_metrics = self.metrics.current_result()
+        self.train_loss = self.loss_stat.current_result()
 
         for callback in self.end_of_train_callbacks:
             callback(self)
 
+        self.loss_stat.reset()
+        self.metrics.reset()
         for self.ibatch, batch in enumerate(self.dl_val):
             self.batch_step(data=batch, n_batches=self.n_val_batches, validation=True)
+        self.val_metrics = self.metrics.current_result()
+        self.val_loss = self.loss_stat.current_result()
 
         self.end_of_epoch_log()
         self.end_of_epoch_save()
@@ -676,68 +687,33 @@ class Trainer:
         logger = self.logger
         logger.info(f"* {name}")
         logger.info(yaml.dump(dictionary))
+    
 
     def end_of_batch_log(self, validation: bool):
         """
         store all the loss/mae of each batch
         """
 
-        category = VALIDATION if validation else TRAIN
-
-        if self.ibatch == 0:
-            # initialization
-            stat = {}
-            for key, value in self.batch_mae_contrib.items():
-                stat[key] = []
-            self.statistics[category] = stat
-        else:
-            stat = self.statistics[category]
-
         mat_str = f"  {self.iepoch+1:5d} {self.ibatch+1:5d}"
         log_str = f"{mat_str}"
         batch_type = "Validation" if validation else "Training"
+
         header = f"\n# Epoch\n# batch"
         log_header = f"\n{batch_type}\n# Epoch batch"
-        for combo in [
-            (RMSE_LOSS_KEY, None, self.batch_scaled_loss_contrib),
-            (MAE_KEY, self.batch_mae, self.batch_mae_contrib),
-            (LOSS_KEY, self.batch_loss, self.batch_loss_contrib),
-        ]:
-            name, value, contrib = combo
-            short_name = ABBREV.get(name, name)
 
-            if name == LOSS_KEY:
+        # print and store loss value
+        for name, value in self.batch_losses.items():
+            mat_str += f" {value:16.3g}"
+            header += f"\n# {name}"
+            log_str += f" {value:16.3g}"
+            log_header += f" {name:>16s}"
 
-                stat[name][VALUE_KEY] += [value]
-                mat_str += f" {value:8.3f}"
-                header += f"\n# {name}"
-                log_str += f" {value:16.3g}"
-                log_header += f" {short_name:>16s}"
-
-            for key, d in contrib.items():
-
-                for attr, value in d.items():
-
-                    print_key = f"{ABBREV.get(key, key)}"
-                    store_key = f"{key}"
-                    if key != attr:
-                        store_key += f"_{ABBREV.get(attr, attr)}"
-                        print_key += f"_{ABBREV.get(attr, attr)}"
-
-                    if "mse" in type(self.loss.funcs[attr].func).__name__.lower() and (
-                        name == RMSE_LOSS_KEY
-                    ):
-                        value = torch.sqrt(value)
-                    value = value.item()
-                    stat[name][CONTRIB][store_key] += [value]
-
-                    mat_str += f" {value:8.3f}"
-                    item_name = f"{print_key}_{short_name}"
-                    header += f"\n# {item_name}"
-
-                    if name != LOSS_KEY:
-                        log_str += f" {value:16.3f}"
-                        log_header += f" {item_name:>16s}"
+        # append details from metrics
+        for key, value in self.batch_metrics:
+            mat_str += f" {value:16.3g}"
+            log_str += f" {value:16.3g}"
+            header += "\n# {key}"
+            log_header += " {key:>16s}"
 
         batch_logger = logging.getLogger(self.batch_log[category])
         if not self.batch_header_print[category]:
@@ -805,38 +781,31 @@ class Trainer:
         mat_str = f"{self.iepoch+1:7d} {wall:12.3f} {lr:8.3g}"
         log_str = {TRAIN: f"{mat_str}", VALIDATION: f"{mat_str}"}
 
-        for category in [TRAIN, VALIDATION]:
+        _mat_str, _header, _log_str, _log_header, flat_dict = self.print_metrics(self.train_metrics)
 
-            stats = self.statistics[category]
+        metrics = [self.train_metrics, self.val_metrics]
+        losses = [self.train_loss, self.val_loss]
+        categories = [TRAIN, VALIDATION]
 
-            for name, stat in stats.items():
+        for icat in range(2):
 
-                if name == LOSS_KEY:
+            category = categories[icat]
 
-                    short_name = ABBREV.get(name, name)
+            # append details from loss
+            for key, value in losses[icat].items():
+                mat_str += f" {value:16.3g}"
+                header += "\n# {category}_{key}"
+                log_str[categories] += f" {value:16.3g}"
+                log_header[categories] += " {key:>16s}"
+                self.mae_dict[f"{category}_{key}"] = value
 
-                    arr = torch.as_tensor(stat[VALUE_KEY])
-                    mean = arr.mean().item()
-                    std = arr.std().item()
-
-                    mat_str += f" {mean:8.3f} {std:8.3f}"
-                    header += f"\n# {category}_{short_name}_mean\n# {category}_{short_name}_std"
-
-                    log_header[category] += f" {short_name:>16s}"
-                    log_str[category] += f" {mean:16.3g}"
-                    self.mae_dict[f"{category}_{short_name}"] = mean
-
-                for key in stat[CONTRIB]:
-                    arr = torch.as_tensor(stat[CONTRIB][key])
-                    mean = arr.mean().item()
-                    mat_str += f" {mean:8.3f}"
-                    item_name = f"{ABBREV.get(key, key)}_{ABBREV.get(name, name)}"
-                    header += f"\n# {category}_{item_name}"
-
-                    if name != LOSS_KEY:
-                        log_str[category] += f" {mean:12.3f}"
-                        log_header[category] += f" {item_name:>12s}"
-                    self.mae_dict[f"{category}_{item_name}"] = mean
+            # append details from metrics
+            for key, value in metrics[icat].items():
+                mat_str += f" {value:16.3g}"
+                header += "\n# {category}_{key}"
+                log_str[categories] += f" {value:16.3g}"
+                log_header[categories] += " {key:>16s}"
+                self.mae_dict[f"{category}_{key}"] = value
 
         if not self.epoch_header_print:
             self.epoch_logger.info(header)

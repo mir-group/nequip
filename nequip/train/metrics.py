@@ -1,10 +1,10 @@
 from typing import Union
 
 from nequip.data import AtomicDataDict
-from nequip.utils import RunningStats
-from nequip.utils.stats import Reduction
+from nequip.utils import RunningStats, Reduction
 
 from ._loss import find_loss_function
+from ._key import ABBREV
 
 metrics_to_reduction = {"mae": Reduction.MEAN, "rmse": Reduction.RMS}
 
@@ -87,7 +87,7 @@ class Metrics:
             for stat in stats.values():
                 stat.reset()
 
-    def final_stat(self):
+    def current_result(self):
 
         metrics = {}
         for key, func in self.funcs.items():
@@ -96,3 +96,41 @@ class Metrics:
                     reduction
                 ].current_result()
         return metrics
+
+    def flatten_metrics(self, metrics, allowed_species=None):
+
+        flat_dict = {}
+        for k, value in metrics:
+
+            key, reduction = k
+            short_name = ABBREV.get(key, key)
+
+            item_name = f"{short_name}_{reduction}"
+
+            stat = self.running_stats[key][reduction]
+            per_species = self.per_species[key][reduction]
+            if per_species:
+
+                element_names = list(range(value.shape[0])) if allowed_species is None else list(allowed_species.keys()) 
+
+                if stat._dim == tuple():
+                    for id_ele, v in enumerate(value.item()):
+                        flat_dict[f"{element_name[id_ele]}_{item_name}"] = v
+
+                    flat_dict[f"all_{item_name}"] = value.mean().item()
+                else:
+                    for id_ele, vec in enumerate(value.item()):
+                        ele = element_names[id_ele]
+                        for idx, v in enumerate(vec):
+                            flat_dict[f"{ele}_{item_name}_{idx}"] = v
+
+            else: 
+                if stat._dim == tuple():
+                    # a scalar
+                    flat_dict[item_name] = value.item()
+                else:
+                    # a vector
+                    for idx, v in enumerate(value.item()):
+                        flat_dict["{item_name}_{idx}"] = v
+        return flat_dict
+
