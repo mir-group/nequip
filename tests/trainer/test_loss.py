@@ -12,7 +12,11 @@ dicts = (
     {AtomicDataDict.FORCE_KEY: (1.0, "PerSpeciesMSELoss")},
     {AtomicDataDict.FORCE_KEY: (1.0), "k": (1.0, torch.nn.L1Loss())},
     AtomicDataDict.TOTAL_ENERGY_KEY,
-    {AtomicDataDict.TOTAL_ENERGY_KEY: (3.0, "L1Loss"), AtomicDataDict.FORCE_KEY: (1.0), "k": 1.0},
+    {
+        AtomicDataDict.TOTAL_ENERGY_KEY: (3.0, "L1Loss"),
+        AtomicDataDict.FORCE_KEY: (1.0),
+        "k": 1.0,
+    },
 )
 
 
@@ -55,7 +59,9 @@ class TestWeight:
 
         assert isinstance(w_l, torch.Tensor)
         assert not torch.isclose(w_l, l)
-        assert torch.isclose(w_contb[AtomicDataDict.FORCE_KEY], contb[AtomicDataDict.FORCE_KEY])
+        assert torch.isclose(
+            w_contb[AtomicDataDict.FORCE_KEY], contb[AtomicDataDict.FORCE_KEY]
+        )
 
     def test_per_specie(self, data):
 
@@ -83,7 +89,9 @@ class TestWeight:
             for key, value in c.items():
                 assert key in [AtomicDataDict.FORCE_KEY]
 
-        assert torch.allclose(w_contb[AtomicDataDict.FORCE_KEY], contb[AtomicDataDict.FORCE_KEY])
+        assert torch.allclose(
+            w_contb[AtomicDataDict.FORCE_KEY], contb[AtomicDataDict.FORCE_KEY]
+        )
         # assert torch.isclose(w_contb[1][AtomicDataDict.FORCE_KEY], loss_ref_1)
         # assert torch.isclose(w_contb[0][AtomicDataDict.FORCE_KEY], loss_ref_0)
 
@@ -115,8 +123,12 @@ def data(float_tolerance):
         AtomicDataDict.FORCE_KEY: torch.rand(10, 3),
         AtomicDataDict.TOTAL_ENERGY_KEY: torch.rand((2, 1)),
         "k": torch.rand((2, 1)),
-        AtomicDataDict.SPECIES_INDEX_KEY: torch.as_tensor([1, 1, 1, 1, 1, 0, 0, 0, 0, 0]),
+        AtomicDataDict.SPECIES_INDEX_KEY: torch.as_tensor(
+            [1, 1, 1, 1, 1, 0, 0, 0, 0, 0]
+        ),
     }
     ref[AtomicDataDict.WEIGHTS_KEY + AtomicDataDict.FORCE_KEY] = 2 * torch.ones((10, 1))
-    ref[AtomicDataDict.WEIGHTS_KEY + AtomicDataDict.TOTAL_ENERGY_KEY] = torch.rand((2, 1))
+    ref[AtomicDataDict.WEIGHTS_KEY + AtomicDataDict.TOTAL_ENERGY_KEY] = torch.rand(
+        (2, 1)
+    )
     yield pred, ref

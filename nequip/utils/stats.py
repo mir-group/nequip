@@ -92,14 +92,15 @@ class RunningStats:
                     # time to expand
                     N_to_add = new_sum.shape[0] - self._n_bins
                     self._state = torch.cat(
-                        (self._state, self._state.new_zeros((N_to_add,) + self._dim)),
+                        (self._state, self._state.new_zeros((N_to_add, *self._dim))),
                         dim=0,
                     )
-                    self._n = torch.cat((self._n, self._n.new_zeros(N_to_add)), dim=0)
+                    self._n = torch.cat(
+                        (self._n, self._n.new_zeros((N_to_add, 1))), dim=0
+                    )
                     assert len(self._state) == self._n_bins + N_to_add
 
-                N = torch.bincount(accumulate_by)
-                print(N)
+                N = torch.bincount(accumulate_by).reshape([-1, 1])
 
                 N_bins_new = new_sum.shape[0]
 
@@ -122,8 +123,8 @@ class RunningStats:
             self._n.fill_(0)
         else:
             self._n_bins = 1
-            self._n = torch.zeros(self._n_bins, dtype=torch.long)
-            self._state = torch.zeros((self._n_bins,) + self._dim)
+            self._n = torch.zeros((self._n_bins, 1), dtype=torch.long)
+            self._state = torch.zeros([self._n_bins, *self._dim])
 
     def current_result(self):
         """Get the current value of the running statistc."""
