@@ -4,6 +4,7 @@ from typing import Union, List
 import torch.nn
 from ._loss import find_loss_function
 
+from nequip.utils import RunningStats, Reduction
 
 class Loss:
     """
@@ -111,3 +112,26 @@ class Loss:
             loss = loss + self.coeffs[key] * _loss
 
         return loss, contrib
+
+
+class LossStat():
+
+    def __init__(self, keys):
+        self.loss_stat = {"total":RunningStats(dim=tuple(), reduction=Reduction.MEAN)}
+   
+    def __call__(self, loss, loss_contrib):
+        results = {}
+        results["loss"] = self.loss_stat["total"].accumulate_batch(loss)
+        for k, v in loss_contrib.items():
+            if k not in self.loss_stat:
+                self.loss_stat[k] = RunningStats(dim=tuple(), reduction=Reduction.MEAN)
+            results["loss_"+k] = self.loss_stat[k].accumulate_batch(v)
+        return results
+   
+    def reset(self):
+        for v in self.loss_stat.values():
+            v.reset()
+   
+    def current_results():
+        return {"loss_"+k:v.current_result() for k, v in self.loss_stat.items()}
+    

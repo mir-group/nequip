@@ -92,7 +92,7 @@ class RunningStats:
                     # time to expand
                     N_to_add = new_sum.shape[0] - self._n_bins
                     self._state = torch.cat(
-                        (self._state, self._state.new_zeros((N_to_add, *self._dim))),
+                        (self._state, self._state.new_zeros((N_to_add,) + self._dim)),
                         dim=0,
                     )
                     self._n = torch.cat(
@@ -130,7 +130,7 @@ class RunningStats:
         else:
             self._n_bins = 1
             self._n = torch.zeros((self._n_bins, 1), dtype=torch.long)
-            self._state = torch.zeros([self._n_bins, *self._dim])
+            self._state = torch.zeros((self._n_bins,) + self._dim)
 
     def current_result(self):
         """Get the current value of the running statistc."""
