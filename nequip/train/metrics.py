@@ -73,7 +73,8 @@ class Metrics:
 
                 params = {}
                 if self.per_species[key][reduction]:
-                    params = {"accumulate_by": ref[AtomicDataDict.SPECIES_INDEX_KEY]}
+                    # TO DO, this needs OneHot component. will need to be decoupled
+                    params = {"accumulate_by": pred[AtomicDataDict.SPECIES_INDEX_KEY]}
 
                 if stat.dim == ():
                     metrics[(key, reduction)] = stat.accumulate_batch(
