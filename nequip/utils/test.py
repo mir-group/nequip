@@ -89,6 +89,10 @@ def set_irreps_debug(enabled: bool = False):
             raise ValueError(
                 f"Module {mname} should have received a single argument, but got {len(inp)}"
             )
+        elif len(inp) == 0:
+            raise ValueError(
+                f"Module {mname} didn't get any arguments; this case is correctly handled with an empty dict."
+            )
         inp = inp[0]
         if not (isinstance(inp, dict) or isinstance(inp, Data)):
             raise TypeError(
