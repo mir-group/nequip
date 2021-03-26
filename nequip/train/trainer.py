@@ -590,8 +590,10 @@ class Trainer:
         self.save(self.trainer_save_path)
 
     def batch_step(self, data, n_batches, validation=False):
-
-        self.model.train()
+        if validation:
+            self.model.eval()
+        else:
+            self.model.train()
 
         # Do any target rescaling
         data = data.to(self.device)
@@ -601,17 +603,19 @@ class Trainer:
             # this will normalize the targets
             # in validation (eval mode), it does nothing
             # in train mode, if normalizes the targets
-            data = self.model.unscale(data)
+            data_unscaled = self.model.unscale(data)
+        else:
+            data_unscaled = data
 
         # Run model
-        out = self.model(data)
+        out = self.model(data_unscaled)
 
         # If we're in evaluation mode (i.e. validation), then
-        # data's target prop is unnormalized, and out's has been rescaled to be in the same units
-        # If we're in training, data's target prop has been normalized, and out's hasn't been touched, so they're both in normalized units
+        # data_unscaled's target prop is unnormalized, and out's has been rescaled to be in the same units
+        # If we're in training, data_unscaled's target prop has been normalized, and out's hasn't been touched, so they're both in normalized units
         # Note that either way all normalization was handled internally by RescaleOutput
 
-        loss, loss_contrib = self.loss(pred=out, ref=data)
+        loss, loss_contrib = self.loss(pred=out, ref=data_unscaled)
 
         if not validation:
             self.optim.zero_grad()
@@ -622,13 +626,17 @@ class Trainer:
                 self.lr_sched.step(self.iepoch + self.ibatch / n_batches)
 
         with torch.no_grad():
-
-            self.model.eval()
-            if hasattr(self.model, "scale"):
-                data = self.model.scale(data)
+            if not validation and hasattr(self.model, "scale"):
+                # If we are in training mode, we need to bring the prediction
+                # into real units
+                out = self.model.scale(out, force_process=True)
 
             # save metrics stats
             self.batch_losses = self.loss_stat(loss, loss_contrib)
+            # in validation mode, data is in real units and the network scales
+            # out to be in real units interally.
+            # in training mode, data is still in real units, and we rescaled
+            # out to be in real units above.
             self.batch_metrics = self.metrics(pred=out, ref=data)
 
             self.end_of_batch_log(validation)
