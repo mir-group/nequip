@@ -623,7 +623,7 @@ class Trainer:
 
         with torch.no_grad():
 
-            self.model.val()
+            self.model.eval()
             if hasattr(self.model, "scale"):
                 data = self.model.scale(data)
 
