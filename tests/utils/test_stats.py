@@ -123,3 +123,26 @@ def test_raises():
     runstats = RunningStats(dim=4, reduction=Reduction.MEAN)
     with pytest.raises(AssertionError):
         runstats.accumulate_batch(torch.zeros(10, 2))
+
+
+@pytest.mark.parametrize("dim", [1, 3, (2, 3), torch.Size((1, 2, 1))])
+@pytest.mark.parametrize("reduction", [Reduction.MEAN, Reduction.RMS])
+@pytest.mark.parametrize("do_accumulate_by", [True, False])
+def test_one_acc(dim, reduction, do_accumulate_by, allclose):
+    runstats = RunningStats(dim=dim, reduction=reduction)
+    batch = torch.randn((random.randint(3, 10),) + runstats.dim)
+    if do_accumulate_by:
+        accumulate_by = torch.randint(0, random.randint(1, 5), size=(batch.shape[0],))
+        if reduction == Reduction.MEAN:
+            truth = scatter(batch, accumulate_by, dim=0, reduce="mean")
+        elif reduction == Reduction.RMS:
+            truth = scatter(batch.square(), accumulate_by, dim=0, reduce="mean").sqrt()
+        res = runstats.accumulate_batch(batch, accumulate_by=accumulate_by)
+    else:
+        if reduction == Reduction.MEAN:
+            truth = batch.mean(dim=0)
+        elif reduction == Reduction.RMS:
+            truth = batch.square().mean(dim=0).sqrt()
+        res = runstats.accumulate_batch(batch)
+    assert allclose(truth, res)
+    assert allclose(truth, runstats.current_result())
