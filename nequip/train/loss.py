@@ -139,9 +139,9 @@ class LossStat:
         for v in self.loss_stat.values():
             v.reset()
 
-    def to(self):
+    def to(self, device):
         for v in self.loss_stat.values():
-            v.to()
+            v.to(device)
 
     def current_result(self):
         results = {
