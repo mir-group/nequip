@@ -1,7 +1,6 @@
 """Batched running statistics for PyTorch."""
 
 from typing import Union, Tuple, Optional
-from collections import Counter
 import enum
 import numbers
 
