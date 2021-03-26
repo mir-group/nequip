@@ -95,7 +95,15 @@ class RunningStats:
                         (self._state, self._state.new_zeros((N_to_add,) + self._dim)),
                         dim=0,
                     )
-                    self._n = torch.cat((self._n, self._n.new_zeros((N_to_add,)+tuple(1 for i in self._dim))), dim=0)
+                    self._n = torch.cat(
+                        (
+                            self._n,
+                            self._n.new_zeros(
+                                (N_to_add,) + tuple(1 for i in self._dim)
+                            ),
+                        ),
+                        dim=0,
+                    )
                     assert len(self._state) == self._n_bins + N_to_add
 
                 N = torch.bincount(accumulate_by).reshape([-1, 1])
@@ -121,7 +129,9 @@ class RunningStats:
             self._n.fill_(0)
         else:
             self._n_bins = 1
-            self._n = torch.zeros((self._n_bins,)+tuple(1 for i in self._dim), dtype=torch.long)
+            self._n = torch.zeros(
+                (self._n_bins,) + tuple(1 for i in self._dim), dtype=torch.long
+            )
             self._state = torch.zeros((self._n_bins,) + self._dim)
 
     def current_result(self):
