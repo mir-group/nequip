@@ -26,9 +26,9 @@ from nequip.utils import (
     instantiate,
     save_file,
     load_file,
-    RunningStats,
-    Reduction
 )
+
+from torch_runstats import RunningStats, Reduction
 
 from .loss import Loss, LossStat
 from .metrics import Metrics
@@ -627,11 +627,12 @@ class Trainer:
             if hasattr(self.model, "scale"):
                 data = self.model.scale(data)
 
-
             # save metrics stats
             self.batch_losses = self.loss_stat(loss, loss_contrib)
-            self.batch_metrics = self.metrics.flatten_metrics(metrics=self.metrics(pred=out, ref=data),
-            allowed_species=self.kwargs.get("allowed_species", None))
+            self.batch_metrics = self.metrics.flatten_metrics(
+                metrics=self.metrics(pred=out, ref=data),
+                allowed_species=self.kwargs.get("allowed_species", None),
+            )
 
             self.end_of_batch_log(validation)
             for callback in self.end_of_batch_callbacks:
@@ -687,7 +688,6 @@ class Trainer:
         logger = self.logger
         logger.info(f"* {name}")
         logger.info(yaml.dump(dictionary))
-    
 
     def end_of_batch_log(self, validation: bool):
         """
@@ -781,7 +781,9 @@ class Trainer:
         mat_str = f"{self.iepoch+1:7d} {wall:12.3f} {lr:8.3g}"
         log_str = {TRAIN: f"{mat_str}", VALIDATION: f"{mat_str}"}
 
-        _mat_str, _header, _log_str, _log_header, flat_dict = self.print_metrics(self.train_metrics)
+        _mat_str, _header, _log_str, _log_header, flat_dict = self.print_metrics(
+            self.train_metrics
+        )
 
         metrics = [self.train_metrics, self.val_metrics]
         losses = [self.train_loss, self.val_loss]
