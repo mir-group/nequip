@@ -5,7 +5,8 @@ import torch.nn
 from ._loss import find_loss_function
 from ._key import ABBREV
 
-from nequip.utils import RunningStats, Reduction
+from torch_runstats import RunningStats, Reduction
+
 
 
 class Loss:
@@ -126,7 +127,10 @@ class LossStat:
         for k, v in loss_contrib.items():
             if k not in self.loss_stat:
                 self.loss_stat[k] = RunningStats(dim=tuple(), reduction=Reduction.MEAN)
-            results["loss_" + ABBREV.get(k, k)] = self.loss_stat[k].accumulate_batch(v)
+            if k != "total":
+                results["loss_" + ABBREV.get(k, k)] = self.loss_stat[k].accumulate_batch(v)
+            else:
+                results["loss"] = self.loss_stat[k].accumulate_batch(v)
         return results
 
     def reset(self):

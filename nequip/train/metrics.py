@@ -1,7 +1,7 @@
 from typing import Union
 
 from nequip.data import AtomicDataDict
-from nequip.utils import RunningStats, Reduction
+from torch_runstats import RunningStats, Reduction
 
 from ._loss import find_loss_function
 from ._key import ABBREV

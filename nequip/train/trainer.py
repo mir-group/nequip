@@ -26,9 +26,9 @@ from nequip.utils import (
     instantiate,
     save_file,
     load_file,
-    RunningStats,
-    Reduction,
 )
+
+from torch_runstats import RunningStats, Reduction
 
 from .loss import Loss, LossStat
 from .metrics import Metrics
