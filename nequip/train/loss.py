@@ -3,6 +3,7 @@ from typing import Union, List
 
 import torch.nn
 from ._loss import find_loss_function
+from ._key import ABBREV
 
 from nequip.utils import RunningStats, Reduction
 
@@ -125,12 +126,12 @@ class LossStat:
         for k, v in loss_contrib.items():
             if k not in self.loss_stat:
                 self.loss_stat[k] = RunningStats(dim=tuple(), reduction=Reduction.MEAN)
-            results["loss_" + k] = self.loss_stat[k].accumulate_batch(v)
+            results["loss_" + ABBREV.get(k, k)] = self.loss_stat[k].accumulate_batch(v)
         return results
 
     def reset(self):
         for v in self.loss_stat.values():
             v.reset()
 
-    def current_results():
-        return {"loss_" + k: v.current_result() for k, v in self.loss_stat.items()}
+    def current_result(self):
+        return {"loss_" + ABBREV.get(k, k): v.current_result().item() for k, v in self.loss_stat.items()}

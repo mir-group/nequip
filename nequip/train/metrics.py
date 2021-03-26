@@ -90,17 +90,15 @@ class Metrics:
     def current_result(self):
 
         metrics = {}
-        for key, func in self.funcs.items():
-            for reduction, stat in self.running_stats.items():
-                metrics[(key, reduction)] = self.running_stats[key][
-                    reduction
-                ].current_result()
+        for key, stats in self.running_stats.items():
+            for reduction, stat in stats.items():
+                metrics[(key, reduction)] = stat.current_result().item()
         return metrics
 
     def flatten_metrics(self, metrics, allowed_species=None):
 
         flat_dict = {}
-        for k, value in metrics:
+        for k, value in metrics.items():
 
             key, reduction = k
             short_name = ABBREV.get(key, key)
@@ -118,12 +116,12 @@ class Metrics:
                 )
 
                 if stat._dim == tuple():
-                    for id_ele, v in enumerate(value.item()):
+                    for id_ele, v in enumerate(value):
                         flat_dict[f"{element_name[id_ele]}_{item_name}"] = v
 
                     flat_dict[f"all_{item_name}"] = value.mean().item()
                 else:
-                    for id_ele, vec in enumerate(value.item()):
+                    for id_ele, vec in enumerate(value):
                         ele = element_names[id_ele]
                         for idx, v in enumerate(vec):
                             flat_dict[f"{ele}_{item_name}_{idx}"] = v
@@ -131,9 +129,9 @@ class Metrics:
             else:
                 if stat._dim == tuple():
                     # a scalar
-                    flat_dict[item_name] = value.item()
+                    flat_dict[item_name] = value
                 else:
                     # a vector
-                    for idx, v in enumerate(value.item()):
+                    for idx, v in enumerate(value):
                         flat_dict["{item_name}_{idx}"] = v
         return flat_dict

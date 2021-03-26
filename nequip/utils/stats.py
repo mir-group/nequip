@@ -64,6 +64,11 @@ class RunningStats:
         else:
             if accumulate_by is None:
                 # accumulate everything into the first bin
+                if len(batch.shape) == 0:
+                    self._state[0] += (batch - self._state[0]) / (self._n[0, 0] + 1)
+                    self._n[0, 0] += 1
+                    return batch
+
                 N = batch.shape[0]
                 if self._reduction == Reduction.MEAN:
                     new_sum = batch.sum(dim=0)

@@ -696,7 +696,7 @@ class Trainer:
 
         mat_str = f"  {self.iepoch+1:5d} {self.ibatch+1:5d}"
         log_str = f"{mat_str}"
-        batch_type = "Validation" if validation else "Training"
+        batch_type = VALIDATION if validation else TRAIN
 
         header = f"\n# Epoch\n# batch"
         log_header = f"\n{batch_type}\n# Epoch batch"
@@ -709,18 +709,18 @@ class Trainer:
             log_header += f" {name:>16s}"
 
         # append details from metrics
-        for key, value in self.batch_metrics:
+        for key, value in self.batch_metrics.items():
             mat_str += f" {value:16.3g}"
             log_str += f" {value:16.3g}"
-            header += "\n# {key}"
-            log_header += " {key:>16s}"
+            header += f"\n# {key}"
+            log_header += f" {key:>16s}"
 
-        batch_logger = logging.getLogger(self.batch_log[category])
-        if not self.batch_header_print[category]:
-            batch_logger.info(header)
-            self.batch_header_print[category] = True
+        batch_logger = logging.getLogger(self.batch_log[batch_type])
+        if not self.batch_header_print[batch_type]:
+            self.batch_header_print[batch_type] = True
 
         if self.ibatch == 0:
+            batch_logger.info(header)
             self.logger.info(log_header)
 
         batch_logger.info(mat_str)
@@ -733,6 +733,7 @@ class Trainer:
         """
         save model and trainer details
         """
+
         val_metrics = self.mae_dict[f"{VALIDATION}_{self.metrics_key}"]
         if val_metrics < self.best_val_metrics:
             self.best_val_metrics = val_metrics
@@ -781,11 +782,7 @@ class Trainer:
         mat_str = f"{self.iepoch+1:7d} {wall:12.3f} {lr:8.3g}"
         log_str = {TRAIN: f"{mat_str}", VALIDATION: f"{mat_str}"}
 
-        _mat_str, _header, _log_str, _log_header, flat_dict = self.print_metrics(
-            self.train_metrics
-        )
-
-        metrics = [self.train_metrics, self.val_metrics]
+        metrics = [self.metrics.flatten_metrics(self.train_metrics), self.metrics.flatten_metrics(self.val_metrics)]
         losses = [self.train_loss, self.val_loss]
         categories = [TRAIN, VALIDATION]
 
@@ -796,17 +793,17 @@ class Trainer:
             # append details from loss
             for key, value in losses[icat].items():
                 mat_str += f" {value:16.3g}"
-                header += "\n# {category}_{key}"
-                log_str[categories] += f" {value:16.3g}"
-                log_header[categories] += " {key:>16s}"
+                header += f"\n# {category}_{key}"
+                log_str[category] += f" {value:16.3g}"
+                log_header[category] += f" {key:>16s}"
                 self.mae_dict[f"{category}_{key}"] = value
 
             # append details from metrics
             for key, value in metrics[icat].items():
                 mat_str += f" {value:16.3g}"
-                header += "\n# {category}_{key}"
-                log_str[categories] += f" {value:16.3g}"
-                log_header[categories] += " {key:>16s}"
+                header += f"\n# {category}_{key}"
+                log_str[category] += f" {value:16.3g}"
+                log_header[category] += f" {key:>16s}"
                 self.mae_dict[f"{category}_{key}"] = value
 
         if not self.epoch_header_print:
