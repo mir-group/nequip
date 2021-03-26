@@ -84,11 +84,16 @@ def set_irreps_debug(enabled: bool = False):
     def pre_hook(mod: GraphModuleMixin, inp):
         if not isinstance(mod, GraphModuleMixin):
             return
+        mname = type(mod).__name__
+        if len(inp) > 1:
+            raise ValueError(
+                f"Module {mname} should have received a single argument, but got {len(inp)}"
+            )
+        inp = inp[0]
         if not (isinstance(inp, dict) or isinstance(inp, Data)):
             raise TypeError(
-                f"Module {mod} should have received a dict or a torch_geometric Data, instead got a {type(inp).__name__}"
+                f"Module {mname} should have received a dict or a torch_geometric Data, instead got a {type(inp).__name__}"
             )
-        mname = type(mod).__name__
         for k, ir in mod.irreps_in.items():
             if k not in inp:
                 raise KeyError(
@@ -106,11 +111,11 @@ def set_irreps_debug(enabled: bool = False):
     def post_hook(mod: GraphModuleMixin, _, out):
         if not isinstance(mod, GraphModuleMixin):
             return
+        mname = type(mod).__name__
         if not (isinstance(out, dict) or isinstance(out, Data)):
             raise TypeError(
-                f"Module {mod} should have returned a dict or a torch_geometric Data, instead got a {type(out).__name__}"
+                f"Module {mname} should have returned a dict or a torch_geometric Data, instead got a {type(out).__name__}"
             )
-        mname = type(mod).__name__
         for k, ir in mod.irreps_out.items():
             if k not in out:
                 raise KeyError(
