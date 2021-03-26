@@ -8,7 +8,6 @@ from ._key import ABBREV
 from torch_runstats import RunningStats, Reduction
 
 
-
 class Loss:
     """
     assemble loss function based on key(s) and coefficient(s)
@@ -128,7 +127,9 @@ class LossStat:
             if k not in self.loss_stat:
                 self.loss_stat[k] = RunningStats(dim=tuple(), reduction=Reduction.MEAN)
             if k != "total":
-                results["loss_" + ABBREV.get(k, k)] = self.loss_stat[k].accumulate_batch(v)
+                results["loss_" + ABBREV.get(k, k)] = self.loss_stat[
+                    k
+                ].accumulate_batch(v)
             else:
                 results["loss"] = self.loss_stat[k].accumulate_batch(v)
         return results
@@ -138,6 +139,10 @@ class LossStat:
             v.reset()
 
     def current_result(self):
-        results =  {"loss_" + ABBREV.get(k, k): v.current_result().item() for k, v in self.loss_stat.items() if k != "total"}
+        results = {
+            "loss_" + ABBREV.get(k, k): v.current_result().item()
+            for k, v in self.loss_stat.items()
+            if k != "total"
+        }
         results["loss"] = self.loss_stat["total"].current_result().item()
         return results
