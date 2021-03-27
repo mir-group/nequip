@@ -117,22 +117,21 @@ class Loss:
 
 
 class LossStat:
+
     def __init__(self, keys):
         self.loss_stat = {"total": RunningStats(dim=tuple(), reduction=Reduction.MEAN)}
 
     def __call__(self, loss, loss_contrib):
         results = {}
-        results["loss"] = self.loss_stat["total"].accumulate_batch(loss)
+        results["loss"] = self.loss_stat["total"].accumulate_batch(loss).item()
         for k, v in loss_contrib.items():
             if k not in self.loss_stat:
                 self.loss_stat[k] = RunningStats(dim=tuple(), reduction=Reduction.MEAN)
-                self.loss_stat[k].to(v.get_device())
-            if k != "total":
-                results["loss_" + ABBREV.get(k, k)] = self.loss_stat[
-                    k
-                ].accumulate_batch(v)
-            else:
-                results["loss"] = self.loss_stat[k].accumulate_batch(v)
+                device = v.get_device()
+                self.loss_stat[k].to(device="cpu" if device == -1 else device)
+            results["loss_" + ABBREV.get(k, k)] = self.loss_stat[
+                k
+            ].accumulate_batch(v).item()
         return results
 
     def reset(self):
@@ -141,7 +140,7 @@ class LossStat:
 
     def to(self, device):
         for v in self.loss_stat.values():
-            v.to(device)
+            v.to(device=device)
 
     def current_result(self):
         results = {

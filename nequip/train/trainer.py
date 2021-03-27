@@ -598,6 +598,7 @@ class Trainer:
         # Do any target rescaling
         data = data.to(self.device)
         data = AtomicData.to_AtomicDataDict(data)
+
         if hasattr(self.model, "unscale"):
             # This means that self.model is RescaleOutputs
             # this will normalize the targets

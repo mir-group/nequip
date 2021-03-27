@@ -93,7 +93,7 @@ class Metrics:
     def to(self, device):
         for stats in self.running_stats.values():
             for stat in stats.values():
-                stat.to(device)
+                stat.to(device=device)
 
     def current_result(self):
 
@@ -101,7 +101,7 @@ class Metrics:
         for key, stats in self.running_stats.items():
             for reduction, stat in stats.items():
                 if stat.dim == tuple() or stat.dim == (1,):
-                    metrics[(key, reduction)] = stat.current_result().item()
+                    metrics[(key, reduction)] = stat.current_result()
                 else:
                     metrics[(key, reduction)] = stat.current_result()
         return metrics
@@ -119,6 +119,7 @@ class Metrics:
 
             stat = self.running_stats[key][reduction]
             per_species = self.per_species[key][reduction]
+
             if per_species:
 
                 element_names = (
@@ -143,7 +144,7 @@ class Metrics:
             else:
                 if stat.dim == tuple():
                     # a scalar
-                    flat_dict[item_name] = value
+                    flat_dict[item_name] = value.item()
                 else:
                     # a vector
                     for idx, v in enumerate(value):
