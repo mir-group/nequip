@@ -117,7 +117,6 @@ class Loss:
 
 
 class LossStat:
-
     def __init__(self, keys):
         self.loss_stat = {"total": RunningStats(dim=tuple(), reduction=Reduction.MEAN)}
 
@@ -129,9 +128,9 @@ class LossStat:
                 self.loss_stat[k] = RunningStats(dim=tuple(), reduction=Reduction.MEAN)
                 device = v.get_device()
                 self.loss_stat[k].to(device="cpu" if device == -1 else device)
-            results["loss_" + ABBREV.get(k, k)] = self.loss_stat[
-                k
-            ].accumulate_batch(v).item()
+            results["loss_" + ABBREV.get(k, k)] = (
+                self.loss_stat[k].accumulate_batch(v).item()
+            )
         return results
 
     def reset(self):
