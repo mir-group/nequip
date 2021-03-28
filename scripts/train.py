@@ -78,6 +78,7 @@ def main():
     )
 
     # Set the trainer
+    core_model.config = dict(config)
     trainer.model = core_model
 
     # Train
