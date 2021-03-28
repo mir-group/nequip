@@ -470,7 +470,7 @@ class Trainer:
 
         if state_dict is not None and trainer.model is not None:
             trainer.optim.load_state_dict(state_dict["optim"])
-            if self.lr_sched is not None:
+            if trainer.lr_sched is not None:
                 trainer.lr_sched.load_state_dict(state_dict["lr_sched"])
             logging.debug("Reload optimizer and scheduler states")
 
@@ -748,7 +748,9 @@ class Trainer:
         # append details from metrics
         metrics, skip_keys = self.metrics.flatten_metrics(
             metrics=self.batch_metrics,
-            allowed_species=self.model.config.get("allowed_species", None),
+            allowed_species=self.model.config.get("allowed_species", None)
+            if hasattr(self.model, "config")
+            else None,
         )
         for key, value in metrics.items():
 
@@ -837,7 +839,9 @@ class Trainer:
             category = categories[icat]
             met, skip_keys = self.metrics.flatten_metrics(
                 metrics=metrics[icat],
-                allowed_species=self.model.config.get("allowed_species", None),
+                allowed_species=self.model.config.get("allowed_species", None)
+                if hasattr(self.model, "config")
+                else None,
             )
 
             # append details from loss

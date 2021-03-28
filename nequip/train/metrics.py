@@ -1,3 +1,4 @@
+from copy import deepcopy
 from typing import Union
 
 from nequip.data import AtomicDataDict
@@ -33,7 +34,8 @@ class Metrics:
             elif len(component) == 2:
                 key, reduction = component
             elif len(component) == 3:
-                key, reduction, params = component
+                key, reduction, _params = component
+                params = {k: deepcopy(v) for k, v in _params.items()}
             else:
                 raise ValueError(
                     f"tuple should have a max length of 3 but {len(component)} is given"

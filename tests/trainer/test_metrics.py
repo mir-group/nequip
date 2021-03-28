@@ -40,21 +40,28 @@ class TestMetrics:
 
 
 class TestWeight:
-    def test_per_specie(self, data):
+    @pytest.mark.parametrize("reduction", [True, False])
+    def test_per_specie(self, data, reduction):
 
         pred, ref = data
 
+        if reduction:
+            dim = {"dim": 3, "reduce_dims": 0}
+        else:
+            dim = {"dim": 3}
+
         loss = Metrics(
             components=[
-                (AtomicDataDict.FORCE_KEY, "rmse"),
-                (AtomicDataDict.FORCE_KEY, "mae"),
+                (AtomicDataDict.FORCE_KEY, "rmse", dim),
+                (AtomicDataDict.FORCE_KEY, "mae", dim),
             ]
         )
 
+        dim["PerSpecies"] = True
         w_loss = Metrics(
             components=[
-                (AtomicDataDict.FORCE_KEY, "rmse", {"PerSpecies": True, "dim": 3}),
-                (AtomicDataDict.FORCE_KEY, "mae", {"PerSpecies": True, "dim": 3}),
+                (AtomicDataDict.FORCE_KEY, "rmse", dim),
+                (AtomicDataDict.FORCE_KEY, "mae", dim),
             ]
         )
 
@@ -62,12 +69,14 @@ class TestWeight:
         contb = loss(pred, ref)
 
         # first half data are specie 1
-        loss_ref_1 = torch.sqrt(
-            torch.square(pred["forces"][:5] - ref["forces"][:5]).mean(dim=0)
-        )
-        loss_ref_0 = torch.sqrt(
-            torch.square(pred["forces"][5:] - ref["forces"][5:]).mean(dim=0)
-        )
+        loss_ref_0 = torch.square(pred["forces"][5:] - ref["forces"][5:])
+        loss_ref_1 = torch.square(pred["forces"][:5] - ref["forces"][:5])
+        if reduction:
+            loss_ref_1 = torch.sqrt(loss_ref_1.mean())
+            loss_ref_0 = torch.sqrt(loss_ref_0.mean())
+        else:
+            loss_ref_1 = torch.sqrt(loss_ref_1.mean(dim=0))
+            loss_ref_0 = torch.sqrt(loss_ref_0.mean(dim=0))
 
         for c in [w_contb, contb]:
             for key, value in c.items():
@@ -76,7 +85,7 @@ class TestWeight:
 
         # mae should be the same cause # of type 0 == # of type 1
         assert torch.allclose(
-            w_contb[("forces", "mae")].mean(), contb[("forces", "mae")]
+            w_contb[("forces", "mae")].mean(dim=0), contb[("forces", "mae")]
         )
         assert torch.allclose(w_contb[("forces", "rmse")][0], loss_ref_0)
         assert torch.allclose(w_contb[("forces", "rmse")][1], loss_ref_1)
