@@ -215,7 +215,7 @@ class Trainer:
         max_epochs: int = 1000000,
         lr_sched=None,
         learning_rate: float = 1e-2,
-        lr_scheduler_name: str = "ReduceLROnPlateau",
+        lr_scheduler_name: str = "none",
         lr_scheduler_params: Optional[dict] = None,
         optim=None,
         optimizer_name: str = "Adam",
@@ -335,7 +335,8 @@ class Trainer:
         if state_dict:
             dictionary["state_dict"] = {}
             dictionary["state_dict"]["optim"] = self.optim.state_dict()
-            dictionary["state_dict"]["lr_sched"] = self.lr_sched.state_dict()
+            if self.lr_sched is not None:
+                dictionary["state_dict"]["lr_sched"] = self.lr_sched.state_dict()
 
         if hasattr(self.model, "save") and not issubclass(
             type(self.model), torch.jit.ScriptModule
@@ -437,7 +438,7 @@ class Trainer:
         iepoch = 0
         if "progress" in d:
             progress = d["progress"]
-            stop_arg = progress["stop_arg"]
+            stop_arg = progress.pop("stop_arg", None)
             if stop_arg is not None:
                 raise RuntimeError(
                     f"The previous run has properly stopped with {stop_arg}."
@@ -469,7 +470,8 @@ class Trainer:
 
         if state_dict is not None and trainer.model is not None:
             trainer.optim.load_state_dict(state_dict["optim"])
-            trainer.lr_sched.load_state_dict(state_dict["lr_sched"])
+            if self.lr_sched is not None:
+                trainer.lr_sched.load_state_dict(state_dict["lr_sched"])
             logging.debug("Reload optimizer and scheduler states")
 
         if "progress" in d:
@@ -503,19 +505,22 @@ class Trainer:
         if self.lr_sched is None:
             assert (
                 self.lr_scheduler_name
-                in ["CosineAnnealingWarmRestarts", "ReduceLROnPlateau"]
+                in ["CosineAnnealingWarmRestarts", "ReduceLROnPlateau", "none"]
             ) or (
                 (len(self.end_of_epoch_callbacks) + len(self.end_of_batch_callbacks))
                 > 0
             ), f"{self.lr_scheduler_name} cannot be used unless callback functions are defined"
-            self.lr_sched, self.lr_scheduler_params = instantiate_from_cls_name(
-                module=torch.optim.lr_scheduler,
-                class_name=self.lr_scheduler_name,
-                prefix="lr",
-                positional_args=dict(optimizer=self.optim),
-                optional_args=self.lr_scheduler_params,
-                all_args=self.kwargs,
-            )
+            self.lr_sched = None
+            self.lr_scheduler_params = {}
+            if self.lr_scheduler_name != "none":
+                self.lr_sched, self.lr_scheduler_params = instantiate_from_cls_name(
+                    module=torch.optim.lr_scheduler,
+                    class_name=self.lr_scheduler_name,
+                    prefix="lr",
+                    positional_args=dict(optimizer=self.optim),
+                    optional_args=self.lr_scheduler_params,
+                    all_args=self.kwargs,
+                )
 
         self.loss, _ = instantiate(
             cls_name=Loss,
@@ -525,17 +530,38 @@ class Trainer:
         )
         self.loss_stat = LossStat(keys=list(self.loss.funcs.keys()))
 
+        self._initialized = True
+
+    def init_metrics(self):
+
         if self.metrics_components is None:
             self.metrics_components = []
             for key, func in self.loss.funcs.items():
-                self.metrics_components.append((key, "mae"))
+                dim = (
+                    self.dataset_train[0][key].shape[1:]
+                    if hasattr(self, "dataset_train")
+                    else tuple()
+                )
+                params = {
+                    "dim": dim,
+                    "PerSpecies": type(func).__name__.startswith("PerSpecies"),
+                }
+                if key == AtomicDataDict.FORCE_KEY:
+                    params["reduce_dims"] = 0
+                self.metrics_components.append((key, "mae", params))
+                self.metrics_components.append((key, "rmse", params))
+        elif hasattr(self, "dataset_train"):
+            # update the metric dim based on dataset data
+            for comp in self.metrics_components:
+                key, reduction, params = comp
+                params["dim"] = self.dataset_train[0][key].shape[1:]
+
         self.metrics, _ = instantiate(
             cls_name=Metrics,
             prefix="metrics",
             positional_args=dict(components=self.metrics_components),
             all_args=self.kwargs,
         )
-        self._initialized = True
 
     def init_model(self):
 
@@ -569,6 +595,7 @@ class Trainer:
             self.best_val_metrics = float("inf")
             self.best_epoch = 0
             self.iepoch = 0
+        self.init_metrics()
 
         while self.iepoch < self.max_epochs and not stop:
 
@@ -713,23 +740,23 @@ class Trainer:
 
         # print and store loss value
         for name, value in self.batch_losses.items():
-            mat_str += f" {value:16.3g}"
+            mat_str += f" {value:16.5g}"
             header += f"\n# {name}"
-            log_str += f" {value:16.3g}"
-            log_header += f" {name:>16s}"
+            log_str += f" {value:12.3g}"
+            log_header += f" {name:>12s}"
 
         # append details from metrics
         metrics, skip_keys = self.metrics.flatten_metrics(
             metrics=self.batch_metrics,
-            allowed_species=self.kwargs.get("allowed_species", None),
+            allowed_species=self.model.config.get("allowed_species", None),
         )
         for key, value in metrics.items():
 
-            mat_str += f" {value:16.3g}"
+            mat_str += f" {value:16.5g}"
             header += f"\n# {key}"
             if key not in skip_keys:
-                log_str += f" {value:16.3g}"
-                log_header += f" {key:>16s}"
+                log_str += f" {value:12.3g}"
+                log_header += f" {key:>12s}"
 
         batch_logger = logging.getLogger(self.batch_log[batch_type])
         if not self.batch_header_print[batch_type]:
@@ -791,37 +818,43 @@ class Trainer:
         )
 
         header = "# Epoch\n# wall\n# LR"
-        log_header = {
-            TRAIN: "# Epoch         wall       LR",
-            VALIDATION: "# Epoch         wall       LR",
-        }
-        mat_str = f"{self.iepoch+1:7d} {wall:12.3f} {lr:8.3g}"
-        log_str = {TRAIN: f"{mat_str}", VALIDATION: f"{mat_str}"}
 
         metrics = [self.train_metrics, self.val_metrics]
         losses = [self.train_loss, self.val_loss]
         categories = [TRAIN, VALIDATION]
+        log_header = {}
+        log_str = {}
+
+        strings = ["Epoch", "wal", "LR"]
+        mat_str = f"{self.iepoch+1:10d} {wall:8.3f} {lr:8.3g}"
+        for cat in categories:
+            log_header[cat] = "# "
+            log_header[cat] += " ".join([f"{s:>8s}" for s in strings])
+            log_str[cat] = f"{mat_str}"
 
         for icat in range(2):
 
             category = categories[icat]
-            met, skip_keys = self.metrics.flatten_metrics(metrics[icat])
+            met, skip_keys = self.metrics.flatten_metrics(
+                metrics=metrics[icat],
+                allowed_species=self.model.config.get("allowed_species", None),
+            )
 
             # append details from loss
             for key, value in losses[icat].items():
-                mat_str += f" {value:16.3g}"
+                mat_str += f" {value:16.5g}"
                 header += f"\n# {category}_{key}"
-                log_str[category] += f" {value:16.3g}"
-                log_header[category] += f" {key:>16s}"
+                log_str[category] += f" {value:12.3g}"
+                log_header[category] += f" {key:>12s}"
                 self.mae_dict[f"{category}_{key}"] = value
 
             # append details from metrics
             for key, value in met.items():
-                mat_str += f" {value:16.3g}"
+                mat_str += f" {value:12.3g}"
                 header += f"\n# {category}_{key}"
                 if key not in skip_keys:
-                    log_str[category] += f" {value:16.3g}"
-                    log_header[category] += f" {key:>16s}"
+                    log_str[category] += f" {value:12.3g}"
+                    log_header[category] += f" {key:>12s}"
                 self.mae_dict[f"{category}_{key}"] = value
 
         if not self.epoch_header_print:
