@@ -139,9 +139,6 @@ def instantiate(
         return_args_only (bool): if True, do not instantiate, only return the arguments
     """
 
-    # debug info
-    logging.debug(f"..{cls_name.__name__} init: ")
-
     if isinstance(prefix, str):
         prefix_list = [prefix]
     else:
@@ -158,7 +155,9 @@ def instantiate(
         for idx, prefix_str in enumerate(prefix_list):
             # fetch paratemeters that match prefix + "_" + name
             _keys = config.update_w_prefix(
-                all_args, prefix=prefix_str, prefix_only=True
+                all_args,
+                prefix=prefix_str,
+                prefix_only=True,
             )
             keys["all"].update(_keys)
 
@@ -167,7 +166,9 @@ def instantiate(
         keys["optional"] = {k: k for k in _keys}
         for idx, prefix_str in enumerate(prefix_list):
             _keys = config.update_w_prefix(
-                optional_args, prefix=prefix_str, prefix_only=True
+                optional_args,
+                prefix=prefix_str,
+                prefix_only=True,
             )
             keys["optional"].update(_keys)
 
@@ -177,27 +178,29 @@ def instantiate(
             k: v for k, v in keys["all"].items() if k not in keys["optional"]
         }
 
-    optional_params = dict(config)
+    optional_args = dict(config)
 
     # remove duplicates
     for key in positional_args:
-        optional_params.pop(key, None)
+        optional_args.pop(key, None)
         for t in keys:
             keys[t].pop(key, None)
 
+    # debug info
+    logging.debug(f"instantiate {cls_name.__name__}")
     for t in keys:
         for k, v in keys[t].items():
-            if k == v:
-                logging.debug(f"....found keys {v} from {t}_args")
-            else:
-                logging.debug(f"....found keys {k} named as {v} from {t}_args")
-    logging.debug(f"....{cls_name.__name__}_param = dict(")
-    logging.debug(f"....   optional_params = {optional_params},")
-    logging.debug(f"....   positional_params = {positional_args})")
+            string = f" {t:>10s}_args :  {k:>30s}"
+            if k != v:
+                string += f" <- {v:>30s}"
+            logging.debug(string)
+    logging.debug(f"...{cls_name.__name__}_param = dict(")
+    logging.debug(f"...   optional_args = {optional_args},")
+    logging.debug(f"...   positional_args = {positional_args})")
 
     if return_args_only:
-        return dict(**positional_args, **optional_params)
+        return dict(**positional_args, **optional_args)
 
-    instance = cls_name(**positional_args, **optional_params)
+    instance = cls_name(**positional_args, **optional_args)
 
-    return instance, optional_params
+    return instance, optional_args

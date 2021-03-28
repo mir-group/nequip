@@ -157,7 +157,11 @@ class Config(object):
         return key in self._items
 
     def update_w_prefix(
-        self, dictionary: dict, prefix: str, allow_val_change=None, prefix_only=False
+        self,
+        dictionary: dict,
+        prefix: str,
+        allow_val_change=None,
+        prefix_only: bool = False,
     ):
         """Mock of wandb.config function
 
@@ -183,18 +187,16 @@ class Config(object):
                 remain[k] = value
         key1 = self.update(remain, allow_val_change=allow_val_change)
         key2 = self.update(prefix_dict, allow_val_change=allow_val_change)
-        key3 = set()
-
-        if f"{prefix}_params" in dictionary:
-            key3 = self.update(
-                dictionary[f"{prefix}_params"], allow_val_change=allow_val_change
-            )
-        key2 = key2 - key3
-        key1 = key1 - key2
-        key1 = key1 - key3
         keys = {k: k for k in key1}
-        keys.update({k: prefix + "_" + k for k in key2})
-        keys.update({k: prefix + "_params:" + k for k in key3})
+        keys.update({k: f"{prefix}_{k}" for k in key2})
+
+        for suffix in ["params", "kwargs"]:
+            if f"{prefix}_{suffix}" in dictionary:
+                key3 = self.update(
+                    dictionary[f"{prefix}_{suffix}"],
+                    allow_val_change=allow_val_change,
+                )
+                keys.update({k: f"{prefix}_{suffix}:{k}" for k in key3})
         return keys
 
     def update(self, dictionary: dict, allow_val_change=None):
