@@ -43,7 +43,6 @@ class Metrics:
 
             # default is to flatten the array
             per_species = params.pop("PerSpecies", False)
-            dim = params.pop("dim", tuple())
 
             if key not in self.running_stats:
                 self.running_stats[key] = {}
@@ -51,7 +50,6 @@ class Metrics:
                 self.funcs[key] = find_loss_function(functional, {})
 
             self.running_stats[key][reduction] = RunningStats(
-                dim=dim,
                 reduction=metrics_to_reduction.get(reduction, reduction),
                 **params,
             )
@@ -76,7 +74,7 @@ class Metrics:
                     # TO DO, this needs OneHot component. will need to be decoupled
                     params = {"accumulate_by": pred[AtomicDataDict.SPECIES_INDEX_KEY]}
 
-                if stat.dim == ():
+                if stat.dim == () and not self.per_species[key][reduction]:
                     metrics[(key, reduction)] = stat.accumulate_batch(
                         error.flatten(), **params
                     )
@@ -100,10 +98,7 @@ class Metrics:
         metrics = {}
         for key, stats in self.running_stats.items():
             for reduction, stat in stats.items():
-                if stat.dim == tuple() or stat.dim == (1,):
-                    metrics[(key, reduction)] = stat.current_result()
-                else:
-                    metrics[(key, reduction)] = stat.current_result()
+                metrics[(key, reduction)] = stat.current_result()
         return metrics
 
     def flatten_metrics(self, metrics, allowed_species=None):
@@ -125,12 +120,12 @@ class Metrics:
                 element_names = (
                     list(range(value.shape[0]))
                     if allowed_species is None
-                    else list(allowed_species.keys())
+                    else list(allowed_species)
                 )
 
-                if stat.dim == tuple():
+                if stat.output_dim == tuple():
                     for id_ele, v in enumerate(value):
-                        flat_dict[f"{element_name[id_ele]}_{item_name}"] = v
+                        flat_dict[f"{element_names[id_ele]}_{item_name}"] = v
 
                     flat_dict[f"all_{item_name}"] = value.mean().item()
                 else:
@@ -142,7 +137,7 @@ class Metrics:
                             skip_keys.append(name)
 
             else:
-                if stat.dim == tuple():
+                if stat.output_dim == tuple():
                     # a scalar
                     flat_dict[item_name] = value.item()
                 else:
