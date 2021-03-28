@@ -2,7 +2,7 @@ import inspect
 import logging
 
 from importlib import import_module
-from typing import Optional
+from typing import Optional, Union, List
 
 from nequip import data, datasets
 from .config import Config
@@ -62,11 +62,12 @@ def dataset_from_config(config):
 def instantiate_from_cls_name(
     module,
     class_name: str,
-    prefix: str = "",
+    prefix: Union[str, List[str]] = "",
     positional_args: dict = {},
     optional_args: Optional[dict] = None,
     all_args: Optional[dict] = None,
     remove_kwargs: bool = True,
+    return_args_only: bool = False,
 ):
     """Initialize a class based on a string class name
 
@@ -76,6 +77,9 @@ def instantiate_from_cls_name(
     positional_args (dict): positional arguments
     optional_args (optional, dict): optional arguments
     all_args (dict): list of all candidate parameters tha could potentially match the argument list
+    remove_kwargs: if True, ignore the kwargs argument in the init funciton
+        same definition as the one in Config.from_function
+    return_args_only (bool): if True, do not instantiate, only return the arguments
 
     Returns:
 
@@ -104,16 +108,18 @@ def instantiate_from_cls_name(
         optional_args=optional_args,
         all_args=all_args,
         remove_kwargs=remove_kwargs,
+        return_args_only=return_args_only,
     )
 
 
 def instantiate(
     cls_name,
-    prefix: str,
+    prefix: Union[str, List[str]],
     positional_args: dict = {},
     optional_args: dict = None,
     all_args: dict = None,
     remove_kwargs: bool = True,
+    return_args_only: bool = False,
 ):
     """Automatic initializing class instance by matching keys in the parameter dictionary to the constructor function.
 
@@ -130,43 +136,67 @@ def instantiate(
         all_args: the third priority group to search for keys.
         remove_kwargs: if True, ignore the kwargs argument in the init funciton
             same definition as the one in Config.from_function
+        return_args_only (bool): if True, do not instantiate, only return the arguments
     """
 
     # debug info
     logging.debug(f"..{cls_name.__name__} init: ")
 
+    if isinstance(prefix, str):
+        prefix_list = [prefix]
+    else:
+        prefix_list = prefix
+
     # detect the input parameters needed from params
     config = Config.from_class(cls_name, remove_kwargs=remove_kwargs)
+
+    keys = {}
     if all_args is not None:
-        key1, key2, key3 = config.update_w_prefix(all_args, prefix=prefix)
-        if len(key1) > 0:
-            logging.debug(f"....found keys {key1} from all_args")
-        if len(key2) > 0:
-            logging.debug(f"....found keys {key2} from all_args with prefix {prefix}_")
-        if len(key3) > 0:
-            logging.debug(f"....found keys {key3} from all_args in {prefix}_params")
+        # fetch paratemeters that directly match the name
+        _keys = config.update(all_args)
+        keys["all"] = {k: k for k in _keys}
+        for idx, prefix_str in enumerate(prefix_list):
+            # fetch paratemeters that match prefix + "_" + name
+            _keys = config.update_w_prefix(
+                all_args, prefix=prefix_str, prefix_only=True
+            )
+            keys["all"].update(_keys)
+
     if optional_args is not None:
-        key1, key2, key3 = config.update_w_prefix(optional_args, prefix=prefix)
-        if len(key1) > 0:
-            logging.debug(f"....found keys {key1} from optional_args")
-        if len(key2) > 0:
-            logging.debug(
-                f"....found keys {key2} from optional_args with prefix {prefix}_"
+        _keys = config.update(optional_args)
+        keys["optional"] = {k: k for k in _keys}
+        for idx, prefix_str in enumerate(prefix_list):
+            _keys = config.update_w_prefix(
+                optional_args, prefix=prefix_str, prefix_only=True
             )
-        if len(key3) > 0:
-            logging.debug(
-                f"....found keys {key3} from optional_args in {prefix}_params"
-            )
+            keys["optional"].update(_keys)
+
+    # for logging only, remove the overlapped keys
+    if "all" in keys and "optional" in keys:
+        keys["all"] = {
+            k: v for k, v in keys["all"].items() if k not in keys["optional"]
+        }
 
     optional_params = dict(config)
 
     # remove duplicates
     for key in positional_args:
         optional_params.pop(key, None)
+        for t in keys:
+            keys[t].pop(key, None)
 
+    for t in keys:
+        for k, v in keys[t].items():
+            if k == v:
+                logging.debug(f"....found keys {v} from {t}_args")
+            else:
+                logging.debug(f"....found keys {k} named as {v} from {t}_args")
     logging.debug(f"....{cls_name.__name__}_param = dict(")
     logging.debug(f"....   optional_params = {optional_params},")
     logging.debug(f"....   positional_params = {positional_args})")
+
+    if return_args_only:
+        return dict(**positional_args, **optional_params)
 
     instance = cls_name(**positional_args, **optional_params)
 
