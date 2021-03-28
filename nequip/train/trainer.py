@@ -643,9 +643,8 @@ class Trainer:
         # If we're in training, data_unscaled's target prop has been normalized, and out's hasn't been touched, so they're both in normalized units
         # Note that either way all normalization was handled internally by RescaleOutput
 
-        loss, loss_contrib = self.loss(pred=out, ref=data_unscaled)
-
         if not validation:
+            loss, loss_contrib = self.loss(pred=out, ref=data_unscaled)
             self.optim.zero_grad()
             loss.backward()
             self.optim.step()
@@ -654,10 +653,18 @@ class Trainer:
                 self.lr_sched.step(self.iepoch + self.ibatch / n_batches)
 
         with torch.no_grad():
-            if not validation and hasattr(self.model, "scale"):
-                # If we are in training mode, we need to bring the prediction
-                # into real units
-                out = self.model.scale(out, force_process=True)
+            if hasattr(self.model, "unscale"):
+                if validation:
+                    # loss function always needs to be in normalized unit
+                    scaled_out = self.model.unscale(out, force_process=True)
+                    _data_unscaled = self.model.unscale(data, force_process=True)
+                    loss, loss_contrib = self.loss(pred=scaled_out, ref=_data_unscaled)
+                else:
+                    # If we are in training mode, we need to bring the prediction
+                    # into real units
+                    out = self.model.scale(out, force_process=True)
+            elif validation:
+                loss, loss_contrib = self.loss(pred=out, ref=data_unscaled)
 
             # save metrics stats
             self.batch_losses = self.loss_stat(loss, loss_contrib)
