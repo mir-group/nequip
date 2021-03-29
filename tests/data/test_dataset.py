@@ -5,8 +5,6 @@ import torch
 
 from os.path import isdir
 
-from ase.atoms import Atoms
-from ase.calculators.singlepoint import SinglePointCalculator
 from ase.io import write
 
 from nequip.data import (
@@ -19,22 +17,9 @@ from nequip.utils import dataset_from_config, Config
 
 
 @pytest.fixture(scope="module")
-def ase_data():
+def ase_file(molecules):
     with tempfile.NamedTemporaryFile(suffix=".xyz") as fp:
-        L = 10.0
-        max_atoms = 5
-        nframes = 4
-        for i in range(nframes):
-            natoms = np.random.randint(2, max_atoms)
-            atoms = Atoms(
-                ["Au"] * natoms,
-                positions=np.random.random((natoms, 3)),
-                cell=[L, L, L],
-                pbc=[1, 1, 1],
-            )
-            atoms.calc = SinglePointCalculator(
-                atoms, **{"forces": np.random.random((natoms, 3))}
-            )
+        for atoms in molecules:
             write(fp.name, atoms, format="extxyz", append=True)
         yield fp.name
 
@@ -85,9 +70,9 @@ class TestInit:
         assert isdir(g.root)
         assert isdir(f"{g.root}/processed")
 
-    def test_ase(self, ase_data, root):
+    def test_ase(self, ase_file, root):
         a = ASEDataset(
-            file_name=ase_data,
+            file_name=ase_file,
             root=root,
             extra_fixed_fields={"r_max": 3.0},
             ase_args=dict(format="extxyz"),
@@ -182,11 +167,11 @@ class TestFromConfig:
         assert isdir(g.root)
         assert isdir(f"{g.root}/processed")
 
-    def test_ase(self, ase_data, root):
+    def test_ase(self, ase_file, root):
         config = Config(
             dict(
                 dataset="ASEDataset",
-                file_name=ase_data,
+                file_name=ase_file,
                 root=root,
                 extra_fixed_fields={"r_max": 3.0},
                 ase_args=dict(format="extxyz"),
