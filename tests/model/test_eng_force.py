@@ -84,7 +84,6 @@ def device(request):
     return request.param
 
 
-
 class TestWorkflow:
     """
     test class methods
