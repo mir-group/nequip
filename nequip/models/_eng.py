@@ -1,3 +1,4 @@
+import inspect
 import logging
 
 from nequip.data import AtomicDataDict
@@ -79,7 +80,38 @@ def EnergyModel(**shared_params):
     # insertion preserves order
     for layer_i in range(num_layers):
         layers.update({f"layer{layer_i}_{bk}": v for bk, v in before_layer.items()})
-        layers[f"layer{layer_i}_convnet"] = ConvNetLayer
+
+        layer_name = f"layer{layer_i}_convnet"
+
+        # find out convolution type and other parameters
+        layer_kwargs = instantiate(
+            ConvNetLayer,
+            prefix=["ConvNetLayer", "convnet", layer_name],
+            all_args=shared_params,
+            remove_kwargs=True,
+            return_args_only=True,
+        )
+        convolution = layer_kwargs["convolution"]
+
+        # find out kwargs for convlution
+        convolution_kwargs = instantiate(
+            convolution,
+            prefix=[
+                convolution.__name__,
+                "convolution",
+                "ConvNetLayer",
+                "convnet",
+                layer_name,
+                layer_name + "_convolution",
+            ],
+            all_args=shared_params,
+            remove_kwargs=True,
+            return_args_only=True,
+        )
+        layer_kwargs["convolution_kwargs"] = convolution_kwargs
+
+        layers[layer_name] = (ConvNetLayer, layer_kwargs)
+
         layers.update({f"layer{layer_i}_{ak}": v for ak, v in after_layer.items()})
 
     # .update also maintains insertion order

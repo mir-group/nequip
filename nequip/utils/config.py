@@ -156,7 +156,13 @@ class Config(object):
     def __contains__(self, key):
         return key in self._items
 
-    def update_w_prefix(self, dictionary: dict, prefix: str, allow_val_change=None):
+    def update_w_prefix(
+        self,
+        dictionary: dict,
+        prefix: str,
+        allow_val_change=None,
+        prefix_only: bool = False,
+    ):
         """Mock of wandb.config function
 
         Add a dictionary of parameters to the
@@ -177,17 +183,21 @@ class Config(object):
         for k, value in dictionary.items():
             if k.startswith(prefix + "_"):
                 prefix_dict[k[len(prefix) + 1 :]] = value
-            else:
+            elif not prefix_only:
                 remain[k] = value
         key1 = self.update(remain, allow_val_change=allow_val_change)
         key2 = self.update(prefix_dict, allow_val_change=allow_val_change)
-        key3 = set()
+        keys = {k: k for k in key1}
+        keys.update({k: f"{prefix}_{k}" for k in key2})
 
-        if f"{prefix}_params" in dictionary:
-            key3 = self.update(
-                dictionary[f"{prefix}_params"], allow_val_change=allow_val_change
-            )
-        return (key1, key2, key3)
+        for suffix in ["params", "kwargs"]:
+            if f"{prefix}_{suffix}" in dictionary:
+                key3 = self.update(
+                    dictionary[f"{prefix}_{suffix}"],
+                    allow_val_change=allow_val_change,
+                )
+                keys.update({k: f"{prefix}_{suffix}:{k}" for k in key3})
+        return keys
 
     def update(self, dictionary: dict, allow_val_change=None):
         """Mock of wandb.config function
