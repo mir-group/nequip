@@ -1,5 +1,7 @@
 import pytest
+import torch
 
+from nequip.data import AtomicData
 from nequip.nn import (
     AtomwiseLinear,
     AtomwiseReduce,
@@ -40,11 +42,12 @@ def model(float_tolerance, request):
 
 @pytest.fixture(scope="class")
 def batches(float_tolerance, nequip_dataset):
-    return (
-        Batch.from_data_list([nequip_dataset.data[0]]),
-        Batch.from_data_list([nequip_dataset.data[1]]),
-        Batch.from_data_list(nequip_dataset.data[:1]),
-    )
+    b = []
+    for idx in [[0], [1], [0, 1]]:
+        b += [
+            AtomicData.to_AtomicDataDict(Batch.from_data_list(nequip_dataset.data[idx]))
+        ]
+    return b
 
 
 def test_per_specie_shift(nequip_dataset, batches, model):
@@ -55,5 +58,9 @@ def test_per_specie_shift(nequip_dataset, batches, model):
     result12 = model(batch12)
 
     assert torch.isclose(
-        result1["shifted"] + result2["shifted"], result12["shifted"].sum()
+        result1["shifted"], result12["shifted"][0]
     )
+    assert torch.isclose(
+        result2["shifted"], result12["shifted"][1]
+    )
+    print(result1["shifted"], result2["shifted"], result12["shifted"])
