@@ -82,6 +82,7 @@ def set_irreps_debug(enabled: bool = False):
     from torch_geometric.data import Data
 
     def pre_hook(mod: GraphModuleMixin, inp):
+        __tracebackhide__ = True
         if not isinstance(mod, GraphModuleMixin):
             return
         mname = type(mod).__name__
@@ -104,6 +105,10 @@ def set_irreps_debug(enabled: bool = False):
                     f"Field {k} with irreps {ir} expected to be input to {mname}; not present"
                 )
             elif isinstance(inp[k], torch.Tensor) and isinstance(ir, o3.Irreps):
+                if inp[k].ndim == 1:
+                    raise ValueError(
+                        f"Field {k} in input to module {mname} has only one dimension."
+                    )
                 if inp[k].shape[-1] != ir.dim:
                     raise ValueError(
                         f"Field {k} in input to module {mname} has last dimension {inp[k].shape[-1]} but its irreps {ir} indicate last dimension {ir.dim}"
@@ -113,6 +118,7 @@ def set_irreps_debug(enabled: bool = False):
     h1 = torch.nn.modules.module.register_module_forward_pre_hook(pre_hook)
 
     def post_hook(mod: GraphModuleMixin, _, out):
+        __tracebackhide__ = True
         if not isinstance(mod, GraphModuleMixin):
             return
         mname = type(mod).__name__
@@ -126,6 +132,10 @@ def set_irreps_debug(enabled: bool = False):
                     f"Field {k} with irreps {ir} expected to be in output from {mname}; not present"
                 )
             elif isinstance(out[k], torch.Tensor) and isinstance(ir, o3.Irreps):
+                if out[k].ndim == 1:
+                    raise ValueError(
+                        f"Field {k} in output from module {mname} has only one dimension."
+                    )
                 if out[k].shape[-1] != ir.dim:
                     raise ValueError(
                         f"Field {k} in output from {mname} has last dimension {out[k].shape[-1]} but its irreps {ir} indicate last dimension {ir.dim}"
