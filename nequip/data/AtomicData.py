@@ -73,7 +73,15 @@ class AtomicData(Data):
                 else:
                     kwargs[k] = torch.as_tensor(v)
             elif np.issubdtype(type(v), np.floating):
-                kwargs[k] = torch.as_tensor(v, dtype=torch.get_default_dtype())
+                # Force scalars to be tensors with a data dimension
+                # This makes them play well with irreps
+                kwargs[k] = torch.as_tensor(
+                    v, dtype=torch.get_default_dtype()
+                ).unsqueeze(-1)
+            elif isinstance(v, torch.Tensor) and len(v.shape) == 0:
+                # ^ this tensor is a scalar; we need to give it
+                # a data dimension to play nice with irreps
+                kwargs[k] = v.unsqueeze(-1)
 
         super().__init__(num_nodes=len(kwargs["pos"]), **kwargs)
 
