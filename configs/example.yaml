@@ -26,12 +26,18 @@ invariant_layers: 1                                                             
 invariant_neurons: 8                                                              # number of hidden neurons in radial function, again keep this small for MD applications, 8 - 32, smaller is faster
 avg_num_neighbors: null                                                           # number of neighbors to divide by, None => no normalization.
 use_sc: true                                                                      # use self-connection or not, usually gives big improvement
-layer1_convnet_use_sc: true                                                       # use "layer{i}_convent_" prefix to specify parameter for only one of the layer, 
-layer2_convnet_params:
-  use_sc: true                                                       # use "layer{i}_convent_" prefix to specify parameter for only one of the layer, 
+
+# to specify different parameters for each convolutional layer, try examples below
+# layer1_use_sc: true                                                             # use "layer{i}_" prefix to specify parameters for only one of the layer, 
+# layer2_params:
+#   use_sc: true                                                                  # use "layer{i}_params" dictionary to specify parameters for only one of the layer, 
+# priority for different definition: 
+# invariant_neurons < convolution_invariant_neurons < convolution_kwargs:invariant_neurons 
+# < layer{i}_convnet_invariant_neurons < layer{i}_convnet_params:invariant_neurons (edited) 
+
 energy_shift_enable: true                                                         # whether shift the energy
-energy_shift_shifts: [0, 0, 0]                                                    # atomic energy shift for each specie. ordered with atomic number
-energy_shift_total_shift: 1.0                                                     # total energy shift
+energy_shift_shifts: [0, 0, 0]                                                    # atomic energy shift for each specie. order should be the same as the allowed_species used in train.py
+energy_shift_total_shift: 0.0                                                     # total energy shift
 energy_shift_trainable: true                                                      # whether the shifts are trainable
 
 # data set
