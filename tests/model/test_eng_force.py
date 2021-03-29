@@ -140,7 +140,7 @@ class TestGradient:
 
         model = force_model(**config)
         model.to(device)
-        data = atomic_batch.to(debice)
+        data = atomic_batch.to(device)
         output = model(AtomicData.to_AtomicDataDict(data))
 
         forces = output[AtomicDataDict.FORCE_KEY]
@@ -152,11 +152,11 @@ class TestGradient:
             pos = data[AtomicDataDict.POSITIONS_KEY][iatom, idir]
             data[AtomicDataDict.POSITIONS_KEY][iatom, idir] = pos + epsilon
             output = model(AtomicData.to_AtomicDataDict(data.to(device)))
-            e_plus = output[AtomicDataDict.TOTAL_ENERGY_KEY]
+            e_plus = output[AtomicDataDict.TOTAL_ENERGY_KEY].sum()
 
             data[AtomicDataDict.POSITIONS_KEY][iatom, idir] -= epsilon2
             output = model(AtomicData.to_AtomicDataDict(data.to(device)))
-            e_minus = output[AtomicDataDict.TOTAL_ENERGY_KEY]
+            e_minus = output[AtomicDataDict.TOTAL_ENERGY_KEY].sum()
 
             numeric = -(e_plus - e_minus) / epsilon2
             analytical = forces[iatom, idir]

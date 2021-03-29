@@ -78,6 +78,5 @@ def nequip_dataset(molecules, temp_data, float_tolerance):
 def atomic_batch(nequip_dataset):
     return Batch.from_data_list([nequip_dataset.data[0], nequip_dataset.data[1]])
 
-
 # Use debug mode
 set_irreps_debug(True)
