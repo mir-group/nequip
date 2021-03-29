@@ -708,12 +708,11 @@ class Trainer:
                     data=batch,
                     validation=(category == VALIDATION),
                 )
+                self.end_of_batch_log(validation=False)
+                for callback in self.end_of_batch_callbacks:
+                    callback(self)
             self.metrics_dict[category] = self.metrics.current_result()
             self.loss_dict[category] = self.loss_stat.current_result()
-
-            self.end_of_batch_log(validation=False)
-            for callback in self.end_of_batch_callbacks:
-                callback(self)
 
             if category == TRAIN:
                 for callback in self.end_of_train_callbacks:
@@ -778,9 +777,9 @@ class Trainer:
         batch_logger = logging.getLogger(self.batch_log[batch_type])
         if not self.batch_header_print[batch_type]:
             self.batch_header_print[batch_type] = True
+            batch_logger.info(header)
 
         if self.ibatch == 0:
-            batch_logger.info(header)
             self.logger.info(log_header)
 
         batch_logger.info(mat_str)
