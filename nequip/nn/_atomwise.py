@@ -76,7 +76,7 @@ class AtomwiseReduce(GraphModuleMixin, torch.nn.Module):
         data = AtomicDataDict.with_batch(data)
         data[self.out_field] = scatter(
             data[self.field], data[AtomicDataDict.BATCH_KEY], dim=0, reduce=self.reduce
-        ).squeeze(-1)
+        )
         return data
 
 

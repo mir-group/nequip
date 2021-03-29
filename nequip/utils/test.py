@@ -107,9 +107,9 @@ def set_irreps_debug(enabled: bool = False):
             elif isinstance(inp[k], torch.Tensor) and isinstance(ir, o3.Irreps):
                 if inp[k].ndim == 1:
                     raise ValueError(
-                        f"Field {k} in input to module {mname} has only one dimension."
+                        f"Field {k} in input to module {mname} has only one dimension (assumed to be batch-like); it must have a second irreps dimension even if irreps.dim == 1 (i.e. a single per atom scalar must have shape [N_at, 1], not [N_at])"
                     )
-                if inp[k].shape[-1] != ir.dim:
+                elif inp[k].shape[-1] != ir.dim:
                     raise ValueError(
                         f"Field {k} in input to module {mname} has last dimension {inp[k].shape[-1]} but its irreps {ir} indicate last dimension {ir.dim}"
                     )
@@ -134,9 +134,9 @@ def set_irreps_debug(enabled: bool = False):
             elif isinstance(out[k], torch.Tensor) and isinstance(ir, o3.Irreps):
                 if out[k].ndim == 1:
                     raise ValueError(
-                        f"Field {k} in output from module {mname} has only one dimension."
+                        f"Field {k} in output from module {mname} has only one dimension (assumed to be batch-like); it must have a second irreps dimension even if irreps.dim == 1 (i.e. a single per atom scalar must have shape [N_at, 1], not [N_at])"
                     )
-                if out[k].shape[-1] != ir.dim:
+                elif out[k].shape[-1] != ir.dim:
                     raise ValueError(
                         f"Field {k} in output from {mname} has last dimension {out[k].shape[-1]} but its irreps {ir} indicate last dimension {ir.dim}"
                     )
