@@ -35,7 +35,7 @@ def temp_data(float_tolerance):
 
 
 @pytest.fixture(scope="session")
-def CH3CHO():
+def CH3CHO(float_tolerance):
     atoms = molecule("CH3CHO")
     data = AtomicData.from_ase(atoms, r_max=2.0)
     return atoms, data
