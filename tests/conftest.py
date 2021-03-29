@@ -9,6 +9,8 @@ from ase.build import molecule
 from ase.calculators.singlepoint import SinglePointCalculator
 from ase.io import write
 
+from torch_geometric.data import Batch
+
 from nequip.utils.test import set_irreps_debug
 from nequip.data import AtomicData, ASEDataset
 
@@ -33,21 +35,21 @@ def temp_data(float_tolerance):
 
 
 @pytest.fixture(scope="session")
-def CH3CHO(float_tolerance):
+def CH3CHO():
     atoms = molecule("CH3CHO")
     data = AtomicData.from_ase(atoms, r_max=2.0)
     return atoms, data
 
 
 @pytest.fixture(scope="session")
-def molecules(float_tolerance):
+def molecules():
     atoms_list = []
     for i in range(8):
         atoms = molecule("CH3CHO" if i % 2 == 0 else "H2")
         atoms.rattle()
         atoms.set_calculator(
             SinglePointCalculator(
-                energy=np.random,
+                energy=np.random.random(),
                 forces=np.random.random((len(atoms), 3)),
                 stress=None,
                 magmoms=None,
@@ -70,6 +72,11 @@ def nequip_dataset(molecules, temp_data, float_tolerance):
             ase_args=dict(format="extxyz"),
         )
         yield a
+
+
+@pytest.fixture(scope="session")
+def atomic_batch(nequip_dataset):
+    return Batch.from_data_list([nequip_dataset.data[0], nequip_dataset.data[1]])
 
 
 # Use debug mode

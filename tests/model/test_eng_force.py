@@ -2,14 +2,10 @@ import logging
 import numpy as np
 import pytest
 
-import ase
-import ase.build
 import tempfile
 import torch
 
 from os.path import isfile
-from ase.calculators.singlepoint import SinglePointCalculator
-from torch_geometric.data import Batch
 
 from e3nn import o3
 from e3nn.util.jit import script
@@ -23,7 +19,7 @@ from nequip.utils.test import assert_AtomicData_equivariant
 
 logging.basicConfig(level=logging.DEBUG)
 
-ALLOWED_SPECIES = [1, 8]
+ALLOWED_SPECIES = [1, 6, 8]
 r_max = 3
 minimal_config1 = dict(
     allowed_species=ALLOWED_SPECIES,
@@ -88,37 +84,6 @@ def device(request):
     return request.param
 
 
-@pytest.fixture(scope="module")
-def data(float_tolerance):
-    torch.manual_seed(0)
-    np.random.seed(0)
-    data = AtomicData.from_ase(get_atoms(), r_max=3)
-    return data
-
-
-@pytest.fixture(scope="module")
-def batch(data, float_tolerance):
-    torch.manual_seed(0)
-    np.random.seed(0)
-    data1 = AtomicData.from_ase(get_atoms(), r_max=3)
-    data2 = AtomicData.from_ase(get_atoms(), r_max=3)
-    batch = Batch.from_data_list([data1, data2])
-    return batch
-
-
-def get_atoms():
-    atoms = []
-    atoms = ase.build.molecule("H2O")
-    atoms.rattle(stdev=1)
-    atoms.calc = SinglePointCalculator(
-        atoms,
-        **{
-            "forces": np.random.random((len(atoms), 3)),
-            "free_energy": np.random.random(1),
-        },
-    )
-    return atoms
-
 
 class TestWorkflow:
     """
@@ -129,10 +94,10 @@ class TestWorkflow:
         instance, _ = model
         assert isinstance(instance, GraphModuleMixin)
 
-    def test_jit(self, model, data, device):
+    def test_jit(self, model, atomic_batch, device):
         instance, out_field = model
         instance = instance.to(device=device)
-        data = data.to(device)
+        data = atomic_batch.to(device)
         model_script = script(instance)
         assert torch.allclose(
             instance(AtomicData.to_AtomicDataDict(data))[out_field],
@@ -153,10 +118,10 @@ class TestWorkflow:
             == true_irreps
         )
 
-    def test_forward(self, model, data, device):
+    def test_forward(self, model, atomic_batch, device):
         instance, out_field = model
         instance.to(device)
-        data = data.to(device)
+        data = atomic_batch.to(device)
         output = instance(AtomicData.to_AtomicDataDict(data))
         assert out_field in output
 
@@ -171,11 +136,12 @@ class TestWorkflow:
 
 
 class TestGradient:
-    def test_numeric_gradient(self, config, data, device, float_tolerance):
+    def test_numeric_gradient(self, config, atomic_batch, device, float_tolerance):
 
         model = force_model(**config)
         model.to(device)
-        output = model(AtomicData.to_AtomicDataDict(data.to(device)))
+        data = atomic_batch.to(debice)
+        output = model(AtomicData.to_AtomicDataDict(data))
 
         forces = output[AtomicDataDict.FORCE_KEY]
 
@@ -201,7 +167,8 @@ class TestGradient:
 
 
 class TestAutoGradient:
-    def test_cross_frame_grad(self, config, batch):
+    def test_cross_frame_grad(self, config, nequip_dataset):
+        batch = nequip_dataset.data
         device = "cpu"
         energy_model = EnergyModel(**config)
         energy_model.to(device)
@@ -225,6 +192,6 @@ class TestAutoGradient:
 
 
 class TestEquivariance:
-    def test_forward(self, model, data):
+    def test_forward(self, model, atomic_batch):
         instance, out_field = model
-        assert_AtomicData_equivariant(func=instance, data_in=data)
+        assert_AtomicData_equivariant(func=instance, data_in=atomic_batch)
