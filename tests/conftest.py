@@ -47,14 +47,12 @@ def molecules():
     for i in range(8):
         atoms = molecule("CH3CHO" if i % 2 == 0 else "H2")
         atoms.rattle()
-        atoms.set_calculator(
-            SinglePointCalculator(
-                energy=np.random.random(),
-                forces=np.random.random((len(atoms), 3)),
-                stress=None,
-                magmoms=None,
-                atoms=atoms,
-            )
+        atoms.calc = SinglePointCalculator(
+            energy=np.random.random(),
+            forces=np.random.random((len(atoms), 3)),
+            stress=None,
+            magmoms=None,
+            atoms=atoms,
         )
         atoms_list.append(atoms)
     return atoms_list
@@ -77,6 +75,7 @@ def nequip_dataset(molecules, temp_data, float_tolerance):
 @pytest.fixture(scope="session")
 def atomic_batch(nequip_dataset):
     return Batch.from_data_list([nequip_dataset.data[0], nequip_dataset.data[1]])
+
 
 # Use debug mode
 set_irreps_debug(True)
