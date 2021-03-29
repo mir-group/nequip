@@ -132,7 +132,7 @@ class Metrics:
 
                 if stat.output_dim == tuple():
                     for id_ele, v in enumerate(value):
-                        flat_dict[f"{element_names[id_ele]}_{item_name}"] = v
+                        flat_dict[f"{element_names[id_ele]}_{item_name}"] = v.item()
 
                     flat_dict[f"all_{item_name}"] = value.mean().item()
                 else:
@@ -140,7 +140,7 @@ class Metrics:
                         ele = element_names[id_ele]
                         for idx, v in enumerate(vec):
                             name = f"{ele}_{item_name}_{idx}"
-                            flat_dict[name] = v
+                            flat_dict[name] = v.item()
                             skip_keys.append(name)
 
             else:
@@ -149,6 +149,6 @@ class Metrics:
                     flat_dict[item_name] = value.item()
                 else:
                     # a vector
-                    for idx, v in enumerate(value):
-                        flat_dict[f"{item_name}_{idx}"] = v
+                    for idx, v in enumerate(value.flatten()):
+                        flat_dict[f"{item_name}_{idx}"] = v.item()
         return flat_dict, skip_keys
