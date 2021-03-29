@@ -81,7 +81,7 @@ def EnergyModel(**shared_params):
     for layer_i in range(num_layers):
         layers.update({f"layer{layer_i}_{bk}": v for bk, v in before_layer.items()})
 
-        layer_name = f"layer{layer_i}_convnet"
+        layer_name = f"layer{layer_i}"
 
         # find out convolution type and other parameters
         layer_kwargs = instantiate(
