@@ -23,23 +23,7 @@ class Metrics:
         self.funcs = {}
         for component in components:
 
-            # parse the input list
-            reduction = "mae"
-            params = {}
-
-            if isinstance(component, str):
-                key = component
-            elif len(component) == 1:
-                key = component[0]
-            elif len(component) == 2:
-                key, reduction = component
-            elif len(component) == 3:
-                key, reduction, _params = component
-                params = {k: deepcopy(v) for k, v in _params.items()}
-            else:
-                raise ValueError(
-                    f"tuple should have a max length of 3 but {len(component)} is given"
-                )
+            key, reduction, params = Metrics.parse(component)
 
             functional = params.pop("functional", "L1Loss")
 
@@ -56,6 +40,27 @@ class Metrics:
                 **params,
             )
             self.per_species[key][reduction] = per_species
+
+    @staticmethod
+    def parse(component):
+        # parse the input list
+        reduction = "mae"
+        params = {}
+
+        if isinstance(component, str):
+            key = component
+        elif len(component) == 1:
+            key = component[0]
+        elif len(component) == 2:
+            key, reduction = component
+        elif len(component) == 3:
+            key, reduction, _params = component
+            params = {k: deepcopy(v) for k, v in _params.items()}
+        else:
+            raise ValueError(
+                f"tuple should have a max length of 3 but {len(component)} is given"
+            )
+        return key, reduction, params
 
     def __call__(self, pred: dict, ref: dict):
 

@@ -212,6 +212,7 @@ class Trainer:
         loss_coeffs: Union[dict, str] = AtomicDataDict.TOTAL_ENERGY_KEY,
         metrics_components: Optional[Union[dict, str]] = None,
         metrics_key: str = ABBREV.get(LOSS_KEY, LOSS_KEY),
+        early_stop_lower_threshold:Optional[float] = None,
         max_epochs: int = 1000000,
         lr_sched=None,
         learning_rate: float = 1e-2,
@@ -552,9 +553,12 @@ class Trainer:
                 self.metrics_components.append((key, "rmse", params))
         elif hasattr(self, "dataset_train"):
             # update the metric dim based on dataset data
-            for comp in self.metrics_components:
-                key, reduction, params = comp
+            new_list = []
+            for component in self.metrics_components:
+                key, reduction, params = Metrics.parse(component)
                 params["dim"] = self.dataset_train[0][key].shape[1:]
+                new_list.append((key, reduction, params))
+            self.metrics_components = new_list
 
         self.metrics, _ = instantiate(
             cls_name=Metrics,
@@ -678,6 +682,9 @@ class Trainer:
     def early_stop_cond(self):
         """ kill the training early """
 
+        if self.early_stop_lower_threshold is not None:
+            if self.best_val_metrics < self.early_stop_lower_threshold:
+                return True
         return False
 
     def reset_metrics(self):
