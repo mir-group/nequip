@@ -616,7 +616,7 @@ class Trainer:
 
         self.save(self.trainer_save_path)
 
-    def batch_step(self, data, n_batches, validation=False):
+    def batch_step(self, data, validation=False):
         if validation:
             self.model.eval()
         else:
@@ -650,7 +650,7 @@ class Trainer:
             self.optim.step()
 
             if self.lr_scheduler_name == "CosineAnnealingWarmRestarts":
-                self.lr_sched.step(self.iepoch + self.ibatch / n_batches)
+                self.lr_sched.step(self.iepoch + self.ibatch / self.n_batches)
 
         with torch.no_grad():
             if hasattr(self.model, "unscale"):
@@ -674,42 +674,43 @@ class Trainer:
             # out to be in real units above.
             self.batch_metrics = self.metrics(pred=out, ref=data)
 
-            self.end_of_batch_log(validation)
-            for callback in self.end_of_batch_callbacks:
-                callback(self)
-
     @property
     def early_stop_cond(self):
         """ kill the training early """
 
         return False
 
+    def reset_metrics(self):
+        self.loss_stat.reset()
+        self.loss_stat.to(self.device)
+        self.metrics.reset()
+        self.metrics.to(self.device)
+
     def epoch_step(self):
 
-        self.loss_stat.reset()
-        self.loss_stat.to(self.device)
-        self.metrics.reset()
-        self.metrics.to(self.device)
-        for self.ibatch, batch in enumerate(self.dl_train):
-            self.batch_step(
-                data=batch,
-                n_batches=self.n_train_batches,
-                validation=False,
-            )
-        self.train_metrics = self.metrics.current_result()
-        self.train_loss = self.loss_stat.current_result()
+        datasets = [self.dl_train, self.dl_val]
+        categories = [TRAIN, VALIDATION]
+        self.metrics_dict = {}
+        self.loss_dict = {}
+        for category, dataset in zip(categories, datasets):
 
-        for callback in self.end_of_train_callbacks:
-            callback(self)
+            self.reset_metrics()
+            self.n_batches = len(dataset)
+            for self.ibatch, batch in enumerate(dataset):
+                self.batch_step(
+                    data=batch,
+                    validation=(category == VALIDATION),
+                )
+            self.metrics_dict[category] = self.metrics.current_result()
+            self.loss_dict[category] = self.loss_stat.current_result()
 
-        self.loss_stat.reset()
-        self.loss_stat.to(self.device)
-        self.metrics.reset()
-        self.metrics.to(self.device)
-        for self.ibatch, batch in enumerate(self.dl_val):
-            self.batch_step(data=batch, n_batches=self.n_val_batches, validation=True)
-        self.val_metrics = self.metrics.current_result()
-        self.val_loss = self.loss_stat.current_result()
+            self.end_of_batch_log(validation=False)
+            for callback in self.end_of_batch_callbacks:
+                callback(self)
+
+            if category == TRAIN:
+                for callback in self.end_of_train_callbacks:
+                    callback(self)
 
         self.end_of_epoch_log()
         self.end_of_epoch_save()
@@ -778,7 +779,7 @@ class Trainer:
         batch_logger.info(mat_str)
         if (self.ibatch + 1) % self.log_batch_freq == 0 or (
             self.ibatch + 1
-        ) == self.n_train_batches:
+        ) == self.n_batches:
             self.logger.info(log_str)
 
     def end_of_epoch_save(self):
@@ -828,8 +829,6 @@ class Trainer:
 
         header = "# Epoch\n# wall\n# LR"
 
-        metrics = [self.train_metrics, self.val_metrics]
-        losses = [self.train_loss, self.val_loss]
         categories = [TRAIN, VALIDATION]
         log_header = {}
         log_str = {}
@@ -841,18 +840,17 @@ class Trainer:
             log_header[cat] += " ".join([f"{s:>8s}" for s in strings])
             log_str[cat] = f"{mat_str}"
 
-        for icat in range(2):
+        for category in categories:
 
-            category = categories[icat]
             met, skip_keys = self.metrics.flatten_metrics(
-                metrics=metrics[icat],
+                metrics=self.metrics_dict[category],
                 allowed_species=self.model.config.get("allowed_species", None)
                 if hasattr(self.model, "config")
                 else None,
             )
 
             # append details from loss
-            for key, value in losses[icat].items():
+            for key, value in self.loss_dict[category].items():
                 mat_str += f" {value:16.5g}"
                 header += f"\n# {category}_{key}"
                 log_str[category] += f" {value:12.3g}"
@@ -942,6 +940,3 @@ class Trainer:
             optional_args=self.loader_params,
             all_args=self.kwargs,
         )
-
-        self.n_train_batches = len(self.dl_train.dataset)
-        self.n_val_batches = len(self.dl_val.dataset)
