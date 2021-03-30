@@ -301,6 +301,7 @@ class DummyNet(torch.nn.Module):
         x = data["pos"]
         return {
             AtomicDataDict.FORCE_KEY: self.linear2(x),
+            AtomicDataDict.TOTAL_ENERGY_KEY: self.linear1(x),
         }
 
 
@@ -352,7 +353,7 @@ def scale_train(nequip_dataset):
             loss_coeffs=AtomicDataDict.FORCE_KEY,
             root=path,
         )
-        trainer.set_dataset(npz_dataset)
+        trainer.set_dataset(nequip_dataset)
         trainer.train()
         trainer.scale = 1.3
         yield trainer
