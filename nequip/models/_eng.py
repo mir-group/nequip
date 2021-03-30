@@ -102,9 +102,7 @@ def EnergyModel(**shared_params):
                 "ConvNetLayer",
                 "convnet",
                 f"layer{layer_i}",
-                layer_name,
-                f"layer{layer_i}_convolution",
-                layer_name + "_convolution",
+                f"layer{layer_i}_{convolution.__name__}"
             ],
             all_args=shared_params,
             remove_kwargs=True,
