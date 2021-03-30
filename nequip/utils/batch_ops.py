@@ -28,8 +28,6 @@ def bincount(
 
         num_batch = batch.max() + 1
 
-        return scatter(
-            torch.ones(1, device=input.device, dtype=input.dtype).expand(input.shape),
-            input,
-            dim_size=minlength * num_batch,
-        ).reshape(num_batch, minlength)
+        return torch.bincount(input, minlength=minlength * num_batch).reshape(
+            num_batch, minlength
+        )
