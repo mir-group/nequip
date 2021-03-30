@@ -47,13 +47,6 @@ def force_model(**kwargs):
     return ForceModel(energy_model)
 
 
-devices = (
-    [torch.device("cuda"), torch.device("cpu")]
-    if torch.cuda.is_available()
-    else [torch.device("cpu")]
-)
-
-
 @pytest.fixture(scope="module", params=[minimal_config1, minimal_config2])
 def config(request):
     return request.param
@@ -94,13 +87,24 @@ class TestWorkflow:
         assert isinstance(instance, GraphModuleMixin)
 
     def test_jit(self, model, atomic_batch, device):
+
         instance, out_field = model
+
+        data = AtomicData.to_AtomicDataDict(atomic_batch.to(device=device))
+
         instance = instance.to(device=device)
-        data = atomic_batch.to(device)
         model_script = script(instance)
+
+        result0 = instance(data)[out_field].flatten()
+        result1 = model_script(data)[out_field].flatten()
+        d = result0-result1
+        for i in range(result0.shape[0]):
+            print(i, f"({result0[i].item():10.3g})-({result1[i].item():10.3g})=({d[i].item():10.3g})", torch.isclose(result0[i], result1[i]).item())
+
         assert torch.allclose(
-            instance(AtomicData.to_AtomicDataDict(data))[out_field],
-            model_script(AtomicData.to_AtomicDataDict(data))[out_field],
+            instance(data)[out_field],
+            model_script(data)[out_field],
+            atol=1e-7
         )
 
     def test_submods(self):
