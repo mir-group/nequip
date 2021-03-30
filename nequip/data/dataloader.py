@@ -31,7 +31,7 @@ class Collater(object):
                 new_dim_fixed.add(f)
         # TODO: cache ^ and the batched versions of fixed fields for various batch sizes if necessary for performance
         out = Batch.from_data_list(
-            batch, exclude_keys=set(self.exclude_keys).union(new_dim_fixed)
+            batch, exclude_keys=self._exclude_keys.union(new_dim_fixed)
         )
         for f in new_dim_fixed:
             out[f] = batch[0][f]

@@ -167,13 +167,6 @@ def H2(float_tolerance):
 
 
 @pytest.fixture(scope="session")
-def CH3CHO(float_tolerance):
-    atoms = ase.build.molecule("CH3CHO")
-    data = AtomicData.from_ase(atoms, r_max=2.0)
-    return atoms, data
-
-
-@pytest.fixture(scope="session")
 def CuFcc(float_tolerance):
     atoms = ase.build.bulk("Cu", "fcc", a=3.6, cubic=True)
     atoms.calc = SinglePointCalculator(
