@@ -63,9 +63,9 @@ class TestTrainerSetUp:
 
 
 class TestDuplicateError:
-    def test_duplicate_id_2(self, root):
+    def test_duplicate_id_2(self, temp_data):
 
-        minimal_config["root"] = root
+        minimal_config["root"] = temp_data
 
         model = DummyNet(3)
         c1 = Trainer(model=model, **minimal_config)
@@ -74,7 +74,6 @@ class TestDuplicateError:
         c2 = Trainer(model=model, **minimal_config)
         logfile2 = c2.logfile
 
-        assert c1.workdir in c2.workdir
         assert c1.root == c2.root
         assert c1.workdir != c2.workdir
         assert c1.logfile.endswith("log")
@@ -175,20 +174,20 @@ class TestSaveLoad:
 class TestData:
     @one_config_test
     @pytest.mark.parametrize("mode", ["random", "sequential"])
-    def test_split(self, trainer, npz_dataset, mode):
+    def test_split(self, trainer, nequip_dataset, mode):
 
         trainer.train_val_split = mode
-        trainer.set_dataset(npz_dataset)
+        trainer.set_dataset(nequip_dataset)
         for i, batch in enumerate(trainer.dl_train):
             print(i, batch)
 
 
 class TestTrain:
     @one_config_test
-    def test_train(self, trainer, npz_dataset):
+    def test_train(self, trainer, nequip_dataset):
 
         v0 = get_param(trainer.model)
-        trainer.set_dataset(npz_dataset)
+        trainer.set_dataset(nequip_dataset)
         trainer.train()
         v1 = get_param(trainer.model)
 
@@ -216,12 +215,12 @@ class TestTrain:
             assert trainer1.max_epochs == minimal_config["max_epochs"] * 2
 
     @one_config_test
-    def test_restart_training(self, trainer, npz_dataset):
+    def test_restart_training(self, trainer, nequip_dataset):
 
         model = trainer.model
         device = trainer.device
         optimizer = trainer.optim
-        trainer.set_dataset(npz_dataset)
+        trainer.set_dataset(nequip_dataset)
         trainer.train()
 
         v0 = get_param(trainer.model)
@@ -241,7 +240,7 @@ class TestTrain:
             trainer1 = Trainer.from_dict(dictionary, append=False)
             trainer1.stop_arg = None
             trainer1.max_epochs *= 2
-            trainer1.set_dataset(npz_dataset)
+            trainer1.set_dataset(nequip_dataset)
             trainer1.train()
             v1 = get_param(trainer1.model)
 
@@ -287,33 +286,6 @@ def get_param(model):
         v += [np.hstack(p.data.tolist())]
     v = np.hstack(v)
     return v
-
-
-@pytest.fixture(scope="class")
-def root():
-    with tempfile.TemporaryDirectory(prefix="output") as path:
-        yield path
-
-
-@pytest.fixture(scope="class")
-def npz_dataset(float_tolerance):
-    natoms = NATOMS
-    nframes = NFRAMES
-    npz = dict(
-        sth=np.random.random((nframes, natoms, 3)),
-        positions=np.random.random((nframes, natoms, 3)),
-        force=np.random.random((nframes, natoms, 3)),
-        energy=np.random.random(nframes),
-        Z=np.random.randint(1, 108, size=(nframes, natoms)),
-    )
-    with tempfile.TemporaryDirectory() as folder:
-        np.savez(folder + "npzdata.npz", **npz)
-        a = NpzDataset(
-            file_name=folder + "npzdata.npz",
-            root=folder,
-            extra_fixed_fields={"r_max": 3},
-        )
-        yield a
 
 
 class DummyNet(torch.nn.Module):
