@@ -52,8 +52,6 @@ class Output:
         logging.debug("* Initialize Output")
 
         FORMAT = "%(message)s"
-        if verbose.lower() == "debug":
-            FORMAT = "%(name)-8s " + FORMAT
         formatter = logging.Formatter(FORMAT)
         for handler in logger.handlers:
             handler.setFormatter(fmt=formatter)
