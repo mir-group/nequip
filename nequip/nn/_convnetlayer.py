@@ -41,7 +41,6 @@ class ConvNetLayer(GraphModuleMixin, torch.nn.Module):
         num_layers: int = 3,
         resnet: bool = True,
         nonlinearity_type: str = "gate",
-        nonlinearity_kwargs: dict = {},
     ):
         super().__init__()
         # initialization
@@ -95,7 +94,6 @@ class ConvNetLayer(GraphModuleMixin, torch.nn.Module):
                 irreps_gates=irreps_gates,
                 act_gates=[act_gates[ir.p] for _, ir in irreps_gates],
                 irreps_gated=irreps_gated,
-                **nonlinearity_kwargs,
             )
 
             conv_irreps_out = equivariant_nonlin.irreps_in.simplify()
@@ -109,7 +107,6 @@ class ConvNetLayer(GraphModuleMixin, torch.nn.Module):
                 normalize=True,
                 epsilon=1e-8,
                 bias=False,
-                **nonlinearity_kwargs,
             )
 
         self.equivariant_nonlin = equivariant_nonlin
