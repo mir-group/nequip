@@ -923,7 +923,7 @@ class Trainer:
         self.dataset_val = dataset.index_select(self.val_idcs)
 
         self.dl_train, self.loader_params = instantiate(
-            cls_name=DataLoader,
+            builder=DataLoader,
             prefix="loader",
             positional_args=dict(
                 dataset=self.dataset_train,
@@ -935,7 +935,7 @@ class Trainer:
             all_args=self.kwargs,
         )
         self.dl_val, _ = instantiate(
-            cls_name=DataLoader,
+            builder=DataLoader,
             prefix="loader",
             positional_args=dict(
                 dataset=self.dataset_val,

@@ -17,7 +17,6 @@ from nequip.nn.embedding import (
 )
 from nequip.nn.radial_basis import BesselBasis
 from nequip.nn.cutoffs import PolynomialCutoff
-from nequip.utils import instantiate
 
 
 # TODO: no allowed_speces?
@@ -45,7 +44,10 @@ def EnergyModel(**shared_params):
         # -- Encode --
         "one_hot": OneHotAtomEncoding,
         "spharm_edges": SphericalHarmonicEdgeAttrs,
-        "radial_basis": (RadialBasisEdgeEncoding, dict(basis=BesselBasis,cutoff=PolynomialCutoff )),
+        "radial_basis": (
+            RadialBasisEdgeEncoding,
+            dict(basis=BesselBasis, cutoff=PolynomialCutoff),
+        ),
         # -- Embed features --
         "feature_embedding": AtomwiseLinear,
     }

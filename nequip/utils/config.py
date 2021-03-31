@@ -114,6 +114,9 @@ class Config(object):
         )
         self.update(default_values)
 
+    def allow_list(self):
+        return self._allow_list
+
     def __setitem__(self, key, val):
 
         # typehint
@@ -161,7 +164,6 @@ class Config(object):
         dictionary: dict,
         prefix: str,
         allow_val_change=None,
-        prefix_only: bool = False,
     ):
         """Mock of wandb.config function
 
@@ -178,17 +180,12 @@ class Config(object):
         """
 
         # override with prefix
-        prefix_dict = {}
-        remain = {}
-        for k, value in dictionary.items():
-            if k.startswith(prefix + "_"):
-                prefix_dict[k[len(prefix) + 1 :]] = value
-            elif not prefix_only:
-                remain[k] = value
-        key1 = self.update(remain, allow_val_change=allow_val_change)
-        key2 = self.update(prefix_dict, allow_val_change=allow_val_change)
-        keys = {k: k for k in key1}
-        keys.update({k: f"{prefix}_{k}" for k in key2})
+        l_prefix = len(prefix) + 1
+        prefix_dict = {
+            k[l_prefix:]: v for k, v in dictionary.items() if k.startswith(prefix + "_")
+        }
+        keys = self.update(prefix_dict, allow_val_change=allow_val_change)
+        keys = {k: f"{prefix}_{k}" for k in keys}
 
         for suffix in ["params", "kwargs"]:
             if f"{prefix}_{suffix}" in dictionary:
