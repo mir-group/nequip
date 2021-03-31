@@ -44,7 +44,10 @@ def EnergyModel(**shared_params):
         # -- Encode --
         "one_hot": OneHotAtomEncoding,
         "spharm_edges": SphericalHarmonicEdgeAttrs,
-        "radial_basis": (RadialBasisEdgeEncoding, dict(basis=BesselBasis,cutoff=PolynomialCutoff )),
+        "radial_basis": (
+            RadialBasisEdgeEncoding,
+            dict(basis=BesselBasis, cutoff=PolynomialCutoff),
+        ),
         # -- Embed features --
         "feature_embedding": AtomwiseLinear,
     }

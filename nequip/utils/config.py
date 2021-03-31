@@ -113,7 +113,7 @@ class Config(object):
             self, "_allow_list", list(set(self._allow_list).union(set(keys)))
         )
         self.update(default_values)
-    
+
     def allow_list(self):
         return self._allow_list
 

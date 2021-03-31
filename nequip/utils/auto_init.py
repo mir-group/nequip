@@ -120,7 +120,7 @@ def instantiate(
     all_args: dict = None,
     remove_kwargs: bool = True,
     return_args_only: bool = False,
-    parent_builder: Optional[str] = None,
+    parent_builders: list = [],
 ):
     """Automatic initializing class instance by matching keys in the parameter dictionary to the constructor function.
 
@@ -148,27 +148,27 @@ def instantiate(
     # detect the input parameters needed from params
     config = Config.from_class(builder, remove_kwargs=remove_kwargs)
 
-    # find out argument for the nested keyword 
-    search_keys = [key for key in config.keys() if key+"_kwargs" in config.keys()]
+    # find out argument for the nested keyword
+    search_keys = [key for key in config.keys() if key + "_kwargs" in config.keys()]
     for key in search_keys:
         sub_builder = config[key]
         # add double check to avoid cycle
-        if sub_builder != parent_builder:
+        if sub_builder not in parent_builder:
             nested_kwargs = instantiate(
                 sub_builder,
                 prefix=[
                     sub_builder.__name__,
                     key,
-                    prefix+"_"+key,
+                    prefix + "_" + key,
                     prefix,
                 ],
                 optional_args=optional_args,
                 all_args=all_args,
                 remove_kwargs=True,
                 return_args_only=True,
-                parent_builder=builder,
+                parent_builders=[builder] + parent_builder,
             )
-            config[key+"_kwargs"] = nested_kwargs
+            config[key + "_kwargs"] = nested_kwargs
 
     keys = {}
     if all_args is not None:

@@ -149,7 +149,7 @@ class SequentialGraphNetwork(GraphModuleMixin, torch.nn.Sequential):
                     else {}
                 ),
                 optional_args=params,
-                all_args=shared_params
+                all_args=shared_params,
             )
 
             built_modules.append(instance)
