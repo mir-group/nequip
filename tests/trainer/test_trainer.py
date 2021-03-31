@@ -248,6 +248,7 @@ class TestTrain:
 
 
 class TestRescale:
+
     def test_scaling(self, scale_train):
 
         trainer = scale_train
@@ -300,6 +301,7 @@ class DummyNet(torch.nn.Module):
         x = data["pos"]
         return {
             AtomicDataDict.FORCE_KEY: self.linear2(x),
+            AtomicDataDict.TOTAL_ENERGY_KEY: self.linear1(x),
         }
 
 
@@ -340,7 +342,7 @@ class DummyScale(torch.nn.Module):
 
 
 @pytest.fixture(scope="class")
-def scale_train(npz_dataset):
+def scale_train(nequip_dataset):
     with tempfile.TemporaryDirectory(prefix="output") as path:
         trainer = Trainer(
             model=DummyScale(AtomicDataDict.FORCE_KEY, scale=1.3, shift=1),
@@ -351,7 +353,7 @@ def scale_train(npz_dataset):
             loss_coeffs=AtomicDataDict.FORCE_KEY,
             root=path,
         )
-        trainer.set_dataset(npz_dataset)
+        trainer.set_dataset(nequip_dataset)
         trainer.train()
         trainer.scale = 1.3
         yield trainer
