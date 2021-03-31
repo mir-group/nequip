@@ -7,6 +7,7 @@ from torch_scatter import scatter
 from e3nn.o3 import Linear
 
 from nequip.data import AtomicDataDict
+from nequip.utils.batch_ops import bincount
 from ._graph_mixin import GraphModuleMixin
 
 
@@ -124,11 +125,18 @@ class PerSpeciesShift(GraphModuleMixin, torch.nn.Module):
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
         if self.enabled:
-            counts = torch.bincount(
-                data[AtomicDataDict.SPECIES_INDEX_KEY], minlength=len(self.shifts)
+            # TODO: short-circut when no batch
+            data = AtomicDataDict.with_batch(data)
+            counts = bincount(
+                data[AtomicDataDict.SPECIES_INDEX_KEY],
+                batch=data[AtomicDataDict.BATCH_KEY],
+                minlength=len(self.shifts),
             )
+            # ^ shape [n_batch, len(self.shifts)]
             data[self.out_field] = (
-                data[self.field] + torch.sum(self.shifts * counts) + self.total_shift
+                data[self.field]
+                + torch.sum(counts * self.shifts, dim=-1)
+                + self.total_shift
             )
         else:
             data[self.out_field] = data[self.field]
