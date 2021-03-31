@@ -22,7 +22,7 @@ def test_spharm_jit():
 
 
 def test_radial_basis_jit():
-    basis = BesselBasis()
-    cutoff = PolynomialCutoff()
+    basis = BesselBasis
+    cutoff = PolynomialCutoff
     rad = RadialBasisEdgeEncoding(basis, cutoff)
     assert_auto_jitable(rad)

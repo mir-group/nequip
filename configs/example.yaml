@@ -29,11 +29,8 @@ use_sc: true                                                                    
 
 # to specify different parameters for each convolutional layer, try examples below
 # layer1_use_sc: true                                                             # use "layer{i}_" prefix to specify parameters for only one of the layer, 
-# layer2_params:
-#   use_sc: true                                                                  # use "layer{i}_params" dictionary to specify parameters for only one of the layer, 
 # priority for different definition: 
-# invariant_neurons < convolution_invariant_neurons < convolution_kwargs:invariant_neurons 
-# < layer{i}_convnet_invariant_neurons < layer{i}_convnet_params:invariant_neurons (edited) 
+#   invariant_neurons < InteractionBlock_invariant_neurons < convolution_kwargs:invariant_neurons < layer{i}_invariant_neurons 
 
 energy_shift_enable: true                                                         # whether shift the energy
 energy_shift_shifts: [0, 0, 0]                                                    # atomic energy shift for each specie. order should be the same as the allowed_species used in train.py

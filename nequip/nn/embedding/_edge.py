@@ -7,6 +7,8 @@ from e3nn.util.jit import compile_mode
 
 from nequip.data import AtomicDataDict
 from .._graph_mixin import GraphModuleMixin
+from ..radial_basis import BesselBasis
+from ..cutoffs import PolynomialCutoff
 
 
 @compile_mode("script")
@@ -55,18 +57,20 @@ class RadialBasisEdgeEncoding(GraphModuleMixin, torch.nn.Module):
 
     def __init__(
         self,
-        basis,
-        cutoff,
+        basis=BesselBasis,
+        cutoff=PolynomialCutoff,
+        basis_kwargs={},
+        cutoff_kwargs={},
         out_field: str = AtomicDataDict.EDGE_EMBEDDING_KEY,
         irreps_in=None,
     ):
         super().__init__()
-        self.basis = basis
-        self.cutoff = cutoff
+        self.basis = basis(**basis_kwargs)
+        self.cutoff = cutoff(**cutoff_kwargs)
         self.out_field = out_field
         self._init_irreps(
             irreps_in=irreps_in,
-            irreps_out={self.out_field: o3.Irreps([(basis.num_basis, (0, 1))])},
+            irreps_out={self.out_field: o3.Irreps([(self.basis.num_basis, (0, 1))])},
         )
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
