@@ -215,3 +215,20 @@ def test_cyclic_nests():
         )
     assert "cyclic" in str(excinfo.value)
     print(excinfo, "hello")
+
+
+class BadKwargs1:
+    def __init__(self, thing_kwargs={}):
+        pass
+
+
+class BadKwargs2:
+    def __init__(self, thing=None, thing_kwargs={}):
+        pass
+
+
+def test_bad_kwargs():
+    with pytest.raises(KeyError):
+        _ = instantiate(BadKwargs1)
+    with pytest.raises(ValueError):
+        _ = instantiate(BadKwargs2)

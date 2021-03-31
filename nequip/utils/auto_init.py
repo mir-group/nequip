@@ -27,6 +27,7 @@ def dataset_from_config(config):
             class_name = ".".join(config.dataset.split(".")[-1:])
             class_name = getattr(import_module(module_name), class_name)
         except Exception as e:
+            # ^ TODO: don't catch all Exception
             # default class defined in nequip.data or nequip.dataset
             dataset_name = config.dataset.lower()
 
@@ -88,7 +89,7 @@ def instantiate_from_cls_name(
     """
 
     if class_name is None:
-        raise NameError(f"class_name type is not defined ")
+        raise NameError("class_name type is not defined ")
 
     # first obtain a list of all classes in this module
     class_list = inspect.getmembers(module, inspect.isclass)
@@ -193,16 +194,30 @@ def instantiate(
     init_args = final_optional_args.copy()
     init_args.update(positional_args)
 
+    # be strict about _kwargs keys:
+    allow = config.allow_list()
+    for key in allow:
+        bname = key[:-7]
+        if key.endswith("_kwargs") and bname not in allow:
+            raise KeyError(
+                f"Found submodule kwargs argument `{key}`, but no parameter `{bname}` for the builder. Either add a parameter for `{bname}` if you are trying to allow construction of a submodule, or, if `{bname}_kwargs` is just supposed to be a dictionary, rename it without `_kwargs`."
+            )
+    del allow
+
     # find out argument for the nested keyword
     search_keys = [key for key in init_args if key + "_kwargs" in config.allow_list()]
     for key in search_keys:
         sub_builder = init_args[key]
+        if not (callable(sub_builder) or inspect.isclass(sub_builder)):
+            raise ValueError(
+                f"Builder for submodule `{key}` must be a callable or a class, got `{builder!r}` instead."
+            )
+
         # add double check to avoid cycle
         # only overwrite the optional argument, not the positional ones
         if (
             sub_builder not in parent_builders
             and key + "_kwargs" not in positional_args
-            and (callable(sub_builder) or inspect.isclass(sub_builder))
         ):
             sub_prefix_list = [sub_builder.__name__, key]
             for prefix in prefix_list:
