@@ -149,6 +149,16 @@ def instantiate(
     # detect the input parameters needed from params
     config = Config.from_class(builder, remove_kwargs=remove_kwargs)
 
+    # be strict about _kwargs keys:
+    allow = config.allow_list()
+    for key in allow:
+        bname = key[:-7]
+        if key.endswith("_kwargs") and bname not in allow:
+            raise KeyError(
+                f"Found submodule kwargs argument `{key}`, but no parameter `{bname}` for the builder. Either add a parameter for `{bname}` if you are trying to allow construction of a submodule, or, if `{bname}_kwargs` is just supposed to be a dictionary, rename it without `_kwargs`."
+            )
+    del allow
+
     key_mapping = {}
     if all_args is not None:
         # fetch paratemeters that directly match the name
@@ -193,16 +203,6 @@ def instantiate(
 
     init_args = final_optional_args.copy()
     init_args.update(positional_args)
-
-    # be strict about _kwargs keys:
-    allow = config.allow_list()
-    for key in allow:
-        bname = key[:-7]
-        if key.endswith("_kwargs") and bname not in allow:
-            raise KeyError(
-                f"Found submodule kwargs argument `{key}`, but no parameter `{bname}` for the builder. Either add a parameter for `{bname}` if you are trying to allow construction of a submodule, or, if `{bname}_kwargs` is just supposed to be a dictionary, rename it without `_kwargs`."
-            )
-    del allow
 
     # find out argument for the nested keyword
     search_keys = [key for key in init_args if key + "_kwargs" in config.allow_list()]
