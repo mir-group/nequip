@@ -102,7 +102,7 @@ def instantiate_from_cls_name(
         raise NameError(f"{class_name} type is not found in {module.__name__} module")
 
     return instantiate(
-        cls_name=the_class,
+        builder=the_class,
         prefix=prefix,
         positional_args=positional_args,
         optional_args=optional_args,
@@ -113,13 +113,14 @@ def instantiate_from_cls_name(
 
 
 def instantiate(
-    cls_name,
+    builder,
     prefix: Union[str, List[str]],
     positional_args: dict = {},
     optional_args: dict = None,
     all_args: dict = None,
     remove_kwargs: bool = True,
     return_args_only: bool = False,
+    parent_builder: Optional[str] = None,
 ):
     """Automatic initializing class instance by matching keys in the parameter dictionary to the constructor function.
 
@@ -129,7 +130,7 @@ def instantiate(
         all_args[key] < all_args[prefix_key] < optional_args[key] < optional_args[prefix_key] < positional_args
 
     Args:
-        cls_name: the type of the instance
+        builder: the type of the instance
         prefix: the prefix used to address the parameter keys
         positional_args: the arguments used for input. These arguments have the top priority.
         optional_args: the second priority group to search for keys.
@@ -145,7 +146,29 @@ def instantiate(
         prefix_list = prefix
 
     # detect the input parameters needed from params
-    config = Config.from_class(cls_name, remove_kwargs=remove_kwargs)
+    config = Config.from_class(builder, remove_kwargs=remove_kwargs)
+
+    # find out argument for the nested keyword 
+    search_keys = [key for key in config.keys() if key+"_kwargs" in config.keys()]
+    for key in search_keys:
+        sub_builder = config[key]
+        # add double check to avoid cycle
+        if sub_builder != parent_builder:
+            nested_kwargs = instantiate(
+                sub_builder,
+                prefix=[
+                    sub_builder.__name__,
+                    key,
+                    prefix+"_"+key,
+                    prefix,
+                ],
+                optional_args=optional_args,
+                all_args=all_args,
+                remove_kwargs=True,
+                return_args_only=True,
+                parent_builder=builder,
+            )
+            config[key+"_kwargs"] = nested_kwargs
 
     keys = {}
     if all_args is not None:
@@ -187,20 +210,20 @@ def instantiate(
             keys[t].pop(key, None)
 
     # debug info
-    logging.debug(f"instantiate {cls_name.__name__}")
+    logging.debug(f"instantiate {builder.__name__}")
     for t in keys:
         for k, v in keys[t].items():
             string = f" {t:>10s}_args :  {k:>30s}"
             if k != v:
                 string += f" <- {v:>30s}"
             logging.debug(string)
-    logging.debug(f"...{cls_name.__name__}_param = dict(")
+    logging.debug(f"...{builder.__name__}_param = dict(")
     logging.debug(f"...   optional_args = {optional_args},")
     logging.debug(f"...   positional_args = {positional_args})")
 
     if return_args_only:
         return dict(**positional_args, **optional_args)
 
-    instance = cls_name(**positional_args, **optional_args)
+    instance = builder(**positional_args, **optional_args)
 
     return instance, optional_args

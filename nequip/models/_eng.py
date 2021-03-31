@@ -17,7 +17,6 @@ from nequip.nn.embedding import (
 )
 from nequip.nn.radial_basis import BesselBasis
 from nequip.nn.cutoffs import PolynomialCutoff
-from nequip.utils import instantiate
 
 
 # TODO: no allowed_speces?

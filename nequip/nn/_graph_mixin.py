@@ -140,44 +140,16 @@ class SequentialGraphNetwork(GraphModuleMixin, torch.nn.Sequential):
                     f"The module has to be a class or a function. got {type(builder)}"
                 )
 
-            # dry run to find out whether it needs nested kwargs
-            kwargs = instantiate(
-                builder,
-                prefix=name,
-                optional_args=params,
-                all_args=shared_params,
-                remove_kwargs=True,
-                return_args_only=True,
-            )
-
-            # find out argument for the nested keyword 
-            search_keys = [key for key in kwargs if key+"_kwargs" in kwargs]
-            for key in search_keys:
-                sub_builder = kwargs[key]
-                nested_kwargs = instantiate(
-                    sub_builder,
-                    prefix=[
-                        sub_builder.__name__,
-                        key,
-                        name+"_"+key,
-                        name,
-                    ],
-                    optional_args=params,
-                    all_args=shared_params,
-                    remove_kwargs=True,
-                    return_args_only=True,
-                )
-                kwargs[key+"_kwargs"] = nested_kwargs
-
             instance, _ = instantiate(
-                cls_name=builder,
+                builder=builder,
                 prefix=name,
                 positional_args=(
                     dict(irreps_in=built_modules[-1].irreps_out)
                     if len(built_modules) > 0
                     else {}
                 ),
-                optional_args=kwargs,
+                optional_args=params,
+                all_args=shared_params
             )
 
             built_modules.append(instance)
