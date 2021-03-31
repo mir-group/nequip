@@ -70,7 +70,7 @@ class RadialBasisEdgeEncoding(GraphModuleMixin, torch.nn.Module):
         self.out_field = out_field
         self._init_irreps(
             irreps_in=irreps_in,
-            irreps_out={self.out_field: o3.Irreps([(basis.num_basis, (0, 1))])},
+            irreps_out={self.out_field: o3.Irreps([(self.basis.num_basis, (0, 1))])},
         )
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:

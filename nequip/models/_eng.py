@@ -61,9 +61,7 @@ def EnergyModel(**shared_params):
     # insertion preserves order
     for layer_i in range(num_layers):
         layers.update({f"layer{layer_i}_{bk}": v for bk, v in before_layer.items()})
-
-        layers[layer_name] = (ConvNetLayer, f"layer{layer_i}_convnet")
-
+        layers[f"layer{layer_i}_convnet"] = ConvNetLayer
         layers.update({f"layer{layer_i}_{ak}": v for ak, v in after_layer.items()})
 
     # .update also maintains insertion order
