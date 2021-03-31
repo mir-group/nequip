@@ -62,7 +62,7 @@ def dataset_from_config(config):
 def instantiate_from_cls_name(
     module,
     class_name: str,
-    prefix: Union[str, List[str]] = "",
+    prefix: Optional[Union[str, List[str]]] = [],
     positional_args: dict = {},
     optional_args: Optional[dict] = None,
     all_args: Optional[dict] = None,
@@ -114,7 +114,7 @@ def instantiate_from_cls_name(
 
 def instantiate(
     builder,
-    prefix: Union[str, List[str]],
+    prefix: Optional[Union[str, List[str]]] = [],
     positional_args: dict = {},
     optional_args: dict = None,
     all_args: dict = None,
@@ -148,44 +148,50 @@ def instantiate(
     # detect the input parameters needed from params
     config = Config.from_class(builder, remove_kwargs=remove_kwargs)
 
-    keys = {}
+    key_mapping = {}
     if all_args is not None:
         # fetch paratemeters that directly match the name
         _keys = config.update(all_args)
-        keys["all"] = {k: k for k in _keys}
+        key_mapping["all"] = {k: k for k in _keys}
+        # fetch paratemeters that match prefix + "_" + name
         for idx, prefix_str in enumerate(prefix_list):
-            # fetch paratemeters that match prefix + "_" + name
             _keys = config.update_w_prefix(
                 all_args,
                 prefix=prefix_str,
             )
-            keys["all"].update(_keys)
+            key_mapping["all"].update(_keys)
 
     if optional_args is not None:
+        # fetch paratemeters that directly match the name
         _keys = config.update(optional_args)
-        keys["optional"] = {k: k for k in _keys}
+        key_mapping["optional"] = {k: k for k in _keys}
+        # fetch paratemeters that match prefix + "_" + name
         for idx, prefix_str in enumerate(prefix_list):
             _keys = config.update_w_prefix(
                 optional_args,
                 prefix=prefix_str,
             )
-            keys["optional"].update(_keys)
+            key_mapping["optional"].update(_keys)
 
     # for logging only, remove the overlapped keys
-    if "all" in keys and "optional" in keys:
-        keys["all"] = {
-            k: v for k, v in keys["all"].items() if k not in keys["optional"]
+    if "all" in key_mapping and "optional" in key_mapping:
+        key_mapping["all"] = {
+            k: v
+            for k, v in key_mapping["all"].items()
+            if k not in key_mapping["optional"]
         }
 
-    # remove duplicates
-    for key in positional_args:
-        config.pop(key, None)
-        for t in keys:
-            keys[t].pop(key, None)
+    final_optional_args = dict(config)
 
-    # update
-    optional_args = dict(config)
-    init_args = dict(**positional_args, **dict(optional_args))
+    # for nested argument, it is possible that the positional args contain unnecesary keys
+    if len(parent_builders) > 0:
+        _positional_args = {
+            k: v for k, v in positional_args.items() if k in config.allow_list()
+        }
+        positional_args = _positional_args
+
+    init_args = final_optional_args.copy()
+    init_args.update(positional_args)
 
     # find out argument for the nested keyword
     search_keys = [key for key in init_args if key + "_kwargs" in config.allow_list()]
@@ -196,40 +202,65 @@ def instantiate(
         if (
             sub_builder not in parent_builders
             and key + "_kwargs" not in positional_args
+            and (callable(sub_builder) or inspect.isclass(sub_builder))
         ):
-            nested_kwargs = instantiate(
-                sub_builder,
-                prefix=[
-                    sub_builder.__name__,
-                    key,
+            sub_prefix_list = [sub_builder.__name__, key]
+            for prefix in prefix_list:
+                sub_prefix_list = sub_prefix_list + [
                     prefix + "_" + key,
                     prefix,
-                ],
+                ]
+
+            nested_km, nested_kwargs = instantiate(
+                sub_builder,
+                prefix=sub_prefix_list,
+                positional_args=positional_args,
                 optional_args=optional_args,
                 all_args=all_args,
-                remove_kwargs=True,
+                remove_kwargs=remove_kwargs,
                 return_args_only=True,
                 parent_builders=[builder] + parent_builders,
             )
             # the values in kwargs get higher priority
-            nested_kwargs.update(optional_args.get(key + "_kwargs", {}))
-            optional_args[key + "_kwargs"] = nested_kwargs
+            nested_kwargs.update(final_optional_args.get(key + "_kwargs", {}))
+            final_optional_args[key + "_kwargs"] = nested_kwargs
+
+            for t in key_mapping:
+                key_mapping[t].update(
+                    {key + "_kwargs." + k: v for k, v in nested_km[t].items()}
+                )
+        elif sub_builder in parent_builders:
+            raise RuntimeError(
+                f"cyclic recursion in builder {parent_builders} {sub_builder}"
+            )
+        elif not callable(sub_builder) and not inspect.isclass(sub_builder):
+            logging.warning(f"subbuilder is not callable {sub_builder}")
+        elif key + "_kwargs" in positional_args:
+            logging.warning(
+                f"skip searching for nested argument because {key}_kwargs are defined in positional arguments"
+            )
+
+    # remove duplicates
+    for key in positional_args:
+        final_optional_args.pop(key, None)
+        for t in key_mapping:
+            key_mapping[t].pop(key, None)
+
+    if return_args_only:
+        return key_mapping, final_optional_args
 
     # debug info
     logging.debug(f"instantiate {builder.__name__}")
-    for t in keys:
-        for k, v in keys[t].items():
-            string = f" {t:>10s}_args :  {k:>30s}"
+    for t in key_mapping:
+        for k, v in key_mapping[t].items():
+            string = f" {t:>10s}_args :  {k:>50s}"
             if k != v:
-                string += f" <- {v:>30s}"
+                string += f" <- {v:>50s}"
             logging.debug(string)
     logging.debug(f"...{builder.__name__}_param = dict(")
-    logging.debug(f"...   optional_args = {optional_args},")
+    logging.debug(f"...   optional_args = {final_optional_args},")
     logging.debug(f"...   positional_args = {positional_args})")
 
-    if return_args_only:
-        return dict(**positional_args, **dict(optional_args))
+    instance = builder(**positional_args, **final_optional_args)
 
-    instance = builder(**positional_args, **optional_args)
-
-    return instance, optional_args
+    return instance, final_optional_args

@@ -65,7 +65,7 @@ class Config(object):
             config = {
                 key: value for key, value in config.items() if key not in exclude_keys
             }
-        if config is not None:
+        elif config is not None:
             self.update(config)
 
     def __repr__(self):
@@ -196,7 +196,7 @@ class Config(object):
                     dictionary[f"{prefix}_{suffix}"],
                     allow_val_change=allow_val_change,
                 )
-                keys.update({k: f"{prefix}_{suffix}:{k}" for k in key3})
+                keys.update({k: f"{prefix}_{suffix}.{k}" for k in key3})
         return keys
 
     def update(self, dictionary: dict, allow_val_change=None):
@@ -283,7 +283,16 @@ class Config(object):
         config (Config):
         """
 
-        return Config.from_function(class_type.__init__, remove_kwargs=remove_kwargs)
+        if inspect.isclass(class_type):
+            return Config.from_function(
+                class_type.__init__, remove_kwargs=remove_kwargs
+            )
+        elif callable(class_type):
+            return Config.from_function(class_type, remove_kwargs=remove_kwargs)
+        else:
+            raise ValueError(
+                f"from_class only takes class type or callable, but got {class_type}"
+            )
 
     @staticmethod
     def from_function(function, remove_kwargs=False):
@@ -318,6 +327,7 @@ class Config(object):
         for key in param_keys:
             default_params[f"_{key}_type"] = None
 
+        # do not restrict variables when kwargs exists
         if "kwargs" in param_keys and not remove_kwargs:
             return Config(config=default_params)
         elif "kwargs" in param_keys:
