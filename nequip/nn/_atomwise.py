@@ -125,6 +125,7 @@ class PerSpeciesShift(GraphModuleMixin, torch.nn.Module):
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
         if self.enabled:
+            # TODO: short-circut when no batch
             data = AtomicDataDict.with_batch(data)
             counts = bincount(
                 data[AtomicDataDict.SPECIES_INDEX_KEY],
