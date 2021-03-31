@@ -524,7 +524,7 @@ class Trainer:
                 )
 
         self.loss, _ = instantiate(
-            cls_name=Loss,
+            builder=Loss,
             prefix="loss",
             positional_args=dict(coeffs=self.loss_coeffs),
             all_args=self.kwargs,
@@ -561,7 +561,7 @@ class Trainer:
             self.metrics_components = new_list
 
         self.metrics, _ = instantiate(
-            cls_name=Metrics,
+            builder=Metrics,
             prefix="metrics",
             positional_args=dict(components=self.metrics_components),
             all_args=self.kwargs,
