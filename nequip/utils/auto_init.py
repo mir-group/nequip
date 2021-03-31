@@ -148,31 +148,6 @@ def instantiate(
     # detect the input parameters needed from params
     config = Config.from_class(builder, remove_kwargs=remove_kwargs)
 
-    # find out argument for the nested keyword
-    search_keys = [key for key in config.keys() if key + "_kwargs" in config.keys()]
-    for key in search_keys:
-        sub_builder = config[key]
-        # add double check to avoid cycle
-        if sub_builder not in parent_builders:
-            original_kwargs = config[key + "_kwargs"]
-            nested_kwargs = instantiate(
-                sub_builder,
-                prefix=[
-                    sub_builder.__name__,
-                    key,
-                    prefix + "_" + key,
-                    prefix,
-                ],
-                optional_args=optional_args,
-                all_args=all_args,
-                remove_kwargs=True,
-                return_args_only=True,
-                parent_builders=[builder] + parent_builders,
-            )
-            # the values in kwargs get higher priority
-            nested_kwargs.update(original_kwargs)
-            config[key + "_kwargs"] = nested_kwargs
-
     keys = {}
     if all_args is not None:
         # fetch paratemeters that directly match the name
@@ -202,13 +177,43 @@ def instantiate(
             k: v for k, v in keys["all"].items() if k not in keys["optional"]
         }
 
-    optional_args = dict(config)
-
     # remove duplicates
     for key in positional_args:
-        optional_args.pop(key, None)
+        config.pop(key, None)
         for t in keys:
             keys[t].pop(key, None)
+
+    # update
+    optional_args = dict(config)
+    init_args = dict(**positional_args, **dict(optional_args))
+
+    # find out argument for the nested keyword
+    search_keys = [key for key in init_args if key + "_kwargs" in config.allow_list()]
+    for key in search_keys:
+        sub_builder = init_args[key]
+        # add double check to avoid cycle
+        # only overwrite the optional argument, not the positional ones
+        if (
+            sub_builder not in parent_builders
+            and key + "_kwargs" not in positional_args
+        ):
+            nested_kwargs = instantiate(
+                sub_builder,
+                prefix=[
+                    sub_builder.__name__,
+                    key,
+                    prefix + "_" + key,
+                    prefix,
+                ],
+                optional_args=optional_args,
+                all_args=all_args,
+                remove_kwargs=True,
+                return_args_only=True,
+                parent_builders=[builder] + parent_builders,
+            )
+            # the values in kwargs get higher priority
+            nested_kwargs.update(optional_args.get(key + "_kwargs", {}))
+            optional_args[key + "_kwargs"] = nested_kwargs
 
     # debug info
     logging.debug(f"instantiate {builder.__name__}")
@@ -223,7 +228,7 @@ def instantiate(
     logging.debug(f"...   positional_args = {positional_args})")
 
     if return_args_only:
-        return dict(**positional_args, **optional_args)
+        return dict(**positional_args, **dict(optional_args))
 
     instance = builder(**positional_args, **optional_args)
 

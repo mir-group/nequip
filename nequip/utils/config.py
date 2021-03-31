@@ -159,6 +159,9 @@ class Config(object):
     def __contains__(self, key):
         return key in self._items
 
+    def pop(self, *args):
+        return self._items.pop(*args)
+
     def update_w_prefix(
         self,
         dictionary: dict,
