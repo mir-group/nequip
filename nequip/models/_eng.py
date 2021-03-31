@@ -39,32 +39,13 @@ def EnergyModel(**shared_params):
 
     logging.debug("Start building the network model")
 
-    # select the parameters needed for BesselBasis
-    # TODO: mark instantiate as ignored for debugger>
-    basis, _ = instantiate(
-        cls_name=BesselBasis,
-        prefix="BesselBasis",
-        all_args=shared_params,
-    )
-    cutoff, _ = instantiate(
-        cls_name=PolynomialCutoff,
-        prefix="PolynomialCutoff",
-        all_args=shared_params,
-    )
-
     num_layers = shared_params.pop("num_layers", 3)
 
     layers = {
         # -- Encode --
         "one_hot": OneHotAtomEncoding,
         "spharm_edges": SphericalHarmonicEdgeAttrs,
-        "radial_basis": (
-            RadialBasisEdgeEncoding,
-            dict(
-                basis=basis,
-                cutoff=cutoff,
-            ),
-        ),
+        "radial_basis": (RadialBasisEdgeEncoding, dict(basis=BesselBasis,cutoff=PolynomialCutoff )),
         # -- Embed features --
         "feature_embedding": AtomwiseLinear,
     }
@@ -81,38 +62,7 @@ def EnergyModel(**shared_params):
     for layer_i in range(num_layers):
         layers.update({f"layer{layer_i}_{bk}": v for bk, v in before_layer.items()})
 
-        layer_name = f"layer{layer_i}_convnet"
-
-        # find out convolution type and other parameters
-        layer_kwargs = instantiate(
-            ConvNetLayer,
-            prefix=["ConvNetLayer", "convnet", f"layer{layer_i}", layer_name],
-            all_args=shared_params,
-            remove_kwargs=True,
-            return_args_only=True,
-        )
-        convolution = layer_kwargs["convolution"]
-
-        # find out kwargs for convlution
-        convolution_kwargs = instantiate(
-            convolution,
-            prefix=[
-                convolution.__name__,
-                "convolution",
-                "ConvNetLayer",
-                "convnet",
-                f"layer{layer_i}",
-                layer_name,
-                f"layer{layer_i}_convolution",
-                layer_name + "_convolution",
-            ],
-            all_args=shared_params,
-            remove_kwargs=True,
-            return_args_only=True,
-        )
-        layer_kwargs["convolution_kwargs"] = convolution_kwargs
-
-        layers[layer_name] = (ConvNetLayer, layer_kwargs)
+        layers[layer_name] = (ConvNetLayer, f"layer{layer_i}_convnet")
 
         layers.update({f"layer{layer_i}_{ak}": v for ak, v in after_layer.items()})
 
