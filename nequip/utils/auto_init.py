@@ -153,7 +153,8 @@ def instantiate(
     for key in search_keys:
         sub_builder = config[key]
         # add double check to avoid cycle
-        if sub_builder not in parent_builder:
+        if sub_builder not in parent_builders:
+            original_kwargs = config[key + "_kwargs"]
             nested_kwargs = instantiate(
                 sub_builder,
                 prefix=[
@@ -166,8 +167,10 @@ def instantiate(
                 all_args=all_args,
                 remove_kwargs=True,
                 return_args_only=True,
-                parent_builders=[builder] + parent_builder,
+                parent_builders=[builder] + parent_builders,
             )
+            # the values in kwargs get higher priority
+            nested_kwargs.update(original_kwargs)
             config[key + "_kwargs"] = nested_kwargs
 
     keys = {}
@@ -180,7 +183,6 @@ def instantiate(
             _keys = config.update_w_prefix(
                 all_args,
                 prefix=prefix_str,
-                prefix_only=True,
             )
             keys["all"].update(_keys)
 
@@ -191,7 +193,6 @@ def instantiate(
             _keys = config.update_w_prefix(
                 optional_args,
                 prefix=prefix_str,
-                prefix_only=True,
             )
             keys["optional"].update(_keys)
 
