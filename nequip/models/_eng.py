@@ -16,7 +16,6 @@ from nequip.nn.embedding import (
 )
 from nequip.nn.radial_basis import BesselBasis
 from nequip.nn.cutoffs import PolynomialCutoff
-from nequip.utils import instantiate
 
 
 # TODO: no allowed_speces?
@@ -38,32 +37,13 @@ def EnergyModel(**shared_params):
 
     logging.debug("Start building the network model")
 
-    # select the parameters needed for BesselBasis
-    # TODO: mark instantiate as ignored for debugger>
-    basis, _ = instantiate(
-        cls_name=BesselBasis,
-        prefix="BesselBasis",
-        all_args=shared_params,
-    )
-    cutoff, _ = instantiate(
-        cls_name=PolynomialCutoff,
-        prefix="PolynomialCutoff",
-        all_args=shared_params,
-    )
-
     num_layers = shared_params.pop("num_layers", 3)
 
     layers = {
         # -- Encode --
         "one_hot": OneHotAtomEncoding,
         "spharm_edges": SphericalHarmonicEdgeAttrs,
-        "radial_basis": (
-            RadialBasisEdgeEncoding,
-            dict(
-                basis=basis,
-                cutoff=cutoff,
-            ),
-        ),
+        "radial_basis": RadialBasisEdgeEncoding,
         # -- Embed features --
         "feature_embedding": AtomwiseLinear,
     }

@@ -140,9 +140,8 @@ class SequentialGraphNetwork(GraphModuleMixin, torch.nn.Sequential):
                     f"The module has to be a class or a function. got {type(builder)}"
                 )
 
-            # parameter priority: irreps_in > kwargs > shared_params[prefix_key] > shared_params[key]
             instance, _ = instantiate(
-                cls_name=builder,
+                builder=builder,
                 prefix=name,
                 positional_args=(
                     dict(irreps_in=built_modules[-1].irreps_out)

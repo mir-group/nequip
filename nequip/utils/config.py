@@ -65,7 +65,7 @@ class Config(object):
             config = {
                 key: value for key, value in config.items() if key not in exclude_keys
             }
-        if config is not None:
+        elif config is not None:
             self.update(config)
 
     def __repr__(self):
@@ -114,6 +114,9 @@ class Config(object):
         )
         self.update(default_values)
 
+    def allow_list(self):
+        return self._allow_list
+
     def __setitem__(self, key, val):
 
         # typehint
@@ -156,7 +159,15 @@ class Config(object):
     def __contains__(self, key):
         return key in self._items
 
-    def update_w_prefix(self, dictionary: dict, prefix: str, allow_val_change=None):
+    def pop(self, *args):
+        return self._items.pop(*args)
+
+    def update_w_prefix(
+        self,
+        dictionary: dict,
+        prefix: str,
+        allow_val_change=None,
+    ):
         """Mock of wandb.config function
 
         Add a dictionary of parameters to the
@@ -172,22 +183,21 @@ class Config(object):
         """
 
         # override with prefix
-        prefix_dict = {}
-        remain = {}
-        for k, value in dictionary.items():
-            if k.startswith(prefix + "_"):
-                prefix_dict[k[len(prefix) + 1 :]] = value
-            else:
-                remain[k] = value
-        key1 = self.update(remain, allow_val_change=allow_val_change)
-        key2 = self.update(prefix_dict, allow_val_change=allow_val_change)
-        key3 = set()
+        l_prefix = len(prefix) + 1
+        prefix_dict = {
+            k[l_prefix:]: v for k, v in dictionary.items() if k.startswith(prefix + "_")
+        }
+        keys = self.update(prefix_dict, allow_val_change=allow_val_change)
+        keys = {k: f"{prefix}_{k}" for k in keys}
 
-        if f"{prefix}_params" in dictionary:
-            key3 = self.update(
-                dictionary[f"{prefix}_params"], allow_val_change=allow_val_change
-            )
-        return (key1, key2, key3)
+        for suffix in ["params", "kwargs"]:
+            if f"{prefix}_{suffix}" in dictionary:
+                key3 = self.update(
+                    dictionary[f"{prefix}_{suffix}"],
+                    allow_val_change=allow_val_change,
+                )
+                keys.update({k: f"{prefix}_{suffix}.{k}" for k in key3})
+        return keys
 
     def update(self, dictionary: dict, allow_val_change=None):
         """Mock of wandb.config function
@@ -273,7 +283,16 @@ class Config(object):
         config (Config):
         """
 
-        return Config.from_function(class_type.__init__, remove_kwargs=remove_kwargs)
+        if inspect.isclass(class_type):
+            return Config.from_function(
+                class_type.__init__, remove_kwargs=remove_kwargs
+            )
+        elif callable(class_type):
+            return Config.from_function(class_type, remove_kwargs=remove_kwargs)
+        else:
+            raise ValueError(
+                f"from_class only takes class type or callable, but got {class_type}"
+            )
 
     @staticmethod
     def from_function(function, remove_kwargs=False):
@@ -308,6 +327,7 @@ class Config(object):
         for key in param_keys:
             default_params[f"_{key}_type"] = None
 
+        # do not restrict variables when kwargs exists
         if "kwargs" in param_keys and not remove_kwargs:
             return Config(config=default_params)
         elif "kwargs" in param_keys:
