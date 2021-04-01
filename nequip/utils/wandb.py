@@ -1,6 +1,7 @@
 import os
 import wandb
 
+
 def init_n_update(config):
     # download from wandb set up
     config.run_id = wandb.util.generate_id()
@@ -15,11 +16,14 @@ def init_n_update(config):
     wandb.config.update(config, allow_val_change=True)
     return config
 
+
 def resume(config, restart):
     # store this id to use it later when resuming
     if restart:
         os.environ["WANDB_RESUME"] = "must"
-        wandb.init(project=config.wandb_project, config=dict(config), resume=config.run_id)
+        wandb.init(
+            project=config.wandb_project, config=dict(config), resume=config.run_id
+        )
     else:
         return init_n_update(config)
     return config

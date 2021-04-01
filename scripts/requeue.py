@@ -26,9 +26,11 @@ def main():
 
     assert config.requeue, "This script only works for auto requeue. Be careful!!"
     for key in ["workdir", "root", "run_name"]:
-        assert isinstance(config[key], str), f"{key} has to be defined for requeue script"
+        assert isinstance(
+            config[key], str
+        ), f"{key} has to be defined for requeue script"
 
-    found_restart_file = isfile(config.workdir+"/trainer.pth")
+    found_restart_file = isfile(config.workdir + "/trainer.pth")
     config.restart = found_restart_file
     config.append = found_restart_file
 
@@ -43,11 +45,13 @@ def main():
         # load the dictionary
         dictionary = load_file(
             supported_formats=dict(torch=["pt", "pth"]),
-            filename=config.workdir+"/trainer.pth",
+            filename=config.workdir + "/trainer.pth",
             enforced_format="torch",
         )
         for key in ["workdir", "root", "run_name"]:
-            assert dictionary[key] == config[key], f"{key} is not consistent with the yaml file"
+            assert (
+                dictionary[key] == config[key]
+            ), f"{key} is not consistent with the yaml file"
         # increase max_epochs if training has hit maximum epochs
         if "progress" in dictionary:
             stop_args = dictionary["progress"].pop("stop_arg", None)
@@ -69,6 +73,7 @@ def main():
 
         # download parameters from wandb in case of sweeping
         from nequip.utils.wandb import resume
+
         config = resume(config, config.restart)
 
         if config.restart:

@@ -30,6 +30,7 @@ def main():
 
         # download parameters from wandb in case of sweeping
         from nequip.utils.wandb import init_n_update
+
         config = init_n_update(config)
 
         trainer = TrainerWandB(model=None, **dict(config))

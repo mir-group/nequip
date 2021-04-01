@@ -298,7 +298,6 @@ class Trainer:
 
         logging.debug("! Done Initialize Trainer")
 
-
     @property
     def init_params(self):
         d = inspect.signature(Trainer.__init__)
