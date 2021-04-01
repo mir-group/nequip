@@ -45,22 +45,17 @@ def main():
 
     # open folders
     output = Output.from_config(config)
-    updated_params = output.updated_dict()
-    config.update(updated_params)
+    config.update(output.updated_dict())
 
     dictionary.update(dict(config))
 
     if config.wandb:
 
-        import wandb
         from nequip.train.trainer_wandb import TrainerWandB
 
-        # download from wandb set up
-        wandb.init(project=config.wandb_project, config=dict(config))
-        config.update(dict(wandb.config))
-
-        wandb.run.name = config.run_name
-        wandb.config.update(updated_params, allow_val_change=True)
+        # download parameters from wandb in case of sweeping
+        from nequip.utils.wandb import init_n_update
+        config = init_n_update(config)
 
         dictionary.update(dict(config))
         trainer = TrainerWandB.from_dict(dictionary)

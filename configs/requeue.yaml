@@ -1,0 +1,41 @@
+# general
+root: aspirin
+project: aspirin
+workdir: result/requeue
+run_name: minimal_requeue
+requeue: True
+
+# network
+num_layer: 3
+num_basis: 3
+r_max: 4.0
+irreps_edge_sh: 0e + 1o
+conv_to_output_hidden_irreps_out: 16x0o + 16x0e + 16x1o + 16x1e + 16x2o + 16x2e
+feature_irreps_hidden: 16x0o + 16x0e 
+invariant_neurons: 4                                                            # number of hidden neurons in radial function, again keep this small for MD applications, 8 - 32, smaller is faster
+avg_num_neighbors: null                                                         # number of neighbors to divide by, None => no normalization.
+use_sc: true                                                                    # use self-connection or not, usually gives big improvement
+
+# data
+dataset: aspirin
+
+# logging
+wandb: true
+verbose: debug
+
+# training
+n_train: 5
+n_val: 5
+batch_size: 1
+max_epochs: 10
+
+# loss function
+loss_coeffs: forces
+
+# optimizer
+optimizer_name: Adam
+
+# lr scheduler
+lr_scheduler_name: CosineAnnealingWarmRestarts
+learning_rate: 0.01
+lr_scheduler_T_0: 10000

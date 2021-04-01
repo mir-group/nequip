@@ -813,7 +813,10 @@ class Trainer:
 
     def init_log(self):
 
-        self.logger.info("! Starting training ...")
+        if self.restart:
+            self.logger.info("! Restarting training ...")
+        else:
+            self.logger.info("! Starting training ...")
         self.epoch_header_print = False
         self.batch_header_print = {TRAIN: False, VALIDATION: False}
 

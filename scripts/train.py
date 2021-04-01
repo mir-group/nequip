@@ -20,8 +20,7 @@ def main():
 
     torch.set_default_dtype(torch.float32)
     output = Output.from_config(config)
-    updated_params = output.updated_dict()
-    config.update(updated_params)
+    config.update(output.updated_dict())
 
     # Make the trainer
     if config.wandb:
@@ -29,13 +28,9 @@ def main():
         import wandb
         from nequip.train.trainer_wandb import TrainerWandB
 
-        # download the config from wandb
-        wandb.init(project=config.wandb_project, config=dict(config))
-        config.update(dict(wandb.config))
-
-        # upload workdir and stuffs to wandb
-        wandb.run.name = updated_params.pop("run_name")
-        wandb.config.update(updated_params, allow_val_change=True)
+        # download parameters from wandb in case of sweeping
+        from nequip.utils.wandb import init_n_update
+        config = init_n_update(config)
 
         trainer = TrainerWandB(model=None, **dict(config))
     else:
