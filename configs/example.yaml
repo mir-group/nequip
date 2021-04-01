@@ -105,6 +105,19 @@ loss_coeffs:                                                                    
 #   - L1Loss
 #   forces: 1.0
 
+# output metrics
+metrics_components:
+  - - forces                               # key 
+    - rmse                                 # "rmse" or "mse"
+    - PerSpecies: True                     # whether per specie contribution is counted
+      reduce_dims: 0                       # axes to average over 
+  - - forces
+    - mae
+    - PerSpecies: True
+      reduce_dims: 0
+  - - total_energy
+    - mae
+
 # optional keys
 # if true and weights_forces defined in the dataset, the loss function will be weighted
 atomic_weight_on: false
