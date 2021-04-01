@@ -1,4 +1,3 @@
-import inspect
 import logging
 
 from nequip.data import AtomicDataDict
@@ -44,10 +43,7 @@ def EnergyModel(**shared_params):
         # -- Encode --
         "one_hot": OneHotAtomEncoding,
         "spharm_edges": SphericalHarmonicEdgeAttrs,
-        "radial_basis": (
-            RadialBasisEdgeEncoding,
-            dict(basis=BesselBasis, cutoff=PolynomialCutoff),
-        ),
+        "radial_basis": RadialBasisEdgeEncoding,
         # -- Embed features --
         "feature_embedding": AtomwiseLinear,
     }
