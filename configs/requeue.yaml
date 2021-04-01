@@ -1,7 +1,7 @@
 # general
 root: aspirin
 project: aspirin
-workdir: result/requeue
+workdir: results/requeue
 run_name: minimal_requeue
 requeue: True
 
