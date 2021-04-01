@@ -341,7 +341,11 @@ class Trainer:
             dictionary["state_dict"]["optim"] = self.optim.state_dict()
             if self.lr_sched is not None:
                 dictionary["state_dict"]["lr_sched"] = self.lr_sched.state_dict()
-            dictionary["state_dict"]["random_number"] = torch.get_rng_state()
+            dictionary["state_dict"]["rng_state"] = torch.get_rng_state()
+            if torch.cuda.is_available():
+                dictionary["state_dict"]["cuda_rng_state"] = torch.cuda.get_rng_state(
+                    device=self.device
+                )
 
         if hasattr(self.model, "save") and not issubclass(
             type(self.model), torch.jit.ScriptModule
@@ -478,7 +482,8 @@ class Trainer:
             if trainer.lr_sched is not None:
                 trainer.lr_sched.load_state_dict(state_dict["lr_sched"])
             logging.debug("Reload optimizer and scheduler states")
-            torch.set_rng_state(state_dict["random_number"])
+            torch.set_rng_state(state_dict["rng_state"])
+            torch.cuda.set_rng_state(state_dict["cuda_rng_state"], device=self.device)
 
         if "progress" in d:
             trainer.best_val_metrics = progress["best_val_metrics"]
