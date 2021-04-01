@@ -899,9 +899,10 @@ class Trainer:
             for i in range(len(logger.handlers)):
                 logger.handlers.pop()
 
-    def set_dataset(self, dataset):
+    def set_dataset(self, train_dataset, val_dataset):
+    #def set_dataset(self, dataset):
 
-        if self.train_idcs is None or self.val_idcs is None:
+        '''if self.train_idcs is None or self.val_idcs is None:
 
             total_n = len(dataset)
 
@@ -924,15 +925,16 @@ class Trainer:
 
         # torch_geometric datasets inherantly support subsets using `index_select`
         self.dataset_train = dataset.index_select(self.train_idcs)
-        self.dataset_val = dataset.index_select(self.val_idcs)
+        self.dataset_val = dataset.index_select(self.val_idcs)'''
 
         self.dl_train, self.loader_params = instantiate(
             cls_name=DataLoader,
             prefix="loader",
             positional_args=dict(
-                dataset=self.dataset_train,
+                #dataset=self.dataset_train,
+                dataset=train_dataset,
                 batch_size=self.batch_size,
-                shuffle=self.shuffle,
+                shuffle=True,
                 exclude_keys=self.exclude_keys,
             ),
             optional_args=self.loader_params,
@@ -942,9 +944,10 @@ class Trainer:
             cls_name=DataLoader,
             prefix="loader",
             positional_args=dict(
-                dataset=self.dataset_val,
+                #dataset=self.dataset_val,
+                dataset=val_dataset,
                 batch_size=self.batch_size,
-                shuffle=self.shuffle,
+                shuffle=False,
                 exclude_keys=self.exclude_keys,
             ),
             optional_args=self.loader_params,

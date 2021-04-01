@@ -1,0 +1,80 @@
+# yaml file used for tutorial
+
+# general
+# Two folders will be used during the training: 'root'/process and 'root'/'project'
+# project contains logfiles and saved models
+# process contains processed data sets
+# if 'root'/'project' exists, 'root'/'project'_'year'-'month'-'day'-'hour'-'min'-'s' will be used instead.
+#root: results/ocp_is2re
+root: results/ocp_is2re
+project: ocp_is2re
+seed: 0                                            # random number seed for numpy and torch
+restart: false                                     # set True for a restarted run
+append: false                                      # set True if a restarted run should append to the previous log file
+
+# network
+compile_model: true                                # true compiles the constructed model to TorchScript
+num_basis: 8                                       # number of basis functions
+r_max: 4.0                                         # cutoff radius
+irreps_edge_sh: 0e + 1o                            # irreps of the spherical harmonics used for edges
+conv_to_output_hidden_irreps_out: 8x0e             # irreps used in hidden layer of output block
+feature_irreps_hidden: 8x0o + 8x0e + 8x1o + 8x1e   # irreps used for hidden features
+BesselBasis_trainable: true                        # set true to train the bessel weights
+nonlinearity_type: gate                            # may be 'gate' or 'norm', 'gate' is recommended
+num_layers: 3                                      # number of interaction blocks
+resnet: false                                      # set True to make interaction block a resnet-style update
+PolynomialCutoff_p: 6                              # p-value used in polynomial cutoff function 
+
+# OCP dataset
+dataset:
+ - src: /path/to/is2re/train/set
+ - src: /path/to/is2re/val/set
+
+# logging
+wandb: true                # we recommend using wandb for logging, turned off here b/c you have to install it first
+verbose: info               # the same as python logging, e.g. warning, info, debug, error. case insensitive
+log_batch_freq: 5           # batch frequency, how often to print training errors withinin the same epoch
+log_epoch_freq: 1           # epoch frequency, how often to print and save the model
+
+# training
+n_train: 100                 # number of training data
+n_val: 10                    # number of validation data
+learning_rate: 0.01         # learning rate, we found 0.01 to work best 
+batch_size: 1               # batch size
+max_epochs: 20              # stop training after _ number of epochs
+train_val_split: random     # can be random or sequential. if sequential, first n_train elements are training, next n_val are val, else random 
+shuffle: true               # If true, the data loader will shuffle the data
+
+# loss function
+loss_coeffs:                # different weights to use in a weighted loss functions
+  forces: 0.0               # for MD applications, we recommed a force weight of 1
+  total_energy: 1.0         # and an energy weight of 0., this usually gives the best errors in the forces
+
+
+# optional keys
+# if true and weights_forces defined in the dataset, the loss function will be weighted
+atomic_weight_on: false
+
+# optimizer, may be any optimizer defined in torch.optim
+# the name `optimizer_name`is case sensitive
+optimizer_name: Adam        # default optimizer is Adam in the amsgrad mode
+optimzer_params:            # any params taken by the torch.optim.xxx constructor
+  amsgrad: true
+  betas: !!python/tuple
+  - 0.9
+  - 0.999
+  eps: 1.0e-08
+  weight_decay: 0
+
+# lr scheduler, currently only supports the two options listed below, if you need more please file an issue
+# first open, consine annealing with warm restart
+lr_scheduler_name: CosineAnnealingWarmRestarts
+lr_scheduler_params:
+  T_0: 10000
+  T_mult: 2
+  eta_min: 0
+  last_epoch: -1
+
+# alternative option, on-plateau
+# lr_scheduler_name: ReduceLROnPlateau
+# lr_patience: 1000
