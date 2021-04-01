@@ -257,8 +257,10 @@ class Trainer:
 
         output = Output.get_output(timestr, self)
 
-        for key, value in output.as_dict().items():
+        # timestr run_name root workdir logfile
+        for key, value in output.updated_dict().items():
             setattr(self, key, value)
+
         if self.logfile is None:
             self.logfile = output.open_logfile("log", propagate=True)
         self.epoch_log = output.open_logfile("metrics_epoch.txt", propagate=False)
@@ -295,6 +297,7 @@ class Trainer:
             self.log_dictionary(self.as_dict(), name="Initialization")
 
         logging.debug("! Done Initialize Trainer")
+
 
     @property
     def init_params(self):

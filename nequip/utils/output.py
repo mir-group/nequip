@@ -103,6 +103,7 @@ class Output:
             run_name=self.run_name,
             root=self.root,
             workdir=self.workdir,
+            logfile=self.logfile
         )
 
     def generate_file(self, file_name: str, w_suffix: bool = False):

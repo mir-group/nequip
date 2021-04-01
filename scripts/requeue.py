@@ -27,8 +27,10 @@ def main():
     assert config.requeue, "This script only works for auto requeue. Be careful!!"
     for key in ["workdir", "root", "run_name"]:
         assert isinstance(config[key], str), f"{key} has to be defined for requeue script"
-    config.restart = True
-    config.append = True
+
+    found_restart_file = isfile(config.workdir+"/trainer.pth")
+    config.restart = found_restart_file
+    config.append = found_restart_file
 
     # open folders
     output = Output.from_config(config)
@@ -37,9 +39,7 @@ def main():
     torch.set_default_dtype(torch.float32)
 
     # load everything from trainer.pth
-    restart = False
-    if isfile(config.workdir+"/trainer.pth"):
-        restart = True
+    if found_restart_file:
         # load the dictionary
         dictionary = load_file(
             supported_formats=dict(torch=["pt", "pth"]),
@@ -69,16 +69,16 @@ def main():
 
         # download parameters from wandb in case of sweeping
         from nequip.utils.wandb import resume
-        config = resume(config, restart)
+        config = resume(config, config.restart)
 
-        if restart:
+        if config.restart:
             trainer = TrainerWandB.from_dict(dictionary)
         else:
             trainer = TrainerWandB(model=None, **dict(config))
     else:
         from nequip.train.trainer import Trainer
 
-        if restart:
+        if config.restart:
             trainer = Trainer.from_dict(dictionary)
         else:
             trainer = Trainer(model=None, **dict(config))
@@ -90,7 +90,7 @@ def main():
     # Train/test split
     trainer.set_dataset(dataset)
 
-    if not restart:
+    if not config.restart:
         # Get statistics of training dataset
         (
             (forces_std,),
