@@ -274,7 +274,7 @@ class Trainer:
         self.last_model_path = output.generate_file("last_model.pth")
         self.trainer_save_path = output.generate_file("trainer.pth")
 
-        if seed is not None:
+        if not (seed is None or self.restart):
             torch.manual_seed(seed)
             np.random.seed(seed)
 
@@ -341,6 +341,7 @@ class Trainer:
             dictionary["state_dict"]["optim"] = self.optim.state_dict()
             if self.lr_sched is not None:
                 dictionary["state_dict"]["lr_sched"] = self.lr_sched.state_dict()
+            dictionary["state_dict"]["random_number"] = torch.get_rng_state()
 
         if hasattr(self.model, "save") and not issubclass(
             type(self.model), torch.jit.ScriptModule
@@ -477,6 +478,7 @@ class Trainer:
             if trainer.lr_sched is not None:
                 trainer.lr_sched.load_state_dict(state_dict["lr_sched"])
             logging.debug("Reload optimizer and scheduler states")
+            torch.set_rng_state(state_dict["random_number"])
 
         if "progress" in d:
             trainer.best_val_metrics = progress["best_val_metrics"]
