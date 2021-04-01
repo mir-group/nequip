@@ -16,9 +16,9 @@ class Output:
     """Class to manage file and folders
 
     Args:
-        project: unique name of the simulation
+        run_name: unique name of the simulation
         root: the base folder where the processed data will be stored
-        workdir: the path where all log files will be stored. will be updated to root/project_timestr if the folder already exists.
+        workdir: the path where all log files will be stored. will be updated to root/{run_name}_{timestr} if the folder already exists.
         timestr (optional): unique id to generate work folder and store the output instance. default is time stamp if not defined.
         logfile (optional): if define, an additional logger (from the root one) will be defined and write to the file
         restart (optional): if True, the append flag will be used.
@@ -31,7 +31,7 @@ class Output:
 
     def __init__(
         self,
-        project: Optional[str] = None,
+        run_name: Optional[str] = None,
         root: Optional[str] = None,
         timestr: Optional[str] = None,
         workdir: Optional[str] = None,
@@ -68,22 +68,22 @@ class Output:
                 "%Y-%m-%d_%H:%M:%S:%f"
             )
         root = set_if_none(root, f".")
-        project = set_if_none(project, f"NequIP")
-        assert "/" not in project
-        workdir = set_if_none(workdir, f"{root}/{project}")
+        run_name = set_if_none(run_name, f"NequIP")
+        assert "/" not in run_name
+        workdir = set_if_none(workdir, f"{root}/{run_name}")
 
         # if folder exists in a non-append-mode or a fresh run
-        # rename the work folder based on project name
+        # rename the work folder based on run name
         if isdir(workdir) and ((restart and not append) or (not restart)):
             logging.debug(f"  ...renaming workdir from {workdir} to")
 
-            workdir = f"{root}/{project}_{timestr}"
+            workdir = f"{root}/{run_name}_{timestr}"
             logging.debug(f"  ...{workdir}")
 
         makedirs(workdir, exist_ok=True)
 
         self.timestr = timestr
-        self.project = project
+        self.run_name = run_name
         self.root = root
         self.workdir = workdir
         self.n_files = {}
@@ -96,6 +96,14 @@ class Output:
             logging.debug(f"  ...logfile {self.logfile} to")
 
         Output.instances[self.timestr] = self
+
+    def updated_dict(self):
+        return dict(
+            timestr=self.timestr,
+            run_name=self.run_name,
+            root=self.root,
+            workdir=self.workdir,
+        )
 
     def generate_file(self, file_name: str, w_suffix: bool = False):
         """

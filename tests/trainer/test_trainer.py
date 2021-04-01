@@ -96,10 +96,10 @@ class TestSaveLoad:
             state_dict=state_dict, training_progress=training_progress
         )
 
-        assert "optim_params" in dictionary
+        assert "optimizer_kwargs" in dictionary
         assert state_dict == ("state_dict" in dictionary)
         assert training_progress == ("progress" in dictionary)
-        assert len(dictionary["optim_params"]) > 1
+        assert len(dictionary["optimizer_kwargs"]) > 1
 
     @loop_config
     @pytest.mark.parametrize("format, suffix", [("torch", "pth"), ("yaml", "yaml")])
@@ -248,7 +248,6 @@ class TestTrain:
 
 
 class TestRescale:
-
     def test_scaling(self, scale_train):
 
         trainer = scale_train

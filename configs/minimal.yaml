@@ -1,6 +1,6 @@
 # general
 root: results/aspirin
-project: minimal
+run_name: minimal
 seed: 0
 
 # network
@@ -15,6 +15,7 @@ dataset: aspirin
 
 # logging
 wandb: false
+wandb_project: aspirin
 # verbose: debug
 
 # training

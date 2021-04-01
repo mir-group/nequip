@@ -65,7 +65,7 @@ class Config(object):
             config = {
                 key: value for key, value in config.items() if key not in exclude_keys
             }
-        elif config is not None:
+        if config is not None:
             self.update(config)
 
     def __repr__(self):

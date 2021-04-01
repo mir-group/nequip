@@ -76,7 +76,7 @@ class Trainer:
     trainer.train()
     '''
 
-    For a fresh run, the simulation results will be stored in the 'root/project' folder. With
+    For a fresh run, the simulation results will be stored in the 'root/run_name' folder. With
     - "log" : plain text information about the whole training process
     - "metrics_epoch.txt" : txt matrice format (readable by np.loadtxt) with loss/mae from training and validation of each epoch
     - "metrics_batch.txt" : txt matrice format (readable by np.loadtxt) with training loss/mae of each batch
@@ -85,7 +85,7 @@ class Trainer:
     - "trainer_save.pth": all the training information. The file used for loading and restart
 
     For restart run, the default set up is to not append to the original folders and files.
-    The Output class will automatically build a folder call root/project_
+    The Output class will automatically build a folder call root/run_name
     If append mode is on, the log file will be appended and the best model and last model will be overwritten.
 
     More examples can be found in tests/train/test_trainer.py
@@ -120,7 +120,7 @@ class Trainer:
 
         seed (int): random see number
 
-        project (str): project name.
+        run_name (str): run name.
         root (str): the name of root dir to make work folders
         timestr (optional, str): unique string to differentiate this trainer from others.
 
@@ -134,11 +134,11 @@ class Trainer:
         lr_sched (optional): scheduler
         learning_rate (float): initial learning rate
         lr_scheduler_name (str): scheduler name
-        lr_scheduler_params (dict): parameters to initialize the scheduler
+        lr_scheduler_kwargs (dict): parameters to initialize the scheduler
 
         optim (): optimizer
         optimizer_name (str): name for optimizer
-        optim_params (dict): parameters to initialize the optimizer
+        optim_kwargs (dict): parameters to initialize the optimizer
 
         batch_size (int): size of each batch
         shuffle (bool): parameters for dataloader
@@ -148,7 +148,7 @@ class Trainer:
         train_idcs (optional, list):  list of frames to use for training
         val_idcs (list):  list of frames to use for validation
         train_val_split (str):  "random" or "sequential"
-        loader_params (dict):  Parameters for dataloader
+        loader_kwargs (dict):  Parameters for dataloader
 
         init_callbacks (list): list of callback function at the begining of the training
         end_of_epoch_callbacks (list): list of callback functions at the end of each epoch
@@ -200,10 +200,13 @@ class Trainer:
     ```
     """
 
+    lr_scheduler_module = torch.optim.lr_scheduler
+    optim_module = torch.optim
+
     def __init__(
         self,
         model,
-        project: Optional[str] = None,
+        run_name: Optional[str] = None,
         root: Optional[str] = None,
         timestr: Optional[str] = None,
         seed: Optional[int] = None,
@@ -212,15 +215,15 @@ class Trainer:
         loss_coeffs: Union[dict, str] = AtomicDataDict.TOTAL_ENERGY_KEY,
         metrics_components: Optional[Union[dict, str]] = None,
         metrics_key: str = ABBREV.get(LOSS_KEY, LOSS_KEY),
-        early_stop_lower_threshold:Optional[float] = None,
+        early_stop_lower_threshold: Optional[float] = None,
         max_epochs: int = 1000000,
         lr_sched=None,
         learning_rate: float = 1e-2,
         lr_scheduler_name: str = "none",
-        lr_scheduler_params: Optional[dict] = None,
+        lr_scheduler_kwargs: Optional[dict] = None,
         optim=None,
         optimizer_name: str = "Adam",
-        optim_params: Optional[dict] = None,
+        optimizer_kwargs: Optional[dict] = None,
         exclude_keys: list = [],
         batch_size: int = 5,
         shuffle: bool = True,
@@ -229,7 +232,7 @@ class Trainer:
         train_idcs: Optional[list] = None,
         val_idcs: Optional[list] = None,
         train_val_split: str = "random",
-        loader_params: Optional[dict] = None,
+        loader_kwargs: Optional[dict] = None,
         init_callbacks: list = [],
         end_of_epoch_callbacks: list = [],
         end_of_batch_callbacks: list = [],
@@ -279,9 +282,9 @@ class Trainer:
         # sort out all the other parameters
         # for samplers, optimizer and scheduler
         self.kwargs = deepcopy(kwargs)
-        self.optim_params = deepcopy(optim_params)
-        self.lr_scheduler_params = deepcopy(lr_scheduler_params)
-        self.loader_params = deepcopy(loader_params)
+        self.optimizer_kwargs = deepcopy(optimizer_kwargs)
+        self.lr_scheduler_kwargs = deepcopy(lr_scheduler_kwargs)
+        self.loader_kwargs = deepcopy(loader_kwargs)
 
         # initialize the optimizer and scheduler, the params will be updated in the function
         self.init()
@@ -326,12 +329,10 @@ class Trainer:
         """
 
         dictionary = {}
-        # collect all init arguments
-        # note that kwargs will not be stored if those values are not in
-        # load_params, optim_params and lr_schduler_params
+
         for key in self.init_params:
             dictionary[key] = getattr(self, key, None)
-        dictionary["kwargs"] = getattr(self, "kwargs", {})
+        dictionary.update(getattr(self, "kwargs", {}))
 
         if state_dict:
             dictionary["state_dict"] = {}
@@ -423,8 +424,6 @@ class Trainer:
         """
 
         d = deepcopy(dictionary)
-        kwargs = d.pop("kwargs", {})
-        d.update(kwargs)
 
         # update the restart and append option
         d["restart"] = True
@@ -437,7 +436,9 @@ class Trainer:
 
         model = None
         iepoch = 0
-        if "progress" in d:
+        if "model" in d:
+            model = d.pop("model")
+        elif "progress" in d:
             progress = d["progress"]
             stop_arg = progress.pop("stop_arg", None)
             if stop_arg is not None:
@@ -492,15 +493,15 @@ class Trainer:
             return
 
         if self.optim is None:
-            self.optim, self.optim_params = instantiate_from_cls_name(
+            self.optim, self.optimizer_kwargs = instantiate_from_cls_name(
                 module=torch.optim,
                 class_name=self.optimizer_name,
-                prefix="optim",
+                prefix="optimizer",
                 positional_args=dict(
                     params=self.model.parameters(), lr=self.learning_rate
                 ),
                 all_args=self.kwargs,
-                optional_args=self.optim_params,
+                optional_args=self.optimizer_kwargs,
             )
 
         if self.lr_sched is None:
@@ -512,14 +513,14 @@ class Trainer:
                 > 0
             ), f"{self.lr_scheduler_name} cannot be used unless callback functions are defined"
             self.lr_sched = None
-            self.lr_scheduler_params = {}
+            self.lr_scheduler_kwargs = {}
             if self.lr_scheduler_name != "none":
-                self.lr_sched, self.lr_scheduler_params = instantiate_from_cls_name(
+                self.lr_sched, self.lr_scheduler_kwargs = instantiate_from_cls_name(
                     module=torch.optim.lr_scheduler,
                     class_name=self.lr_scheduler_name,
-                    prefix="lr",
+                    prefix="lr_scheduler",
                     positional_args=dict(optimizer=self.optim),
-                    optional_args=self.lr_scheduler_params,
+                    optional_args=self.lr_scheduler_kwargs,
                     all_args=self.kwargs,
                 )
 
@@ -750,7 +751,7 @@ class Trainer:
         batch_type = VALIDATION if validation else TRAIN
 
         header = f"\n# Epoch\n# batch"
-        log_header = f"\n{batch_type}\n# Epoch batch"
+        log_header = f"# Epoch batch"
 
         # print and store loss value
         for name, value in self.batch_losses.items():
@@ -780,6 +781,8 @@ class Trainer:
             batch_logger.info(header)
 
         if self.ibatch == 0:
+            self.logger.info("")
+            self.logger.info(f"{batch_type}")
             self.logger.info(log_header)
 
         batch_logger.info(mat_str)
@@ -922,7 +925,7 @@ class Trainer:
         self.dataset_train = dataset.index_select(self.train_idcs)
         self.dataset_val = dataset.index_select(self.val_idcs)
 
-        self.dl_train, self.loader_params = instantiate(
+        self.dl_train, self.loader_kwargs = instantiate(
             builder=DataLoader,
             prefix="loader",
             positional_args=dict(
@@ -931,7 +934,7 @@ class Trainer:
                 shuffle=self.shuffle,
                 exclude_keys=self.exclude_keys,
             ),
-            optional_args=self.loader_params,
+            optional_args=self.loader_kwargs,
             all_args=self.kwargs,
         )
         self.dl_val, _ = instantiate(
@@ -943,6 +946,6 @@ class Trainer:
                 shuffle=self.shuffle,
                 exclude_keys=self.exclude_keys,
             ),
-            optional_args=self.loader_params,
+            optional_args=self.loader_kwargs,
             all_args=self.kwargs,
         )

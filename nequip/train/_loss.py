@@ -90,7 +90,7 @@ class PerSpeciesLoss(SimpleLoss):
         else:
             atomic_weight_on = False
 
-        species_index = ref[AtomicDataDict.SPECIES_INDEX_KEY]
+        species_index = pred[AtomicDataDict.SPECIES_INDEX_KEY]
         _, inverse_species_index = torch.unique(species_index, return_inverse=True)
 
         if atomic_weight_on:

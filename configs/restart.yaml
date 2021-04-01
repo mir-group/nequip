@@ -2,7 +2,8 @@
 
 # general
 root: results/aspirin
-project: new_minimal
+wandb_project: aspirin
+run_name: new_minimal
 seed: 0
 restart: true
 append: false

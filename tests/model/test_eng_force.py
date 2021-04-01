@@ -97,14 +97,16 @@ class TestWorkflow:
 
         result0 = instance(data)[out_field].flatten()
         result1 = model_script(data)[out_field].flatten()
-        d = result0-result1
+        d = result0 - result1
         for i in range(result0.shape[0]):
-            print(i, f"({result0[i].item():10.3g})-({result1[i].item():10.3g})=({d[i].item():10.3g})", torch.isclose(result0[i], result1[i]).item())
+            print(
+                i,
+                f"({result0[i].item():10.3g})-({result1[i].item():10.3g})=({d[i].item():10.3g})",
+                torch.isclose(result0[i], result1[i]).item(),
+            )
 
         assert torch.allclose(
-            instance(data)[out_field],
-            model_script(data)[out_field],
-            atol=1e-7
+            instance(data)[out_field], model_script(data)[out_field], atol=1e-7
         )
 
     def test_submods(self):
