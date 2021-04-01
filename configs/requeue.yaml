@@ -1,6 +1,6 @@
 # general
-root: aspirin
-project: aspirin
+root: results/
+wandb_project: aspirin
 workdir: results/requeue
 run_name: minimal_requeue
 requeue: True

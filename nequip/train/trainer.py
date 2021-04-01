@@ -434,7 +434,7 @@ class Trainer:
 
         # update the file and folder name
         output = Output.from_config(d)
-        d.update(output.as_dict())
+        d.update(output.updated_dict())
 
         model = None
         iepoch = 0

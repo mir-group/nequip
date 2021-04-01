@@ -40,6 +40,7 @@ class Output:
         append: bool = False,
         screen: bool = False,
         verbose: str = "info",
+        force_append: bool = False,
     ):
 
         # add screen output to the universal logger
@@ -58,23 +59,27 @@ class Output:
 
         self.restart = restart
         self.append = append
+        self.force_append = force_append
         self.screen = screen
         self.verbose = verbose
 
         # open root folder for storing
         # if folder exists and not append, the folder name and filename will be updated
-        if (restart and not append) or timestr is None:
+        if not force_append and ((restart and not append) or timestr is None):
             timestr = datetime.datetime.fromtimestamp(time()).strftime(
                 "%Y-%m-%d_%H:%M:%S:%f"
             )
-        root = set_if_none(root, f".")
-        run_name = set_if_none(run_name, f"NequIP")
+        if not force_append:
+            root = set_if_none(root, f".")
+            run_name = set_if_none(run_name, f"NequIP")
+            workdir = set_if_none(workdir, f"{root}/{run_name}")
         assert "/" not in run_name
-        workdir = set_if_none(workdir, f"{root}/{run_name}")
 
         # if folder exists in a non-append-mode or a fresh run
         # rename the work folder based on run name
-        if isdir(workdir) and ((restart and not append) or (not restart)):
+        if (
+            isdir(workdir) and ((restart and not append) or (not restart))
+        ) or not force_append:
             logging.debug(f"  ...renaming workdir from {workdir} to")
 
             workdir = f"{root}/{run_name}_{timestr}"

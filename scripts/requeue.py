@@ -21,7 +21,10 @@ from nequip.nn import RescaleOutput
 def main():
 
     config = Config.from_file(
-        argv[1], defaults=dict(wandb=False, compile_model=False, wandb_project="NequIP")
+        argv[1],
+        defaults=dict(
+            wandb=False, compile_model=False, wandb_project="NequIP", requeue=False
+        ),
     )
 
     assert config.requeue, "This script only works for auto requeue. Be careful!!"
@@ -33,6 +36,7 @@ def main():
     found_restart_file = isfile(config.workdir + "/trainer.pth")
     config.restart = found_restart_file
     config.append = found_restart_file
+    config.force_append = True
 
     # open folders
     output = Output.from_config(config)
