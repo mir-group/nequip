@@ -155,7 +155,7 @@ def instantiate(
         bname = key[:-7]
         if key.endswith("_kwargs") and bname not in allow:
             raise KeyError(
-                f"Found submodule kwargs argument `{key}`, but no parameter `{bname}` for the builder. Either add a parameter for `{bname}` if you are trying to allow construction of a submodule, or, if `{bname}_kwargs` is just supposed to be a dictionary, rename it without `_kwargs`."
+                f"Instantiating {builder.__name__}: found kwargs argument `{key}`, but no parameter `{bname}` for the corresponding builder. (Did you rename `{bname}` but forget to change `{bname}_kwargs`?) Either add a parameter for `{bname}` if you are trying to allow construction of a submodule, or, if `{bname}_kwargs` is just supposed to be a dictionary, rename it without `_kwargs`."
             )
     del allow
 
