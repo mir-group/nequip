@@ -29,7 +29,7 @@ class TestInit:
 
 class TestProject:
     def test_empty_init(self, root):
-        output = Output(root=root, project="not_default")
+        output = Output(root=root, run_name="not_default")
         assert isdir(output.root)
         assert isdir(output.workdir)
         assert "not_default" in output.workdir

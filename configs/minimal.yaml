@@ -1,6 +1,6 @@
 # general
 root: results/aspirin
-project: minimal
+run_name: minimal
 seed: 0
 
 # network
@@ -15,23 +15,17 @@ dataset: aspirin
 
 # logging
 wandb: false
-verbose: debug
+wandb_project: aspirin
+# verbose: debug
 
 # training
 n_train: 5
 n_val: 5
 batch_size: 1
 max_epochs: 10
-metrics_key: all_f_mae
 
 # loss function
-loss_coeffs: 
-  forces: PerSpeciesMSELoss
+loss_coeffs: forces
 
 # optimizer
 optimizer_name: Adam
-
-# lr scheduler
-lr_scheduler_name: CosineAnnealingWarmRestarts
-learning_rate: 0.01
-lr_T_0: 10000

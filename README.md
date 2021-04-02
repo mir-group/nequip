@@ -48,6 +48,13 @@ $ cd opt_einsum_fx/
 $ pip install .
 ```
 
+* Install [`pytorch_runstats`](https://github.com/mir-group/pytorch_runstats):
+```bash
+$ git clone https://github.com/mir-group/pytorch_runstats
+$ cd pytorch_runstats/
+$ pip install .
+```
+
 * We use [Weights&Biases](https://wandb.ai) to keep track of experiments. This is not a strict requirement, you can use our software without this, but it may make your life easier. If you want to use it, create an account [here](https://wandb.ai) and install it: 
 
 ```

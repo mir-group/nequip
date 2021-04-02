@@ -26,7 +26,6 @@ minimal_config = dict(
     max_epochs=2,
     batch_size=2,
     learning_rate=1e-2,
-    lr_scheduler="CosineAnnealingWarmRestarts",
     optimizer="Adam",
     seed=0,
     restart=False,
@@ -97,10 +96,10 @@ class TestSaveLoad:
             state_dict=state_dict, training_progress=training_progress
         )
 
-        assert "optim_params" in dictionary
+        assert "optimizer_kwargs" in dictionary
         assert state_dict == ("state_dict" in dictionary)
         assert training_progress == ("progress" in dictionary)
-        assert len(dictionary["optim_params"]) > 1
+        assert len(dictionary["optimizer_kwargs"]) > 1
 
     @loop_config
     @pytest.mark.parametrize("format, suffix", [("torch", "pth"), ("yaml", "yaml")])
@@ -192,7 +191,7 @@ class TestTrain:
         trainer.train()
         v1 = get_param(trainer.model)
 
-        assert not np.isclose(v0, v1).all(), "fail to train parameters"
+        assert not np.allclose(v0, v1), "fail to train parameters"
         assert isfile(trainer.last_model_path), "fail to save best model"
 
     @one_config_test
@@ -245,7 +244,40 @@ class TestTrain:
             trainer1.train()
             v1 = get_param(trainer1.model)
 
-            assert not np.isclose(v0, v1).all(), "fail to train parameters"
+            assert not np.allclose(v0, v1), "fail to train parameters"
+
+
+class TestRescale:
+    def test_scaling(self, scale_train):
+
+        trainer = scale_train
+
+        data = trainer.dataset_train[0]
+
+        def get_loss_val(validation):
+            trainer.ibatch = 0
+            trainer.n_batches = 10
+            trainer.reset_metrics()
+            trainer.batch_step(
+                data=data,
+                validation=validation,
+            )
+            metrics, _ = trainer.metrics.flatten_metrics(
+                trainer.batch_metrics,
+            )
+            return trainer.batch_losses, metrics
+
+        ref_loss, ref_met = get_loss_val(True)
+        loss, met = get_loss_val(False)
+
+        # metrics should always be in real unit
+        for k in ref_met:
+            assert np.allclose(ref_met[k], met[k])
+        # loss should always be in normalized unit
+        for k in ref_loss:
+            assert np.allclose(ref_loss[k], loss[k])
+
+        assert np.allclose(np.sqrt(loss["loss_f"]) * trainer.scale, met["f_rmse"])
 
 
 def get_param(model):
@@ -268,4 +300,59 @@ class DummyNet(torch.nn.Module):
         x = data["pos"]
         return {
             AtomicDataDict.FORCE_KEY: self.linear2(x),
+            AtomicDataDict.TOTAL_ENERGY_KEY: self.linear1(x),
         }
+
+
+class DummyScale(torch.nn.Module):
+    """ mimic the rescale model"""
+
+    def __init__(self, key, scale, shift) -> None:
+        super().__init__()
+        self.key = key
+        self.scale_by = torch.as_tensor(scale, dtype=torch.get_default_dtype())
+        self.shift_by = torch.as_tensor(shift, dtype=torch.get_default_dtype())
+        self.linear2 = Linear(3, 3)
+
+    def forward(self, data):
+        out = self.linear2(data["pos"])
+        if not self.training:
+            out = out * self.scale_by
+            out = out + self.shift_by
+        return {self.key: out}
+
+    def scale(self, data, force_process=False, do_shift=True, do_scale=True):
+        data = data.copy()
+        if force_process or not self.training:
+            if do_scale:
+                data[self.key] = data[self.key] * self.scale_by
+            if do_shift:
+                data[self.key] = data[self.key] + self.shift_by
+        return data
+
+    def unscale(self, data, force_process=False, do_shift=True, do_scale=True):
+        data = data.copy()
+        if force_process or self.training:
+            if do_shift:
+                data[self.key] = data[self.key] - self.shift_by
+            if do_scale:
+                data[self.key] = data[self.key] / self.scale_by
+        return data
+
+
+@pytest.fixture(scope="class")
+def scale_train(nequip_dataset):
+    with tempfile.TemporaryDirectory(prefix="output") as path:
+        trainer = Trainer(
+            model=DummyScale(AtomicDataDict.FORCE_KEY, scale=1.3, shift=1),
+            n_train=4,
+            n_val=4,
+            max_epochs=0,
+            batch_size=2,
+            loss_coeffs=AtomicDataDict.FORCE_KEY,
+            root=path,
+        )
+        trainer.set_dataset(nequip_dataset)
+        trainer.train()
+        trainer.scale = 1.3
+        yield trainer

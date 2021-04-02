@@ -13,24 +13,25 @@ from nequip.nn import RescaleOutput
 
 
 def main():
-    config = Config.from_file(argv[1], defaults=dict(wandb=False, compile_model=False))
+
+    config = Config.from_file(
+        argv[1], defaults=dict(wandb=False, compile_model=False, wandb_project="NequIP")
+    )
 
     torch.set_default_dtype(torch.float32)
     output = Output.from_config(config)
-    config.update(output.as_dict())
+    config.update(output.updated_dict())
 
     # Make the trainer
     if config.wandb:
-        _config = dict(config)
-        project = _config.pop("project", "NequIP")
-        _config.pop("wandb", False)
 
         import wandb
-
-        wandb.init(project=project, config=_config)
-        config.update(dict(wandb.config))
-
         from nequip.train.trainer_wandb import TrainerWandB
+
+        # download parameters from wandb in case of sweeping
+        from nequip.utils.wandb import init_n_update
+
+        config = init_n_update(config)
 
         trainer = TrainerWandB(model=None, **dict(config))
     else:
@@ -86,6 +87,7 @@ def main():
     )
 
     # Set the trainer
+    core_model.config = dict(config)
     trainer.model = core_model
 
     # Train

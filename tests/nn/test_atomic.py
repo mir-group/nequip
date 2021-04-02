@@ -57,10 +57,6 @@ def test_per_specie_shift(nequip_dataset, batches, model):
     result2 = model(batch2)
     result12 = model(batch12)
 
-    assert torch.isclose(
-        result1["shifted"], result12["shifted"][0]
-    )
-    assert torch.isclose(
-        result2["shifted"], result12["shifted"][1]
-    )
+    assert torch.isclose(result1["shifted"], result12["shifted"][0])
+    assert torch.isclose(result2["shifted"], result12["shifted"][1])
     print(result1["shifted"], result2["shifted"], result12["shifted"])

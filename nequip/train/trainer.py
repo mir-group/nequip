@@ -28,7 +28,10 @@ from nequip.utils import (
     load_file,
 )
 
-from .loss import Loss
+from torch_runstats import RunningStats, Reduction
+
+from .loss import Loss, LossStat
+from .metrics import Metrics
 from ._key import *
 
 
@@ -73,7 +76,7 @@ class Trainer:
     trainer.train()
     '''
 
-    For a fresh run, the simulation results will be stored in the 'root/project' folder. With
+    For a fresh run, the simulation results will be stored in the 'root/run_name' folder. With
     - "log" : plain text information about the whole training process
     - "metrics_epoch.txt" : txt matrice format (readable by np.loadtxt) with loss/mae from training and validation of each epoch
     - "metrics_batch.txt" : txt matrice format (readable by np.loadtxt) with training loss/mae of each batch
@@ -82,7 +85,7 @@ class Trainer:
     - "trainer_save.pth": all the training information. The file used for loading and restart
 
     For restart run, the default set up is to not append to the original folders and files.
-    The Output class will automatically build a folder call root/project_
+    The Output class will automatically build a folder call root/run_name
     If append mode is on, the log file will be appended and the best model and last model will be overwritten.
 
     More examples can be found in tests/train/test_trainer.py
@@ -117,7 +120,7 @@ class Trainer:
 
         seed (int): random see number
 
-        project (str): project name.
+        run_name (str): run name.
         root (str): the name of root dir to make work folders
         timestr (optional, str): unique string to differentiate this trainer from others.
 
@@ -125,18 +128,17 @@ class Trainer:
         append (bool): If true, the preexisted workfolder and files will be overwritten. And log files will be appended
 
         loss_coeffs (dict): dictionary to store coefficient and loss functions
-        atomic_weight_on (dict): if true, the weights in dataset will be used for loss/mae calculations.
 
         max_epochs (int): maximum number of epochs
 
         lr_sched (optional): scheduler
         learning_rate (float): initial learning rate
         lr_scheduler_name (str): scheduler name
-        lr_scheduler_params (dict): parameters to initialize the scheduler
+        lr_scheduler_kwargs (dict): parameters to initialize the scheduler
 
         optim (): optimizer
         optimizer_name (str): name for optimizer
-        optim_params (dict): parameters to initialize the optimizer
+        optim_kwargs (dict): parameters to initialize the optimizer
 
         batch_size (int): size of each batch
         shuffle (bool): parameters for dataloader
@@ -146,7 +148,7 @@ class Trainer:
         train_idcs (optional, list):  list of frames to use for training
         val_idcs (list):  list of frames to use for validation
         train_val_split (str):  "random" or "sequential"
-        loader_params (dict):  Parameters for dataloader
+        loader_kwargs (dict):  Parameters for dataloader
 
         init_callbacks (list): list of callback function at the begining of the training
         end_of_epoch_callbacks (list): list of callback functions at the end of each epoch
@@ -198,26 +200,30 @@ class Trainer:
     ```
     """
 
+    lr_scheduler_module = torch.optim.lr_scheduler
+    optim_module = torch.optim
+
     def __init__(
         self,
         model,
-        project: Optional[str] = None,
+        run_name: Optional[str] = None,
         root: Optional[str] = None,
         timestr: Optional[str] = None,
         seed: Optional[int] = None,
         restart: bool = False,
         append: bool = False,
         loss_coeffs: Union[dict, str] = AtomicDataDict.TOTAL_ENERGY_KEY,
+        metrics_components: Optional[Union[dict, str]] = None,
         metrics_key: str = ABBREV.get(LOSS_KEY, LOSS_KEY),
-        atomic_weight_on: bool = False,
+        early_stop_lower_threshold: Optional[float] = None,
         max_epochs: int = 1000000,
         lr_sched=None,
         learning_rate: float = 1e-2,
-        lr_scheduler_name: str = "ReduceLROnPlateau",
-        lr_scheduler_params: Optional[dict] = None,
+        lr_scheduler_name: str = "none",
+        lr_scheduler_kwargs: Optional[dict] = None,
         optim=None,
         optimizer_name: str = "Adam",
-        optim_params: Optional[dict] = None,
+        optimizer_kwargs: Optional[dict] = None,
         exclude_keys: list = [],
         batch_size: int = 5,
         shuffle: bool = True,
@@ -226,7 +232,7 @@ class Trainer:
         train_idcs: Optional[list] = None,
         val_idcs: Optional[list] = None,
         train_val_split: str = "random",
-        loader_params: Optional[dict] = None,
+        loader_kwargs: Optional[dict] = None,
         init_callbacks: list = [],
         end_of_epoch_callbacks: list = [],
         end_of_batch_callbacks: list = [],
@@ -251,8 +257,10 @@ class Trainer:
 
         output = Output.get_output(timestr, self)
 
-        for key, value in output.as_dict().items():
+        # timestr run_name root workdir logfile
+        for key, value in output.updated_dict().items():
             setattr(self, key, value)
+
         if self.logfile is None:
             self.logfile = output.open_logfile("log", propagate=True)
         self.epoch_log = output.open_logfile("metrics_epoch.txt", propagate=False)
@@ -266,7 +274,7 @@ class Trainer:
         self.last_model_path = output.generate_file("last_model.pth")
         self.trainer_save_path = output.generate_file("trainer.pth")
 
-        if seed is not None:
+        if not (seed is None or self.restart):
             torch.manual_seed(seed)
             np.random.seed(seed)
 
@@ -276,9 +284,9 @@ class Trainer:
         # sort out all the other parameters
         # for samplers, optimizer and scheduler
         self.kwargs = deepcopy(kwargs)
-        self.optim_params = deepcopy(optim_params)
-        self.lr_scheduler_params = deepcopy(lr_scheduler_params)
-        self.loader_params = deepcopy(loader_params)
+        self.optimizer_kwargs = deepcopy(optimizer_kwargs)
+        self.lr_scheduler_kwargs = deepcopy(lr_scheduler_kwargs)
+        self.loader_kwargs = deepcopy(loader_kwargs)
 
         # initialize the optimizer and scheduler, the params will be updated in the function
         self.init()
@@ -323,17 +331,21 @@ class Trainer:
         """
 
         dictionary = {}
-        # collect all init arguments
-        # note that kwargs will not be stored if those values are not in
-        # load_params, optim_params and lr_schduler_params
+
         for key in self.init_params:
             dictionary[key] = getattr(self, key, None)
-        dictionary["kwargs"] = getattr(self, "kwargs", {})
+        dictionary.update(getattr(self, "kwargs", {}))
 
         if state_dict:
             dictionary["state_dict"] = {}
             dictionary["state_dict"]["optim"] = self.optim.state_dict()
-            dictionary["state_dict"]["lr_sched"] = self.lr_sched.state_dict()
+            if self.lr_sched is not None:
+                dictionary["state_dict"]["lr_sched"] = self.lr_sched.state_dict()
+            dictionary["state_dict"]["rng_state"] = torch.get_rng_state()
+            if torch.cuda.is_available():
+                dictionary["state_dict"]["cuda_rng_state"] = torch.cuda.get_rng_state(
+                    device=self.device
+                )
 
         if hasattr(self.model, "save") and not issubclass(
             type(self.model), torch.jit.ScriptModule
@@ -419,8 +431,6 @@ class Trainer:
         """
 
         d = deepcopy(dictionary)
-        kwargs = d.pop("kwargs", {})
-        d.update(kwargs)
 
         # update the restart and append option
         d["restart"] = True
@@ -429,13 +439,15 @@ class Trainer:
 
         # update the file and folder name
         output = Output.from_config(d)
-        d.update(output.as_dict())
+        d.update(output.updated_dict())
 
         model = None
         iepoch = 0
-        if "progress" in d:
+        if "model" in d:
+            model = d.pop("model")
+        elif "progress" in d:
             progress = d["progress"]
-            stop_arg = progress["stop_arg"]
+            stop_arg = progress.pop("stop_arg", None)
             if stop_arg is not None:
                 raise RuntimeError(
                     f"The previous run has properly stopped with {stop_arg}."
@@ -467,8 +479,12 @@ class Trainer:
 
         if state_dict is not None and trainer.model is not None:
             trainer.optim.load_state_dict(state_dict["optim"])
-            trainer.lr_sched.load_state_dict(state_dict["lr_sched"])
+            if trainer.lr_sched is not None:
+                trainer.lr_sched.load_state_dict(state_dict["lr_sched"])
             logging.debug("Reload optimizer and scheduler states")
+            torch.set_rng_state(state_dict["rng_state"])
+            if torch.cuda.is_available():
+                torch.cuda.set_rng_state(state_dict["cuda_rng_state"])
 
         if "progress" in d:
             trainer.best_val_metrics = progress["best_val_metrics"]
@@ -487,36 +503,80 @@ class Trainer:
             return
 
         if self.optim is None:
-            self.optim, self.optim_params = instantiate_from_cls_name(
+            self.optim, self.optimizer_kwargs = instantiate_from_cls_name(
                 module=torch.optim,
                 class_name=self.optimizer_name,
-                prefix="optim",
+                prefix="optimizer",
                 positional_args=dict(
                     params=self.model.parameters(), lr=self.learning_rate
                 ),
                 all_args=self.kwargs,
-                optional_args=self.optim_params,
+                optional_args=self.optimizer_kwargs,
             )
 
         if self.lr_sched is None:
             assert (
                 self.lr_scheduler_name
-                in ["CosineAnnealingWarmRestarts", "ReduceLROnPlateau"]
+                in ["CosineAnnealingWarmRestarts", "ReduceLROnPlateau", "none"]
             ) or (
                 (len(self.end_of_epoch_callbacks) + len(self.end_of_batch_callbacks))
                 > 0
             ), f"{self.lr_scheduler_name} cannot be used unless callback functions are defined"
-            self.lr_sched, self.lr_scheduler_params = instantiate_from_cls_name(
-                module=torch.optim.lr_scheduler,
-                class_name=self.lr_scheduler_name,
-                prefix="lr",
-                positional_args=dict(optimizer=self.optim),
-                optional_args=self.lr_scheduler_params,
-                all_args=self.kwargs,
-            )
+            self.lr_sched = None
+            self.lr_scheduler_kwargs = {}
+            if self.lr_scheduler_name != "none":
+                self.lr_sched, self.lr_scheduler_kwargs = instantiate_from_cls_name(
+                    module=torch.optim.lr_scheduler,
+                    class_name=self.lr_scheduler_name,
+                    prefix="lr_scheduler",
+                    positional_args=dict(optimizer=self.optim),
+                    optional_args=self.lr_scheduler_kwargs,
+                    all_args=self.kwargs,
+                )
 
-        self.loss = Loss(self.loss_coeffs, atomic_weight_on=self.atomic_weight_on)
+        self.loss, _ = instantiate(
+            builder=Loss,
+            prefix="loss",
+            positional_args=dict(coeffs=self.loss_coeffs),
+            all_args=self.kwargs,
+        )
+        self.loss_stat = LossStat(keys=list(self.loss.funcs.keys()))
+
         self._initialized = True
+
+    def init_metrics(self):
+
+        if self.metrics_components is None:
+            self.metrics_components = []
+            for key, func in self.loss.funcs.items():
+                dim = (
+                    self.dataset_train[0][key].shape[1:]
+                    if hasattr(self, "dataset_train")
+                    else tuple()
+                )
+                params = {
+                    "dim": dim,
+                    "PerSpecies": type(func).__name__.startswith("PerSpecies"),
+                }
+                if key == AtomicDataDict.FORCE_KEY:
+                    params["reduce_dims"] = 0
+                self.metrics_components.append((key, "mae", params))
+                self.metrics_components.append((key, "rmse", params))
+        elif hasattr(self, "dataset_train"):
+            # update the metric dim based on dataset data
+            new_list = []
+            for component in self.metrics_components:
+                key, reduction, params = Metrics.parse(component)
+                params["dim"] = self.dataset_train[0][key].shape[1:]
+                new_list.append((key, reduction, params))
+            self.metrics_components = new_list
+
+        self.metrics, _ = instantiate(
+            builder=Metrics,
+            prefix="metrics",
+            positional_args=dict(components=self.metrics_components),
+            all_args=self.kwargs,
+        )
 
     def init_model(self):
 
@@ -550,6 +610,7 @@ class Trainer:
             self.best_val_metrics = float("inf")
             self.best_epoch = 0
             self.iepoch = 0
+        self.init_metrics()
 
         while self.iepoch < self.max_epochs and not stop:
 
@@ -570,116 +631,103 @@ class Trainer:
 
         self.save(self.trainer_save_path)
 
-    def batch_step(self, data, n_batches, validation=False):
-
-        self.model.train()
+    def batch_step(self, data, validation=False):
+        if validation:
+            self.model.eval()
+        else:
+            self.model.train()
 
         # Do any target rescaling
         data = data.to(self.device)
         data = AtomicData.to_AtomicDataDict(data)
+
         if hasattr(self.model, "unscale"):
             # This means that self.model is RescaleOutputs
             # this will normalize the targets
             # in validation (eval mode), it does nothing
             # in train mode, if normalizes the targets
-            data = self.model.unscale(data)
+            data_unscaled = self.model.unscale(data)
+        else:
+            data_unscaled = data
 
         # Run model
-        out = self.model(data)
+        out = self.model(data_unscaled)
 
         # If we're in evaluation mode (i.e. validation), then
-        # data's target prop is unnormalized, and out's has been rescaled to be in the same units
-        # If we're in training, data's target prop has been normalized, and out's hasn't been touched, so they're both in normalized units
+        # data_unscaled's target prop is unnormalized, and out's has been rescaled to be in the same units
+        # If we're in training, data_unscaled's target prop has been normalized, and out's hasn't been touched, so they're both in normalized units
         # Note that either way all normalization was handled internally by RescaleOutput
 
-        loss, loss_contrib = self.loss(pred=out, ref=data)
-
         if not validation:
+            loss, loss_contrib = self.loss(pred=out, ref=data_unscaled)
             self.optim.zero_grad()
             loss.backward()
             self.optim.step()
 
             if self.lr_scheduler_name == "CosineAnnealingWarmRestarts":
-                self.lr_sched.step(self.iepoch + self.ibatch / n_batches)
+                self.lr_sched.step(self.iepoch + self.ibatch / self.n_batches)
 
-        # save loss stats
         with torch.no_grad():
-            mae, mae_contrib = self.loss.mae(pred=out, ref=data)
-            scaled_loss_contrib = {}
-            if hasattr(self.model, "scale"):
+            if hasattr(self.model, "unscale"):
+                if validation:
+                    # loss function always needs to be in normalized unit
+                    scaled_out = self.model.unscale(out, force_process=True)
+                    _data_unscaled = self.model.unscale(data, force_process=True)
+                    loss, loss_contrib = self.loss(pred=scaled_out, ref=_data_unscaled)
+                else:
+                    # If we are in training mode, we need to bring the prediction
+                    # into real units
+                    out = self.model.scale(out, force_process=True)
+            elif validation:
+                loss, loss_contrib = self.loss(pred=out, ref=data_unscaled)
 
-                for key in mae_contrib:
-                    mae_contrib[key] = self.model.scale(
-                        mae_contrib[key], force_process=True, do_shift=False
-                    )
-
-                # TO DO, this evetually needs to be removed. no guarantee that a loss is MSE
-                for key in loss_contrib:
-
-                    scaled_loss_contrib[key] = {
-                        k: torch.clone(v) for k, v in loss_contrib[key].items()
-                    }
-
-                    scaled_loss_contrib[key] = self.model.scale(
-                        scaled_loss_contrib[key],
-                        force_process=True,
-                        do_shift=False,
-                        do_scale=True,
-                    )
-
-                    keys = [k for k in scaled_loss_contrib[key] if k in self.loss.funcs]
-                    keys = [
-                        k
-                        for k in keys
-                        if "mse" in type(self.loss.funcs[k].func).__name__.lower()
-                    ]
-                    if len(keys) > 0:
-                        scaled_loss_contrib[key] = self.model.scale(
-                            scaled_loss_contrib[key],
-                            force_process=True,
-                            do_shift=False,
-                            do_scale=True,
-                        )
-
-            self.batch_loss = loss.detach()
-            self.batch_scaled_loss_contrib = {
-                k1: {k2: v2.detach() for k2, v2 in v1.items()}
-                for k1, v1 in scaled_loss_contrib.items()
-            }
-            self.batch_loss_contrib = {
-                k1: {k2: v2.detach() for k2, v2 in v1.items()}
-                for k1, v1 in loss_contrib.items()
-            }
-            self.batch_mae = mae.detach()
-            self.batch_mae_contrib = {
-                k1: {k2: v2.detach() for k2, v2 in v1.items()}
-                for k1, v1 in mae_contrib.items()
-            }
-
-            self.end_of_batch_log(validation)
-            for callback in self.end_of_batch_callbacks:
-                callback(self)
+            # save metrics stats
+            self.batch_losses = self.loss_stat(loss, loss_contrib)
+            # in validation mode, data is in real units and the network scales
+            # out to be in real units interally.
+            # in training mode, data is still in real units, and we rescaled
+            # out to be in real units above.
+            self.batch_metrics = self.metrics(pred=out, ref=data)
 
     @property
     def early_stop_cond(self):
         """ kill the training early """
 
+        if self.early_stop_lower_threshold is not None:
+            if self.best_val_metrics < self.early_stop_lower_threshold:
+                return True
         return False
+
+    def reset_metrics(self):
+        self.loss_stat.reset()
+        self.loss_stat.to(self.device)
+        self.metrics.reset()
+        self.metrics.to(self.device)
 
     def epoch_step(self):
 
-        for self.ibatch, batch in enumerate(self.dl_train):
-            self.batch_step(
-                data=batch,
-                n_batches=self.n_train_batches,
-                validation=False,
-            )
+        datasets = [self.dl_train, self.dl_val]
+        categories = [TRAIN, VALIDATION]
+        self.metrics_dict = {}
+        self.loss_dict = {}
+        for category, dataset in zip(categories, datasets):
 
-        for callback in self.end_of_train_callbacks:
-            callback(self)
+            self.reset_metrics()
+            self.n_batches = len(dataset)
+            for self.ibatch, batch in enumerate(dataset):
+                self.batch_step(
+                    data=batch,
+                    validation=(category == VALIDATION),
+                )
+                self.end_of_batch_log(validation=False)
+                for callback in self.end_of_batch_callbacks:
+                    callback(self)
+            self.metrics_dict[category] = self.metrics.current_result()
+            self.loss_dict[category] = self.loss_stat.current_result()
 
-        for self.ibatch, batch in enumerate(self.dl_val):
-            self.batch_step(data=batch, n_batches=self.n_val_batches, validation=True)
+            if category == TRAIN:
+                for callback in self.end_of_train_callbacks:
+                    callback(self)
 
         self.end_of_epoch_log()
         self.end_of_epoch_save()
@@ -708,93 +756,56 @@ class Trainer:
         store all the loss/mae of each batch
         """
 
-        category = VALIDATION if validation else TRAIN
-
-        if self.ibatch == 0:
-            # initialization
-            stat = {
-                RMSE_LOSS_KEY: {VALUE_KEY: [], CONTRIB: {}},
-                MAE_KEY: {VALUE_KEY: [], CONTRIB: {}},
-                LOSS_KEY: {VALUE_KEY: [], CONTRIB: {}},
-            }
-
-            for key, d in self.batch_mae_contrib.items():
-                for attr, value in d.items():
-                    if key != attr:
-                        store_key = f"{key}_{ABBREV.get(attr, attr)}"
-                    else:
-                        store_key = f"{key}"
-                    for name, d_cat in stat.items():
-                        d_cat[CONTRIB][store_key] = []
-
-            self.statistics[category] = stat
-        else:
-            stat = self.statistics[category]
-
         mat_str = f"  {self.iepoch+1:5d} {self.ibatch+1:5d}"
         log_str = f"{mat_str}"
-        batch_type = "Validation" if validation else "Training"
+        batch_type = VALIDATION if validation else TRAIN
+
         header = f"\n# Epoch\n# batch"
-        log_header = f"\n{batch_type}\n# Epoch batch"
-        for combo in [
-            (RMSE_LOSS_KEY, None, self.batch_scaled_loss_contrib),
-            (MAE_KEY, self.batch_mae, self.batch_mae_contrib),
-            (LOSS_KEY, self.batch_loss, self.batch_loss_contrib),
-        ]:
-            name, value, contrib = combo
-            short_name = ABBREV.get(name, name)
+        log_header = f"# Epoch batch"
 
-            if name == LOSS_KEY:
+        # print and store loss value
+        for name, value in self.batch_losses.items():
+            mat_str += f" {value:16.5g}"
+            header += f"\n# {name}"
+            log_str += f" {value:12.3g}"
+            log_header += f" {name:>12s}"
 
-                stat[name][VALUE_KEY] += [value]
-                mat_str += f" {value:8.3f}"
-                header += f"\n# {name}"
-                log_str += f" {value:16.3g}"
-                log_header += f" {short_name:>16s}"
+        # append details from metrics
+        metrics, skip_keys = self.metrics.flatten_metrics(
+            metrics=self.batch_metrics,
+            allowed_species=self.model.config.get("allowed_species", None)
+            if hasattr(self.model, "config")
+            else None,
+        )
+        for key, value in metrics.items():
 
-            for key, d in contrib.items():
+            mat_str += f" {value:16.5g}"
+            header += f"\n# {key}"
+            if key not in skip_keys:
+                log_str += f" {value:12.3g}"
+                log_header += f" {key:>12s}"
 
-                for attr, value in d.items():
-
-                    print_key = f"{ABBREV.get(key, key)}"
-                    store_key = f"{key}"
-                    if key != attr:
-                        store_key += f"_{ABBREV.get(attr, attr)}"
-                        print_key += f"_{ABBREV.get(attr, attr)}"
-
-                    if "mse" in type(self.loss.funcs[attr].func).__name__.lower() and (
-                        name == RMSE_LOSS_KEY
-                    ):
-                        value = torch.sqrt(value)
-                    value = value.item()
-                    stat[name][CONTRIB][store_key] += [value]
-
-                    mat_str += f" {value:8.3f}"
-                    item_name = f"{print_key}_{short_name}"
-                    header += f"\n# {item_name}"
-
-                    if name != LOSS_KEY:
-                        log_str += f" {value:16.3f}"
-                        log_header += f" {item_name:>16s}"
-
-        batch_logger = logging.getLogger(self.batch_log[category])
-        if not self.batch_header_print[category]:
+        batch_logger = logging.getLogger(self.batch_log[batch_type])
+        if not self.batch_header_print[batch_type]:
+            self.batch_header_print[batch_type] = True
             batch_logger.info(header)
-            self.batch_header_print[category] = True
 
         if self.ibatch == 0:
+            self.logger.info("")
+            self.logger.info(f"{batch_type}")
             self.logger.info(log_header)
 
         batch_logger.info(mat_str)
         if (self.ibatch + 1) % self.log_batch_freq == 0 or (
             self.ibatch + 1
-        ) == self.n_train_batches:
+        ) == self.n_batches:
             self.logger.info(log_str)
 
     def end_of_epoch_save(self):
         """
         save model and trainer details
         """
+
         val_metrics = self.mae_dict[f"{VALIDATION}_{self.metrics_key}"]
         if val_metrics < self.best_val_metrics:
             self.best_val_metrics = val_metrics
@@ -812,7 +823,10 @@ class Trainer:
 
     def init_log(self):
 
-        self.logger.info("! Starting training ...")
+        if self.restart:
+            self.logger.info("! Restarting training ...")
+        else:
+            self.logger.info("! Starting training ...")
         self.epoch_header_print = False
         self.batch_header_print = {TRAIN: False, VALIDATION: False}
 
@@ -836,45 +850,43 @@ class Trainer:
         )
 
         header = "# Epoch\n# wall\n# LR"
-        log_header = {
-            TRAIN: "# Epoch         wall       LR",
-            VALIDATION: "# Epoch         wall       LR",
-        }
-        mat_str = f"{self.iepoch+1:7d} {wall:12.3f} {lr:8.3g}"
-        log_str = {TRAIN: f"{mat_str}", VALIDATION: f"{mat_str}"}
 
-        for category in [TRAIN, VALIDATION]:
+        categories = [TRAIN, VALIDATION]
+        log_header = {}
+        log_str = {}
 
-            stats = self.statistics[category]
+        strings = ["Epoch", "wal", "LR"]
+        mat_str = f"{self.iepoch+1:10d} {wall:8.3f} {lr:8.3g}"
+        for cat in categories:
+            log_header[cat] = "# "
+            log_header[cat] += " ".join([f"{s:>8s}" for s in strings])
+            log_str[cat] = f"{mat_str}"
 
-            for name, stat in stats.items():
+        for category in categories:
 
-                if name == LOSS_KEY:
+            met, skip_keys = self.metrics.flatten_metrics(
+                metrics=self.metrics_dict[category],
+                allowed_species=self.model.config.get("allowed_species", None)
+                if hasattr(self.model, "config")
+                else None,
+            )
 
-                    short_name = ABBREV.get(name, name)
+            # append details from loss
+            for key, value in self.loss_dict[category].items():
+                mat_str += f" {value:16.5g}"
+                header += f"\n# {category}_{key}"
+                log_str[category] += f" {value:12.3g}"
+                log_header[category] += f" {key:>12s}"
+                self.mae_dict[f"{category}_{key}"] = value
 
-                    arr = torch.as_tensor(stat[VALUE_KEY])
-                    mean = arr.mean().item()
-                    std = arr.std().item()
-
-                    mat_str += f" {mean:8.3f} {std:8.3f}"
-                    header += f"\n# {category}_{short_name}_mean\n# {category}_{short_name}_std"
-
-                    log_header[category] += f" {short_name:>16s}"
-                    log_str[category] += f" {mean:16.3g}"
-                    self.mae_dict[f"{category}_{short_name}"] = mean
-
-                for key in stat[CONTRIB]:
-                    arr = torch.as_tensor(stat[CONTRIB][key])
-                    mean = arr.mean().item()
-                    mat_str += f" {mean:8.3f}"
-                    item_name = f"{ABBREV.get(key, key)}_{ABBREV.get(name, name)}"
-                    header += f"\n# {category}_{item_name}"
-
-                    if name != LOSS_KEY:
-                        log_str[category] += f" {mean:12.3f}"
-                        log_header[category] += f" {item_name:>12s}"
-                    self.mae_dict[f"{category}_{item_name}"] = mean
+            # append details from metrics
+            for key, value in met.items():
+                mat_str += f" {value:12.3g}"
+                header += f"\n# {category}_{key}"
+                if key not in skip_keys:
+                    log_str[category] += f" {value:12.3g}"
+                    log_header[category] += f" {key:>12s}"
+                self.mae_dict[f"{category}_{key}"] = value
 
         if not self.epoch_header_print:
             self.epoch_logger.info(header)
@@ -926,7 +938,7 @@ class Trainer:
         self.dataset_train = dataset.index_select(self.train_idcs)
         self.dataset_val = dataset.index_select(self.val_idcs)
 
-        self.dl_train, self.loader_params = instantiate(
+        self.dl_train, self.loader_kwargs = instantiate(
             builder=DataLoader,
             prefix="loader",
             positional_args=dict(
@@ -935,7 +947,7 @@ class Trainer:
                 shuffle=self.shuffle,
                 exclude_keys=self.exclude_keys,
             ),
-            optional_args=self.loader_params,
+            optional_args=self.loader_kwargs,
             all_args=self.kwargs,
         )
         self.dl_val, _ = instantiate(
@@ -947,9 +959,6 @@ class Trainer:
                 shuffle=self.shuffle,
                 exclude_keys=self.exclude_keys,
             ),
-            optional_args=self.loader_params,
+            optional_args=self.loader_kwargs,
             all_args=self.kwargs,
         )
-
-        self.n_train_batches = len(self.dl_train.dataset)
-        self.n_val_batches = len(self.dl_val.dataset)

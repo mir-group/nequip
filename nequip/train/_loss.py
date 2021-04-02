@@ -32,17 +32,33 @@ class SimpleLoss:
         )
         self.func = func
 
-    def __call__(self, pred: dict, ref: dict, key: str, atomic_weight_on: bool):
-
+    def __call__(
+        self,
+        pred: dict,
+        ref: dict,
+        key: str,
+        atomic_weight_on: bool = False,
+        mean: bool = True,
+    ):
         loss = self.func(pred[key], ref[key])
         weights_key = AtomicDataDict.WEIGHTS_KEY + key
         if weights_key in ref and atomic_weight_on:
             weights = ref[weights_key]
-            loss = (loss * weights).mean() / weights.mean()
+            # TO DO
+            if mean:
+                return (loss * weights).mean() / weights.mean()
+            else:
+                raise NotImplementedError(
+                    "metrics and running stat needs to be compatible with this"
+                )
+                return loss * weights, weights
         else:
-            loss = loss.mean()
+            if mean:
+                return loss.mean()
+            else:
+                return loss
 
-        return loss, {key: {key: loss}}  # torch.clone(loss)}}
+        return loss
 
 
 class PerSpeciesLoss(SimpleLoss):
@@ -52,7 +68,16 @@ class PerSpeciesLoss(SimpleLoss):
     Args same as SimpleLoss
     """
 
-    def __call__(self, pred: dict, ref: dict, key: str, atomic_weight_on: bool):
+    def __call__(
+        self,
+        pred: dict,
+        ref: dict,
+        key: str,
+        atomic_weight_on: bool = False,
+        mean: bool = True,
+    ):
+        if not mean:
+            raise NotImplementedError("cannot handle this yet")
 
         per_atom_loss = self.func(pred[key], ref[key])
         per_atom_loss = per_atom_loss.mean(dim=-1, keepdim=True)
@@ -65,44 +90,34 @@ class PerSpeciesLoss(SimpleLoss):
         else:
             atomic_weight_on = False
 
-        atomic_number = ref[AtomicDataDict.ATOMIC_NUMBERS_KEY]
-        all_species, species_index = torch.unique(atomic_number, return_inverse=True)
+        species_index = pred[AtomicDataDict.SPECIES_INDEX_KEY]
+        _, inverse_species_index = torch.unique(species_index, return_inverse=True)
 
         if atomic_weight_on:
-            per_species_weight = scatter(weights, species_index, dim=0)
-            per_species_loss = scatter(per_atom_loss, species_index, dim=0)
-            per_species_loss = per_species_loss / per_species_weight
+            # TO DO
+            per_species_weight = scatter(weights, inverse_species_index, dim=0)
+            per_species_loss = scatter(per_atom_loss, inverse_species_index, dim=0)
+            return (per_species_loss / per_species_weight).mean()
         else:
-            per_species_loss = scatter(
-                per_atom_loss, species_index, reduce="mean", dim=0
-            )
-
-        total_loss = per_species_loss.mean()
-        contrib = {
-            int(all_species[i]): {key: per_species_loss[i]}
-            for i in range(len(per_species_loss))
-        }
-        contrib["all"] = {key: total_loss}
-        return total_loss, contrib
+            return scatter(
+                per_atom_loss, inverse_species_index, reduce="mean", dim=0
+            ).mean()
 
 
-def find_loss_function(name: str, params: dict = {}):
+def find_loss_function(name: str, params):
 
     wrapper_list = dict(
         PerSpecies=PerSpeciesLoss,
     )
-    mae_func = SimpleLoss("L1Loss")
 
     if isinstance(name, str):
         for key in wrapper_list:
             if name.startswith(key):
                 logging.debug(f"create loss instance {wrapper_list[key]}")
-                return wrapper_list[key](name[len(key) :], params), wrapper_list[key](
-                    "L1Loss"
-                )
+                return wrapper_list[key](name[len(key) :], params)
 
-        return SimpleLoss(name, params), mae_func
+        return SimpleLoss(name, params)
     elif callable(name):
-        return name, mae_func
+        return name
     else:
         raise NotImplementedError(f"{name} Loss is not implemented")
