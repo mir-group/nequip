@@ -483,7 +483,8 @@ class Trainer:
                 trainer.lr_sched.load_state_dict(state_dict["lr_sched"])
             logging.debug("Reload optimizer and scheduler states")
             torch.set_rng_state(state_dict["rng_state"])
-            torch.cuda.set_rng_state(state_dict["cuda_rng_state"], device=self.device)
+            if torch.cuda.is_available():
+                torch.cuda.set_rng_state(state_dict["cuda_rng_state"])
 
         if "progress" in d:
             trainer.best_val_metrics = progress["best_val_metrics"]
