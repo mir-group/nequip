@@ -1,10 +1,7 @@
 import pytest
 
 import logging
-import sys
 import tempfile
-import textwrap
-import subprocess
 import torch
 from os.path import isfile
 

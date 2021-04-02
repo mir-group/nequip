@@ -14,16 +14,13 @@ from nequip.data.AtomicData import neighbor_list_and_relative_vec
 
 
 def test_from_ase(CuFcc):
-
     atoms, data = CuFcc
     for key in [AtomicDataDict.FORCE_KEY, AtomicDataDict.POSITIONS_KEY]:
         assert data[key].shape == (len(atoms), 3)  # 4 species in this atoms
 
 
 def test_non_periodic_edge(CH3CHO):
-
     atoms, data = CH3CHO
-
     # check edges
     for edge in range(data.num_edges):
         real_displacement = (
@@ -41,7 +38,7 @@ def test_periodic_edge():
         # Check that when the cutoff is too small, the code complains
         # about a lack of edges in the graph.
         atoms = ase.build.bulk("Cu", "fcc", a=3.6, cubic=True)
-        data = AtomicData.from_ase(atoms, r_max=2.5)
+        _ = AtomicData.from_ase(atoms, r_max=2.5)
 
 
 def test_without_nodes(CH3CHO):
