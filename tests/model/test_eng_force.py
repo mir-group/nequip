@@ -104,31 +104,15 @@ class TestWorkflow:
             # Save stuff
             model_script.save(tmpdir + "/model.pt")
             torch.save(data, tmpdir + "/dat.pt")
-            # Load in new process
-            with open(tmpdir + "/code.py", "x") as code:
-                code.write(
-                    textwrap.dedent(
-                        f"""
-                        import numpy  # required to avert a strange subprocess bug with Intel MKL initialization
-                        import torch
-                        # Needed for the TorchScript kernels for scatter and radius_graph
-                        import torch_scatter
-                        import torch_cluster
-                        f = torch.jit.load('{tmpdir}/model.pt')
-                        d = torch.load('{tmpdir}/dat.pt')
-                        out = f(d)
-                        torch.save(out, '{tmpdir}/out.pt')
-                        """
-                    )
-                )
-            # Run
-            # sys.executable gives the path to the current python interpreter
-            proc_res = subprocess.run([sys.executable, tmpdir + "/code.py"])
-            proc_res.check_returncode()
-            # Check
-            out = torch.load(tmpdir + "/out.pt")
+            # Ideally, this would be tested in a subprocess where nequip isn't imported.
+            # But CUDA + torch plays very badly with subprocesses here and causes a race condition.
+            # So instead we do a slightly less complete test, loading the saved model here in the original process:
+            load_model = torch.jit.load(tmpdir + "/model.pt")
+            load_dat = torch.load(tmpdir + "/dat.pt")
             assert torch.allclose(
-                model_script(data)[out_field], out[out_field], atol=1e-7
+                model_script(data)[out_field],
+                load_model(load_dat)[out_field],
+                atol=1e-7,
             )
 
     def test_submods(self):
