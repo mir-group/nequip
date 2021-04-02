@@ -1,11 +1,14 @@
-import logging
-import numpy as np
 import pytest
 
+import logging
+import sys
 import tempfile
+import textwrap
+import subprocess
 import torch
-
 from os.path import isfile
+
+import numpy as np
 
 from e3nn import o3
 from e3nn.util.jit import script
@@ -87,27 +90,46 @@ class TestWorkflow:
         assert isinstance(instance, GraphModuleMixin)
 
     def test_jit(self, model, atomic_batch, device):
-
         instance, out_field = model
-
         data = AtomicData.to_AtomicDataDict(atomic_batch.to(device=device))
-
         instance = instance.to(device=device)
         model_script = script(instance)
-
-        result0 = instance(data)[out_field].flatten()
-        result1 = model_script(data)[out_field].flatten()
-        d = result0 - result1
-        for i in range(result0.shape[0]):
-            print(
-                i,
-                f"({result0[i].item():10.3g})-({result1[i].item():10.3g})=({d[i].item():10.3g})",
-                torch.isclose(result0[i], result1[i]).item(),
-            )
 
         assert torch.allclose(
             instance(data)[out_field], model_script(data)[out_field], atol=1e-7
         )
+
+        # - Try saving, loading in another process, and running -
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Save stuff
+            model_script.save(tmpdir + "/model.pt")
+            torch.save(data, tmpdir + "/dat.pt")
+            # Load in new process
+            with open(tmpdir + "/code.py", "x") as code:
+                code.write(
+                    textwrap.dedent(
+                        f"""
+                        import numpy  # required to avert a strange subprocess bug with Intel MKL initialization
+                        import torch
+                        # Needed for the TorchScript kernels for scatter and radius_graph
+                        import torch_scatter
+                        import torch_cluster
+                        f = torch.jit.load('{tmpdir}/model.pt')
+                        d = torch.load('{tmpdir}/dat.pt')
+                        out = f(d)
+                        torch.save(out, '{tmpdir}/out.pt')
+                        """
+                    )
+                )
+            # Run
+            # sys.executable gives the path to the current python interpreter
+            proc_res = subprocess.run([sys.executable, tmpdir + "/code.py"])
+            proc_res.check_returncode()
+            # Check
+            out = torch.load(tmpdir + "/out.pt")
+            assert torch.allclose(
+                model_script(data)[out_field], out[out_field], atol=1e-7
+            )
 
     def test_submods(self):
         model = EnergyModel(**minimal_config2)
