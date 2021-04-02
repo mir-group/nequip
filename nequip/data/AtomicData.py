@@ -202,19 +202,18 @@ class AtomicData(Data):
             ):
                 add_fields = deepcopy(atoms.calc.results)
                 if "forces" in add_fields:
+                    add_fields[AtomicDataDict.FORCE_KEY] = atoms.get_forces()
                     add_fields.pop("forces")
+
                 if "free_energy" in add_fields and "energy" not in add_fields:
                     add_fields[AtomicDataDict.TOTAL_ENERGY_KEY] = add_fields[
                         "free_energy"
                     ]
                     add_fields.pop("free_energy")
-
                 elif "energy" in add_fields:
                     add_fields[AtomicDataDict.TOTAL_ENERGY_KEY] = add_fields["energy"]
-
                     add_fields.pop("energy")
 
-                add_fields[AtomicDataDict.FORCE_KEY] = atoms.get_forces()
         elif "forces" in atoms.arrays:
             add_fields[AtomicDataDict.FORCE_KEY] = atoms.arrays["forces"]
         elif "force" in atoms.arrays:
