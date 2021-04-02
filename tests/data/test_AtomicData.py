@@ -33,12 +33,23 @@ def test_non_periodic_edge(CH3CHO):
         )
 
 
-def test_periodic_edge():
+def test_edges_missing():
     with pytest.raises(ValueError):
         # Check that when the cutoff is too small, the code complains
         # about a lack of edges in the graph.
         atoms = ase.build.bulk("Cu", "fcc", a=3.6, cubic=True)
         _ = AtomicData.from_ase(atoms, r_max=2.5)
+
+
+def test_periodic_edge():
+    atoms = ase.build.bulk("Cu", "fcc")
+    dist = np.linalg.norm(atoms.cell[0])
+    data = AtomicData.from_ase(atoms, r_max=1.05 * dist)
+    edge_vecs = data.get_edge_vectors()
+    assert edge_vecs.shape == (12, 3)  # 12 neighbors in close-packed bulk
+    assert torch.allclose(
+        edge_vecs.norm(dim=-1), torch.as_tensor(dist, dtype=torch.get_default_dtype())
+    )
 
 
 def test_without_nodes(CH3CHO):
