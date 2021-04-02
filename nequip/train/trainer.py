@@ -575,6 +575,8 @@ class Trainer:
         self.model.train()
 
         # Do any target rescaling
+        # converts ocp data to AtomicData
+        data = convert_ocp(data)
         data = data.to(self.device)
         data = AtomicData.to_AtomicDataDict(data)
         if hasattr(self.model, "unscale"):
@@ -956,3 +958,17 @@ class Trainer:
 
         self.n_train_batches = len(self.dl_train.dataset)
         self.n_val_batches = len(self.dl_val.dataset)
+
+
+def convert_ocp(data):
+    data = AtomicData(
+        pos=data.pos, 
+        forces=data.force,
+        total_energy=data.y_relaxed,
+        edge_index=data.edge_index,
+        edge_cell_shift=data.cell_offsets.float(),
+        cell=data.cell,
+        atomic_numbers=data.atomic_numbers.long(),
+        batch=data.batch,
+     )
+    return data

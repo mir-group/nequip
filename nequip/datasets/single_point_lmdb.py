@@ -39,7 +39,7 @@ class SinglePointLmdbDataset(Dataset):
         ]
         self.transform = transform
         # this is a bit of hack for nequip
-        self.fixed_fields = {"cell": []}
+        # self.fixed_fields = {"cell": []}
 
     def __len__(self):
         return len(self._keys)
@@ -54,10 +54,7 @@ class SinglePointLmdbDataset(Dataset):
             else self.transform(data_object)
         )
         
-        # convert to nequip atomic data object
-        atomic_data_obj = convert_ocp(data_object)
-
-        return atomic_data_obj
+        return data_object
 
     def connect_db(self, lmdb_path=None):
         env = lmdb.open(
@@ -73,15 +70,3 @@ class SinglePointLmdbDataset(Dataset):
 
     def close_db(self):
         self.env.close()
-
-def convert_ocp(data):
-    data = AtomicData(
-        pos=data.pos, 
-        forces=data.force,
-        total_energy=data.y_relaxed,
-        edge_index=data.edge_index,
-        edge_cell_shift=data.cell_offsets.float(),
-        cell=data.cell,
-        atomic_numbers=data.atomic_numbers.long(),
-     )
-    return data
