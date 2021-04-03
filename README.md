@@ -126,7 +126,7 @@ If you have questions, please don't hesitate to reach out at batzner[at]g[dot]ha
 
 ### Citing
 
-If you use this repository in your work, plase consider citing NequIP (1) and e3nn (2): 
+If you use this repository in your work, please consider citing NequIP (1) and e3nn (2): 
 
     [1] https://arxiv.org/abs/2101.03164
     [2] https://zenodo.org/record/4557591#.YFDmoZNKi3I
