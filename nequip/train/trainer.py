@@ -719,7 +719,7 @@ class Trainer:
                     data=batch,
                     validation=(category == VALIDATION),
                 )
-                self.end_of_batch_log(validation=False)
+                self.end_of_batch_log(batch_type=category)
                 for callback in self.end_of_batch_callbacks:
                     callback(self)
             self.metrics_dict[category] = self.metrics.current_result()
@@ -751,14 +751,13 @@ class Trainer:
         logger.info(f"* {name}")
         logger.info(yaml.dump(dictionary))
 
-    def end_of_batch_log(self, validation: bool):
+    def end_of_batch_log(self, batch_type: str):
         """
         store all the loss/mae of each batch
         """
 
         mat_str = f"  {self.iepoch+1:5d} {self.ibatch+1:5d}"
         log_str = f"{mat_str}"
-        batch_type = VALIDATION if validation else TRAIN
 
         header = f"\n# Epoch\n# batch"
         log_header = f"# Epoch batch"
