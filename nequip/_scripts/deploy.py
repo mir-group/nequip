@@ -7,11 +7,15 @@ from nequip import deploy
 
 
 def main():
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        description="Create and view information about deployed NequIP potentials. By default, deploys `model` to `outfile`."
+    )
     parser.add_argument("model", help="Saved model to process", type=pathlib.Path)
     parser.add_argument("outfile", help="File for output", type=pathlib.Path)
     parser.add_argument(
-        "--extract-config", help="Extract the original configuration from model"
+        "--extract-config",
+        help="Extract the original configuration from `model` to `outfile`.",
+        action="store_true",
     )
     args = parser.parse_args()
 
