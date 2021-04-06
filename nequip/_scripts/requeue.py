@@ -12,6 +12,8 @@ import torch
 from sys import argv
 from os.path import isfile
 
+import e3nn.util.jit
+
 from nequip.utils import Config, dataset_from_config, Output, load_file
 from nequip.models import EnergyModel, ForceModel
 from nequip.data import AtomicDataDict
@@ -19,7 +21,6 @@ from nequip.nn import RescaleOutput
 
 
 def main():
-
     config = Config.from_file(
         argv[1],
         defaults=dict(

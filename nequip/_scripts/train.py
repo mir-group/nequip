@@ -25,7 +25,7 @@ def main():
 
     # Make the trainer
     if config.wandb:
-        import wandb
+        import wandb  # noqa: F401
         from nequip.train.trainer_wandb import TrainerWandB
 
         # download parameters from wandb in case of sweeping

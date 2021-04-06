@@ -139,7 +139,7 @@ class Config(object):
             # try to format the variable
             try:
                 val = typehint(val) if typehint is not None else val
-            except:
+            except Exception:
                 raise TypeError(
                     f"Wrong Type: Parameter {key} should be {typehint} type."
                     f"But {type(val)} is given"
