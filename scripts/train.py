@@ -10,6 +10,7 @@ from nequip.utils import Config, dataset_from_config, Output
 from nequip.models import EnergyModel, ForceModel
 from nequip.data import AtomicDataDict
 from nequip.nn import RescaleOutput
+from nequip.deploy import ORIG_CONFIG_KEY
 
 
 def main():
@@ -24,7 +25,6 @@ def main():
 
     # Make the trainer
     if config.wandb:
-
         import wandb
         from nequip.train.trainer_wandb import TrainerWandB
 
@@ -87,7 +87,7 @@ def main():
     )
 
     # Set the trainer
-    core_model.config = dict(config)
+    setattr(core_model, ORIG_CONFIG_KEY, dict(config))
     trainer.model = core_model
 
     # Train
