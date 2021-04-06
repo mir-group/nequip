@@ -10,7 +10,6 @@ from nequip.utils import Config, dataset_from_config, Output
 from nequip.models import EnergyModel, ForceModel
 from nequip.data import AtomicDataDict
 from nequip.nn import RescaleOutput
-from nequip.deploy import ORIG_CONFIG_KEY
 
 
 def main():
@@ -90,8 +89,10 @@ def main():
         f"Outputs are scaled by: {forces_std}, eneriges are shifted by {energies_mean}"
     )
 
+    # Record final config
+    # output.generate_file()
+
     # Set the trainer
-    setattr(core_model, ORIG_CONFIG_KEY, dict(config))
     trainer.model = core_model
 
     # Train
