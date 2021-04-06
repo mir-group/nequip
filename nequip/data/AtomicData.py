@@ -201,7 +201,6 @@ class AtomicData(Data):
                 atoms.calc, (SinglePointCalculator, SinglePointDFTCalculator)
             ):
                 add_fields = deepcopy(atoms.calc.results)
-                print("Add fields", add_fields)
                 if "forces" in add_fields:
                     add_fields.pop("forces")
                     add_fields[AtomicDataDict.FORCE_KEY] = atoms.get_forces()
