@@ -3,14 +3,12 @@
 Arguments: config.yaml
 
 config.yaml: requeue=True, and workdir, root, run_name have to be unique.
-
 """
-
 import logging
-import torch
-
-from sys import argv
+import argparse
 from os.path import isfile
+
+import torch
 
 import e3nn.util.jit
 
@@ -21,8 +19,14 @@ from nequip.nn import RescaleOutput
 
 
 def main():
+    parser = argparse.ArgumentParser(
+        description="Start or automatically restart a NequIP training session."
+    )
+    parser.add_argument("config", help="configuration file")
+    args = parser.parse_args()
+
     config = Config.from_file(
-        argv[1],
+        args.config,
         defaults=dict(
             wandb=False, compile_model=False, wandb_project="NequIP", requeue=False
         ),

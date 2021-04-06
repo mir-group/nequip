@@ -1,8 +1,8 @@
 """ Train a network."""
 import logging
-import torch
+import argparse
 
-from sys import argv
+import torch
 
 import e3nn.util.jit
 
@@ -14,9 +14,13 @@ from nequip.deploy import ORIG_CONFIG_KEY
 
 
 def main():
+    parser = argparse.ArgumentParser(description="Train a NequIP model.")
+    parser.add_argument("config", help="configuration file")
+    args = parser.parse_args()
 
     config = Config.from_file(
-        argv[1], defaults=dict(wandb=False, compile_model=False, wandb_project="NequIP")
+        args.config,
+        defaults=dict(wandb=False, compile_model=False, wandb_project="NequIP"),
     )
 
     torch.set_default_dtype(torch.float32)
