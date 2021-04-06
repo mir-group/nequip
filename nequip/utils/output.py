@@ -79,7 +79,7 @@ class Output:
         # rename the work folder based on run name
         if (
             isdir(workdir) and ((restart and not append) or (not restart))
-        ) or not force_append:
+        ) and not force_append:
             logging.debug(f"  ...renaming workdir from {workdir} to")
 
             workdir = f"{root}/{run_name}_{timestr}"
