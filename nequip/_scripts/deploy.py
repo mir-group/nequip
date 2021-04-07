@@ -17,7 +17,7 @@ R_MAX_KEY: Final[str] = "r_max"
 N_SPECIES_KEY: Final[str] = "n_species"
 
 
-def main():
+def main(args=None):
     parser = argparse.ArgumentParser(
         description="Create and view information about deployed NequIP potentials."
     )
@@ -43,7 +43,7 @@ def main():
         type=pathlib.Path,
     )
 
-    args = parser.parse_args()
+    args = parser.parse_args(args=args)
 
     # TODO: configurable?
     logging.basicConfig(level=logging.INFO)

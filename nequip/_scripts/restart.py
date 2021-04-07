@@ -13,7 +13,7 @@ import torch
 from nequip.utils import Config, dataset_from_config, Output, load_file
 
 
-def main():
+def main(args=None):
     parser = argparse.ArgumentParser(
         description="Restart an existing NequIP training session."
     )
@@ -21,7 +21,7 @@ def main():
     parser.add_argument(
         "--update-config", help="File containing any config paramters to update"
     )
-    args = parser.parse_args()
+    args = parser.parse_args(args=args)
 
     torch.set_default_dtype(torch.float32)
 

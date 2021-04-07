@@ -13,10 +13,10 @@ from nequip.data import AtomicDataDict
 from nequip.nn import RescaleOutput
 
 
-def main():
+def main(args=None):
     parser = argparse.ArgumentParser(description="Train a NequIP model.")
     parser.add_argument("config", help="configuration file")
-    args = parser.parse_args()
+    args = parser.parse_args(args=args)
 
     config = Config.from_file(
         args.config,
