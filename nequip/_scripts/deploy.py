@@ -21,7 +21,7 @@ def main(args=None):
     parser = argparse.ArgumentParser(
         description="Create and view information about deployed NequIP potentials."
     )
-    subparsers = parser.add_subparsers(dest="command", required=True)
+    subparsers = parser.add_subparsers(dest="command", required=True, title="commands")
     info_parser = subparsers.add_parser(
         "info", help="Get information from a deployed model file"
     )
