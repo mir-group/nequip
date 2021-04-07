@@ -2,6 +2,7 @@ from typing import Final
 import argparse
 import pathlib
 import logging
+import yaml
 
 import torch
 
@@ -10,84 +11,91 @@ from e3nn.util.jit import script
 import nequip
 from nequip.nn import GraphModuleMixin
 
-R_MAX_KEY: Final[str] = "r_max"
-ORIG_CONFIG_KEY: Final[str] = "orig_config"
+CONFIG_KEY: Final[str] = "config"
 NEQUIP_VERSION_KEY: Final[str] = "nequip_version"
+R_MAX_KEY: Final[str] = "r_max"
+N_SPECIES_KEY: Final[str] = "n_species"
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Create and view information about deployed NequIP potentials. By default, deploys `model` to `outfile`."
+        description="Create and view information about deployed NequIP potentials."
     )
-    parser.add_argument(
-        "model",
-        help="Saved model to process, such as `best_model.pth` from a training session.",
+    subparsers = parser.add_subparsers(dest="command", required=True)
+    info_parser = subparsers.add_parser(
+        "info", help="Get information from a deployed model file"
+    )
+    info_parser.add_argument(
+        "model_path",
+        help="Path to a deployed model file.",
         type=pathlib.Path,
     )
-    # we have to do something
-    parser.add_argument(
-        "-d",
-        "--deploy-to",
+
+    build_parser = subparsers.add_parser("build", help="Build a deployment model")
+    build_parser.add_argument(
+        "train_dir",
+        help="Path to a working directory from a training session.",
+        type=pathlib.Path,
+    )
+    build_parser.add_argument(
+        "out_file",
         help="Output file for deployed model.",
         type=pathlib.Path,
     )
-    parser.add_argument(
-        "--extract-config",
-        help="Extract the original configuration from model into the given file.",
-        type=pathlib.Path,
-    )
+
     args = parser.parse_args()
-    if not (args.deploy_to or args.extract_config):
-        parser.error(
-            "At least one operation (--deploy-to, --extract-config) must be specified."
-        )
 
-    # -- load model --
-    model_is_jit = False
-    try:
-        model = torch.jit.load(args.model)
-        model_is_jit = True
-        logging.info("Loaded TorchScript model")
-    except RuntimeError:
-        # ^ jit.load throws this when it can't find TorchScript files
-        model = torch.load(args.model)
-        if not isinstance(model, GraphModuleMixin):
-            raise TypeError(
-                "Model contained object that wasn't a NequIP model (nequip.nn.GraphModuleMixin)"
-            )
-        logging.info("Loaded pickled model")
+    # TODO: configurable?
+    logging.basicConfig(level=logging.INFO)
 
-    # -- compile --
-    if not model_is_jit:
-        model = script(model)
-        logging.info("Compiled model to TorchScript")
+    if args.command == "info":
+        metadata = {CONFIG_KEY: "", NEQUIP_VERSION_KEY: ""}
+        model = torch.jit.load(args.model_path, _extra_files=metadata)
+        del model
+        # Everything we store right now is ASCII, so decode for printing
+        metadata = {k: v.decode("ascii") for k, v in metadata.items()}
+        config = metadata.pop(CONFIG_KEY)
+        logging.info(f"Loaded TorchScript model with metadata {metadata}")
+        logging.info("Model was built with config:")
+        print(config)
 
-    # -- Extract configs --
-    if args.extract_config:
-        if hasattr(model, ORIG_CONFIG_KEY):
-            config = getattr(model, ORIG_CONFIG_KEY)
-        else:
-            raise KeyError("The provided model does not contain a configuration.")
+    elif args.command == "build":
+        if not args.train_dir.is_dir():
+            raise ValueError(f"{args.train_dir} is not a directory")
+        # -- load model --
+        model_is_jit = False
+        model_path = args.train_dir / "best_model.pth"
+        try:
+            model = torch.jit.load(model_path)
+            model_is_jit = True
+            logging.info("Loaded TorchScript model")
+        except RuntimeError:
+            # ^ jit.load throws this when it can't find TorchScript files
+            model = torch.load(model_path)
+            if not isinstance(model, GraphModuleMixin):
+                raise TypeError(
+                    "Model contained object that wasn't a NequIP model (nequip.nn.GraphModuleMixin)"
+                )
+            logging.info("Loaded pickled model")
 
-        if args.extract_config.suffix == ".yaml":
-            import yaml
+        # -- compile --
+        if not model_is_jit:
+            model = script(model)
+            logging.info("Compiled model to TorchScript")
 
-            with open(args.extract_config, "w+") as fout:
-                yaml.dump(config, fout)
-        elif args.extract_config.suffix == ".json":
-            import json
+        # load config
+        # TODO: walk module tree if config does not exist to find params?
+        config_str = (args.train_dir / "config_final.yaml").read_text()
+        config = yaml.load(config_str, Loader=yaml.Loader)
 
-            with open(args.extract_config, "w+") as fout:
-                json.dump(config, fout)
-        else:
-            raise ValueError(
-                f"Don't know how to write config to file with extension `{args.extract_config.suffix}`; try .json or .yaml."
-            )
-
-    # Deploy
-    if args.deploy_to:
+        # Deploy
         metadata: dict = {NEQUIP_VERSION_KEY: nequip.__version__}
-        torch.jit.save(model, args.deploy_to, _extra_files=metadata)
+        metadata[R_MAX_KEY] = str(float(config["r_max"]))
+        metadata[N_SPECIES_KEY] = str(len(config["allowed_species"]))
+        metadata[CONFIG_KEY] = config_str
+        torch.jit.save(model, args.out_file, _extra_files=metadata)
+    else:
+        raise ValueError
 
     return
 

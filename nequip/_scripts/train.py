@@ -1,6 +1,7 @@
 """ Train a network."""
 import logging
 import argparse
+import yaml
 
 import torch
 
@@ -90,7 +91,8 @@ def main():
     )
 
     # Record final config
-    # output.generate_file()
+    with open(output.generate_file("config_final.yaml"), "w+") as fp:
+        yaml.dump(dict(config), fp)
 
     # Set the trainer
     trainer.model = core_model
