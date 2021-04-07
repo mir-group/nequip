@@ -143,4 +143,4 @@ lr_scheduler_last_epoch: -1
 
 # alternative option, on-plateau
 # lr_scheduler_name: ReduceLROnPlateau
-# lr_patience: 1000
+# lr_scheduler_patience: 100
