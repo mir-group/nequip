@@ -5,7 +5,7 @@ from torch import nn
 
 
 class BesselBasis(nn.Module):
-    def __init__(self, r_max=5.0, num_basis=8, trainable=True):
+    def __init__(self, r_max, num_basis=8, trainable=True):
         r"""Radial Bessel Basis, as proposed in DimeNet: https://arxiv.org/abs/2003.03123
 
 
