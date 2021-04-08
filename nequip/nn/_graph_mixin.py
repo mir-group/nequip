@@ -193,7 +193,7 @@ class SequentialGraphNetwork(GraphModuleMixin, torch.nn.Sequential):
             optional_args=params,
             all_args=shared_params,
         )
-        self.append(instance)
+        self.append(name, instance)
         return
 
     # Copied from https://pytorch.org/docs/stable/_modules/torch/nn/modules/container.html#Sequential
