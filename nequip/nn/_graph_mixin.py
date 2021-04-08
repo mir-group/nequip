@@ -1,6 +1,5 @@
 import random
-from copy import deepcopy
-from typing import Dict, Tuple, Callable, Any, Sequence, Optional, Union, Mapping
+from typing import Dict, Tuple, Callable, Any, Sequence, Union, Mapping
 from collections import OrderedDict
 
 import torch
