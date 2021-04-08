@@ -73,6 +73,12 @@ class GraphModuleMixin:
 
 
 class SequentialGraphNetwork(GraphModuleMixin, torch.nn.Sequential):
+    r"""A ``torch.nn.Sequential`` of ``GraphModuleMixin``s.
+
+    Args:
+        modules (list or dict of ``GraphModuleMixin``s): the sequence of graph modules. If a list, the modules will be named ``"module0", "module1", ...``.
+    """
+
     def __init__(
         self,
         modules: Union[Sequence[GraphModuleMixin], Dict[str, GraphModuleMixin]],
@@ -90,13 +96,12 @@ class SequentialGraphNetwork(GraphModuleMixin, torch.nn.Sequential):
             my_irreps_in=module_list[0].irreps_in,
             irreps_out=module_list[-1].irreps_out,
         )
+        # torch.nn.Sequential will name children correctly if passed an OrderedDict
         if isinstance(modules, dict):
-            if not isinstance(modules, OrderedDict):
-                modules = OrderedDict(modules)
-            # torch.nn.Sequential will name children correctly if passed an OrderedDict
-            super().__init__(modules)
+            modules = OrderedDict(modules)
         else:
-            super().__init__(*module_list)
+            modules = OrderedDict((f"module{i}", m) for i, m in enumerate(module_list))
+        super().__init__(modules)
         self.init_args = deepcopy(init_args)
 
     @classmethod
@@ -105,26 +110,22 @@ class SequentialGraphNetwork(GraphModuleMixin, torch.nn.Sequential):
         shared_params: Mapping,
         layers: Dict[str, Union[Callable, Tuple[Callable, Dict[str, Any]]]],
     ):
-        """construct the network from parameters
+        r"""Construct a ``SequentialGraphModule`` of modules built from a shared set of parameters.
+
+        For some layer, a parameter with name ``param`` will be taken, in order of priority, from:
+          1. The specific value in the parameter dictionary for that layer, if provided
+          2. ``name_param`` in ``shared_params`` where ``name`` is the name of the layer
+          3. ``param`` in ``shared_params``
 
         Args:
+            shared_params (dict-like): shared parameters from which to pull when instantiating the module
+            layers (dict): dictionary mapping unique names of layers to either:
+                  1. A callable (such as a class or function) that can be used to ``instantiate`` a module for that layer
+                  2. A tuple of such a callable and a dictionary mapping parameter names to values. The given dictionary of parameters will override for this layer values found in ``shared_params``.
+                Options 1. and 2. can be mixed.
 
-        shared_params (dict): the parameters that are shared among all modules, can be overridden by the args
-        args: list of modules
-
-        Each module can be declared in three ways
-
-            * callable constructor
-            * callable constructor, prefix
-            * callable constructor, prefix, kwargs
-
-        Instantiate use four groups of parameters to initialize the modeul:
-
-        1. the ones in shared_params that matches the callalble initialization arguments.
-        2. the ones in shared_params that prefix_+(init argument)
-        3. The ones in kwargs that matches (arg) or prefix_(arg)
-        4. irreps_out from the previous model is taken as irreps_in
-
+        Returns:
+            The constructed SequentialGraphNetwork.
         """
         # note that dictionary ordered gueranteed in >=3.7, so its fine to do an ordered sequential as a dict.
         built_modules = []
@@ -152,12 +153,54 @@ class SequentialGraphNetwork(GraphModuleMixin, torch.nn.Sequential):
                 all_args=shared_params,
             )
 
+            if not isinstance(instance, GraphModuleMixin):
+                raise TypeError(
+                    f"Builder `{builder}` for layer with name `{name}` did not return a GraphModuleMixin, instead got a {type(instance).__name__}"
+                )
+
             built_modules.append(instance)
 
         return cls(
             OrderedDict(zip(layers.keys(), built_modules)),
             init_args=[shared_params, layers],
         )
+
+    def append(self, name: str, module: GraphModuleMixin) -> None:
+        r"""Append a module to the SequentialGraphNetwork.
+
+        Args:
+            name (str): the name for the module
+            module (GraphModuleMixin): the module to append
+        """
+        assert AtomicDataDict._irreps_compatible(self.irreps_out, module.irreps_in)
+        self.add_module(name, module)
+        self.irreps_out = dict(module.irreps_out)
+        return
+
+    def append_from_parameters(
+        self,
+        shared_params: Mapping,
+        name: str,
+        builder: Callable,
+        params: Dict[str, Any] = {},
+    ) -> None:
+        r"""Build a module from parameters and append it.
+
+        Args:
+            shared_params (dict-like): shared parameters from which to pull when instantiating the module
+            name (str): the name for the module
+            builder (callable): a class or function to build a module
+            params (dict, optional): extra specific parameters for this module that take priority over those in ``shared_params``
+        """
+        instance, _ = instantiate(
+            builder=builder,
+            prefix=name,
+            positional_args=(dict(irreps_in=self[-1].irreps_out)),
+            optional_args=params,
+            all_args=shared_params,
+        )
+        self.append(instance)
+        return
 
     # Copied from https://pytorch.org/docs/stable/_modules/torch/nn/modules/container.html#Sequential
     # with type annotations added
