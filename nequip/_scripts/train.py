@@ -68,6 +68,11 @@ def main(args=None):
         modes=["rms", "mean_std", "count"],
     )
 
+    RESCALE_THRESHOLD = 1e-6
+    if forces_std < RESCALE_THRESHOLD:
+        raise ValueError(f"RMS of forces in this dataset was very low: {forces_std}")
+        # TODO: offer option to disable rescaling?
+
     config.update(dict(allowed_species=allowed_species))
 
     # Build a model
