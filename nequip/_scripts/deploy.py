@@ -58,11 +58,13 @@ def main(args=None):
             model = torch.jit.load(args.model_path, _extra_files=metadata)
         except RuntimeError as e:
             raise ValueError(
-                f"{args.model_path} is not a deployed NequIP model file. (Underlying error: {e})"
+                f"{args.model_path} does not seem to be a deployed NequIP model file. (Underlying error: {e})"
             )
         del model
         if metadata[NEQUIP_VERSION_KEY] == "":
-            raise ValueError(f"{args.model_path} is not a deployed NequIP model file")
+            raise ValueError(
+                f"{args.model_path} does not seem to be a deployed NequIP model file"
+            )
         # Everything we store right now is ASCII, so decode for printing
         metadata = {k: v.decode("ascii") for k, v in metadata.items()}
         config = metadata.pop(CONFIG_KEY)
@@ -81,17 +83,18 @@ def main(args=None):
         model_is_jit = False
         model_path = args.train_dir / "best_model.pth"
         try:
-            model = torch.jit.load(model_path)
+            model = torch.jit.load(model_path, map_location=torch.device("cpu"))
             model_is_jit = True
             logging.info("Loaded TorchScript model")
         except RuntimeError:
             # ^ jit.load throws this when it can't find TorchScript files
-            model = torch.load(model_path)
+            model = torch.load(model_path, map_location=torch.device("cpu"))
             if not isinstance(model, GraphModuleMixin):
                 raise TypeError(
                     "Model contained object that wasn't a NequIP model (nequip.nn.GraphModuleMixin)"
                 )
             logging.info("Loaded pickled model")
+        model = model.to(device=torch.device("cpu"))
 
         # -- compile --
         if not model_is_jit:
