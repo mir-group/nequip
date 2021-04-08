@@ -54,8 +54,15 @@ def main(args=None):
 
     if args.command == "info":
         metadata = {CONFIG_KEY: "", NEQUIP_VERSION_KEY: ""}
-        model = torch.jit.load(args.model_path, _extra_files=metadata)
+        try:
+            model = torch.jit.load(args.model_path, _extra_files=metadata)
+        except RuntimeError as e:
+            raise ValueError(
+                f"{args.model_path} is not a deployed NequIP model file. (Underlying error: {e})"
+            )
         del model
+        if metadata[NEQUIP_VERSION_KEY] == "":
+            raise ValueError(f"{args.model_path} is not a deployed NequIP model file")
         # Everything we store right now is ASCII, so decode for printing
         metadata = {k: v.decode("ascii") for k, v in metadata.items()}
         config = metadata.pop(CONFIG_KEY)
@@ -66,6 +73,10 @@ def main(args=None):
     elif args.command == "build":
         if not args.train_dir.is_dir():
             raise ValueError(f"{args.train_dir} is not a directory")
+        if args.out_file.is_dir():
+            raise ValueError(
+                f"{args.out_dir} is a directory, but a path to a file for the deployed model must be given"
+            )
         # -- load model --
         model_is_jit = False
         model_path = args.train_dir / "best_model.pth"
