@@ -14,7 +14,7 @@ setup(
         "ase",
         "torch",
         "torch_geometric",
-        "e3nn",
+        "e3nn>=0.2.5",
         "pyyaml",
     ],
     zip_safe=True,
