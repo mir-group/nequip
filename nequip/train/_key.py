@@ -7,8 +7,8 @@ LOSS_KEY = "noramlized_loss"
 VALUE_KEY = "value"
 CONTRIB = "contrib"
 
-VALIDATION = "validation"
-TRAIN = "train"
+VALIDATION = "Validation"
+TRAIN = "Training"
 
 ABBREV = {
     AtomicDataDict.TOTAL_ENERGY_KEY: "e",

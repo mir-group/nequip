@@ -13,7 +13,7 @@ def init_n_update(config):
     config.update(dict(wandb.config))
     config.run_id = wandb.run.id
     wandb.run.name = config.run_name
-    wandb.config.update(config, allow_val_change=True)
+    wandb.config.update(dict(config), allow_val_change=True)
     return config
 
 
