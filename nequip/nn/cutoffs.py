@@ -3,7 +3,7 @@ from torch import nn
 
 
 class PolynomialCutoff(nn.Module):
-    def __init__(self, r_max=5.0, p=6):
+    def __init__(self, r_max, p=6):
         r"""Polynomial cutoff, as proposed in DimeNet: https://arxiv.org/abs/2003.03123
 
 

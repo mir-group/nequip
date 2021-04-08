@@ -1,8 +1,13 @@
 """ Train a network."""
 import logging
-import torch
+import argparse
+import yaml
 
-from sys import argv
+# This is a weird hack to avoid Intel MKL issues on the cluster when this is called as a subprocess of a process that has itself initialized PyTorch.
+# Since numpy gets imported later anyway for dataset stuff, this shouldn't affect performance.
+import numpy as np  # noqa: F401
+
+import torch
 
 import e3nn.util.jit
 
@@ -12,10 +17,14 @@ from nequip.data import AtomicDataDict
 from nequip.nn import RescaleOutput
 
 
-def main():
+def main(args=None):
+    parser = argparse.ArgumentParser(description="Train a NequIP model.")
+    parser.add_argument("config", help="configuration file")
+    args = parser.parse_args(args=args)
 
     config = Config.from_file(
-        argv[1], defaults=dict(wandb=False, compile_model=False, wandb_project="NequIP")
+        args.config,
+        defaults=dict(wandb=False, compile_model=False, wandb_project="NequIP"),
     )
 
     torch.set_default_dtype(torch.float32)
@@ -24,8 +33,7 @@ def main():
 
     # Make the trainer
     if config.wandb:
-
-        import wandb
+        import wandb  # noqa: F401
         from nequip.train.trainer_wandb import TrainerWandB
 
         # download parameters from wandb in case of sweeping
@@ -86,8 +94,11 @@ def main():
         f"Outputs are scaled by: {forces_std}, eneriges are shifted by {energies_mean}"
     )
 
+    # Record final config
+    with open(output.generate_file("config_final.yaml"), "w+") as fp:
+        yaml.dump(dict(config), fp)
+
     # Set the trainer
-    core_model.config = dict(config)
     trainer.model = core_model
 
     # Train

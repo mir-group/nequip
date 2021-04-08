@@ -468,7 +468,10 @@ class Trainer:
             if "model_class" in d:
                 model = d["model_class"].load(load_path)
             else:
-                model = torch.load(load_path)
+                if dictionary.get("compile_model", False):
+                    model = torch.jit.load(load_path)
+                else:
+                    model = torch.load(load_path)
             logging.debug(f"Reload the model from {load_path}")
 
             d.pop("progress")

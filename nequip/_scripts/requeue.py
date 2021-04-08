@@ -3,14 +3,14 @@
 Arguments: config.yaml
 
 config.yaml: requeue=True, and workdir, root, run_name have to be unique.
-
 """
-
 import logging
+import argparse
+from os.path import isfile
+
 import torch
 
-from sys import argv
-from os.path import isfile
+import e3nn.util.jit
 
 from nequip.utils import Config, dataset_from_config, Output, load_file
 from nequip.models import EnergyModel, ForceModel
@@ -18,10 +18,15 @@ from nequip.data import AtomicDataDict
 from nequip.nn import RescaleOutput
 
 
-def main():
+def main(args=None):
+    parser = argparse.ArgumentParser(
+        description="Start or automatically restart a NequIP training session."
+    )
+    parser.add_argument("config", help="configuration file")
+    args = parser.parse_args(args=args)
 
     config = Config.from_file(
-        argv[1],
+        args.config,
         defaults=dict(
             wandb=False, compile_model=False, wandb_project="NequIP", requeue=False
         ),

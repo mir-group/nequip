@@ -111,7 +111,7 @@ class Output:
             logfile=self.logfile,
         )
 
-    def generate_file(self, file_name: str, w_suffix: bool = False):
+    def generate_file(self, file_name: str):
         """
         only works with relative path. open a file
         """
@@ -126,20 +126,9 @@ class Output:
         if isfile(file_name) and (
             (self.restart and not self.append) or (not self.restart)
         ):
-
-            # get a uniq timestr
-            fstr = f"{self.timestr}"
-            if self.n_files[file_name] > 1:
-                fstr = f"{fstr}-{self.n_files[file_name]}"
-
-            # insert it to the file name
-            if w_suffix:
-                split = new_name.split(".")
-                new_name = ".".join(split)
-                new_name = f"{new_name}-{fstr}.{split[-1]}"
-            else:
-                new_name = f"{file_name}.{fstr}"
-            file_name = new_name
+            raise RuntimeError(
+                f"Tried to create file `{file_name}` but it already exists and either (1) append is disabled or (2) this run is not a restart"
+            )
 
         logging.debug(f"  ...generate file name {file_name}")
         return file_name
@@ -148,7 +137,6 @@ class Output:
         self,
         file_name: str,
         screen: bool = False,
-        w_suffix: bool = False,
         propagate: bool = False,
     ):
         """open a logger with a file and screen print
@@ -164,7 +152,7 @@ class Output:
         Returns:
         """
 
-        file_name = self.generate_file(file_name, w_suffix=w_suffix)
+        file_name = self.generate_file(file_name)
 
         logger = logging.getLogger(file_name)
         logger.propagate = propagate

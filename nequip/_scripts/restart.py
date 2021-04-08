@@ -5,24 +5,28 @@ Arguments: file_name config.yaml(optional)
 file_name: trainer.pth from a previous training
 config.yaml: any parameters that needs to be revised
 """
-
 import logging
+import argparse
+
 import torch
 
-from sys import argv
-
 from nequip.utils import Config, dataset_from_config, Output, load_file
-from nequip.models import EnergyModel, ForceModel
-from nequip.data import AtomicDataDict
-from nequip.nn import RescaleOutput
 
 
-def main():
+def main(args=None):
+    parser = argparse.ArgumentParser(
+        description="Restart an existing NequIP training session."
+    )
+    parser.add_argument("session", help="trainer.pth from a previous training")
+    parser.add_argument(
+        "--update-config", help="File containing any config paramters to update"
+    )
+    args = parser.parse_args(args=args)
 
     torch.set_default_dtype(torch.float32)
 
     # load the dictionary
-    file_name = argv[1]
+    file_name = args.session
     dictionary = load_file(
         supported_formats=dict(torch=["pt", "pth"]),
         filename=file_name,
@@ -38,8 +42,8 @@ def main():
     config.run_name = config.pop("run_name", "NequIP")
 
     # update with new set up
-    if len(argv) > 2:
-        new_config = Config.from_file(argv[2])
+    if args.update_config:
+        new_config = Config.from_file(args.update_config)
         config.run_name = new_config.pop("run_name", config.run_name + "_restart")
         config.update(new_config)
 
@@ -50,7 +54,6 @@ def main():
     dictionary.update(dict(config))
 
     if config.wandb:
-
         from nequip.train.trainer_wandb import TrainerWandB
 
         # download parameters from wandb in case of sweeping
