@@ -468,7 +468,7 @@ class Trainer:
             if "model_class" in d:
                 model = d["model_class"].load(load_path)
             else:
-                if 'compile_model' in dictionary and dictionary['compile_model']:
+                if dictionary.get("compile_model", False):
                     model = torch.jit.load(load_path)
                 else:
                     model = torch.load(load_path)
