@@ -9,6 +9,11 @@ from nequip.utils import instantiate
 
 
 class GraphModuleMixin:
+    f"""Mixin parent class for ``torch.nn.Module``s that act on and return ``AtomicDataDict.Type`` graph data.
+
+    All such classes should call ``_init_irreps`` in their ``__init__`` functions with information on the data fields they expect, require, and produce, as well as their corresponding irreps.
+    """
+
     def _init_irreps(
         self,
         irreps_in: Dict[str, Any] = {},
@@ -16,11 +21,13 @@ class GraphModuleMixin:
         required_irreps_in: Sequence[str] = [],
         irreps_out: Dict[str, Any] = {},
     ):
-        """Set the data fields for this graph module.
+        """Setup the expected data fields and their irreps for this graph module.
+
+        ``None`` is a valid irreps in the context for anything that is invariant but not well described by an ``e3nn.o3.Irreps``. An example are edge indexes in a graph, which are invariant but are integers, not ``0e`` scalars.
 
         Args:
             irreps_in (dict): maps names of all input fields from previous modules or data to their corresponding irreps
-            my_irreps_in (dict): maps names of fields to the irreps they must have for this graph module
+            my_irreps_in (dict): maps names of fields to the irreps they must have for this graph module. Will be checked for consistancy with ``irreps_in``
             required_irreps_in: sequence of names of fields that must be present in ``irreps_in``, but that can have any irreps.
             irreps_out (dict): mapping names of fields that are modified/output by this graph module to their irreps.
         """
