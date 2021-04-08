@@ -136,8 +136,8 @@ class SequentialGraphNetwork(GraphModuleMixin, torch.nn.Sequential):
             else:
                 params = {}
             if not callable(builder):
-                raise ValueError(
-                    f"The module has to be a class or a function. got {type(builder)}"
+                raise TypeError(
+                    f"The builder has to be a class or a function. got {type(builder)}"
                 )
 
             instance, _ = instantiate(
