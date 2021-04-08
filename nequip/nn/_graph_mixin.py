@@ -5,8 +5,6 @@ from collections import OrderedDict
 
 import torch
 
-from e3nn import o3
-
 from nequip.data import AtomicDataDict
 from nequip.utils import instantiate
 
@@ -82,7 +80,6 @@ class SequentialGraphNetwork(GraphModuleMixin, torch.nn.Sequential):
     def __init__(
         self,
         modules: Union[Sequence[GraphModuleMixin], Dict[str, GraphModuleMixin]],
-        init_args: Optional[list] = [],
     ):
         if isinstance(modules, dict):
             module_list = list(modules.values())
@@ -102,7 +99,6 @@ class SequentialGraphNetwork(GraphModuleMixin, torch.nn.Sequential):
         else:
             modules = OrderedDict((f"module{i}", m) for i, m in enumerate(module_list))
         super().__init__(modules)
-        self.init_args = deepcopy(init_args)
 
     @classmethod
     def from_parameters(
@@ -162,7 +158,6 @@ class SequentialGraphNetwork(GraphModuleMixin, torch.nn.Sequential):
 
         return cls(
             OrderedDict(zip(layers.keys(), built_modules)),
-            init_args=[shared_params, layers],
         )
 
     def append(self, name: str, module: GraphModuleMixin) -> None:
