@@ -15,7 +15,6 @@ from nequip.models import EnergyModel, ForceModel
 from nequip.nn import GraphModuleMixin, AtomwiseLinear
 from nequip.utils.test import assert_AtomicData_equivariant
 
-# from nequip.utils.test import assert_AtomicData_equivariant
 
 logging.basicConfig(level=logging.DEBUG)
 
