@@ -11,6 +11,13 @@ from nequip.data import AtomicData, AtomicDataDict
 PERMUTATION_FLOAT_TOLERANCE = {torch.float32: 1e-7, torch.float64: 1e-10}
 
 
+# https://discuss.pytorch.org/t/how-to-quickly-inverse-a-permutation-by-using-pytorch/116205/4
+def _inverse_permutation(perm):
+    inv = torch.empty_like(perm)
+    inv[perm] = torch.arange(perm.size(0), device=perm.device)
+    return inv
+
+
 def assert_permutation_equivariant(
     func: GraphModuleMixin, data_in: AtomicDataDict.Type
 ) -> None:
@@ -40,8 +47,22 @@ def assert_permutation_equivariant(
         AtomicDataDict.EDGE_ATTRS_KEY,
         AtomicDataDict.EDGE_EMBEDDING_KEY,
     }
-    node_perm = torch.randperm(len(data_in[AtomicDataDict.POSITIONS_KEY]))
-    edge_perm = torch.randperm(data_in[AtomicDataDict.EDGE_INDEX_KEY].shape[1])
+    # Make permutations and make sure they are not identities
+    n_node: int = len(data_in[AtomicDataDict.POSITIONS_KEY])
+    while True:
+        node_perm = torch.randperm(n_node)
+        if not torch.all(node_perm == torch.arange(n_node)):
+            break
+    n_edge: int = data_in[AtomicDataDict.EDGE_INDEX_KEY].shape[1]
+    while True:
+        edge_perm = torch.randperm(n_edge)
+        if not torch.all(edge_perm == torch.arange(n_edge)):
+            break
+    # ^ note that these permutations are maps from the "to" index to the "from" index
+    # because we index by them, the 0th element of the permuted array will be the ith
+    # of the original array, where i = perm[0]. Thus i is "from" and 0 is to, so perm
+    # interpreted as a map is a map from "to" to "from".
+
     perm_data_in = {}
     for k in data_in.keys():
         if k in node_permute_fields:
@@ -51,7 +72,7 @@ def assert_permutation_equivariant(
         else:
             perm_data_in[k] = data_in[k]
 
-    perm_data_in[AtomicDataDict.EDGE_INDEX_KEY] = node_perm[
+    perm_data_in[AtomicDataDict.EDGE_INDEX_KEY] = _inverse_permutation(node_perm)[
         data_in[AtomicDataDict.EDGE_INDEX_KEY]
     ][:, edge_perm]
 
