@@ -8,11 +8,16 @@ from nequip.nn import GraphModuleMixin
 from nequip.data import AtomicData, AtomicDataDict
 
 
+PERMUTATION_FLOAT_TOLERANCE = {torch.float32: 1e-7, torch.float64: 1e-10}
+
+
 def assert_permutation_equivariant(
     func: GraphModuleMixin, data_in: AtomicDataDict.Type
 ) -> None:
     # Prevent pytest from showing this function in the traceback
     __tracebackhide__ = True
+
+    atol = PERMUTATION_FLOAT_TOLERANCE[torch.get_default_dtype()]
 
     data_in = data_in.copy()
 
@@ -47,8 +52,8 @@ def assert_permutation_equivariant(
             perm_data_in[k] = data_in[k]
 
     perm_data_in[AtomicDataDict.EDGE_INDEX_KEY] = node_perm[
-        data_in[AtomicDataDict.EDGE_INDEX_KEY][:, edge_perm]
-    ]
+        data_in[AtomicDataDict.EDGE_INDEX_KEY]
+    ][:, edge_perm]
 
     out_orig = func(data_in)
     out_perm = func(perm_data_in)
@@ -57,27 +62,30 @@ def assert_permutation_equivariant(
         out_perm.keys()
     ), "Permutation changed the set of fields returned by model"
 
+    problems = []
     for k in out_orig.keys():
         if k in node_permute_fields:
-            assert torch.allclose(
-                out_orig[k][node_perm], out_perm[k]
-            ), f"node permutation equivariance violated for field {k}"
+            if not torch.allclose(out_orig[k][node_perm], out_perm[k], atol=atol):
+                problems.append(f"node permutation equivariance violated for field {k}")
         elif k in edge_permute_fields:
-            assert torch.allclose(
-                out_orig[k][edge_perm], out_perm[k]
-            ), f"edge permutation equivariance violated for field {k}"
+            if not torch.allclose(out_orig[k][edge_perm], out_perm[k], atol=atol):
+                problems.append(f"edge permutation equivariance violated for field {k}")
         elif k == AtomicDataDict.EDGE_INDEX_KEY:
             pass
         else:
             # Assume invariant
             if out_orig[k].dtype == torch.bool:
-                assert torch.all(
-                    out_orig[k] == out_perm[k]
-                ), f"edge/node permutation invariance violated for field {k} ({k} was assumed to be invariant, should it have been marked as equivariant?)"
+                if not torch.all(out_orig[k] == out_perm[k]):
+                    problems.append(
+                        f"edge/node permutation invariance violated for field {k} ({k} was assumed to be invariant, should it have been marked as equivariant?)"
+                    )
             else:
-                assert torch.allclose(
-                    out_orig[k], out_perm[k]
-                ), f"edge/node permutation invariance violated for field {k} ({k} was assumed to be invariant, should it have been marked as equivariant?)"
+                if not torch.allclose(out_orig[k], out_perm[k], atol=atol):
+                    problems.append(
+                        f"edge/node permutation invariance violated for field {k} ({k} was assumed to be invariant, should it have been marked as equivariant?)"
+                    )
+    if len(problems) > 0:
+        raise AssertionError("\n".join(problems))
     return
 
 
