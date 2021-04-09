@@ -72,18 +72,18 @@ def EnergyModel(**shared_params):
                 AtomwiseLinear,
                 dict(irreps_out="1x0e", out_field=AtomicDataDict.PER_ATOM_ENERGY_KEY),
             ),
+            "energy_shift": (
+                PerSpeciesShift,
+                dict(
+                    field=AtomicDataDict.PER_ATOM_ENERGY_KEY,
+                    out_field=AtomicDataDict.PER_ATOM_ENERGY_KEY,
+                ),
+            ),
             "total_energy_sum": (
                 AtomwiseReduce,
                 dict(
                     reduce="sum",
                     field=AtomicDataDict.PER_ATOM_ENERGY_KEY,
-                    out_field="raw_total_energy",
-                ),
-            ),
-            "energy_shift": (
-                PerSpeciesShift,
-                dict(
-                    field="raw_total_energy",
                     out_field=AtomicDataDict.TOTAL_ENERGY_KEY,
                 ),
             ),
