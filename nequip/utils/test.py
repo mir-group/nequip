@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Union, Sequence
 
 import torch
 from e3nn import o3
@@ -19,8 +19,23 @@ def _inverse_permutation(perm):
 
 
 def assert_permutation_equivariant(
-    func: GraphModuleMixin, data_in: AtomicDataDict.Type
-) -> None:
+    func: GraphModuleMixin,
+    data_in: AtomicDataDict.Type,
+    extra_node_permute_fields: Sequence[str] = [],
+    extra_edge_permute_fields: Sequence[str] = [],
+):
+    r"""Test the permutation equivariance of ``func``.
+
+    Standard fields are assumed to be equivariant to node or edge permutations according to their standard interpretions; all other fields are assumed to be invariant to all permutations. Non-standard fields can be specified as node/edge permutation equivariant using ``extra_node_permute_fields`` and ``extra_edge_permute_fields``.
+
+    Raises ``AssertionError`` if issues are found.
+
+    Args:
+        func: the module or model to test
+        data_in: the example input data to test with
+        extra_node_permute_fields: names of non-standard fields that should be equivariant to permutations of the *node* ordering
+        extra_edge_permute_fields: names of non-standard fields that should be equivariant to permutations of the *edge* ordering
+    """
     # Prevent pytest from showing this function in the traceback
     __tracebackhide__ = True
 
@@ -39,14 +54,14 @@ def assert_permutation_equivariant(
         AtomicDataDict.FORCE_KEY,
         AtomicDataDict.PER_ATOM_ENERGY_KEY,
         AtomicDataDict.BATCH_KEY,
-    }
+    }.union(extra_node_permute_fields)
     edge_permute_fields = {
         AtomicDataDict.EDGE_CELL_SHIFT_KEY,
         AtomicDataDict.EDGE_VECTORS_KEY,
         AtomicDataDict.EDGE_LENGTH_KEY,
         AtomicDataDict.EDGE_ATTRS_KEY,
         AtomicDataDict.EDGE_EMBEDDING_KEY,
-    }
+    }.union(extra_edge_permute_fields)
     # Make permutations and make sure they are not identities
     n_node: int = len(data_in[AtomicDataDict.POSITIONS_KEY])
     while True:
@@ -111,8 +126,29 @@ def assert_permutation_equivariant(
 
 
 def assert_AtomicData_equivariant(
-    func: GraphModuleMixin, data_in: Union[AtomicData, AtomicDataDict.Type], **kwargs
+    func: GraphModuleMixin,
+    data_in: Union[AtomicData, AtomicDataDict.Type],
+    extra_node_permute_fields: Sequence[str] = [],
+    extra_edge_permute_fields: Sequence[str] = [],
+    **kwargs,
 ):
+    r"""Test the rotation, translation, parity, and permutation equivariance of ``func``.
+
+    For details on permutation testing, see ``assert_permutation_equivariant``.
+    For details on geometric equivariance testing, see ``e3nn.util.test.assert_equivariant``.
+
+    Raises ``AssertionError`` if issues are found.
+
+    Args:
+        func: the module or model to test
+        data_in: the example input data to test with
+        extra_node_permute_fields: see ``assert_permutation_equivariant``
+        extra_edge_permute_fields: see ``assert_permutation_equivariant``
+        **kwargs: passed to ``e3nn.util.test.assert_equivariant``
+
+    Returns:
+        Information on equivariance error from ``e3nn.util.test.assert_equivariant``
+    """
     # Prevent pytest from showing this function in the traceback
     __tracebackhide__ = True
 
@@ -120,7 +156,12 @@ def assert_AtomicData_equivariant(
         data_in = AtomicData.to_AtomicDataDict(data_in)
 
     # == Test permutation of graph nodes ==
-    assert_permutation_equivariant(func, data_in)
+    assert_permutation_equivariant(
+        func,
+        data_in,
+        extra_node_permute_fields=extra_node_permute_fields,
+        extra_edge_permute_fields=extra_edge_permute_fields,
+    )
 
     # == Test rotation, parity, and translation using e3nn ==
     irreps_in = {k: None for k in AtomicDataDict.ALLOWED_KEYS}
@@ -172,8 +213,12 @@ def assert_AtomicData_equivariant(
 _DEBUG_HOOKS = None
 
 
-def set_irreps_debug(enabled: bool = False):
-    """Add debugging hooks to ``forward()`` that check data-irreps consistancy."""
+def set_irreps_debug(enabled: bool = False) -> None:
+    r"""Add debugging hooks to ``forward()`` that check data-irreps consistancy.
+
+    Args:
+        enabled: whether to set debug mode as enabled or disabled
+    """
     global _DEBUG_HOOKS
     if _DEBUG_HOOKS is None and not enabled:
         return
