@@ -92,7 +92,7 @@ class PerSpeciesShift(GraphModuleMixin, torch.nn.Module):
         allowed_species: List[int],
         out_field: Optional[str] = None,
         shifts: Optional[list] = None,
-        total_shift: float = 0,
+        scales: Optional[list] = None,
         trainable: bool = False,
         enabled: bool = False,
         irreps_in={},
@@ -114,29 +114,30 @@ class PerSpeciesShift(GraphModuleMixin, torch.nn.Module):
             if shifts is None
             else torch.as_tensor(shifts, dtype=torch.get_default_dtype())
         )
-        total_shift = torch.as_tensor(total_shift, dtype=torch.get_default_dtype())
+        assert shifts.shape == (
+            len(allowed_species),
+        ), f"Invalid shape of shifts {shifts}"
+        scales = (
+            torch.ones(len(allowed_species))
+            if scales is None
+            else torch.as_tensor(scales, dtype=torch.get_default_dtype())
+        )
+        assert scales.shape == (
+            len(allowed_species),
+        ), f"Invalid shape of scales {scales}"
 
         if trainable:
             self.shifts = torch.nn.Parameter(shifts)
-            self.total_shift = torch.nn.Parameter(total_shift)
+            self.scales = torch.nn.Parameter(scales)
         else:
             self.register_buffer("shifts", shifts)
-            self.register_buffer("total_shift", total_shift)
+            self.register_buffer("scales", scales)
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
         if self.enabled:
-            # TODO: short-circut when no batch
-            data = AtomicDataDict.with_batch(data)
-            counts = bincount(
-                data[AtomicDataDict.SPECIES_INDEX_KEY],
-                batch=data[AtomicDataDict.BATCH_KEY],
-                minlength=len(self.shifts),
-            )
-            # ^ shape [n_batch, len(self.shifts)]
+            species_idx = data[AtomicDataDict.SPECIES_INDEX_KEY]
             data[self.out_field] = (
-                data[self.field]
-                + torch.sum(counts * self.shifts, dim=-1)
-                + self.total_shift
+                self.shifts[species_idx] + self.scales[species_idx] * data[self.field]
             )
         else:
             data[self.out_field] = data[self.field]
