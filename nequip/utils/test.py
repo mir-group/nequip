@@ -8,12 +8,92 @@ from nequip.nn import GraphModuleMixin
 from nequip.data import AtomicData, AtomicDataDict
 
 
+def assert_permutation_equivariant(
+    func: GraphModuleMixin, data_in: AtomicDataDict.Type
+) -> None:
+    # Prevent pytest from showing this function in the traceback
+    __tracebackhide__ = True
+
+    data_in = data_in.copy()
+
+    # instead of doing fragile shape checks, just do a list of fields that permute
+    node_permute_fields = {
+        AtomicDataDict.POSITIONS_KEY,
+        AtomicDataDict.WEIGHTS_KEY,
+        AtomicDataDict.NODE_FEATURES_KEY,
+        AtomicDataDict.NODE_ATTRS_KEY,
+        AtomicDataDict.ATOMIC_NUMBERS_KEY,
+        AtomicDataDict.SPECIES_INDEX_KEY,
+        AtomicDataDict.FORCE_KEY,
+        AtomicDataDict.PER_ATOM_ENERGY_KEY,
+        AtomicDataDict.BATCH_KEY,
+    }
+    edge_permute_fields = {
+        AtomicDataDict.EDGE_CELL_SHIFT_KEY,
+        AtomicDataDict.EDGE_VECTORS_KEY,
+        AtomicDataDict.EDGE_LENGTH_KEY,
+        AtomicDataDict.EDGE_ATTRS_KEY,
+        AtomicDataDict.EDGE_EMBEDDING_KEY,
+    }
+    node_perm = torch.randperm(len(data_in[AtomicDataDict.POSITIONS_KEY]))
+    edge_perm = torch.randperm(data_in[AtomicDataDict.EDGE_INDEX_KEY].shape[1])
+    perm_data_in = {}
+    for k in data_in.keys():
+        if k in node_permute_fields:
+            perm_data_in[k] = data_in[k][node_perm]
+        elif k in edge_permute_fields:
+            perm_data_in[k] = data_in[k][edge_perm]
+        else:
+            perm_data_in[k] = data_in[k]
+
+    perm_data_in[AtomicDataDict.EDGE_INDEX_KEY] = node_perm[
+        data_in[AtomicDataDict.EDGE_INDEX_KEY][:, edge_perm]
+    ]
+
+    out_orig = func(data_in)
+    out_perm = func(perm_data_in)
+
+    assert set(out_orig.keys()) == set(
+        out_perm.keys()
+    ), "Permutation changed the set of fields returned by model"
+
+    for k in out_orig.keys():
+        if k in node_permute_fields:
+            assert torch.allclose(
+                out_orig[k][node_perm], out_perm[k]
+            ), f"node permutation equivariance violated for field {k}"
+        elif k in edge_permute_fields:
+            assert torch.allclose(
+                out_orig[k][edge_perm], out_perm[k]
+            ), f"edge permutation equivariance violated for field {k}"
+        elif k == AtomicDataDict.EDGE_INDEX_KEY:
+            pass
+        else:
+            # Assume invariant
+            if out_orig[k].dtype == torch.bool:
+                assert torch.all(
+                    out_orig[k] == out_perm[k]
+                ), f"edge/node permutation invariance violated for field {k} ({k} was assumed to be invariant, should it have been marked as equivariant?)"
+            else:
+                assert torch.allclose(
+                    out_orig[k], out_perm[k]
+                ), f"edge/node permutation invariance violated for field {k} ({k} was assumed to be invariant, should it have been marked as equivariant?)"
+    return
+
+
 def assert_AtomicData_equivariant(
     func: GraphModuleMixin, data_in: Union[AtomicData, AtomicDataDict.Type], **kwargs
 ):
     # Prevent pytest from showing this function in the traceback
     __tracebackhide__ = True
 
+    if not isinstance(data_in, dict):
+        data_in = AtomicData.to_AtomicDataDict(data_in)
+
+    # == Test permutation of graph nodes ==
+    assert_permutation_equivariant(func, data_in)
+
+    # == Test rotation, parity, and translation using e3nn ==
     irreps_in = {k: None for k in AtomicDataDict.ALLOWED_KEYS}
     irreps_in.update(
         {
@@ -82,7 +162,7 @@ def set_irreps_debug(enabled: bool = False):
     from torch_geometric.data import Data
 
     def pre_hook(mod: GraphModuleMixin, inp):
-        __tracebackhide__ = True
+        # __tracebackhide__ = True
         if not isinstance(mod, GraphModuleMixin):
             return
         mname = type(mod).__name__
@@ -118,7 +198,7 @@ def set_irreps_debug(enabled: bool = False):
     h1 = torch.nn.modules.module.register_module_forward_pre_hook(pre_hook)
 
     def post_hook(mod: GraphModuleMixin, _, out):
-        __tracebackhide__ = True
+        # __tracebackhide__ = True
         if not isinstance(mod, GraphModuleMixin):
             return
         mname = type(mod).__name__
