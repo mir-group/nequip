@@ -15,7 +15,7 @@ from nequip.utils import Config, dataset_from_config, Output
 from nequip.models import EnergyModel, ForceModel
 from nequip.data import AtomicDataDict
 from nequip.nn import RescaleOutput
-from nequip.utils.test import assert_AtomicData_equivariant
+from nequip.utils.test import assert_AtomicData_equivariant, set_irreps_debug
 
 
 def main(args=None):
@@ -24,6 +24,11 @@ def main(args=None):
     parser.add_argument(
         "--equivariance-test",
         help="test the model's equivariance before training",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--debug-mode",
+        help="enable debug mode (sometimes can give more helpful error messages)",
         action="store_true",
     )
     args = parser.parse_args(args=args)
@@ -36,6 +41,9 @@ def main(args=None):
     torch.set_default_dtype(torch.float32)
     output = Output.from_config(config)
     config.update(output.updated_dict())
+
+    if args.debug_mode:
+        set_irreps_debug(enabled=True)
 
     # Make the trainer
     if config.wandb:
