@@ -70,13 +70,13 @@ def EnergyModel(**shared_params):
             "conv_to_output_hidden": AtomwiseLinear,
             "output_hidden_to_scalar": (
                 AtomwiseLinear,
-                dict(irreps_out="1x0e", out_field="atomic_energy"),
+                dict(irreps_out="1x0e", out_field=AtomicDataDict.PER_ATOM_ENERGY_KEY),
             ),
             "total_energy_sum": (
                 AtomwiseReduce,
                 dict(
                     reduce="sum",
-                    field="atomic_energy",
+                    field=AtomicDataDict.PER_ATOM_ENERGY_KEY,
                     out_field="raw_total_energy",
                 ),
             ),
