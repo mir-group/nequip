@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 from pathlib import Path
 
 # see https://packaging.python.org/guides/single-sourcing-package-version/
@@ -15,7 +15,7 @@ setup(
     download_url="https://github.com/mir-group/nequip",
     author="Simon Batzner, Anders Johansson, Albert Musealian, Lixin Sun, Mario Geiger, Tess Smidt",
     python_requires=">=3.8",
-    packages=["nequip"],
+    packages=find_packages(include=["nequip", "nequip.*"]),
     entry_points={
         # make the scripts available as command line scripts
         "console_scripts": [
