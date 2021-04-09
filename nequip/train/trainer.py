@@ -654,7 +654,10 @@ class Trainer:
             data_unscaled = data
 
         # Run model
-        out = self.model(data_unscaled)
+        # We make a shallow copy of the input dict in case the model modifies it
+        input_data = data_unscaled.copy()
+        out = self.model(input_data)
+        del input_data
 
         # If we're in evaluation mode (i.e. validation), then
         # data_unscaled's target prop is unnormalized, and out's has been rescaled to be in the same units
