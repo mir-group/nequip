@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
 setup(
     name="nequip",
@@ -7,7 +7,7 @@ setup(
     download_url="https://github.com/mir-group/nequip",
     author="Simon Batzner, Anders Johansson, Albert Musealian, Lixin Sun, Mario Geiger, Tess Smidt",
     python_requires=">=3.8",
-    packages=["nequip"],
+    packages=find_packages(include=["nequip", "nequip.*"]),
     install_requires=[
         "numpy",
         "scipy",
