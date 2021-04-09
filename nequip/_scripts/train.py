@@ -15,11 +15,17 @@ from nequip.utils import Config, dataset_from_config, Output
 from nequip.models import EnergyModel, ForceModel
 from nequip.data import AtomicDataDict
 from nequip.nn import RescaleOutput
+from nequip.utils.test import assert_AtomicData_equivariant
 
 
 def main(args=None):
     parser = argparse.ArgumentParser(description="Train a NequIP model.")
     parser.add_argument("config", help="configuration file")
+    parser.add_argument(
+        "--equivariance-test",
+        help="test the model's equivariance before training",
+        action="store_true",
+    )
     args = parser.parse_args(args=args)
 
     config = Config.from_file(
@@ -102,6 +108,17 @@ def main(args=None):
     # Record final config
     with open(output.generate_file("config_final.yaml"), "w+") as fp:
         yaml.dump(dict(config), fp)
+
+    # Equivar test
+    if args.equivariance_test:
+        equivar_err = assert_AtomicData_equivariant(core_model, dataset.get(0))
+        errstr = "\n".join(
+            f"    parity_k={parity_k.item()}, did_translate={did_trans} -> error={err.item()}"
+            for (parity_k, did_trans), err in equivar_err.items()
+        )
+        del equivar_err
+        logging.info(f"Equivariance test passed; equivariance errors:\n{errstr}")
+        del errstr
 
     # Set the trainer
     trainer.model = core_model

@@ -51,7 +51,7 @@ def assert_AtomicData_equivariant(
 
     args_in = [data_in[k] for k in irreps_in]
 
-    assert_equivariant(
+    return assert_equivariant(
         wrapper,
         args_in=args_in,
         irreps_in=list(irreps_in.values()),
