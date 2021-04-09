@@ -113,7 +113,7 @@ def main(args=None):
     if args.equivariance_test:
         equivar_err = assert_AtomicData_equivariant(core_model, dataset.get(0))
         errstr = "\n".join(
-            f"    parity_k={parity_k.item()}, did_translate={did_trans} -> error={err.item()}"
+            f"    parity_k={parity_k.item()}, did_translate={did_trans} -> max componentwise error={err.item()}"
             for (parity_k, did_trans), err in equivar_err.items()
         )
         del equivar_err
