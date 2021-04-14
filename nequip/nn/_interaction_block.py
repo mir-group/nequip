@@ -10,7 +10,6 @@ from e3nn.nn import FullyConnectedNet
 from e3nn.o3 import TensorProduct, Linear, FullyConnectedTensorProduct
 
 from nequip.data import AtomicDataDict
-from nequip.nn.cutoffs import PolynomialCutoff
 from nequip.nn.nonlinearities import ShiftedSoftPlus
 from ._graph_mixin import GraphModuleMixin
 
@@ -26,9 +25,7 @@ class InteractionBlock(GraphModuleMixin, torch.nn.Module):
         invariant_layers=1,
         invariant_neurons=8,
         avg_num_neighbors=None,
-        use_sc=False,
-        cutoff=PolynomialCutoff,
-        cutoff_kwargs={},
+        use_sc=False
     ) -> None:
         """
         InteractionBlock.
@@ -42,8 +39,6 @@ class InteractionBlock(GraphModuleMixin, torch.nn.Module):
         :param number_of_basis: Number or Basis function, default = 8
         :param irreps_in: Input Features, default = None
         :param use_sc: bool, use self-connection or not
-        :param cutoff: nn.Module, cutoff function to be applied
-        :param cuotff_kwargs: dict, kwars for cutoff func
         """
         super().__init__()
 
@@ -70,7 +65,6 @@ class InteractionBlock(GraphModuleMixin, torch.nn.Module):
 
         self.avg_num_neighbors = avg_num_neighbors
         self.use_sc = use_sc
-        self.cutoff = cutoff(**cutoff_kwargs)
 
         feature_irreps_in = self.irreps_in[AtomicDataDict.NODE_FEATURES_KEY]
         feature_irreps_out = self.irreps_out[AtomicDataDict.NODE_FEATURES_KEY]
@@ -150,9 +144,7 @@ class InteractionBlock(GraphModuleMixin, torch.nn.Module):
 
         :return:
         """
-        # compute radial function and apply smooth cutoff on outputs
-        raw_weight = self.fc(data[AtomicDataDict.EDGE_EMBEDDING_KEY])
-        weight = raw_weight * self.cutoff(data[AtomicDataDict.EDGE_LENGTH_KEY])[:, None]
+        weight = self.fc(data[AtomicDataDict.EDGE_EMBEDDING_KEY])
 
         x = data[AtomicDataDict.NODE_FEATURES_KEY]
         edge_src = data[AtomicDataDict.EDGE_INDEX_KEY][0]
