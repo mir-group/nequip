@@ -93,7 +93,13 @@ def main(args=None):
     energy_model = EnergyModel(**dict(config))
     force_model = ForceModel(energy_model)
 
-    logging.info("Successfully built the network...")
+    global_shift = config.get("global_rescale_shift", None)
+    if global_shift is None:
+        global_shift = energies_mean
+
+    global_scale = config.get("global_rescale_scale", None)
+    if global_scale is None:
+        global_scale = forces_std
 
     core_model = RescaleOutput(
         model=force_model,
@@ -101,18 +107,25 @@ def main(args=None):
             AtomicDataDict.FORCE_KEY,
             AtomicDataDict.TOTAL_ENERGY_KEY,
         ],
-        scale_by=forces_std,
+        scale_by=global_scale,
         shift_keys=AtomicDataDict.TOTAL_ENERGY_KEY,
-        shift_by=energies_mean,
-        trainable_global_rescale_shift=config["trainable_global_rescale_shift"],
-        trainable_global_rescale_scale=config["trainable_global_rescale_scale"],
+        shift_by=global_shift,
+        trainable_global_rescale_shift=config.get(
+            "trainable_global_rescale_shift", False
+        ),
+        trainable_global_rescale_scale=config.get(
+            "trainable_global_rescale_scale", False
+        ),
     )
+
+    logging.info("Successfully built the network...")
 
     if config.compile_model:
         core_model = e3nn.util.jit.script(core_model)
+        logging.info("Successfully compiled the network...")
 
     logging.debug(
-        f"Outputs are scaled by: {forces_std}, eneriges are shifted by {energies_mean}"
+        f"Outputs are scaled by: {core_model.scale_by}, eneriges are shifted by {core_model.shift_by}"
     )
 
     # Record final config
