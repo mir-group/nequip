@@ -37,6 +37,8 @@ class RescaleOutput(GraphModuleMixin, torch.nn.Module):
         shift_keys: Union[Sequence[str], str] = [],
         scale_by=1.0,
         shift_by=0.0,
+        trainable_global_rescale_shift: bool = False,
+        trainable_global_rescale_scale: bool = False,
         irreps_in: dict = {},
     ):
         super().__init__()
@@ -67,8 +69,20 @@ class RescaleOutput(GraphModuleMixin, torch.nn.Module):
 
         self.scale_keys = list(scale_keys)
         self.shift_keys = list(shift_keys)
-        self.register_buffer("scale_by", torch.as_tensor(scale_by))
-        self.register_buffer("shift_by", torch.as_tensor(shift_by))
+
+        self.trainable_global_rescale_scale = trainable_global_rescale_scale
+        scale_by = torch.as_tensor(scale_by)
+        if self.trainable_global_rescale_scale:
+            self.scale_by = torch.nn.Parameter(scale_by)
+        else:
+            self.register_buffer("scale_by", scale_by)
+
+        self.trainable_global_rescale_shift = trainable_global_rescale_shift
+        shift_by = torch.as_tensor(shift_by)
+        if self.trainable_global_rescale_shift:
+            self.shift_by = torch.nn.Parameter(shift_by)
+        else:
+            self.register_buffer("shift_by", shift_by)
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
         data = self.model(data)

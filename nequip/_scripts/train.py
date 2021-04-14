@@ -104,6 +104,8 @@ def main(args=None):
         scale_by=forces_std,
         shift_keys=AtomicDataDict.TOTAL_ENERGY_KEY,
         shift_by=energies_mean,
+        trainable_global_rescale_shift=config["trainable_global_rescale_shift"],
+        trainable_global_rescale_scale=config["trainable_global_rescale_scale"],
     )
 
     if config.compile_model:

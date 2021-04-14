@@ -41,6 +41,11 @@ PerSpeciesScaleShift_shifts: [0.0, 0.0, 0.0]
 # optional initial atomic energy scale for each species. order should be the same as the allowed_species used in train.py. Defaults to ones.
 PerSpeciesScaleShift_scales: [1.0, 1.0, 1.0]
 
+# whether the shift of the final global energy rescaling should be trainable
+trainable_global_rescale_shift: false
+# whether the scale of the final global energy rescaling should be trainable
+trainable_global_rescale_scale: false
+
 # data set
 # the keys used need to be stated at least once in key_mapping, npz_fixed_field_keys or npz_keys
 # key_mapping is used to map the key in the npz file to the NequIP default values (see data/_key.py)
