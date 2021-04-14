@@ -38,7 +38,7 @@ def EnergyModel(**shared_params):
     logging.debug("Start building the network model")
 
     num_layers = shared_params.pop("num_layers", 3)
-    add_per_species_shift = shared_params.pop("PerSpeciesScaleShift_enabled", False)
+    add_per_species_shift = shared_params.pop("PerSpeciesScaleShift_enable", False)
 
     layers = {
         # -- Encode --
