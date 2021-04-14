@@ -14,8 +14,6 @@ from nequip.nn.embedding import (
     RadialBasisEdgeEncoding,
     SphericalHarmonicEdgeAttrs,
 )
-from nequip.nn.radial_basis import BesselBasis
-from nequip.nn.cutoffs import PolynomialCutoff
 
 
 # TODO: no allowed_speces?
