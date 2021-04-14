@@ -80,8 +80,7 @@ class AtomwiseReduce(GraphModuleMixin, torch.nn.Module):
         return data
 
 
-class PerSpeciesShift(GraphModuleMixin, torch.nn.Module):
-    enabled: bool
+class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
     field: str
     out_field: str
     trainable: bool
@@ -94,7 +93,6 @@ class PerSpeciesShift(GraphModuleMixin, torch.nn.Module):
         shifts: Optional[list] = None,
         scales: Optional[list] = None,
         trainable: bool = False,
-        enabled: bool = False,
         irreps_in={},
     ):
         super().__init__()
@@ -105,9 +103,6 @@ class PerSpeciesShift(GraphModuleMixin, torch.nn.Module):
             my_irreps_in={self.field: "0e"},  # input to shift must be a single scalar
             irreps_out={self.out_field: irreps_in[self.field]},
         )
-
-        self.enabled = enabled
-        self.trainable = trainable
 
         shifts = (
             torch.zeros(len(allowed_species))
@@ -126,6 +121,7 @@ class PerSpeciesShift(GraphModuleMixin, torch.nn.Module):
             len(allowed_species),
         ), f"Invalid shape of scales {scales}"
 
+        self.trainable = trainable
         if trainable:
             self.shifts = torch.nn.Parameter(shifts)
             self.scales = torch.nn.Parameter(scales)
@@ -134,11 +130,8 @@ class PerSpeciesShift(GraphModuleMixin, torch.nn.Module):
             self.register_buffer("scales", scales)
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
-        if self.enabled:
-            species_idx = data[AtomicDataDict.SPECIES_INDEX_KEY]
-            data[self.out_field] = (
-                self.shifts[species_idx] + self.scales[species_idx] * data[self.field]
-            )
-        else:
-            data[self.out_field] = data[self.field]
+        species_idx = data[AtomicDataDict.SPECIES_INDEX_KEY]
+        data[self.out_field] = (
+            self.shifts[species_idx] + self.scales[species_idx] * data[self.field]
+        )
         return data

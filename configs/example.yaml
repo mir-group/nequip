@@ -32,10 +32,14 @@ use_sc: true                                                                    
 # priority for different definition: 
 #   invariant_neurons < InteractionBlock_invariant_neurons < layer{i}_invariant_neurons 
 
-energy_shift_enable: true                                                         # whether shift the energy
-energy_shift_shifts: [0, 0, 0]                                                    # atomic energy shift for each specie. order should be the same as the allowed_species used in train.py
-energy_shift_total_shift: 0.0                                                     # total energy shift
-energy_shift_trainable: true                                                      # whether the shifts are trainable
+# whether to apply a shift and scale, defined per-species, to the atomic energies
+PerSpeciesScaleShift_enable: false
+# whether the shifts and scales are trainable
+PerSpeciesScaleShift_trainable: true
+# optional initial atomic energy shift for each species. order should be the same as the allowed_species used in train.py. Defaults to zeros.
+PerSpeciesScaleShift_shifts: [0.0, 0.0, 0.0]
+# optional initial atomic energy scale for each species. order should be the same as the allowed_species used in train.py. Defaults to ones.
+PerSpeciesScaleShift_scales: [1.0, 1.0, 1.0]
 
 # data set
 # the keys used need to be stated at least once in key_mapping, npz_fixed_field_keys or npz_keys

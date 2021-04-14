@@ -3,7 +3,7 @@ from ._atomwise import (
     AtomwiseOperation,
     AtomwiseReduce,
     AtomwiseLinear,
-    PerSpeciesShift,
+    PerSpeciesScaleShift,
 )  # noqa: F401
 from ._interaction_block import InteractionBlock  # noqa: F401
 from ._grad_output import GradientOutput  # noqa: F401
