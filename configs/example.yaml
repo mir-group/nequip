@@ -41,6 +41,11 @@ PerSpeciesScaleShift_shifts: [0.0, 0.0, 0.0]
 # optional initial atomic energy scale for each species. order should be the same as the allowed_species used in train.py. Defaults to ones.
 PerSpeciesScaleShift_scales: [1.0, 1.0, 1.0]
 
+# global energy shift. When None/null, defaults to the mean energy of the dataset
+global_rescale_shift: null
+# global energy scale. When None/null, defaults to the RMS of force components in the dataset
+# ^ this is the same as the std of force components
+global_rescale_scale: null
 # whether the shift of the final global energy rescaling should be trainable
 trainable_global_rescale_shift: false
 # whether the scale of the final global energy rescaling should be trainable
