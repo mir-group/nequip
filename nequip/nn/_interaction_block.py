@@ -151,8 +151,8 @@ class InteractionBlock(GraphModuleMixin, torch.nn.Module):
         :return:
         """
         # compute radial function and apply smooth cutoff on outputs
-        raw_weight = self.fc(data[AtomicDataDict.EDGE_EMBEDDING_KEY])
-        weight = raw_weight * self.cutoff(data[AtomicDataDict.EDGE_LENGTH_KEY])[:, None]
+        weight = self.fc(data[AtomicDataDict.EDGE_EMBEDDING_KEY])
+        weight = weight * self.cutoff(data[AtomicDataDict.EDGE_LENGTH_KEY])[:, None]
 
         x = data[AtomicDataDict.NODE_FEATURES_KEY]
         edge_src = data[AtomicDataDict.EDGE_INDEX_KEY][0]
