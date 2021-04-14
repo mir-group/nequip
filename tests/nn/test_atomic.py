@@ -5,7 +5,7 @@ from nequip.data import AtomicData
 from nequip.nn import (
     AtomwiseLinear,
     AtomwiseReduce,
-    PerSpeciesShift,
+    PerSpeciesScaleShift,
     SequentialGraphNetwork,
 )
 from nequip.nn.embedding import (
@@ -28,13 +28,13 @@ def model(float_tolerance, request):
                 AtomwiseLinear,
                 dict(irreps_out="1x0e", out_field="e"),
             ),
+            "shift": (
+                PerSpeciesScaleShift,
+                dict(field="e", out_field="shifted"),
+            ),
             "sum": (
                 AtomwiseReduce,
-                dict(reduce="sum", field="e", out_field="sum"),
-            ),
-            "shift": (
-                PerSpeciesShift,
-                dict(field="sum", out_field="shifted"),
+                dict(reduce="sum", field="shifted", out_field="sum"),
             ),
         },
     )
@@ -51,12 +51,11 @@ def batches(float_tolerance, nequip_dataset):
 
 
 def test_per_specie_shift(nequip_dataset, batches, model):
-
     batch1, batch2, batch12 = batches
     result1 = model(batch1)
     result2 = model(batch2)
     result12 = model(batch12)
 
-    assert torch.isclose(result1["shifted"], result12["shifted"][0])
-    assert torch.isclose(result2["shifted"], result12["shifted"][1])
+    assert torch.isclose(result1["sum"], result12["sum"][0])
+    assert torch.isclose(result2["sum"], result12["sum"][1])
     print(result1["shifted"], result2["shifted"], result12["shifted"])

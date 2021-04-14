@@ -131,7 +131,12 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
         species_idx = data[AtomicDataDict.SPECIES_INDEX_KEY]
+        in_field = data[self.field]
+        assert len(in_field) == len(
+            species_idx
+        ), "in_field doesnt seem to have correct per-atom shape"
         data[self.out_field] = (
-            self.shifts[species_idx] + self.scales[species_idx] * data[self.field]
+            self.shifts[species_idx].view(-1, 1)
+            + self.scales[species_idx].view(-1, 1) * in_field
         )
         return data
