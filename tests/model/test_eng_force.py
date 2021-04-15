@@ -6,7 +6,6 @@ import torch
 from os.path import isfile
 
 import numpy as np
-import ase
 
 from e3nn import o3
 from e3nn.util.jit import script
