@@ -196,3 +196,52 @@ class TestEquivariance:
     def test_forward(self, model, atomic_batch):
         instance, out_field = model
         assert_AtomicData_equivariant(func=instance, data_in=atomic_batch)
+
+
+class TestCutoff:
+    def test_large_separation(self, model, config, molecules):
+        atol = {torch.float32: 1e-6, torch.float64: 1e-10}[torch.get_default_dtype()]
+        instance, _ = model
+        r_max = config["r_max"]
+        atoms1 = molecules[0].copy()
+        atoms2 = molecules[1].copy()
+        # translate atoms2 far away
+        atoms2.positions += 40.0 + np.random.randn(3)
+        atoms_both = atoms1.copy()
+        atoms_both.extend(atoms2)
+        data1 = AtomicData.from_ase(atoms1, r_max=r_max)
+        data2 = AtomicData.from_ase(atoms2, r_max=r_max)
+        data_both = AtomicData.from_ase(atoms_both, r_max=r_max)
+        assert (
+            data_both[AtomicDataDict.EDGE_INDEX_KEY].shape[1]
+            == data1[AtomicDataDict.EDGE_INDEX_KEY].shape[1]
+            + data2[AtomicDataDict.EDGE_INDEX_KEY].shape[1]
+        )
+
+        out1 = instance(AtomicData.to_AtomicDataDict(data1))
+        out2 = instance(AtomicData.to_AtomicDataDict(data2))
+        out_both = instance(AtomicData.to_AtomicDataDict(data_both))
+
+        assert torch.allclose(
+            out1[AtomicDataDict.TOTAL_ENERGY_KEY]
+            + out2[AtomicDataDict.TOTAL_ENERGY_KEY],
+            out_both[AtomicDataDict.TOTAL_ENERGY_KEY],
+            atol=atol,
+        )
+
+        atoms_both2 = atoms1.copy()
+        atoms3 = atoms2.copy()
+        atoms3.positions += np.random.randn(3)
+        atoms_both2.extend(atoms3)
+        data_both2 = AtomicData.from_ase(atoms_both2, r_max=r_max)
+        out_both2 = instance(AtomicData.to_AtomicDataDict(data_both2))
+        assert torch.allclose(
+            out_both2[AtomicDataDict.TOTAL_ENERGY_KEY],
+            out_both[AtomicDataDict.TOTAL_ENERGY_KEY],
+            atol=atol,
+        )
+        assert torch.allclose(
+            out_both2[AtomicDataDict.PER_ATOM_ENERGY_KEY],
+            out_both[AtomicDataDict.PER_ATOM_ENERGY_KEY],
+            atol=atol,
+        )
