@@ -34,7 +34,13 @@ def main(args=None):
 
     config = Config.from_file(
         args.config,
-        defaults=dict(wandb=False, compile_model=False, wandb_project="NequIP"),
+        defaults=dict(
+            wandb=False,
+            compile_model=False,
+            wandb_project="NequIP",
+            model_builder="nequip.models.ForceModel",
+            force_training=True,
+        ),
     )
 
     torch.set_default_dtype(torch.float32)
@@ -68,28 +74,37 @@ def main(args=None):
     trainer.set_dataset(dataset)
 
     # Get statistics of training dataset
-    (
-        (forces_std,),
-        (energies_mean, energies_std),
-        (allowed_species, Z_count),
-    ) = trainer.dataset_train.statistics(
-        fields=[
-            AtomicDataDict.FORCE_KEY,
-            AtomicDataDict.TOTAL_ENERGY_KEY,
-            AtomicDataDict.ATOMIC_NUMBERS_KEY,
-        ],
-        modes=["rms", "mean_std", "count"],
+    stats_fields = [
+        AtomicDataDict.TOTAL_ENERGY_KEY,
+        AtomicDataDict.ATOMIC_NUMBERS_KEY,
+    ]
+    stats_modes = ["mean_std", "count"]
+    if config.force_training:
+        stats_fields.append(AtomicDataDict.FORCE_KEY)
+        stats_modes.append("rms")
+    stats = trainer.dataset_train.statistics(
+        fields=stats_fields,
+        modes=stats_modes,
     )
+    (
+        (energies_mean, energies_scale),
+        (allowed_species, Z_count),
+    ) = stats[:2]
+    if config.force_training:
+        # Scale by the force std instead
+        energies_scale = stats[2][0]
+    del stats_modes
+    del stats_fields
 
     RESCALE_THRESHOLD = 1e-6
-    if forces_std < RESCALE_THRESHOLD:
+    if energies_scale < RESCALE_THRESHOLD:
         raise ValueError(f"RMS of forces in this dataset was very low: {forces_std}")
         # TODO: offer option to disable rescaling?
 
     config.update(dict(allowed_species=allowed_species))
 
     # Build a model
-    model_builder = config.get("model_builder", "nequip.models.ForceModel")
+    model_builder = config.model_builder
     model_builder = yaml.load(f"!!python/name:{model_builder}", Loader=yaml.Loader)
     assert callable(model_builder), f"Model builder {model_builder} isn't callable"
     core_model = model_builder(**dict(config))
@@ -98,11 +113,13 @@ def main(args=None):
 
     final_model = RescaleOutput(
         model=core_model,
-        scale_keys=[
-            AtomicDataDict.FORCE_KEY,
-            AtomicDataDict.TOTAL_ENERGY_KEY,
-        ],
-        scale_by=forces_std,
+        scale_keys=[AtomicDataDict.TOTAL_ENERGY_KEY]
+        + (
+            [AtomicDataDict.FORCE_KEY]
+            if AtomicDataDict.FORCE_KEY in core_model.irreps_out
+            else []
+        ),
+        scale_by=energies_scale,
         shift_keys=AtomicDataDict.TOTAL_ENERGY_KEY,
         shift_by=energies_mean,
     )
@@ -111,7 +128,7 @@ def main(args=None):
         final_model = e3nn.util.jit.script(final_model)
 
     logging.debug(
-        f"Outputs are scaled by: {forces_std}, eneriges are shifted by {energies_mean}"
+        f"Outputs are scaled by: {energies_scale}, eneriges are shifted by {energies_mean}"
     )
 
     # Record final config
