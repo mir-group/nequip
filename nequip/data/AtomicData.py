@@ -64,8 +64,14 @@ class AtomicData(Data):
         AtomicDataDict.validate_keys(kwargs)
         # Deal with _some_ dtype issues
         for k, v in kwargs.items():
-            if k == AtomicDataDict.EDGE_INDEX_KEY:
-                # Node indexes must be longs
+            if (
+                k == AtomicDataDict.EDGE_INDEX_KEY
+                or k == AtomicDataDict.ATOMIC_NUMBERS_KEY
+                or k == AtomicDataDict.SPECIES_INDEX_KEY
+                or k == AtomicDataDict.BATCH_KEY
+            ):
+                # Any property used as an index must be long (or byte or bool, but those are not relevant for atomic scale systems)
+                # int32 would pass later checks, but is actually disallowed by torch
                 kwargs[k] = torch.as_tensor(v, dtype=torch.long)
             elif isinstance(v, np.ndarray):
                 if np.issubdtype(v.dtype, np.floating):
