@@ -40,6 +40,7 @@ def main(args=None):
             wandb_project="NequIP",
             model_builder="nequip.models.ForceModel",
             force_training=True,
+            dataset_statistics_stride=1,
         ),
     )
 
@@ -83,8 +84,7 @@ def main(args=None):
         stats_fields.append(AtomicDataDict.FORCE_KEY)
         stats_modes.append("rms")
     stats = trainer.dataset_train.statistics(
-        fields=stats_fields,
-        modes=stats_modes,
+        fields=stats_fields, modes=stats_modes, stride=config.dataset_statistics_stride
     )
     (
         (energies_mean, energies_scale),
