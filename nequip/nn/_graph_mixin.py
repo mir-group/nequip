@@ -1,5 +1,5 @@
 import random
-from typing import Dict, Tuple, Callable, Any, Sequence, Union, Mapping
+from typing import Dict, Tuple, Callable, Any, Sequence, Union, Mapping, Optional
 from collections import OrderedDict
 
 import torch
@@ -111,6 +111,7 @@ class SequentialGraphNetwork(GraphModuleMixin, torch.nn.Sequential):
         cls,
         shared_params: Mapping,
         layers: Dict[str, Union[Callable, Tuple[Callable, Dict[str, Any]]]],
+        irreps_in: Optional[dict] = None,
     ):
         r"""Construct a ``SequentialGraphModule`` of modules built from a shared set of parameters.
 
@@ -125,6 +126,7 @@ class SequentialGraphNetwork(GraphModuleMixin, torch.nn.Sequential):
                   1. A callable (such as a class or function) that can be used to ``instantiate`` a module for that layer
                   2. A tuple of such a callable and a dictionary mapping parameter names to values. The given dictionary of parameters will override for this layer values found in ``shared_params``.
                 Options 1. and 2. can be mixed.
+            irreps_in (optional dict): ``irreps_in`` for the first module in the sequence.
 
         Returns:
             The constructed SequentialGraphNetwork.
@@ -147,9 +149,13 @@ class SequentialGraphNetwork(GraphModuleMixin, torch.nn.Sequential):
                 builder=builder,
                 prefix=name,
                 positional_args=(
-                    dict(irreps_in=built_modules[-1].irreps_out)
-                    if len(built_modules) > 0
-                    else {}
+                    dict(
+                        irreps_in=(
+                            built_modules[-1].irreps_out
+                            if len(built_modules) > 0
+                            else irreps_in
+                        )
+                    )
                 ),
                 optional_args=params,
                 all_args=shared_params,

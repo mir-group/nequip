@@ -41,11 +41,6 @@ minimal_config2 = dict(
 )
 
 
-def force_model(**kwargs):
-    energy_model = EnergyModel(**kwargs)
-    return ForceModel(energy_model)
-
-
 @pytest.fixture(scope="module", params=[minimal_config1, minimal_config2])
 def config(request):
     return request.param
@@ -53,7 +48,7 @@ def config(request):
 
 @pytest.fixture(
     params=[
-        (force_model, AtomicDataDict.FORCE_KEY),
+        (ForceModel, AtomicDataDict.FORCE_KEY),
         (EnergyModel, AtomicDataDict.TOTAL_ENERGY_KEY),
     ]
 )
@@ -144,8 +139,7 @@ class TestWorkflow:
 
 class TestGradient:
     def test_numeric_gradient(self, config, atomic_batch, device, float_tolerance):
-
-        model = force_model(**config)
+        model = ForceModel(**config)
         model.to(device)
         data = atomic_batch.to(device)
         output = model(AtomicData.to_AtomicDataDict(data))

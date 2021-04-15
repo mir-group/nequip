@@ -2,10 +2,11 @@ import logging
 
 from nequip.data import AtomicDataDict
 from nequip.nn import (
+    GraphModuleMixin,
     SequentialGraphNetwork,
     AtomwiseLinear,
     AtomwiseReduce,
-    GradientOutput,
+    ForceOutput,
     PerSpeciesShift,
     ConvNetLayer,
 )
@@ -16,23 +17,11 @@ from nequip.nn.embedding import (
 )
 
 
-# TODO: no allowed_speces?
-def EnergyModel(**shared_params):
-    """
-    The model that predicts total energy.
+def EnergyModel(**shared_params) -> SequentialGraphNetwork:
+    """Base default energy model archetecture.
 
-    Example input for each class
-      - OneHotAtomEncoding {'allowed_species': array([1, 6, 8]), 'num_species': None, 'set_features': True}
-      - SphericalHarmonicEdgeAttrs {'set_node_features': False, 'l_max': 1}
-      - RadialBasisEdgeEncoding {'basis': BesselBasis(), 'cutoff': PolynomialCutoff()}
-      - AtomwiseLinear {'field': 'node_features', 'out_field': None, 'irreps_out': '1x0e'}
-      - ConvNetLayer {'convolution': <class 'nequip.nn._interaction_block.InteractionBlock'>, 'num_layers': 2,
-        'resnet': False, 'nonlinearity_type': 'norm', 'nonlinearity_kwargs': {},
-        'feature_irreps_hidden': '16x0o + 16x0e + 16x1o + 16x1e + 16x2o + 16x2e',}
-      - AtomwiseLinear
-        {'field': 'node_features', 'out_field': None, 'irreps_out': '1x0e'}
+    For minimal and full configuration option listings, see ``minimal.yaml`` and ``example.yaml``.
     """
-
     logging.debug("Start building the network model")
 
     num_layers = shared_params.pop("num_layers", 3)
@@ -89,20 +78,18 @@ def EnergyModel(**shared_params):
     )
 
     return SequentialGraphNetwork.from_parameters(
-        shared_params=shared_params, layers=layers
+        shared_params=shared_params,
+        layers=layers,
+        irreps_in={AtomicDataDict.POSITIONS_KEY: "1o"},
     )
 
 
-def ForceModel(energy_model):
+def ForceModel(**shared_params) -> GraphModuleMixin:
+    """Base default energy and force model archetecture.
 
-    return GradientOutput(
-        func=energy_model,
-        of=AtomicDataDict.TOTAL_ENERGY_KEY,
-        wrt=AtomicDataDict.POSITIONS_KEY,
-        out_field=AtomicDataDict.FORCE_KEY,
-        irreps_in={
-            AtomicDataDict.TOTAL_ENERGY_KEY: "1x0e",
-            AtomicDataDict.POSITIONS_KEY: "1x1o",
-        },
-        sign=-1,  # force is the negative gradient
-    )
+    For minimal and full configuration option listings, see ``minimal.yaml`` and ``example.yaml``.
+
+    A convinience method, equivalent to constructing ``EnergyModel`` and passing it to ``nequip.nn.ForceOutput``.
+    """
+    energy_model = EnergyModel(**shared_params)
+    return ForceOutput(energy_model=energy_model)

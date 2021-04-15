@@ -12,7 +12,6 @@ import torch
 import e3nn.util.jit
 
 from nequip.utils import Config, dataset_from_config, Output
-from nequip.models import EnergyModel, ForceModel
 from nequip.data import AtomicDataDict
 from nequip.nn import RescaleOutput
 from nequip.utils.test import assert_AtomicData_equivariant, set_irreps_debug
@@ -90,13 +89,15 @@ def main(args=None):
     config.update(dict(allowed_species=allowed_species))
 
     # Build a model
-    energy_model = EnergyModel(**dict(config))
-    force_model = ForceModel(energy_model)
+    model_builder = config.get("model_builder", "nequip.models.ForceModel")
+    model_builder = yaml.load(f"!!python/name:{model_builder}", Loader=yaml.Loader)
+    assert callable(model_builder), f"Model builder {model_builder} isn't callable"
+    core_model = model_builder(**dict(config))
 
     logging.info("Successfully built the network...")
 
-    core_model = RescaleOutput(
-        model=force_model,
+    final_model = RescaleOutput(
+        model=core_model,
         scale_keys=[
             AtomicDataDict.FORCE_KEY,
             AtomicDataDict.TOTAL_ENERGY_KEY,
@@ -107,7 +108,7 @@ def main(args=None):
     )
 
     if config.compile_model:
-        core_model = e3nn.util.jit.script(core_model)
+        final_model = e3nn.util.jit.script(final_model)
 
     logging.debug(
         f"Outputs are scaled by: {forces_std}, eneriges are shifted by {energies_mean}"
@@ -119,7 +120,7 @@ def main(args=None):
 
     # Equivar test
     if args.equivariance_test:
-        equivar_err = assert_AtomicData_equivariant(core_model, dataset.get(0))
+        equivar_err = assert_AtomicData_equivariant(final_model, dataset.get(0))
         errstr = "\n".join(
             f"    parity_k={parity_k.item()}, did_translate={did_trans} -> max componentwise error={err.item()}"
             for (parity_k, did_trans), err in equivar_err.items()
@@ -129,7 +130,7 @@ def main(args=None):
         del errstr
 
     # Set the trainer
-    trainer.model = core_model
+    trainer.model = final_model
 
     # Train
     trainer.train()
