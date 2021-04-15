@@ -74,8 +74,16 @@ def main(args=None):
     trainer.set_dataset(dataset)
 
     # Determine training type
-    force_training = "forces" in config.loss_coeffs
+    train_on = config.loss_coeffs
+    train_on = [train_on] if isinstance(train_on, str) else train_on
+    train_on = set(train_on)
+    if not train_on.issubset({"forces", "total_energy"}):
+        raise NotImplementedError(
+            f"Training on fields `{train_on}` besides forces and total energy not supported in the out-of-the-box training script yet; please use your own training script based on train.py."
+        )
+    force_training = "forces" in train_on
     logging.debug(f"Force training mode: {force_training}")
+    del train_on
 
     # Get statistics of training dataset
     stats_fields = [
@@ -103,7 +111,7 @@ def main(args=None):
     if energies_scale < RESCALE_THRESHOLD:
         # TODO: move this after merge
         raise ValueError(
-            f"RMS of forces in this dataset was very low: {energies_scale}"
+            f"RMS of forces/stdev of energies in this dataset was very low: {energies_scale}"
         )
         # TODO: offer option to disable rescaling?
 
@@ -134,7 +142,7 @@ def main(args=None):
         final_model = e3nn.util.jit.script(final_model)
 
     logging.debug(
-        f"Outputs are scaled by: {energies_scale}, eneriges are shifted by {energies_mean}"
+        f"Outputs are scaled by: {energies_scale}, eneriges are shifted by {energies_mean}. Scaling factors derived from statistics of {"forces" if force_training else "energies"} in the dataset."
     )
 
     # Record final config
