@@ -55,6 +55,12 @@ $ cd pytorch_runstats/
 $ pip install .
 ```
 
+* Install [`pytorch_ema`](https://github.com/fadel/pytorch_ema) for using an Exponential Moving Average on the weights: 
+```bash
+$ pip install -U git+https://github.com/fadel/pytorch_ema
+```
+pip install -U git+https://github.com/fadel/pytorch_ema
+
 * We use [Weights&Biases](https://wandb.ai) to keep track of experiments. This is not a strict requirement, you can use our software without this, but it may make your life easier. If you want to use it, create an account [here](https://wandb.ai) and install it: 
 
 ```
