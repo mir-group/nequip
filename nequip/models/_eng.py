@@ -36,18 +36,9 @@ def EnergyModel(**shared_params) -> SequentialGraphNetwork:
     }
 
     # add convnet layers
-    # we get any before and after layers:
-    before_layer = shared_params.pop("before_layer", {})
-    after_layer = shared_params.pop("after_layer", {})
-    if len(set(before_layer.keys()).union(after_layer.keys())) > 1:
-        raise ValueError(
-            "before_layer and after_layer may not have common module names"
-        )
     # insertion preserves order
     for layer_i in range(num_layers):
-        layers.update({f"layer{layer_i}_{bk}": v for bk, v in before_layer.items()})
         layers[f"layer{layer_i}_convnet"] = ConvNetLayer
-        layers.update({f"layer{layer_i}_{ak}": v for ak, v in after_layer.items()})
 
     # .update also maintains insertion order
     layers.update(
