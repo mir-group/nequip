@@ -142,7 +142,7 @@ def main(args=None):
         final_model = e3nn.util.jit.script(final_model)
 
     logging.debug(
-        f"Outputs are scaled by: {energies_scale}, eneriges are shifted by {energies_mean}. Scaling factors derived from statistics of {"forces" if force_training else "energies"} in the dataset."
+        f"Outputs are scaled by: {energies_scale}, eneriges are shifted by {energies_mean}. Scaling factors derived from statistics of {'forces' if force_training else 'energies'} in the dataset."
     )
 
     # Record final config
