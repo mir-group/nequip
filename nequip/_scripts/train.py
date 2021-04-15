@@ -39,7 +39,6 @@ def main(args=None):
             compile_model=False,
             wandb_project="NequIP",
             model_builder="nequip.models.ForceModel",
-            force_training=True,
             dataset_statistics_stride=1,
         ),
     )
@@ -74,13 +73,17 @@ def main(args=None):
     # Train/test split
     trainer.set_dataset(dataset)
 
+    # Determine training type
+    force_training = "forces" in config.loss_coeffs
+    logging.debug(f"Force training mode: {force_training}")
+
     # Get statistics of training dataset
     stats_fields = [
         AtomicDataDict.TOTAL_ENERGY_KEY,
         AtomicDataDict.ATOMIC_NUMBERS_KEY,
     ]
     stats_modes = ["mean_std", "count"]
-    if config.force_training:
+    if force_training:
         stats_fields.append(AtomicDataDict.FORCE_KEY)
         stats_modes.append("rms")
     stats = trainer.dataset_train.statistics(
@@ -90,7 +93,7 @@ def main(args=None):
         (energies_mean, energies_scale),
         (allowed_species, Z_count),
     ) = stats[:2]
-    if config.force_training:
+    if force_training:
         # Scale by the force std instead
         energies_scale = stats[2][0]
     del stats_modes
@@ -98,7 +101,10 @@ def main(args=None):
 
     RESCALE_THRESHOLD = 1e-6
     if energies_scale < RESCALE_THRESHOLD:
-        raise ValueError(f"RMS of forces in this dataset was very low: {forces_std}")
+        # TODO: move this after merge
+        raise ValueError(
+            f"RMS of forces in this dataset was very low: {energies_scale}"
+        )
         # TODO: offer option to disable rescaling?
 
     config.update(dict(allowed_species=allowed_species))

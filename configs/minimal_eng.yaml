@@ -2,7 +2,6 @@
 root: results/aspirin
 run_name: minimal_eng
 seed: 0
-force_training: false
 
 # network
 model_builder: nequip.models.EnergyModel
