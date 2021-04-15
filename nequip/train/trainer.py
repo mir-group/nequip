@@ -18,6 +18,7 @@ from copy import deepcopy
 from os.path import isfile
 from time import perf_counter
 from typing import Optional, Union
+from torch_ema import ExponentialMovingAverage
 
 from nequip.data import DataLoader, AtomicData, AtomicDataDict
 from nequip.utils import (
@@ -224,6 +225,8 @@ class Trainer:
         optim=None,
         optimizer_name: str = "Adam",
         optimizer_kwargs: Optional[dict] = None,
+        use_ema: bool = False,
+        ema_weight: float = 0.999,
         exclude_keys: list = [],
         batch_size: int = 5,
         shuffle: bool = True,
@@ -251,6 +254,13 @@ class Trainer:
         self.model = model
         self.optim = optim
         self.lr_sched = lr_sched
+
+        # exponential moving average of weights for val/test
+        self.use_ema = use_ema
+        self.ema_weight = ema_weight
+
+        if self.use_ema:
+            self.ema = None
 
         for key in self.init_params:
             setattr(self, key, locals()[key])
@@ -545,6 +555,12 @@ class Trainer:
         )
         self.loss_stat = LossStat(keys=list(self.loss.funcs.keys()))
 
+        if self.use_ema:
+            self.ema = ExponentialMovingAverage(
+                self.model.parameters(),
+                decay=self.ema_weight
+            )
+
         self._initialized = True
 
     def init_metrics(self):
@@ -670,6 +686,9 @@ class Trainer:
             loss.backward()
             self.optim.step()
 
+            if self.use_ema:
+                self.ema.update(self.model.parameters())
+
             if self.lr_scheduler_name == "CosineAnnealingWarmRestarts":
                 self.lr_sched.step(self.iepoch + self.ibatch / self.n_batches)
 
@@ -718,6 +737,10 @@ class Trainer:
         self.loss_dict = {}
         for category, dataset in zip(categories, datasets):
 
+            if category == VALIDATION and self.use_ema:
+                self.ema.store(self.model.parameters())
+                self.ema.copy_to(self.model.parameters())
+
             self.reset_metrics()
             self.n_batches = len(dataset)
             for self.ibatch, batch in enumerate(dataset):
@@ -734,6 +757,9 @@ class Trainer:
             if category == TRAIN:
                 for callback in self.end_of_train_callbacks:
                     callback(self)
+
+            if category == VALIDATION and self.use_ema:
+                self.ema.restore(self.model.parameters())
 
         self.end_of_epoch_log()
         self.end_of_epoch_save()
