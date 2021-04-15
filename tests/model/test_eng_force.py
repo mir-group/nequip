@@ -29,7 +29,7 @@ minimal_config1 = dict(
     num_layers=2,
     num_basis=8,
     PolynomialCutoff_p=6,
-    # nonlinearity_type="norm",  # TODO: !! continuity tests fail with this
+    nonlinearity_type="norm",
 )
 minimal_config2 = dict(
     allowed_species=ALLOWED_SPECIES,
@@ -39,9 +39,22 @@ minimal_config2 = dict(
     irreps_mid_output_block="2x0e",
     feature_irreps_hidden="4x0e + 4x1o",
 )
+minimal_config3 = dict(
+    allowed_species=ALLOWED_SPECIES,
+    irreps_edge_sh="0e + 1o",
+    r_max=4,
+    feature_irreps_hidden="4x0e + 4x1o",
+    resnet=True,
+    num_layers=2,
+    num_basis=8,
+    PolynomialCutoff_p=6,
+    nonlinearity_type="gate",
+)
 
 
-@pytest.fixture(scope="module", params=[minimal_config1, minimal_config2])
+@pytest.fixture(
+    scope="module", params=[minimal_config1, minimal_config2, minimal_config3]
+)
 def config(request):
     return request.param
 

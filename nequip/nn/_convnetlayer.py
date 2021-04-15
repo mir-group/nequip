@@ -45,10 +45,6 @@ class ConvNetLayer(GraphModuleMixin, torch.nn.Module):
         super().__init__()
         # initialization
         assert nonlinearity_type in ("gate", "norm")
-        if nonlinearity_type == "norm":
-            raise NotImplementedError(
-                "norm nonlinearities have numerical issues right now"
-            )
         self.feature_irreps_hidden = o3.Irreps(feature_irreps_hidden)
         self.resnet = resnet
         self.num_layers = num_layers
