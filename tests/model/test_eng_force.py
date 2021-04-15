@@ -6,6 +6,7 @@ import torch
 from os.path import isfile
 
 import numpy as np
+import ase
 
 from e3nn import o3
 from e3nn.util.jit import script
@@ -245,3 +246,37 @@ class TestCutoff:
             out_both[AtomicDataDict.PER_ATOM_ENERGY_KEY],
             atol=atol,
         )
+
+    def test_embedding_cutoff(self, model, config):
+        atol = {torch.float32: 1e-6, torch.float64: 1e-10}[torch.get_default_dtype()]
+        instance, _ = model
+        r_max = config["r_max"]
+
+        # make a synthetic three atom example
+        data = AtomicData(
+            atomic_numbers=np.random.choice(ALLOWED_SPECIES, size=3),
+            pos=np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]),
+            edge_index=np.array([[0, 1, 0, 2], [1, 0, 2, 0]]),
+        )
+        edge_embed = instance(AtomicData.to_AtomicDataDict(data))[
+            AtomicDataDict.EDGE_EMBEDDING_KEY
+        ]
+        data.pos[2, 1] = r_max  # put it past the cutoff
+        edge_embed2 = instance(AtomicData.to_AtomicDataDict(data))[
+            AtomicDataDict.EDGE_EMBEDDING_KEY
+        ]
+
+        assert torch.allclose(edge_embed[:2], edge_embed2[:2])
+        assert edge_embed[2:].abs().sum() > 1e-6  # some nonzero terms
+        assert torch.allclose(edge_embed2[2:], torch.zeros(1))
+
+        # test gradients
+        in_dict = AtomicData.to_AtomicDataDict(data)
+        in_dict[AtomicDataDict.POSITIONS_KEY].requires_grad_(True)
+        out_embed = instance(in_dict)[AtomicDataDict.EDGE_EMBEDDING_KEY]
+
+        grads = torch.autograd.grad(
+            outputs=out_embed[2:].sum(),
+            inputs=in_dict[AtomicDataDict.POSITIONS_KEY],
+        )[0]
+        assert torch.allclose(grads, torch.zeros(1))
