@@ -255,15 +255,11 @@ class Trainer:
         self.optim = optim
         self.lr_sched = lr_sched
 
-        # exponential moving average of weights for val/test
-        self.use_ema = use_ema
-        self.ema_weight = ema_weight
+        for key in self.init_params:
+            setattr(self, key, locals()[key])
 
         if self.use_ema:
             self.ema = None
-
-        for key in self.init_params:
-            setattr(self, key, locals()[key])
 
         output = Output.get_output(timestr, self)
 
@@ -554,13 +550,6 @@ class Trainer:
             all_args=self.kwargs,
         )
         self.loss_stat = LossStat(keys=list(self.loss.funcs.keys()))
-
-        if self.use_ema:
-            self.ema = ExponentialMovingAverage(
-                self.model.parameters(),
-                decay=self.ema_weight
-            )
-
         self._initialized = True
 
     def init_metrics(self):
@@ -614,6 +603,12 @@ class Trainer:
             self.init()
 
         self.model.to(self.device)
+
+        if self.use_ema:
+            self.ema = ExponentialMovingAverage(
+                self.model.parameters(),
+                decay=self.ema_weight
+            )
 
         if not self.restart:
             self.init_model()
