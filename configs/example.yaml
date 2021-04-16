@@ -32,11 +32,6 @@ use_sc: true                                                                    
 # priority for different definition: 
 #   invariant_neurons < InteractionBlock_invariant_neurons < layer{i}_invariant_neurons 
 
-energy_shift_enable: true                                                         # whether shift the energy
-energy_shift_shifts: [0, 0, 0]                                                    # atomic energy shift for each specie. order should be the same as the allowed_species used in train.py
-energy_shift_total_shift: 0.0                                                     # total energy shift
-energy_shift_trainable: true                                                      # whether the shifts are trainable
-
 # data set
 # the keys used need to be stated at least once in key_mapping, npz_fixed_field_keys or npz_keys
 # key_mapping is used to map the key in the npz file to the NequIP default values (see data/_key.py)
@@ -119,10 +114,6 @@ metrics_components:
   - - total_energy
     - mae
 
-# optional keys
-# if true and weights_forces defined in the dataset, the loss function will be weighted
-atomic_weight_on: false
-
 # optimizer, may be any optimizer defined in torch.optim
 # the name `optimizer_name`is case sensitive
 optimizer_name: Adam                                                               # default optimizer is Adam in the amsgrad mode
@@ -134,13 +125,14 @@ optimizer_eps: 1.0e-08
 optimizer_weight_decay: 0
 
 # lr scheduler, currently only supports the two options listed below, if you need more please file an issue
-# first open, consine annealing with warm restart
-lr_scheduler_name: CosineAnnealingWarmRestarts
-lr_scheduler_T_0: 10000
-lr_scheduler_T_mult: 2
-lr_scheduler_eta_min: 0
-lr_scheduler_last_epoch: -1
+# first: on-plateau
+lr_scheduler_name: ReduceLROnPlateau
+lr_scheduler_patience: 100
+lr_scheduler_factor: 0.5
 
-# alternative option, on-plateau
-# lr_scheduler_name: ReduceLROnPlateau
-# lr_scheduler_patience: 100
+# second, consine annealing with warm restart
+# lr_scheduler_name: CosineAnnealingWarmRestarts
+# lr_scheduler_T_0: 10000
+# lr_scheduler_T_mult: 2
+# lr_scheduler_eta_min: 0
+# lr_scheduler_last_epoch: -1
