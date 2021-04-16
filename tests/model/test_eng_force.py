@@ -286,24 +286,24 @@ class TestCutoff:
         # test gradients
         in_dict = AtomicData.to_AtomicDataDict(data)
         in_dict[AtomicDataDict.POSITIONS_KEY].requires_grad_(True)
-        out = instance(in_dict)
 
-        # is the edge embedding of the cutoff length edge unchanged at the cutoff?
         with torch.autograd.set_detect_anomaly(True):
+            out = instance(in_dict)
+
+            # is the edge embedding of the cutoff length edge unchanged at the cutoff?
             grads = torch.autograd.grad(
                 outputs=out[AtomicDataDict.EDGE_EMBEDDING_KEY][2:].sum(),
                 inputs=in_dict[AtomicDataDict.POSITIONS_KEY],
                 retain_graph=True,
             )[0]
-        assert torch.allclose(grads, torch.zeros(1))
+            assert torch.allclose(grads, torch.zeros(1))
 
-        # are the first two atom's energies unaffected by atom at the cutoff?
-        with torch.autograd.set_detect_anomaly(True):
+            # are the first two atom's energies unaffected by atom at the cutoff?
             grads = torch.autograd.grad(
                 outputs=out[AtomicDataDict.PER_ATOM_ENERGY_KEY][:2].sum(),
                 inputs=in_dict[AtomicDataDict.POSITIONS_KEY],
             )[0]
-        print(grads)
-        # only care about gradient wrt moved atom
-        assert grads.shape == (3, 3)
-        assert torch.allclose(grads[2], torch.zeros(1))
+            print(grads)
+            # only care about gradient wrt moved atom
+            assert grads.shape == (3, 3)
+            assert torch.allclose(grads[2], torch.zeros(1))
