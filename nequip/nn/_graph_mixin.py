@@ -4,6 +4,8 @@ from collections import OrderedDict
 
 import torch
 
+from e3nn import o3
+
 from nequip.data import AtomicDataDict
 from nequip.utils import instantiate
 
@@ -26,17 +28,35 @@ class GraphModuleMixin:
         ``None`` is a valid irreps in the context for anything that is invariant but not well described by an ``e3nn.o3.Irreps``. An example are edge indexes in a graph, which are invariant but are integers, not ``0e`` scalars.
 
         Args:
-            irreps_in (dict): maps names of all input fields from previous modules or data to their corresponding irreps
-            my_irreps_in (dict): maps names of fields to the irreps they must have for this graph module. Will be checked for consistancy with ``irreps_in``
-            required_irreps_in: sequence of names of fields that must be present in ``irreps_in``, but that can have any irreps.
-            irreps_out (dict): mapping names of fields that are modified/output by this graph module to their irreps.
+            irreps_in (dict): maps names of all input fields from previous modules or
+                data to their corresponding irreps
+            my_irreps_in (dict): maps names of fields to the irreps they must have for
+                this graph module. Will be checked for consistancy with ``irreps_in``
+            required_irreps_in: sequence of names of fields that must be present in
+                ``irreps_in``, but that can have any irreps.
+            irreps_out (dict): mapping names of fields that are modified/output by
+                this graph module to their irreps.
         """
-        # TODO: forward hook for checking input shapes?
         # Coerce
         irreps_in = {} if irreps_in is None else irreps_in
         irreps_in = AtomicDataDict._fix_irreps_dict(irreps_in)
-        # question, what is this?
+        # positions are *always* 1o, and always present
+        if AtomicDataDict.POSITIONS_KEY in irreps_in:
+            if irreps_in[AtomicDataDict.POSITIONS_KEY] != o3.Irreps("1x1o"):
+                raise ValueError(
+                    f"Positions must have irreps 1o, got instead `{irreps_in[AtomicDataDict.POSITIONS_KEY]}`"
+                )
+        irreps_in[AtomicDataDict.POSITIONS_KEY] = o3.Irreps("1o")
+        # edges are also always present
+        if AtomicDataDict.EDGE_INDEX_KEY in irreps_in:
+            if irreps_in[AtomicDataDict.EDGE_INDEX_KEY] is not None:
+                raise ValueError(
+                    f"Edge indexes must have irreps None, got instead `{irreps_in[AtomicDataDict.EDGE_INDEX_KEY]}`"
+                )
+        irreps_in[AtomicDataDict.EDGE_INDEX_KEY] = None
+
         my_irreps_in = AtomicDataDict._fix_irreps_dict(my_irreps_in)
+
         irreps_out = AtomicDataDict._fix_irreps_dict(irreps_out)
         # Confirm compatibility:
         # with my_irreps_in

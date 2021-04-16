@@ -13,6 +13,7 @@ def test_basic():
     sgn(
         {
             AtomicDataDict.POSITIONS_KEY: torch.randn(5, 3),
+            AtomicDataDict.EDGE_INDEX_KEY: torch.LongTensor([[0, 1], [1, 0]]),
             AtomicDataDict.SPECIES_INDEX_KEY: torch.LongTensor([0, 0, 1, 2, 0]),
         }
     )
@@ -32,6 +33,7 @@ def test_append():
     out = sgn(
         {
             AtomicDataDict.POSITIONS_KEY: torch.randn(5, 3),
+            AtomicDataDict.EDGE_INDEX_KEY: torch.LongTensor([[0, 1], [1, 0]]),
             AtomicDataDict.SPECIES_INDEX_KEY: torch.LongTensor([0, 0, 1, 2, 0]),
         }
     )

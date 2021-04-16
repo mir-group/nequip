@@ -71,7 +71,6 @@ def EnergyModel(**shared_params) -> SequentialGraphNetwork:
     return SequentialGraphNetwork.from_parameters(
         shared_params=shared_params,
         layers=layers,
-        irreps_in={AtomicDataDict.POSITIONS_KEY: "1o"},
     )
 
 
