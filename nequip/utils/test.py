@@ -103,10 +103,16 @@ def assert_permutation_equivariant(
     for k in out_orig.keys():
         if k in node_permute_fields:
             if not torch.allclose(out_orig[k][node_perm], out_perm[k], atol=atol):
-                problems.append(f"node permutation equivariance violated for field {k}")
+                err = (out_orig[k][node_perm] - out_perm[k]).abs().max()
+                problems.append(
+                    f"node permutation equivariance violated for field {k}; maximum componentwise error: {err:e}"
+                )
         elif k in edge_permute_fields:
             if not torch.allclose(out_orig[k][edge_perm], out_perm[k], atol=atol):
-                problems.append(f"edge permutation equivariance violated for field {k}")
+                err = (out_orig[k][edge_perm] - out_perm[k]).abs().max()
+                problems.append(
+                    f"edge permutation equivariance violated for field {k}; maximum componentwise error: {err:e}"
+                )
         elif k == AtomicDataDict.EDGE_INDEX_KEY:
             pass
         else:
@@ -118,8 +124,9 @@ def assert_permutation_equivariant(
                     )
             else:
                 if not torch.allclose(out_orig[k], out_perm[k], atol=atol):
+                    err = (out_orig[k] - out_perm[k]).abs().max()
                     problems.append(
-                        f"edge/node permutation invariance violated for field {k} ({k} was assumed to be invariant, should it have been marked as equivariant?)"
+                        f"edge/node permutation invariance violated for field {k}; maximum componentwise error: {err:e}. (`{k}` was assumed to be invariant, should it have been marked as equivariant?)"
                     )
     if len(problems) > 0:
         raise AssertionError("\n".join(problems))
