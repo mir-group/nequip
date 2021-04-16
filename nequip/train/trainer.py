@@ -617,7 +617,7 @@ class Trainer:
             self.ema = ExponentialMovingAverage(
                 self.model.parameters(),
                 decay=self.ema_weight,
-                use_num_updates=self.ema_use_num_updates
+                use_num_updates=self.ema_use_num_updates,
             )
 
         if not self.restart:
