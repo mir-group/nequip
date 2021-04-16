@@ -228,6 +228,7 @@ class Trainer:
         optimizer_kwargs: Optional[dict] = None,
         use_ema: bool = False,
         ema_weight: float = 0.999,
+        ema_use_num_updates=True,
         exclude_keys: list = [],
         batch_size: int = 5,
         shuffle: bool = True,
@@ -615,7 +616,8 @@ class Trainer:
         if self.use_ema:
             self.ema = ExponentialMovingAverage(
                 self.model.parameters(),
-                decay=self.ema_weight
+                decay=self.ema_weight,
+                use_num_updates=self.ema_use_num_updates
             )
 
         if not self.restart:
