@@ -206,8 +206,10 @@ class TestAutoGradient:
 
 
 class TestEquivariance:
-    def test_forward(self, model, atomic_batch):
+    def test_forward(self, model, atomic_batch, device):
         instance, out_field = model
+        instance = instance.to(device=device)
+        atomic_batch = atomic_batch.to(device=device)
         assert_AtomicData_equivariant(func=instance, data_in=atomic_batch)
 
 
