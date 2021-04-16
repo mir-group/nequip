@@ -1,8 +1,10 @@
 import random
-from typing import Dict, Tuple, Callable, Any, Sequence, Union, Mapping
+from typing import Dict, Tuple, Callable, Any, Sequence, Union, Mapping, Optional
 from collections import OrderedDict
 
 import torch
+
+from e3nn import o3
 
 from nequip.data import AtomicDataDict
 from nequip.utils import instantiate
@@ -26,17 +28,35 @@ class GraphModuleMixin:
         ``None`` is a valid irreps in the context for anything that is invariant but not well described by an ``e3nn.o3.Irreps``. An example are edge indexes in a graph, which are invariant but are integers, not ``0e`` scalars.
 
         Args:
-            irreps_in (dict): maps names of all input fields from previous modules or data to their corresponding irreps
-            my_irreps_in (dict): maps names of fields to the irreps they must have for this graph module. Will be checked for consistancy with ``irreps_in``
-            required_irreps_in: sequence of names of fields that must be present in ``irreps_in``, but that can have any irreps.
-            irreps_out (dict): mapping names of fields that are modified/output by this graph module to their irreps.
+            irreps_in (dict): maps names of all input fields from previous modules or
+                data to their corresponding irreps
+            my_irreps_in (dict): maps names of fields to the irreps they must have for
+                this graph module. Will be checked for consistancy with ``irreps_in``
+            required_irreps_in: sequence of names of fields that must be present in
+                ``irreps_in``, but that can have any irreps.
+            irreps_out (dict): mapping names of fields that are modified/output by
+                this graph module to their irreps.
         """
-        # TODO: forward hook for checking input shapes?
         # Coerce
         irreps_in = {} if irreps_in is None else irreps_in
         irreps_in = AtomicDataDict._fix_irreps_dict(irreps_in)
-        # question, what is this?
+        # positions are *always* 1o, and always present
+        if AtomicDataDict.POSITIONS_KEY in irreps_in:
+            if irreps_in[AtomicDataDict.POSITIONS_KEY] != o3.Irreps("1x1o"):
+                raise ValueError(
+                    f"Positions must have irreps 1o, got instead `{irreps_in[AtomicDataDict.POSITIONS_KEY]}`"
+                )
+        irreps_in[AtomicDataDict.POSITIONS_KEY] = o3.Irreps("1o")
+        # edges are also always present
+        if AtomicDataDict.EDGE_INDEX_KEY in irreps_in:
+            if irreps_in[AtomicDataDict.EDGE_INDEX_KEY] is not None:
+                raise ValueError(
+                    f"Edge indexes must have irreps None, got instead `{irreps_in[AtomicDataDict.EDGE_INDEX_KEY]}`"
+                )
+        irreps_in[AtomicDataDict.EDGE_INDEX_KEY] = None
+
         my_irreps_in = AtomicDataDict._fix_irreps_dict(my_irreps_in)
+
         irreps_out = AtomicDataDict._fix_irreps_dict(irreps_out)
         # Confirm compatibility:
         # with my_irreps_in
@@ -111,6 +131,7 @@ class SequentialGraphNetwork(GraphModuleMixin, torch.nn.Sequential):
         cls,
         shared_params: Mapping,
         layers: Dict[str, Union[Callable, Tuple[Callable, Dict[str, Any]]]],
+        irreps_in: Optional[dict] = None,
     ):
         r"""Construct a ``SequentialGraphModule`` of modules built from a shared set of parameters.
 
@@ -125,6 +146,7 @@ class SequentialGraphNetwork(GraphModuleMixin, torch.nn.Sequential):
                   1. A callable (such as a class or function) that can be used to ``instantiate`` a module for that layer
                   2. A tuple of such a callable and a dictionary mapping parameter names to values. The given dictionary of parameters will override for this layer values found in ``shared_params``.
                 Options 1. and 2. can be mixed.
+            irreps_in (optional dict): ``irreps_in`` for the first module in the sequence.
 
         Returns:
             The constructed SequentialGraphNetwork.
@@ -147,9 +169,13 @@ class SequentialGraphNetwork(GraphModuleMixin, torch.nn.Sequential):
                 builder=builder,
                 prefix=name,
                 positional_args=(
-                    dict(irreps_in=built_modules[-1].irreps_out)
-                    if len(built_modules) > 0
-                    else {}
+                    dict(
+                        irreps_in=(
+                            built_modules[-1].irreps_out
+                            if len(built_modules) > 0
+                            else irreps_in
+                        )
+                    )
                 ),
                 optional_args=params,
                 all_args=shared_params,
