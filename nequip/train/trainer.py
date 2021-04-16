@@ -81,6 +81,7 @@ class Trainer:
     - "metrics_epoch.txt" : txt matrice format (readable by np.loadtxt) with loss/mae from training and validation of each epoch
     - "metrics_batch.txt" : txt matrice format (readable by np.loadtxt) with training loss/mae of each batch
     - "best_model.pth": the best model. save the model when validation mae goes lower
+    - "best_model_ema.pth" the best model weights, averaged with EMA, save the model when validation mae goes lower
     - "last_model.pth": the last model. save the model every log_epoch_freq epoch
     - "trainer_save.pth": all the training information. The file used for loading and restart
 
@@ -176,6 +177,7 @@ class Trainer:
         best_val_metrics (float): current best validation mae
         best_epoch (float): current best epoch
         best_model_path (str): path to save the best model
+        best_model_path_ema (str): path to save the best model with EMA
         last_model_path (str): path to save the latest model
         trainer_save_path (str): path to save the trainer.
              Default is trainer.(date).pth at the current folder
@@ -276,6 +278,7 @@ class Trainer:
 
         # add filenames if not defined
         self.best_model_path = output.generate_file("best_model.pth")
+        self.best_model_path_ema = output.generate_file("best_model_ema.pth")
         self.last_model_path = output.generate_file("last_model.pth")
         self.trainer_save_path = output.generate_file("trainer.pth")
 
@@ -331,7 +334,7 @@ class Trainer:
         Args:
 
         state_dict (bool): if True, the weights and bias will also be stored.
-              When best_model_path and last_model_path are not defined,
+              When best_model_path, best_model_path_ema, and last_model_path are not defined,
               the weights of the model will be explicitly stored in the dictionary
         """
 
@@ -365,7 +368,10 @@ class Trainer:
                 "best_val_metrics", float("inf")
             )
             dictionary["progress"]["stop_arg"] = self.__dict__.get("stop_arg", None)
+
+            # TODO: these might not both be available, str defined, but no weights
             dictionary["progress"]["best_model_path"] = self.best_model_path
+            dictionary["progress"]["best_model_path_ema"] = self.best_model_path_ema
             dictionary["progress"]["last_model_path"] = self.last_model_path
             dictionary["progress"]["trainer_save_path"] = self.trainer_save_path
 
@@ -466,6 +472,9 @@ class Trainer:
                 iepoch = progress["iepoch"]
             elif isfile(progress["best_model_path"]):
                 load_path = progress["best_model_path"]
+                iepoch = progress["best_epoch"]
+            elif isfile(progress["best_model_path_ema"]):
+                load_path = progress["best_model_path_ema"]
                 iepoch = progress["best_epoch"]
             else:
                 raise AttributeError("model weights & bias are not saved")
@@ -835,10 +844,24 @@ class Trainer:
         if val_metrics < self.best_val_metrics:
             self.best_val_metrics = val_metrics
             self.best_epoch = self.iepoch
-            if hasattr(self.model, "save"):
-                self.model.save(self.best_model_path)
+
+            if self.use_ema:
+                save_path = self.best_model_path_ema
+                self.ema.store(self.model.parameters())
+                self.ema.copy_to(self.model.parameters())
+
             else:
-                torch.save(self.model, self.best_model_path)
+                save_path = self.best_model_path
+
+            if hasattr(self.model, "save"):
+                self.model.save(save_path)
+
+            else:
+                torch.save(self.model, save_path)
+
+            if self.use_ema:
+                self.ema.restore(self.model.parameters())
+
             self.logger.info(
                 f"! Best model {self.best_epoch+1:8d} {self.best_val_metrics:8.3f}"
             )
