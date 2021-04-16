@@ -75,7 +75,7 @@ train_val_split: random                                                         
 shuffle: true                                                                      # If true, the data loader will shuffle the data
 metrics_key: loss                                                                  # metrics used for scheduling and saving best model. Options: loss, or anything that appears in the validation batch step header, such as f_mae, f_rmse, e_mae, e_rmse
 use_ema: False                                                                     # if true, use exponential moving average on weights for val/test
-ema_weight: 0.999                                                                  # ema weight, commonly set to 0.999
+ema_decay: 0.999                                                                  # ema weight, commonly set to 0.999
 ema_use_num_updates: True                                                          # whether to use number of updates when computing averages
 
 # loss function
