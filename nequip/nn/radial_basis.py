@@ -5,6 +5,9 @@ from torch import nn
 
 
 class BesselBasis(nn.Module):
+    r_max: float
+    prefactor: float
+
     def __init__(self, r_max, num_basis=8, trainable=True):
         r"""Radial Bessel Basis, as proposed in DimeNet: https://arxiv.org/abs/2003.03123
 
@@ -25,8 +28,8 @@ class BesselBasis(nn.Module):
         self.trainable = trainable
         self.num_basis = num_basis
 
-        self.register_buffer("r_max", torch.Tensor([r_max]))
-        self.register_buffer("prefactor", torch.Tensor([2.0 / self.r_max]))
+        self.r_max = float(r_max)
+        self.prefactor = 2.0 / self.r_max
 
         self.bessel_weights = torch.linspace(
             start=1.0, end=num_basis, steps=num_basis

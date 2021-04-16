@@ -8,7 +8,7 @@ from nequip.nn import GraphModuleMixin
 from nequip.data import AtomicData, AtomicDataDict
 
 
-PERMUTATION_FLOAT_TOLERANCE = {torch.float32: 1e-7, torch.float64: 1e-10}
+PERMUTATION_FLOAT_TOLERANCE = {torch.float32: 1e-6, torch.float64: 1e-10}
 
 
 # https://discuss.pytorch.org/t/how-to-quickly-inverse-a-permutation-by-using-pytorch/116205/4
@@ -42,6 +42,7 @@ def assert_permutation_equivariant(
     atol = PERMUTATION_FLOAT_TOLERANCE[torch.get_default_dtype()]
 
     data_in = data_in.copy()
+    device = data_in[AtomicDataDict.POSITIONS_KEY].device
 
     # instead of doing fragile shape checks, just do a list of fields that permute
     node_permute_fields = {
@@ -65,13 +66,13 @@ def assert_permutation_equivariant(
     # Make permutations and make sure they are not identities
     n_node: int = len(data_in[AtomicDataDict.POSITIONS_KEY])
     while True:
-        node_perm = torch.randperm(n_node)
-        if not torch.all(node_perm == torch.arange(n_node)):
+        node_perm = torch.randperm(n_node, device=device)
+        if not torch.all(node_perm == torch.arange(n_node, device=device)):
             break
     n_edge: int = data_in[AtomicDataDict.EDGE_INDEX_KEY].shape[1]
     while True:
-        edge_perm = torch.randperm(n_edge)
-        if not torch.all(edge_perm == torch.arange(n_edge)):
+        edge_perm = torch.randperm(n_edge, device=device)
+        if not torch.all(edge_perm == torch.arange(n_edge, device=device)):
             break
     # ^ note that these permutations are maps from the "to" index to the "from" index
     # because we index by them, the 0th element of the permuted array will be the ith
@@ -102,10 +103,16 @@ def assert_permutation_equivariant(
     for k in out_orig.keys():
         if k in node_permute_fields:
             if not torch.allclose(out_orig[k][node_perm], out_perm[k], atol=atol):
-                problems.append(f"node permutation equivariance violated for field {k}")
+                err = (out_orig[k][node_perm] - out_perm[k]).abs().max()
+                problems.append(
+                    f"node permutation equivariance violated for field {k}; maximum componentwise error: {err:e}"
+                )
         elif k in edge_permute_fields:
             if not torch.allclose(out_orig[k][edge_perm], out_perm[k], atol=atol):
-                problems.append(f"edge permutation equivariance violated for field {k}")
+                err = (out_orig[k][edge_perm] - out_perm[k]).abs().max()
+                problems.append(
+                    f"edge permutation equivariance violated for field {k}; maximum componentwise error: {err:e}"
+                )
         elif k == AtomicDataDict.EDGE_INDEX_KEY:
             pass
         else:
@@ -117,8 +124,9 @@ def assert_permutation_equivariant(
                     )
             else:
                 if not torch.allclose(out_orig[k], out_perm[k], atol=atol):
+                    err = (out_orig[k] - out_perm[k]).abs().max()
                     problems.append(
-                        f"edge/node permutation invariance violated for field {k} ({k} was assumed to be invariant, should it have been marked as equivariant?)"
+                        f"edge/node permutation invariance violated for field {k}; maximum componentwise error: {err:e}. (`{k}` was assumed to be invariant, should it have been marked as equivariant?)"
                     )
     if len(problems) > 0:
         raise AssertionError("\n".join(problems))
