@@ -12,7 +12,6 @@ import torch
 import e3nn.util.jit
 
 from nequip.utils import Config, dataset_from_config, Output
-from nequip.models import EnergyModel, ForceModel
 from nequip.data import AtomicDataDict
 from nequip.nn import RescaleOutput
 from nequip.utils.test import assert_AtomicData_equivariant, set_irreps_debug
@@ -35,7 +34,13 @@ def main(args=None):
 
     config = Config.from_file(
         args.config,
-        defaults=dict(wandb=False, compile_model=False, wandb_project="NequIP"),
+        defaults=dict(
+            wandb=False,
+            compile_model=False,
+            wandb_project="NequIP",
+            model_builder="nequip.models.ForceModel",
+            dataset_statistics_stride=1,
+        ),
     )
 
     torch.set_default_dtype(torch.float32)
@@ -68,49 +73,76 @@ def main(args=None):
     # Train/test split
     trainer.set_dataset(dataset)
 
+    # Determine training type
+    train_on = config.loss_coeffs
+    train_on = [train_on] if isinstance(train_on, str) else train_on
+    train_on = set(train_on)
+    if not train_on.issubset({"forces", "total_energy"}):
+        raise NotImplementedError(
+            f"Training on fields `{train_on}` besides forces and total energy not supported in the out-of-the-box training script yet; please use your own training script based on train.py."
+        )
+    force_training = "forces" in train_on
+    logging.debug(f"Force training mode: {force_training}")
+    del train_on
+
     # Get statistics of training dataset
-    (
-        (forces_std,),
-        (energies_mean, energies_std),
-        (allowed_species, Z_count),
-    ) = trainer.dataset_train.statistics(
-        fields=[
-            AtomicDataDict.FORCE_KEY,
-            AtomicDataDict.TOTAL_ENERGY_KEY,
-            AtomicDataDict.ATOMIC_NUMBERS_KEY,
-        ],
-        modes=["rms", "mean_std", "count"],
+    stats_fields = [
+        AtomicDataDict.TOTAL_ENERGY_KEY,
+        AtomicDataDict.ATOMIC_NUMBERS_KEY,
+    ]
+    stats_modes = ["mean_std", "count"]
+    if force_training:
+        stats_fields.append(AtomicDataDict.FORCE_KEY)
+        stats_modes.append("rms")
+    stats = trainer.dataset_train.statistics(
+        fields=stats_fields, modes=stats_modes, stride=config.dataset_statistics_stride
     )
+    (
+        (energies_mean, energies_scale),
+        (allowed_species, Z_count),
+    ) = stats[:2]
+    if force_training:
+        # Scale by the force std instead
+        energies_scale = stats[2][0]
+    del stats_modes
+    del stats_fields
 
     RESCALE_THRESHOLD = 1e-6
-    if forces_std < RESCALE_THRESHOLD:
-        raise ValueError(f"RMS of forces in this dataset was very low: {forces_std}")
+    if energies_scale < RESCALE_THRESHOLD:
+        # TODO: move this after merge
+        raise ValueError(
+            f"RMS of forces/stdev of energies in this dataset was very low: {energies_scale}"
+        )
         # TODO: offer option to disable rescaling?
 
     config.update(dict(allowed_species=allowed_species))
 
     # Build a model
-    energy_model = EnergyModel(**dict(config))
-    force_model = ForceModel(energy_model)
+    model_builder = config.model_builder
+    model_builder = yaml.load(f"!!python/name:{model_builder}", Loader=yaml.Loader)
+    assert callable(model_builder), f"Model builder {model_builder} isn't callable"
+    core_model = model_builder(**dict(config))
 
     logging.info("Successfully built the network...")
 
-    core_model = RescaleOutput(
-        model=force_model,
-        scale_keys=[
-            AtomicDataDict.FORCE_KEY,
-            AtomicDataDict.TOTAL_ENERGY_KEY,
-        ],
-        scale_by=forces_std,
+    final_model = RescaleOutput(
+        model=core_model,
+        scale_keys=[AtomicDataDict.TOTAL_ENERGY_KEY]
+        + (
+            [AtomicDataDict.FORCE_KEY]
+            if AtomicDataDict.FORCE_KEY in core_model.irreps_out
+            else []
+        ),
+        scale_by=energies_scale,
         shift_keys=AtomicDataDict.TOTAL_ENERGY_KEY,
         shift_by=energies_mean,
     )
 
     if config.compile_model:
-        core_model = e3nn.util.jit.script(core_model)
+        final_model = e3nn.util.jit.script(final_model)
 
     logging.debug(
-        f"Outputs are scaled by: {forces_std}, eneriges are shifted by {energies_mean}"
+        f"Outputs are scaled by: {energies_scale}, eneriges are shifted by {energies_mean}. Scaling factors derived from statistics of {'forces' if force_training else 'energies'} in the dataset."
     )
 
     # Record final config
@@ -119,7 +151,7 @@ def main(args=None):
 
     # Equivar test
     if args.equivariance_test:
-        equivar_err = assert_AtomicData_equivariant(core_model, dataset.get(0))
+        equivar_err = assert_AtomicData_equivariant(final_model, dataset.get(0))
         errstr = "\n".join(
             f"    parity_k={parity_k.item()}, did_translate={did_trans} -> max componentwise error={err.item()}"
             for (parity_k, did_trans), err in equivar_err.items()
@@ -129,7 +161,7 @@ def main(args=None):
         del errstr
 
     # Set the trainer
-    trainer.model = core_model
+    trainer.model = final_model
 
     # Train
     trainer.train()
