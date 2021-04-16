@@ -20,7 +20,7 @@ from time import perf_counter
 from typing import Optional, Union
 from torch_ema import ExponentialMovingAverage
 
-from nequip.data import DataLoader, AtomicData, AtomicDataDict
+from nequip.data import DataLoader, AtomicData
 from nequip.utils import (
     Output,
     instantiate_from_cls_name,
@@ -29,7 +29,6 @@ from nequip.utils import (
     load_file,
 )
 
-from torch_runstats import RunningStats, Reduction
 
 from .loss import Loss, LossStat
 from .metrics import Metrics
