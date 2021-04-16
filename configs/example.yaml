@@ -34,7 +34,7 @@ use_sc: true                                                                    
 
 # whether to apply a shift and scale, defined per-species, to the atomic energies
 PerSpeciesScaleShift_enable: false
-# whether the shifts and scales are trainable
+# if the PerSpeciesScaleShift is enabled, whether the shifts and scales are trainable
 PerSpeciesScaleShift_trainable: true
 # optional initial atomic energy shift for each species. order should be the same as the allowed_species used in train.py. Defaults to zeros.
 PerSpeciesScaleShift_shifts: [0.0, 0.0, 0.0]

@@ -157,7 +157,7 @@ def main(args=None):
         logging.info("Successfully compiled model...")
 
     logging.debug(
-        f"Outputs are scaled by: {energies_scale}, eneriges are shifted by {energies_mean}. Scaling factors derived from statistics of {'forces' if force_training else 'energies'} in the dataset."
+        f"Initially outputs are scaled by: {energies_scale}, eneriges are shifted by {energies_mean}. Scaling factors derived from statistics of {'forces' if force_training else 'energies'} in the dataset."
     )
 
     # Record final config
