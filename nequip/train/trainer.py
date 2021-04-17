@@ -468,9 +468,6 @@ class Trainer:
             if isfile(progress["last_model_path"]):
                 load_path = progress["last_model_path"]
                 iepoch = progress["iepoch"]
-            elif isfile(progress["best_model_path"]):
-                load_path = progress["best_model_path"]
-                iepoch = progress["best_epoch"]
             else:
                 raise AttributeError("model weights & bias are not saved")
 
