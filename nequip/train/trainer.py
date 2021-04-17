@@ -278,7 +278,6 @@ class Trainer:
 
         # add filenames if not defined
         self.best_model_path = output.generate_file("best_model.pth")
-        self.best_model_path_ema = output.generate_file("best_model_ema.pth")
         self.last_model_path = output.generate_file("last_model.pth")
         self.trainer_save_path = output.generate_file("trainer.pth")
 
@@ -333,9 +332,7 @@ class Trainer:
         """convert instance to a dictionary
         Args:
 
-        state_dict (bool): if True, the weights and bias will also be stored.
-              When best_model_path, best_model_path_ema, and last_model_path are not defined,
-              the weights of the model will be explicitly stored in the dictionary
+        state_dict (bool): if True, the state_dicts of the optimizer, lr scheduler, and EMA will be included
         """
 
         dictionary = {}
@@ -354,6 +351,8 @@ class Trainer:
                 dictionary["state_dict"]["cuda_rng_state"] = torch.cuda.get_rng_state(
                     device=self.device
                 )
+            if self.use_ema:
+                dictionary["state_dict"]["ema_state"] = self.ema.state_dict()
 
         if hasattr(self.model, "save") and not issubclass(
             type(self.model), torch.jit.ScriptModule
@@ -371,7 +370,6 @@ class Trainer:
 
             # TODO: these might not both be available, str defined, but no weights
             dictionary["progress"]["best_model_path"] = self.best_model_path
-            dictionary["progress"]["best_model_path_ema"] = self.best_model_path_ema
             dictionary["progress"]["last_model_path"] = self.last_model_path
             dictionary["progress"]["trainer_save_path"] = self.trainer_save_path
 
@@ -473,9 +471,6 @@ class Trainer:
             elif isfile(progress["best_model_path"]):
                 load_path = progress["best_model_path"]
                 iepoch = progress["best_epoch"]
-            elif isfile(progress["best_model_path_ema"]):
-                load_path = progress["best_model_path_ema"]
-                iepoch = progress["best_epoch"]
             else:
                 raise AttributeError("model weights & bias are not saved")
 
@@ -502,6 +497,8 @@ class Trainer:
             torch.set_rng_state(state_dict["rng_state"])
             if torch.cuda.is_available():
                 torch.cuda.set_rng_state(state_dict["cuda_rng_state"])
+            if trainer.use_ema:
+                trainer.ema.load_state_dict(state_dict["ema_state"])
 
         if "progress" in d:
             trainer.best_val_metrics = progress["best_val_metrics"]
@@ -691,7 +688,7 @@ class Trainer:
             self.optim.step()
 
             if self.use_ema:
-                self.ema.update(self.model.parameters())
+                self.ema.update()
 
             if self.lr_scheduler_name == "CosineAnnealingWarmRestarts":
                 self.lr_sched.step(self.iepoch + self.ibatch / self.n_batches)
@@ -742,8 +739,8 @@ class Trainer:
         for category, dataset in zip(categories, datasets):
 
             if category == VALIDATION and self.use_ema:
-                self.ema.store(self.model.parameters())
-                self.ema.copy_to(self.model.parameters())
+                self.ema.store()
+                self.ema.copy_to()
 
             self.reset_metrics()
             self.n_batches = len(dataset)
@@ -763,7 +760,7 @@ class Trainer:
                     callback(self)
 
             if category == VALIDATION and self.use_ema:
-                self.ema.restore(self.model.parameters())
+                self.ema.restore()
 
         self.end_of_epoch_log()
         self.end_of_epoch_save()
@@ -848,20 +845,18 @@ class Trainer:
 
             if self.use_ema:
                 save_path = self.best_model_path_ema
-                self.ema.store(self.model.parameters())
-                self.ema.copy_to(self.model.parameters())
-
+                self.ema.store()
+                self.ema.copy_to()
             else:
                 save_path = self.best_model_path
 
             if hasattr(self.model, "save"):
                 self.model.save(save_path)
-
             else:
                 torch.save(self.model, save_path)
 
             if self.use_ema:
-                self.ema.restore(self.model.parameters())
+                self.ema.restore()
 
             self.logger.info(
                 f"! Best model {self.best_epoch+1:8d} {self.best_val_metrics:8.3f}"
