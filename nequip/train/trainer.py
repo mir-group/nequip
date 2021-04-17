@@ -843,12 +843,14 @@ class Trainer:
             self.best_val_metrics = val_metrics
             self.best_epoch = self.iepoch
 
+            save_path = self.best_model_path
+
             if self.use_ema:
-                save_path = self.best_model_path_ema
+                # If using EMA, store the EMA validation model
+                # that gave us the good val metrics that made the model "best"
+                # in the first place
                 self.ema.store()
                 self.ema.copy_to()
-            else:
-                save_path = self.best_model_path
 
             if hasattr(self.model, "save"):
                 self.model.save(save_path)
@@ -856,6 +858,7 @@ class Trainer:
                 torch.save(self.model, save_path)
 
             if self.use_ema:
+                # If we set EMA weights, restore to training weights
                 self.ema.restore()
 
             self.logger.info(
