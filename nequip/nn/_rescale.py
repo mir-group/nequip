@@ -84,6 +84,9 @@ class RescaleOutput(GraphModuleMixin, torch.nn.Module):
             raise ValueError(
                 "Asked for a trainable_global_rescale_scale, but this RescaleOutput has no scaling (`scale_by = None`)"
             )
+        else:
+            # register dummy for TorchScript
+            self.register_buffer("scale_by", torch.Tensor())
 
         self._has_shift = shift_by is not None
         self.trainable_global_rescale_shift = trainable_global_rescale_shift
@@ -97,6 +100,9 @@ class RescaleOutput(GraphModuleMixin, torch.nn.Module):
             raise ValueError(
                 "Asked for a trainable_global_rescale_shift, but this RescaleOutput has no shift (`shift_by = None`)"
             )
+        else:
+            # register dummy for TorchScript
+            self.register_buffer("shift_by", torch.Tensor())
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
         data = self.model(data)
