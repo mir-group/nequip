@@ -16,6 +16,7 @@ setup(
         "torch_geometric",
         "e3nn>=0.2.5",
         "pyyaml",
+        "typing_extensions;python_version<'3.8'",
     ],
     zip_safe=True,
 )
