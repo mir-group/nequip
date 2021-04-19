@@ -12,9 +12,10 @@ from nequip.data import AtomicDataDict, AtomicData
 from nequip._scripts import deploy
 
 
-def test_deploy(nequip_dataset):
-    if torch.get_default_dtype() != torch.float32:
-        pytest.skip("Currently, the trainer always runs in float32")
+def test_deploy(nequip_dataset, BENCHMARK_ROOT):
+
+    dtype = str(torch.get_default_dtype())[len("torch.") :]
+
     if torch.cuda.is_available():
         # TODO: is this true?
         pytest.skip("CUDA and subprocesses have issues")
@@ -23,6 +24,13 @@ def test_deploy(nequip_dataset):
     true_config = yaml.load(config_path.read_text(), Loader=yaml.Loader)
     with tempfile.TemporaryDirectory() as tmpdir:
         # Save time
+        run_name = "test_deploy" + dtype
+        true_config["run_name"] = run_name
+        true_config["root"] = tmpdir
+        true_config["dataset_file_name"] = str(
+            BENCHMARK_ROOT / "aspirin_ccsd-train.npz"
+        )
+        true_config["default_dtype"] = dtype
         true_config["max_epochs"] = 1
         true_config["n_train"] = 1
         true_config["n_val"] = 1
@@ -33,9 +41,9 @@ def test_deploy(nequip_dataset):
         retcode = subprocess.run(["nequip-train", str(config_path)], cwd=tmpdir)
         retcode.check_returncode()
         # Deploy
-        deployed_path = tmpdir / pathlib.Path("deployed.pth")
+        deployed_path = tmpdir / pathlib.Path(f"deployed_{dtype}.pth")
         retcode = subprocess.run(
-            ["nequip-deploy", "build", "results/aspirin/minimal/", str(deployed_path)],
+            ["nequip-deploy", "build", f"{tmpdir}/{run_name}/", str(deployed_path)],
             cwd=tmpdir,
         )
         retcode.check_returncode()
@@ -47,7 +55,7 @@ def test_deploy(nequip_dataset):
         data[AtomicDataDict.TOTAL_ENERGY_KEY] = data[
             AtomicDataDict.TOTAL_ENERGY_KEY
         ].unsqueeze(0)
-        best_mod = torch.load(tmpdir + "/results/aspirin/minimal/best_model.pth")
+        best_mod = torch.load(f"{tmpdir}/{run_name}/best_model.pth")
         train_pred = best_mod(data)[AtomicDataDict.TOTAL_ENERGY_KEY]
 
         # load model and check that metadata saved
