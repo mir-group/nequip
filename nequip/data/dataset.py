@@ -150,7 +150,10 @@ class AtomicInMemoryDataset(AtomicDataset):
     def processed_file_names(self):
         # TO DO, can be updated to hash all simple terms in extra_fixed_fields
         r_max = self.extra_fixed_fields["r_max"]
-        return [f"{r_max}_data.pt"]
+        dtype = str(torch.get_default_dtype())
+        if dtype.startswith("torch."):
+            dtype = dtype[len("torch.") :]
+        return [f"{r_max}_{dtype}_data.pt"]
 
     def get_data(
         self,

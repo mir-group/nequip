@@ -10,6 +10,8 @@ seed: 0                                                                         
 restart: false                                                                    # set True for a restarted run
 append: false                                                                     # set True if a restarted run should append to the previous log file
 
+default_dtype: float32                                                             # type of float, e.g. float32 and float64
+
 # network
 compile_model: False                                                              # whether to compile the constructed model to TorchScript
 num_basis: 8                                                                      # number of basis functions
@@ -32,10 +34,26 @@ use_sc: true                                                                    
 # priority for different definition: 
 #   invariant_neurons < InteractionBlock_invariant_neurons < layer{i}_invariant_neurons 
 
-#energy_shift_enable: true                                                         # whether shift the energy
-#energy_shift_shifts: [0, 0, 0]                                                    # atomic energy shift for each specie. order should be the same as the allowed_species used in train.py
-#energy_shift_total_shift: 0.0                                                     # total energy shift
-#energy_shift_trainable: true                                                      # whether the shifts are trainable
+
+# whether to apply a shift and scale, defined per-species, to the atomic energies
+PerSpeciesScaleShift_enable: false
+# if the PerSpeciesScaleShift is enabled, whether the shifts and scales are trainable
+PerSpeciesScaleShift_trainable: true
+# optional initial atomic energy shift for each species. order should be the same as the allowed_species used in train.py. Defaults to zeros.
+PerSpeciesScaleShift_shifts: [0.0, 0.0, 0.0]
+# optional initial atomic energy scale for each species. order should be the same as the allowed_species used in train.py. Defaults to ones.
+PerSpeciesScaleShift_scales: [1.0, 1.0, 1.0]
+
+# global energy shift. When None/null, defaults to the mean energy of the dataset
+global_rescale_shift: null
+# global energy scale. When None/null, defaults to the RMS of force components in the dataset
+# ^ this is the same as the std of force components
+global_rescale_scale: null
+# whether the shift of the final global energy rescaling should be trainable
+trainable_global_rescale_shift: false
+# whether the scale of the final global energy rescaling should be trainable
+trainable_global_rescale_scale: false
+
 
 # data set
 # the keys used need to be stated at least once in key_mapping, npz_fixed_field_keys or npz_keys
