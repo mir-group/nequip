@@ -80,8 +80,7 @@ class AtomwiseReduce(GraphModuleMixin, torch.nn.Module):
         return data
 
 
-class PerSpeciesShift(GraphModuleMixin, torch.nn.Module):
-    enabled: bool
+class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
     field: str
     out_field: str
     trainable: bool
@@ -92,9 +91,8 @@ class PerSpeciesShift(GraphModuleMixin, torch.nn.Module):
         allowed_species: List[int],
         out_field: Optional[str] = None,
         shifts: Optional[list] = None,
-        total_shift: float = 0,
+        scales: Optional[list] = None,
         trainable: bool = False,
-        enabled: bool = False,
         irreps_in={},
     ):
         super().__init__()
@@ -106,38 +104,39 @@ class PerSpeciesShift(GraphModuleMixin, torch.nn.Module):
             irreps_out={self.out_field: irreps_in[self.field]},
         )
 
-        self.enabled = enabled
-        self.trainable = trainable
-
         shifts = (
             torch.zeros(len(allowed_species))
             if shifts is None
             else torch.as_tensor(shifts, dtype=torch.get_default_dtype())
         )
-        total_shift = torch.as_tensor(total_shift, dtype=torch.get_default_dtype())
+        assert shifts.shape == (
+            len(allowed_species),
+        ), f"Invalid shape of shifts {shifts}"
+        scales = (
+            torch.ones(len(allowed_species))
+            if scales is None
+            else torch.as_tensor(scales, dtype=torch.get_default_dtype())
+        )
+        assert scales.shape == (
+            len(allowed_species),
+        ), f"Invalid shape of scales {scales}"
 
+        self.trainable = trainable
         if trainable:
             self.shifts = torch.nn.Parameter(shifts)
-            self.total_shift = torch.nn.Parameter(total_shift)
+            self.scales = torch.nn.Parameter(scales)
         else:
             self.register_buffer("shifts", shifts)
-            self.register_buffer("total_shift", total_shift)
+            self.register_buffer("scales", scales)
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
-        if self.enabled:
-            # TODO: short-circut when no batch
-            data = AtomicDataDict.with_batch(data)
-            counts = bincount(
-                data[AtomicDataDict.SPECIES_INDEX_KEY],
-                batch=data[AtomicDataDict.BATCH_KEY],
-                minlength=len(self.shifts),
-            )
-            # ^ shape [n_batch, len(self.shifts)]
-            data[self.out_field] = (
-                data[self.field]
-                + torch.sum(counts * self.shifts, dim=-1)
-                + self.total_shift
-            )
-        else:
-            data[self.out_field] = data[self.field]
+        species_idx = data[AtomicDataDict.SPECIES_INDEX_KEY]
+        in_field = data[self.field]
+        assert len(in_field) == len(
+            species_idx
+        ), "in_field doesnt seem to have correct per-atom shape"
+        data[self.out_field] = (
+            self.shifts[species_idx].view(-1, 1)
+            + self.scales[species_idx].view(-1, 1) * in_field
+        )
         return data

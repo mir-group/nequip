@@ -7,7 +7,7 @@ from nequip.nn import (
     AtomwiseLinear,
     AtomwiseReduce,
     ForceOutput,
-    PerSpeciesShift,
+    PerSpeciesScaleShift,
     ConvNetLayer,
 )
 from nequip.nn.embedding import (
@@ -25,6 +25,7 @@ def EnergyModel(**shared_params) -> SequentialGraphNetwork:
     logging.debug("Start building the network model")
 
     num_layers = shared_params.pop("num_layers", 3)
+    add_per_species_shift = shared_params.pop("PerSpeciesScaleShift_enable", False)
 
     layers = {
         # -- Encode --
@@ -50,22 +51,25 @@ def EnergyModel(**shared_params) -> SequentialGraphNetwork:
                 AtomwiseLinear,
                 dict(irreps_out="1x0e", out_field=AtomicDataDict.PER_ATOM_ENERGY_KEY),
             ),
-            "total_energy_sum": (
-                AtomwiseReduce,
-                dict(
-                    reduce="sum",
-                    field=AtomicDataDict.PER_ATOM_ENERGY_KEY,
-                    out_field="raw_total_energy",
-                ),
-            ),
-            "energy_shift": (
-                PerSpeciesShift,
-                dict(
-                    field="raw_total_energy",
-                    out_field=AtomicDataDict.TOTAL_ENERGY_KEY,
-                ),
-            ),
         }
+    )
+
+    if add_per_species_shift:
+        layers["per_species_scale_shift"] = (
+            PerSpeciesScaleShift,
+            dict(
+                field=AtomicDataDict.PER_ATOM_ENERGY_KEY,
+                out_field=AtomicDataDict.PER_ATOM_ENERGY_KEY,
+            ),
+        )
+
+    layers["total_energy_sum"] = (
+        AtomwiseReduce,
+        dict(
+            reduce="sum",
+            field=AtomicDataDict.PER_ATOM_ENERGY_KEY,
+            out_field=AtomicDataDict.TOTAL_ENERGY_KEY,
+        ),
     )
 
     return SequentialGraphNetwork.from_parameters(

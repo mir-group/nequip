@@ -332,22 +332,18 @@ class DummyScale(torch.nn.Module):
             out = out + self.shift_by
         return {self.key: out}
 
-    def scale(self, data, force_process=False, do_shift=True, do_scale=True):
+    def scale(self, data, force_process=False):
         data = data.copy()
         if force_process or not self.training:
-            if do_scale:
-                data[self.key] = data[self.key] * self.scale_by
-            if do_shift:
-                data[self.key] = data[self.key] + self.shift_by
+            data[self.key] = data[self.key] * self.scale_by
+            data[self.key] = data[self.key] + self.shift_by
         return data
 
-    def unscale(self, data, force_process=False, do_shift=True, do_scale=True):
+    def unscale(self, data, force_process=False):
         data = data.copy()
         if force_process or self.training:
-            if do_shift:
-                data[self.key] = data[self.key] - self.shift_by
-            if do_scale:
-                data[self.key] = data[self.key] / self.scale_by
+            data[self.key] = data[self.key] - self.shift_by
+            data[self.key] = data[self.key] / self.scale_by
         return data
 
 
