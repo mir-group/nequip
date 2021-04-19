@@ -40,10 +40,13 @@ def main(args=None):
             wandb_project="NequIP",
             model_builder="nequip.models.ForceModel",
             dataset_statistics_stride=1,
+            default_dtype="float32",
         ),
     )
 
-    torch.set_default_dtype(torch.float32)
+    torch.set_default_dtype(
+        {"float32": torch.float32, "float64": torch.float64}[config.default_dtype]
+    )
     output = Output.from_config(config)
     config.update(output.updated_dict())
 
@@ -123,7 +126,8 @@ def main(args=None):
     assert callable(model_builder), f"Model builder {model_builder} isn't callable"
     core_model = model_builder(**dict(config))
 
-    logging.info("Successfully built the network...")
+    global_shift = config.get("global_rescale_shift", energies_mean)
+    global_scale = config.get("global_rescale_scale", energies_scale)
 
     final_model = RescaleOutput(
         model=core_model,
@@ -133,16 +137,25 @@ def main(args=None):
             if AtomicDataDict.FORCE_KEY in core_model.irreps_out
             else []
         ),
-        scale_by=energies_scale,
+        scale_by=global_scale,
         shift_keys=AtomicDataDict.TOTAL_ENERGY_KEY,
-        shift_by=energies_mean,
+        shift_by=global_shift,
+        trainable_global_rescale_shift=config.get(
+            "trainable_global_rescale_shift", False
+        ),
+        trainable_global_rescale_scale=config.get(
+            "trainable_global_rescale_scale", False
+        ),
     )
+
+    logging.info("Successfully built the network...")
 
     if config.compile_model:
         final_model = e3nn.util.jit.script(final_model)
+        logging.info("Successfully compiled model...")
 
     logging.debug(
-        f"Outputs are scaled by: {energies_scale}, eneriges are shifted by {energies_mean}. Scaling factors derived from statistics of {'forces' if force_training else 'energies'} in the dataset."
+        f"Initially outputs are scaled by: {energies_scale}, eneriges are shifted by {energies_mean}. Scaling factors derived from statistics of {'forces' if force_training else 'energies'} in the dataset."
     )
 
     # Record final config

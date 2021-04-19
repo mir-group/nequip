@@ -12,6 +12,7 @@ feature_irreps_hidden: 16x0o + 16x0e
 
 # data
 dataset: aspirin
+dataset_file_name: benchmark_data/aspirin_ccsd-train.npz
 
 # logging
 wandb: false
