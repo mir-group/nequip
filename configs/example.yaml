@@ -10,6 +10,8 @@ seed: 0                                                                         
 restart: false                                                                    # set True for a restarted run
 append: false                                                                     # set True if a restarted run should append to the previous log file
 
+default_dtype: float32                                                             # type of float, e.g. float32 and float64
+
 # network
 compile_model: False                                                              # whether to compile the constructed model to TorchScript
 num_basis: 8                                                                      # number of basis functions
