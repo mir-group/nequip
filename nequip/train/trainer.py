@@ -28,11 +28,9 @@ from nequip.utils import (
     load_file,
 )
 
-from torch_runstats import RunningStats, Reduction
-
 from .loss import Loss, LossStat
 from .metrics import Metrics
-from ._key import *
+from ._key import ABBREV, LOSS_KEY, TRAIN, VALIDATION
 
 
 class Trainer:
@@ -765,8 +763,8 @@ class Trainer:
         mat_str = f"  {self.iepoch+1:5d} {self.ibatch+1:5d}"
         log_str = f"{mat_str}"
 
-        header = f"\n# Epoch\n# batch"
-        log_header = f"# Epoch batch"
+        header = "\n# Epoch\n# batch"
+        log_header = "# Epoch batch"
 
         # print and store loss value
         for name, value in self.batch_losses.items():
