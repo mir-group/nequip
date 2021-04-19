@@ -28,7 +28,11 @@ def main(args=None):
     config = Config.from_file(
         args.config,
         defaults=dict(
-            wandb=False, compile_model=False, wandb_project="NequIP", requeue=False
+            wandb=False,
+            compile_model=False,
+            wandb_project="NequIP",
+            requeue=False,
+            default_dtype="float32",
         ),
     )
 
@@ -47,7 +51,7 @@ def main(args=None):
     output = Output.from_config(config)
     config.update(output.updated_dict())
 
-    torch.set_default_dtype(torch.float32)
+    torch.set_default_dtype(getattr(torch, config.default_dtype))
 
     # load everything from trainer.pth
     if found_restart_file:

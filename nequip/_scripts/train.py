@@ -40,10 +40,11 @@ def main(args=None):
             wandb_project="NequIP",
             model_builder="nequip.models.ForceModel",
             dataset_statistics_stride=1,
+            default_dtype="float32",
         ),
     )
 
-    torch.set_default_dtype(torch.float32)
+    torch.set_default_dtype(getattr(torch, config.default_dtype))
     output = Output.from_config(config)
     config.update(output.updated_dict())
 
