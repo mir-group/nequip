@@ -3,7 +3,11 @@
 This is a seperate module to compensate for a TorchScript bug that can only recognize constants when they are accessed as attributes of an imported module.
 """
 import sys
-from typing import List, Final
+if sys.version_info >= (3, 8):
+    from typing import List, Final
+else:
+    from typing import List
+    from typing_extensions import Final
 
 # == Define allowed keys as constants ==
 # The positions of the atoms in the system
