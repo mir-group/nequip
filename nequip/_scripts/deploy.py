@@ -73,6 +73,14 @@ def main(args=None):
         print(config)
 
     elif args.command == "build":
+
+        # load config
+        # TODO: walk module tree if config does not exist to find params?
+        config_str = (args.train_dir / "config_final.yaml").read_text()
+        config = yaml.load(config_str, Loader=yaml.Loader)
+
+        torch.set_default_dtype(getattr(torch, config["default_dtype"]))
+
         if not args.train_dir.is_dir():
             raise ValueError(f"{args.train_dir} is not a directory")
         if args.out_file.is_dir():
@@ -100,11 +108,6 @@ def main(args=None):
         if not model_is_jit:
             model = script(model)
             logging.info("Compiled model to TorchScript")
-
-        # load config
-        # TODO: walk module tree if config does not exist to find params?
-        config_str = (args.train_dir / "config_final.yaml").read_text()
-        config = yaml.load(config_str, Loader=yaml.Loader)
 
         # Deploy
         metadata: dict = {NEQUIP_VERSION_KEY: nequip.__version__}
