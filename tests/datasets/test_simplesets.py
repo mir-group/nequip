@@ -11,7 +11,7 @@ include_frames = [0, 1]
 
 
 @pytest.mark.parametrize("name", ["aspirin"])
-def test_simple(name, temp_data):
+def test_simple(name, temp_data, BENCHMARK_ROOT):
 
     config = Config(
         dict(
@@ -21,6 +21,9 @@ def test_simple(name, temp_data):
             include_frames=include_frames,
         )
     )
+
+    if name == "aspirin":
+        config.dataset_file_name = str(BENCHMARK_ROOT / "aspirin_ccsd-train.npz")
 
     a = dataset_from_config(config)
     print(a.data)
