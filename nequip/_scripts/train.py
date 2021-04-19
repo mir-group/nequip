@@ -123,13 +123,8 @@ def main(args=None):
     assert callable(model_builder), f"Model builder {model_builder} isn't callable"
     core_model = model_builder(**dict(config))
 
-    global_shift = config.get("global_rescale_shift", None)
-    if global_shift is None:
-        global_shift = energies_mean
-
-    global_scale = config.get("global_rescale_scale", None)
-    if global_scale is None:
-        global_scale = energies_scale
+    global_shift = config.get("global_rescale_shift", energies_mean)
+    global_scale = config.get("global_rescale_scale", energies_scale)
 
     final_model = RescaleOutput(
         model=core_model,
