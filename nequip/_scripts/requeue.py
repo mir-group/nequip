@@ -51,7 +51,9 @@ def main(args=None):
     output = Output.from_config(config)
     config.update(output.updated_dict())
 
-    torch.set_default_dtype(getattr(torch, config.default_dtype))
+    torch.set_default_dtype(
+        {"float32": torch.float32, "float64": torch.float64}[config.default_dtype]
+    )
 
     # load everything from trainer.pth
     if found_restart_file:

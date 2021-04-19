@@ -44,7 +44,9 @@ def main(args=None):
         ),
     )
 
-    torch.set_default_dtype(getattr(torch, config.default_dtype))
+    torch.set_default_dtype(
+        {"float32": torch.float32, "float64": torch.float64}[config.default_dtype]
+    )
     output = Output.from_config(config)
     config.update(output.updated_dict())
 

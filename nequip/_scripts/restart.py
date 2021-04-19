@@ -39,7 +39,9 @@ def main(args=None):
     config = Config(dictionary, exclude_keys=["state_dict", "progress"])
     config.run_name = config.pop("run_name", "NequIP")
 
-    torch.set_default_dtype(getattr(torch, config.default_dtype))
+    torch.set_default_dtype(
+        {"float32": torch.float32, "float64": torch.float64}[config.default_dtype]
+    )
 
     # update with new set up
     if args.update_config:
