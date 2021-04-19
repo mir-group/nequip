@@ -71,7 +71,7 @@ def test_rescale(
         # we are now in eval mode if here, test rescaling
         # node attrs are a one hot, so we know orig then are zeros and ones
         if scale_by is None and shift_by is None:
-            assert torch.all((rescale_out == 0.0) | (rescale_out == 1.0))
+            assert torch.all(oh_out == rescale_out)
         if shift_by is None:
             # no shift preserves zeros
             assert torch.all((rescale_out == 0.0) == (oh_out == 0.0))
