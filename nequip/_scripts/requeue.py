@@ -35,7 +35,6 @@ def requeue(config):
     if not found_restart_file:
         config.run_time = 1
         fresh_start(config)
-        return
     else:
         restart(config.workdir + "/trainer.pth", config, mode="requeue")
 

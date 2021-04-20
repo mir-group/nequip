@@ -8,22 +8,6 @@ from nequip import data, datasets
 from .config import Config
 
 
-def trainer_from_config(config, model=None):
-
-    # Make the trainer
-    if config.wandb:
-        from nequip.train.trainer_wandb import TrainerWandB
-
-        class_name = TrainerWandB
-    else:
-        from nequip.train.trainer import Trainer
-
-        class_name = Trainer
-
-    instance, _ = instantiate(class_name, optional_args=config)
-    return instance
-
-
 def dataset_from_config(config):
     """initialize database based on a config instance
 
