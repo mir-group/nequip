@@ -124,7 +124,7 @@ def main(args=None):
     model_builder = config.model_builder
     model_builder = yaml.load(f"!!python/name:{model_builder}", Loader=yaml.Loader)
     assert callable(model_builder), f"Model builder {model_builder} isn't callable"
-    core_model = model_builder(**dict(config))
+    core_model = model_builder(config)
 
     global_shift = config.get("global_rescale_shift", energies_mean)
     global_scale = config.get("global_rescale_scale", energies_scale)
