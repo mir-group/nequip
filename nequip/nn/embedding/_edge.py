@@ -30,7 +30,7 @@ class SphericalHarmonicEdgeAttrs(GraphModuleMixin, torch.nn.Module):
         edge_sh_normalization: str = "component",
         edge_sh_normalize: bool = True,
         irreps_in=None,
-        out_field=AtomicDataDict.EDGE_ATTRS_KEY
+        out_field: str = AtomicDataDict.EDGE_ATTRS_KEY
     ):
         super().__init__()
         self.out_field = out_field
