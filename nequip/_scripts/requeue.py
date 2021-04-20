@@ -17,6 +17,7 @@ from nequip.models import EnergyModel, ForceModel
 from nequip.data import AtomicDataDict
 from nequip.nn import RescaleOutput
 
+from .train import main as train
 
 def main(args=None):
     parser = argparse.ArgumentParser(
@@ -32,6 +33,7 @@ def main(args=None):
             compile_model=False,
             wandb_project="NequIP",
             requeue=False,
+            model_builder="nequip.models.ForceModel",
             default_dtype="float32",
         ),
     )
@@ -55,53 +57,44 @@ def main(args=None):
         {"float32": torch.float32, "float64": torch.float64}[config.default_dtype]
     )
 
-    # load everything from trainer.pth
-    if found_restart_file:
-        # load the dictionary
-        dictionary = load_file(
-            supported_formats=dict(torch=["pt", "pth"]),
-            filename=config.workdir + "/trainer.pth",
-            enforced_format="torch",
-        )
-        for key in ["workdir", "root", "run_name"]:
-            assert (
-                dictionary[key] == config[key]
-            ), f"{key} is not consistent with the yaml file"
-        # increase max_epochs if training has hit maximum epochs
-        if "progress" in dictionary:
-            stop_args = dictionary["progress"].pop("stop_arg", None)
-            if stop_args is not None:
-                dictionary["progress"]["stop_arg"] = None
-                dictionary["max_epochs"] *= 2
-
-        dictionary["restart"] = True
-        dictionary["append"] = True
-        dictionary["run_time"] += 1
-        config.update({k: v for k, v in dictionary.items() if k.startswith("run_")})
-    else:
+    if not found_restart_file:
         config.restart = False
         config.run_time = 1
+        train(config)
+        return
+
+    # load the dictionary
+    # load everything from trainer.pth
+    dictionary = load_file(
+        supported_formats=dict(torch=["pt", "pth"]),
+        filename=config.workdir + "/trainer.pth",
+        enforced_format="torch",
+    )
+    for key in ["workdir", "root", "run_name"]:
+        assert (
+            dictionary[key] == config[key]
+        ), f"{key} is not consistent with the yaml file"
+    # increase max_epochs if training has hit maximum epochs
+    if "progress" in dictionary:
+        stop_args = dictionary["progress"].pop("stop_arg", None)
+        if stop_args is not None:
+            dictionary["progress"]["stop_arg"] = None
+            dictionary["max_epochs"] *= 2
+
+    dictionary["restart"] = True
+    dictionary["append"] = True
+    dictionary["run_time"] += 1
+    config.update({k: v for k, v in dictionary.items() if k.startswith("run_")})
 
     if config.wandb:
-
         from nequip.train.trainer_wandb import TrainerWandB
-
         # download parameters from wandb in case of sweeping
         from nequip.utils.wandb import resume
-
         config = resume(config, config.restart)
-
-        if config.restart:
-            trainer = TrainerWandB.from_dict(dictionary)
-        else:
-            trainer = TrainerWandB(model=None, **dict(config))
+        trainer = TrainerWandB.from_dict(dictionary)
     else:
         from nequip.train.trainer import Trainer
-
-        if config.restart:
-            trainer = Trainer.from_dict(dictionary)
-        else:
-            trainer = Trainer(model=None, **dict(config))
+        trainer = Trainer.from_dict(dictionary)
 
     # Load the dataset
     dataset = dataset_from_config(config)
@@ -109,51 +102,6 @@ def main(args=None):
 
     # Train/test split
     trainer.set_dataset(dataset)
-
-    if not config.restart:
-        # Get statistics of training dataset
-        (
-            (forces_std,),
-            (energies_mean, energies_std),
-            (allowed_species, Z_count),
-        ) = trainer.dataset_train.statistics(
-            fields=[
-                AtomicDataDict.FORCE_KEY,
-                AtomicDataDict.TOTAL_ENERGY_KEY,
-                AtomicDataDict.ATOMIC_NUMBERS_KEY,
-            ],
-            modes=["rms", "mean_std", "count"],
-        )
-
-        config.update(dict(allowed_species=allowed_species))
-
-        # Build a model
-        energy_model = EnergyModel(**dict(config))
-        force_model = ForceModel(energy_model)
-
-        logging.info("Successfully built the network...")
-
-        core_model = RescaleOutput(
-            model=force_model,
-            scale_keys=[
-                AtomicDataDict.FORCE_KEY,
-                AtomicDataDict.TOTAL_ENERGY_KEY,
-            ],
-            scale_by=forces_std,
-            shift_keys=AtomicDataDict.TOTAL_ENERGY_KEY,
-            shift_by=energies_mean,
-        )
-
-        if config.compile_model:
-            core_model = e3nn.util.jit.script(core_model)
-
-        logging.debug(
-            f"Outputs are scaled by: {forces_std}, eneriges are shifted by {energies_mean}"
-        )
-
-        # Set the trainer
-        core_model.config = dict(config)
-        trainer.model = core_model
 
     # Train
     trainer.train()
