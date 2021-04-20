@@ -17,7 +17,7 @@ from nequip.nn.embedding import (
 )
 
 
-def EnergyModel(shared_params) -> SequentialGraphNetwork:
+def EnergyModel(**shared_params) -> SequentialGraphNetwork:
     """Base default energy model archetecture.
 
     For minimal and full configuration option listings, see ``minimal.yaml`` and ``example.yaml``.
@@ -78,12 +78,12 @@ def EnergyModel(shared_params) -> SequentialGraphNetwork:
     )
 
 
-def ForceModel(shared_params) -> GraphModuleMixin:
+def ForceModel(**shared_params) -> GraphModuleMixin:
     """Base default energy and force model archetecture.
 
     For minimal and full configuration option listings, see ``minimal.yaml`` and ``example.yaml``.
 
     A convinience method, equivalent to constructing ``EnergyModel`` and passing it to ``nequip.nn.ForceOutput``.
     """
-    energy_model = EnergyModel(shared_params)
+    energy_model = EnergyModel(**shared_params)
     return ForceOutput(energy_model=energy_model)

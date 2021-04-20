@@ -14,6 +14,11 @@ from nequip.utils import Config, dataset_from_config, Output, load_file
 
 
 def main(args=None):
+    file_name, config = parse_command_line(args)
+    restart(file_name, config, mode="update")
+
+
+def parse_command_line(args=None):
     parser = argparse.ArgumentParser(
         description="Restart an existing NequIP training session."
     )
@@ -23,47 +28,71 @@ def main(args=None):
     )
     args = parser.parse_args(args=args)
 
+    if args.update_config:
+        config = Config.from_file(args.update_config)
+        config.run_name = config.pop("run_name", config.run_name + "_restart")
+    else:
+        config = Config()
+
+    return args.session, config
+
+
+def restart(file_name, config, mode="update"):
+
     # load the dictionary
-    file_name = args.session
     dictionary = load_file(
         supported_formats=dict(torch=["pt", "pth"]),
         filename=file_name,
         enforced_format="torch",
     )
+
     # increase max_epochs if training has hit maximum epochs
     if "progress" in dictionary:
         stop_args = dictionary["progress"].pop("stop_arg", None)
         if stop_args is not None:
             dictionary["progress"]["stop_arg"] = None
             dictionary["max_epochs"] *= 2
-    config = Config(dictionary, exclude_keys=["state_dict", "progress"])
-    config.run_name = config.pop("run_name", "NequIP")
+
+    if mode == "update":
+
+        origin_config = Config(dictionary, exclude_keys=["state_dict", "progress"])
+        origin_config.run_name = origin_config.pop("run_name", "NequIP")
+        origin_config.update(config)
+        del config
+        config = origin_config
+        dictionary.update(dict(config))
+
+    elif mode == "requeue":
+
+        for key in ["workdir", "root", "run_name"]:
+            assert (
+                dictionary[key] == config[key]
+            ), f"{key} is not consistent with the yaml file"
+
+        # fetch run_name, run_time and run_id
+        config.update({k: v for k, v in dictionary.items() if k.startswith("run_")})
+
+        config.run_time += 1
 
     torch.set_default_dtype(
-        {"float32": torch.float32, "float64": torch.float64}[config.default_dtype]
+        {"float32": torch.float32, "float64": torch.float64}[
+            config.default_dtype
+        ]
     )
-
-    # update with new set up
-    if args.update_config:
-        new_config = Config.from_file(args.update_config)
-        config.run_name = new_config.pop("run_name", config.run_name + "_restart")
-        config.update(new_config)
 
     # open folders
     output = Output.from_config(config)
     config.update(output.updated_dict())
 
-    dictionary.update(dict(config))
-
     if config.wandb:
         from nequip.train.trainer_wandb import TrainerWandB
 
-        # download parameters from wandb in case of sweeping
-        from nequip.utils.wandb import init_n_update
+        # resume wandb run
+        from nequip.utils.wandb import resume
 
-        config = init_n_update(config)
-
+        config = resume(config, config.restart)
         dictionary.update(dict(config))
+
         trainer = TrainerWandB.from_dict(dictionary)
     else:
         from nequip.train.trainer import Trainer

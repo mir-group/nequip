@@ -16,8 +16,25 @@ from nequip.data import AtomicDataDict
 from nequip.nn import RescaleOutput
 from nequip.utils.test import assert_AtomicData_equivariant, set_irreps_debug
 
+default_config = dict(
+    wandb=False,
+    compile_model=False,
+    wandb_project="NequIP",
+    model_builder="nequip.models.ForceModel",
+    dataset_statistics_stride=1,
+    default_dtype="float32",
+    verbose="INFO",
+    debug_mode=False,
+    equivariance_test=False,
+)
+
 
 def main(args=None):
+    fresh_start(parse_command_line(args))
+
+
+def parse_command_line(args=None):
+
     parser = argparse.ArgumentParser(description="Train a NequIP model.")
     parser.add_argument("config", help="configuration file")
     parser.add_argument(
@@ -32,26 +49,22 @@ def main(args=None):
     )
     args = parser.parse_args(args=args)
 
-    config = Config.from_file(
-        args.config,
-        defaults=dict(
-            wandb=False,
-            compile_model=False,
-            wandb_project="NequIP",
-            model_builder="nequip.models.ForceModel",
-            dataset_statistics_stride=1,
-            default_dtype="float32",
-        ),
-    )
+    config = Config.from_file(args.config, defaults=default_config)
+    config.debug_mode = args.debug_mode
+    config.equivariance_test = args.equivariance_test
 
+    return config
+
+
+def fresh_start(config):
+
+    if config.debug_mode:
+        set_irreps_debug(enabled=True)
     torch.set_default_dtype(
         {"float32": torch.float32, "float64": torch.float64}[config.default_dtype]
     )
     output = Output.from_config(config)
     config.update(output.updated_dict())
-
-    if args.debug_mode:
-        set_irreps_debug(enabled=True)
 
     # Make the trainer
     if config.wandb:
@@ -121,10 +134,11 @@ def main(args=None):
     config.update(dict(allowed_species=allowed_species))
 
     # Build a model
-    model_builder = config.model_builder
-    model_builder = yaml.load(f"!!python/name:{model_builder}", Loader=yaml.Loader)
+    model_builder = yaml.load(
+        f"!!python/name:{config.model_builder}", Loader=yaml.Loader
+    )
     assert callable(model_builder), f"Model builder {model_builder} isn't callable"
-    core_model = model_builder(config)
+    core_model = model_builder(**dict(config))
 
     global_shift = config.get("global_rescale_shift", energies_mean)
     global_scale = config.get("global_rescale_scale", energies_scale)
@@ -163,7 +177,7 @@ def main(args=None):
         yaml.dump(dict(config), fp)
 
     # Equivar test
-    if args.equivariance_test:
+    if config.equivariance_test:
         equivar_err = assert_AtomicData_equivariant(final_model, dataset.get(0))
         errstr = "\n".join(
             f"    parity_k={parity_k.item()}, did_translate={did_trans} -> max componentwise error={err.item()}"
