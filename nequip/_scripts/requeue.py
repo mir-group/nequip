@@ -13,7 +13,12 @@ from .train import fresh_start, parse_command_line
 from .restart import restart
 
 
-def main(config):
+def main(args=None):
+    config = parse_command_line()
+    requeue(config)
+
+
+def requeue(config):
 
     assert config.requeue, "This script only works for auto requeue. Be careful!!"
     for key in ["workdir", "root", "run_name"]:
@@ -35,8 +40,3 @@ def main(config):
         restart(config.workdir + "/trainer.pth", config, mode="requeue")
 
     return
-
-
-if __name__ == "__main__":
-    config = parse_command_line()
-    main(config)

@@ -46,13 +46,6 @@ def restart(file_name, config, mode="update"):
         enforced_format="torch",
     )
 
-    # increase max_epochs if training has hit maximum epochs
-    if "progress" in dictionary:
-        stop_args = dictionary["progress"].pop("stop_arg", None)
-        if stop_args is not None:
-            dictionary["progress"]["stop_arg"] = None
-            dictionary["max_epochs"] *= 2
-
     if mode == "update":
 
         origin_config = Config(dictionary, exclude_keys=["state_dict", "progress"])
@@ -60,7 +53,6 @@ def restart(file_name, config, mode="update"):
         origin_config.update(config)
         del config
         config = origin_config
-        dictionary.update(dict(config))
 
     elif mode == "requeue":
 
@@ -73,16 +65,23 @@ def restart(file_name, config, mode="update"):
         config.update({k: v for k, v in dictionary.items() if k.startswith("run_")})
 
         config.run_time += 1
+        dictionary["run_time"] += 1
 
-    torch.set_default_dtype(
-        {"float32": torch.float32, "float64": torch.float64}[
-            config.default_dtype
-        ]
-    )
+        torch.set_default_dtype(
+            {"float32": torch.float32, "float64": torch.float64}[config.default_dtype]
+        )
 
     # open folders
     output = Output.from_config(config)
     config.update(output.updated_dict())
+    dictionary.update(output.updated_dict())
+
+    # increase max_epochs if training has hit maximum epochs
+    if "progress" in dictionary:
+        stop_args = dictionary["progress"].pop("stop_arg", None)
+        if stop_args is not None:
+            dictionary["progress"]["stop_arg"] = None
+            dictionary["max_epochs"] *= 2
 
     if config.wandb:
         from nequip.train.trainer_wandb import TrainerWandB
@@ -90,8 +89,7 @@ def restart(file_name, config, mode="update"):
         # resume wandb run
         from nequip.utils.wandb import resume
 
-        config = resume(config, config.restart)
-        dictionary.update(dict(config))
+        resume(config)
 
         trainer = TrainerWandB.from_dict(dictionary)
     else:
@@ -106,7 +104,3 @@ def restart(file_name, config, mode="update"):
     trainer.train()
 
     return
-
-
-if __name__ == "__main__":
-    main()

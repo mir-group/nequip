@@ -194,7 +194,3 @@ def fresh_start(config):
     trainer.train()
 
     return
-
-
-if __name__ == "__main__":
-    main()

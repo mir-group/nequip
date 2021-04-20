@@ -124,7 +124,7 @@ class Config(object):
 
             k = key[1:-5]
             if (not self._allow_all) and key not in self._allow_list:
-                return
+                return None
 
             self._item_types[k] = val
 
