@@ -17,13 +17,7 @@ def init_n_update(config):
     return config
 
 
-def resume(config, restart):
+def resume(config):
     # store this id to use it later when resuming
-    if restart:
-        os.environ["WANDB_RESUME"] = "must"
-        wandb.init(
-            project=config.wandb_project, config=dict(config), resume=config.run_id
-        )
-    else:
-        return init_n_update(config)
-    return config
+    os.environ["WANDB_RESUME"] = "must"
+    wandb.init(project=config.wandb_project, config=dict(config), resume=config.run_id)

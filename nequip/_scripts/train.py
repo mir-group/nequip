@@ -16,8 +16,25 @@ from nequip.data import AtomicDataDict
 from nequip.nn import RescaleOutput
 from nequip.utils.test import assert_AtomicData_equivariant, set_irreps_debug
 
+default_config = dict(
+    wandb=False,
+    compile_model=False,
+    wandb_project="NequIP",
+    model_builder="nequip.models.ForceModel",
+    dataset_statistics_stride=1,
+    default_dtype="float32",
+    verbose="INFO",
+    model_debug_mode=False,
+    equivariance_test=False,
+)
+
 
 def main(args=None):
+    fresh_start(parse_command_line(args))
+
+
+def parse_command_line(args=None):
+
     parser = argparse.ArgumentParser(description="Train a NequIP model.")
     parser.add_argument("config", help="configuration file")
     parser.add_argument(
@@ -26,32 +43,28 @@ def main(args=None):
         action="store_true",
     )
     parser.add_argument(
-        "--debug-mode",
-        help="enable debug mode (sometimes can give more helpful error messages)",
+        "--model-debug-mode",
+        help="enable model debug mode, which can sometimes give much more useful error messages at the cost of some speed. Do not use for production training!",
         action="store_true",
     )
     args = parser.parse_args(args=args)
 
-    config = Config.from_file(
-        args.config,
-        defaults=dict(
-            wandb=False,
-            compile_model=False,
-            wandb_project="NequIP",
-            model_builder="nequip.models.ForceModel",
-            dataset_statistics_stride=1,
-            default_dtype="float32",
-        ),
-    )
+    config = Config.from_file(args.config, defaults=default_config)
+    config.model_debug_mode = args.model_debug_mode or config.model_debug_mode
+    config.equivariance_test = args.equivariance_test or config.equivariance_test
 
+    return config
+
+
+def fresh_start(config):
+
+    if config.model_debug_mode:
+        set_irreps_debug(enabled=True)
     torch.set_default_dtype(
         {"float32": torch.float32, "float64": torch.float64}[config.default_dtype]
     )
     output = Output.from_config(config)
     config.update(output.updated_dict())
-
-    if args.debug_mode:
-        set_irreps_debug(enabled=True)
 
     # Make the trainer
     if config.wandb:
@@ -121,8 +134,9 @@ def main(args=None):
     config.update(dict(allowed_species=allowed_species))
 
     # Build a model
-    model_builder = config.model_builder
-    model_builder = yaml.load(f"!!python/name:{model_builder}", Loader=yaml.Loader)
+    model_builder = yaml.load(
+        f"!!python/name:{config.model_builder}", Loader=yaml.Loader
+    )
     assert callable(model_builder), f"Model builder {model_builder} isn't callable"
     core_model = model_builder(**dict(config))
 
@@ -163,7 +177,7 @@ def main(args=None):
         yaml.dump(dict(config), fp)
 
     # Equivar test
-    if args.equivariance_test:
+    if config.equivariance_test:
         equivar_err = assert_AtomicData_equivariant(final_model, dataset.get(0))
         errstr = "\n".join(
             f"    parity_k={parity_k.item()}, did_translate={did_trans} -> max componentwise error={err.item()}"

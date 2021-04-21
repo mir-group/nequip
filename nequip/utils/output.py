@@ -187,7 +187,6 @@ class Output:
     @classmethod
     def get_output(cls, timestr: str, obj=None):
         if obj is None:
-            print(cls.instances)
             return cls.instances.get(timestr, cls(root="./"))
         else:
             if hasattr(obj, "timestr"):

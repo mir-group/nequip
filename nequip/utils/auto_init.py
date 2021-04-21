@@ -55,7 +55,7 @@ def dataset_from_config(config):
     if "r_max" in config and "r_max" not in config.dataset_extra_fixed_fields:
         config.dataset_extra_fixed_fields["r_max"] = config.r_max
 
-    instance, _ = instantiate(class_name, prefix="dataset", optional_args=dict(config))
+    instance, _ = instantiate(class_name, prefix="dataset", optional_args=config)
 
     return instance
 
