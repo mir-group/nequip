@@ -24,7 +24,7 @@ default_config = dict(
     dataset_statistics_stride=1,
     default_dtype="float32",
     verbose="INFO",
-    debug_mode=False,
+    model_debug_mode=False,
     equivariance_test=False,
 )
 
@@ -43,14 +43,14 @@ def parse_command_line(args=None):
         action="store_true",
     )
     parser.add_argument(
-        "--debug-mode",
-        help="enable debug mode (sometimes can give more helpful error messages)",
+        "--model-debug-mode",
+        help="enable model debug mode, which can sometimes give much more useful error messages at the cost of some speed. Do not use for production training!",
         action="store_true",
     )
     args = parser.parse_args(args=args)
 
     config = Config.from_file(args.config, defaults=default_config)
-    config.debug_mode = args.debug_mode or config.debug_mode
+    config.model_debug_mode = args.model_debug_mode or config.model_debug_mode
     config.equivariance_test = args.equivariance_test or config.equivariance_test
 
     return config
@@ -58,7 +58,7 @@ def parse_command_line(args=None):
 
 def fresh_start(config):
 
-    if config.debug_mode:
+    if config.model_debug_mode:
         set_irreps_debug(enabled=True)
     torch.set_default_dtype(
         {"float32": torch.float32, "float64": torch.float64}[config.default_dtype]
