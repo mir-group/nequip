@@ -30,7 +30,7 @@ def parse_command_line(args=None):
 
     if args.update_config:
         config = Config.from_file(args.update_config)
-        config.run_name = config.pop("run_name", "NequIP")+"_restart"
+        config.run_name = config.pop("run_name", "NequIP") + "_restart"
     else:
         config = Config()
 

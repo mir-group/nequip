@@ -4,10 +4,7 @@ Arguments: config.yaml
 
 config.yaml: requeue=True, and workdir, root, run_name have to be unique.
 """
-import logging
 from os.path import isfile
-
-import torch
 
 from .train import fresh_start, parse_command_line
 from .restart import restart
