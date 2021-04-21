@@ -50,8 +50,8 @@ def parse_command_line(args=None):
     args = parser.parse_args(args=args)
 
     config = Config.from_file(args.config, defaults=default_config)
-    config.debug_mode = args.debug_mode
-    config.equivariance_test = args.equivariance_test
+    config.debug_mode = args.debug_mode or config.debug_mode
+    config.equivariance_test = args.equivariance_test or config.equivariance_test
 
     return config
 
