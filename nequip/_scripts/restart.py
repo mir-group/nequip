@@ -104,3 +104,7 @@ def restart(file_name, config, mode="update"):
     trainer.train()
 
     return
+
+
+if __name__ == "__main__":
+    main()

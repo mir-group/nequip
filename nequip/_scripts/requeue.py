@@ -36,3 +36,7 @@ def requeue(config):
         restart(config.workdir + "/trainer.pth", config, mode="requeue")
 
     return
+
+
+if __name__ == "__main__":
+    main()
