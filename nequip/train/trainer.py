@@ -7,17 +7,23 @@ enable wandb resume
 make an interface with ray
 
 """
-
+import sys
 import inspect
 import logging
-import torch
 import yaml
-import numpy as np
-
 from copy import deepcopy
 from os.path import isfile
 from time import perf_counter
 from typing import Optional, Union
+
+if sys.version_info[1] >= 7:
+    import contextlib
+else:
+    # has backport of nullcontext
+    import contextlib2 as contextlib
+
+import numpy as np
+import torch
 from torch_ema import ExponentialMovingAverage
 
 from nequip.data import DataLoader, AtomicData, AtomicDataDict
@@ -80,7 +86,6 @@ class Trainer:
     - "metrics_epoch.txt" : txt matrice format (readable by np.loadtxt) with loss/mae from training and validation of each epoch
     - "metrics_batch.txt" : txt matrice format (readable by np.loadtxt) with training loss/mae of each batch
     - "best_model.pth": the best model. save the model when validation mae goes lower
-    - "best_model_ema.pth" the best model weights, averaged with EMA, save the model when validation mae goes lower
     - "last_model.pth": the last model. save the model every log_epoch_freq epoch
     - "trainer_save.pth": all the training information. The file used for loading and restart
 
@@ -176,7 +181,6 @@ class Trainer:
         best_val_metrics (float): current best validation mae
         best_epoch (float): current best epoch
         best_model_path (str): path to save the best model
-        best_model_path_ema (str): path to save the best model with EMA
         last_model_path (str): path to save the latest model
         trainer_save_path (str): path to save the trainer.
              Default is trainer.(date).pth at the current folder
@@ -509,7 +513,6 @@ class Trainer:
 
     def init(self):
         """ initialize optimizer """
-
         if self.model is None:
             return
 
@@ -523,6 +526,13 @@ class Trainer:
                 ),
                 all_args=self.kwargs,
                 optional_args=self.optimizer_kwargs,
+            )
+
+        if self.use_ema and self.ema is None:
+            self.ema = ExponentialMovingAverage(
+                self.model.parameters(),
+                decay=self.ema_decay,
+                use_num_updates=self.ema_use_num_updates,
             )
 
         if self.lr_sched is None:
@@ -555,7 +565,6 @@ class Trainer:
         self._initialized = True
 
     def init_metrics(self):
-
         if self.metrics_components is None:
             self.metrics_components = []
             for key, func in self.loss.funcs.items():
@@ -589,7 +598,6 @@ class Trainer:
         )
 
     def init_model(self):
-
         logger = self.logger
         logger.info(
             "Number of weights: {}".format(
@@ -607,11 +615,7 @@ class Trainer:
         self.model.to(self.device)
 
         if self.use_ema:
-            self.ema = ExponentialMovingAverage(
-                self.model.parameters(),
-                decay=self.ema_decay,
-                use_num_updates=self.ema_use_num_updates,
-            )
+            self.ema.to(self.device)
 
         if not self.restart:
             self.init_model()
@@ -728,36 +732,34 @@ class Trainer:
         self.metrics.to(self.device)
 
     def epoch_step(self):
-
         datasets = [self.dl_train, self.dl_val]
         categories = [TRAIN, VALIDATION]
         self.metrics_dict = {}
         self.loss_dict = {}
+
         for category, dataset in zip(categories, datasets):
-
             if category == VALIDATION and self.use_ema:
-                self.ema.store()
-                self.ema.copy_to()
+                cm = self.ema.average_parameters()
+            else:
+                cm = contextlib.nullcontext()
 
-            self.reset_metrics()
-            self.n_batches = len(dataset)
-            for self.ibatch, batch in enumerate(dataset):
-                self.batch_step(
-                    data=batch,
-                    validation=(category == VALIDATION),
-                )
-                self.end_of_batch_log(batch_type=category)
-                for callback in self.end_of_batch_callbacks:
-                    callback(self)
-            self.metrics_dict[category] = self.metrics.current_result()
-            self.loss_dict[category] = self.loss_stat.current_result()
+            with cm:
+                self.reset_metrics()
+                self.n_batches = len(dataset)
+                for self.ibatch, batch in enumerate(dataset):
+                    self.batch_step(
+                        data=batch,
+                        validation=(category == VALIDATION),
+                    )
+                    self.end_of_batch_log(batch_type=category)
+                    for callback in self.end_of_batch_callbacks:
+                        callback(self)
+                self.metrics_dict[category] = self.metrics.current_result()
+                self.loss_dict[category] = self.loss_stat.current_result()
 
-            if category == TRAIN:
-                for callback in self.end_of_train_callbacks:
-                    callback(self)
-
-            if category == VALIDATION and self.use_ema:
-                self.ema.restore()
+                if category == TRAIN:
+                    for callback in self.end_of_train_callbacks:
+                        callback(self)
 
         self.end_of_epoch_log()
         self.end_of_epoch_save()
@@ -846,17 +848,15 @@ class Trainer:
                 # If using EMA, store the EMA validation model
                 # that gave us the good val metrics that made the model "best"
                 # in the first place
-                self.ema.store()
-                self.ema.copy_to()
-
-            if hasattr(self.model, "save"):
-                self.model.save(save_path)
+                cm = self.ema.average_parameters()
             else:
-                torch.save(self.model, save_path)
+                cm = contextlib.nullcontext()
 
-            if self.use_ema:
-                # If we set EMA weights, restore to training weights
-                self.ema.restore()
+            with cm:
+                if hasattr(self.model, "save"):
+                    self.model.save(save_path)
+                else:
+                    torch.save(self.model, save_path)
 
             self.logger.info(
                 f"! Best model {self.best_epoch+1:8d} {self.best_val_metrics:8.3f}"
