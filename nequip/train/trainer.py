@@ -491,13 +491,16 @@ class Trainer:
         trainer = Trainer(model=model, **d)
 
         if state_dict is not None and trainer.model is not None:
+            logging.debug("Reload optimizer and scheduler states")
             trainer.optim.load_state_dict(state_dict["optim"])
+
             if trainer.lr_sched is not None:
                 trainer.lr_sched.load_state_dict(state_dict["lr_sched"])
-            logging.debug("Reload optimizer and scheduler states")
+
             torch.set_rng_state(state_dict["rng_state"])
             if torch.cuda.is_available():
                 torch.cuda.set_rng_state(state_dict["cuda_rng_state"])
+
             if trainer.use_ema:
                 trainer.ema.load_state_dict(state_dict["ema_state"])
 
@@ -515,6 +518,8 @@ class Trainer:
         """ initialize optimizer """
         if self.model is None:
             return
+
+        self.model.to(self.device)
 
         if self.optim is None:
             self.optim, self.optimizer_kwargs = instantiate_from_cls_name(
@@ -611,11 +616,6 @@ class Trainer:
             raise RuntimeError("You must call `set_dataset()` before calling `train()`")
         if not self._initialized:
             self.init()
-
-        self.model.to(self.device)
-
-        if self.use_ema:
-            self.ema.to(self.device)
 
         if not self.restart:
             self.init_model()
