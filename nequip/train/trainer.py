@@ -572,27 +572,11 @@ class Trainer:
         if self.metrics_components is None:
             self.metrics_components = []
             for key, func in self.loss.funcs.items():
-                dim = (
-                    self.dataset_train[0][key].shape[1:]
-                    if hasattr(self, "dataset_train")
-                    else tuple()
-                )
                 params = {
-                    "dim": dim,
                     "PerSpecies": type(func).__name__.startswith("PerSpecies"),
                 }
-                if key == AtomicDataDict.FORCE_KEY:
-                    params["reduce_dims"] = 0
                 self.metrics_components.append((key, "mae", params))
                 self.metrics_components.append((key, "rmse", params))
-        elif hasattr(self, "dataset_train"):
-            # update the metric dim based on dataset data
-            new_list = []
-            for component in self.metrics_components:
-                key, reduction, params = Metrics.parse(component)
-                params["dim"] = self.dataset_train[0][key].shape[1:]
-                new_list.append((key, reduction, params))
-            self.metrics_components = new_list
 
         self.metrics, _ = instantiate(
             builder=Metrics,
