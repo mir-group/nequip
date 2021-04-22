@@ -237,7 +237,7 @@ class Trainer:
         shuffle: bool = True,
         n_train: Optional[int] = None,
         n_val: Optional[int] = None,
-        dataloader_num_workers: int = 1,
+        dataloader_num_workers: int = 0,
         train_idcs: Optional[list] = None,
         val_idcs: Optional[list] = None,
         train_val_split: str = "random",
@@ -971,13 +971,17 @@ class Trainer:
 
         # based on recommendations from
         # https://pytorch.org/tutorials/recipes/recipes/tuning_guide.html#enable-async-data-loading-and-augmentation
+        if self.dataloader_num_workers != 0:
+            # some issues with timeouts need to be investigated
+            raise NotImplementedError
         dl_kwargs = dict(
             batch_size=self.batch_size,
             shuffle=self.shuffle,
             exclude_keys=self.exclude_keys,
-            num_workers=self.dataloader_num_workers,
-            persistent_workers=(self.max_epochs > 1),
+            # num_workers=self.dataloader_num_workers,
+            # persistent_workers=(self.max_epochs > 1),
             pin_memory=(self.device != torch.device("cpu")),
+            # timeout=10,  # just so you don't get stuck
         )
         self.dl_train = DataLoader(dataset=self.dataset_train, **dl_kwargs)
         self.dl_val = DataLoader(dataset=self.dataset_val, **dl_kwargs)
