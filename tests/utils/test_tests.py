@@ -9,6 +9,8 @@ from nequip.nn import GraphModuleMixin
 from nequip.utils.test import (
     assert_AtomicData_equivariant,
     assert_permutation_equivariant,
+    register_fields,
+    deregister_fields,
 )
 
 
@@ -116,3 +118,43 @@ def test_debug_mode():
     badmod = BadIrrepsModule()
     with pytest.raises(ValueError):
         badmod()
+
+
+class EdgePermuteModule(GraphModuleMixin, torch.nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self._init_irreps(
+            irreps_out={
+                "my_edge": "1o",
+            }
+        )
+
+    def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
+        data["my_edge"] = data[AtomicDataDict.POSITIONS_KEY][
+            data[AtomicDataDict.EDGE_INDEX_KEY][0]
+        ]
+        return data
+
+
+def test_permute_register():
+    # Get a clean slate
+    deregister_fields("my_edge")
+
+    mod = EdgePermuteModule()
+    n_pos = 20
+    n_edge = 20
+    inp = {
+        AtomicDataDict.POSITIONS_KEY: mod.irreps_in[AtomicDataDict.POSITIONS_KEY].randn(
+            n_pos, -1
+        ),
+        AtomicDataDict.EDGE_INDEX_KEY: torch.randint(0, n_pos, (2, n_edge)),
+    }
+
+    with pytest.raises(AssertionError):
+        # Fails because thinks "my_edge" is invariant
+        assert_permutation_equivariant(mod, data_in=dict(inp))
+    assert_permutation_equivariant(
+        mod, data_in=dict(inp), extra_edge_permute_fields=["my_edge"]
+    )
+    register_fields(edge_permute_fields=["my_edge"])
+    assert_permutation_equivariant(mod, data_in=dict(inp))
