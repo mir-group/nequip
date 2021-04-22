@@ -132,10 +132,13 @@ def fresh_start(config):
     config.update(dict(allowed_species=allowed_species))
 
     # Build a model
-    if not callable(config.model_builder):
-        model_builder = yaml.load(
-            f"!!python/name:{config.model_builder}", Loader=yaml.Loader
-        )
+    model_builder = config.model_builder
+    if callable(model_builder):
+        pass
+    elif isinstance(model_builder, str):
+        model_builder = yaml.load(f"!!python/name:{model_builder}", Loader=yaml.Loader)
+    else:
+        raise TypeError
     assert callable(model_builder), f"Model builder {model_builder} isn't callable"
     core_model = model_builder(**dict(config))
 
