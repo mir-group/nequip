@@ -91,6 +91,8 @@ class Metrics:
                 kwargs["dim"] = error.shape[1:]
             if not report_per_comp:
                 kwargs["reduce_dims"] = tuple(range(len(error.shape) - 1))
+        else:
+            kwargs["dim"] = tuple()
 
         return RunningStats(**kwargs)
 
