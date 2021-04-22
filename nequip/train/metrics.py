@@ -8,8 +8,6 @@ from ._loss import find_loss_function
 from ._key import ABBREV
 
 metrics_to_reduction = {"mae": Reduction.MEAN, "rmse": Reduction.RMS}
-DEFAULT_PER_SPECIE = False
-DEFAULT_PER_COMP = False
 
 
 class Metrics:
@@ -47,8 +45,7 @@ class Metrics:
     """
 
     def __init__(
-        self,
-        components: Sequence[Union[Tuple[str, str], Tuple[str, str, dict]]]
+        self, components: Sequence[Union[Tuple[str, str], Tuple[str, str, dict]]]
     ):
 
         self.running_stats = {}
@@ -62,7 +59,7 @@ class Metrics:
             functional = params.pop("functional", "L1Loss")
 
             # default is to flatten the array
-            per_species = params.pop("PerSpecies", DEFAULT_PER_SPECIE)
+            per_species = params.pop("PerSpecies", False)
 
             if key not in self.running_stats:
                 self.running_stats[key] = {}
@@ -75,24 +72,21 @@ class Metrics:
 
             # by default, report a scalar that is mae and rmse over all component
             self.kwargs[key][reduction] = dict(
-                per_comp=kwargs.pop("report_per_component", DEFAULT_PER_COMP),
                 reduction=metrics_to_reduction.get(reduction, reduction),
             )
             self.kwargs[key][reduction].update(kwargs)
 
             self.per_species[key][reduction] = per_species
 
-    def init_runstat(self, params, error=None):
+    def init_runstat(self, params, error):
 
         kwargs = deepcopy(params)
-        report_per_comp = kwargs.pop("per_comp")
-        if error is not None:
-            if "dim" not in kwargs:
-                kwargs["dim"] = error.shape[1:]
-            if not report_per_comp:
+        if "dim" not in kwargs:
+            kwargs["dim"] = error.shape[1:]
+
+        if "reduce_dims" not in kwargs:
+            if not kwargs.pop("report_per_component", False):
                 kwargs["reduce_dims"] = tuple(range(len(error.shape) - 1))
-        else:
-            kwargs["dim"] = tuple()
 
         return RunningStats(**kwargs)
 
