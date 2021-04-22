@@ -149,11 +149,11 @@ class Trainer:
         shuffle (bool): parameters for dataloader
         n_train (int): # of frames for training
         n_val (int): # of frames for validation
-        exclude_keys (list):  parameters for dataloader
+        exclude_keys (list):  fields from dataset to ignore.
+        dataloader_num_workers (int): `num_workers` for the `DataLoader`s
         train_idcs (optional, list):  list of frames to use for training
         val_idcs (list):  list of frames to use for validation
         train_val_split (str):  "random" or "sequential"
-        loader_kwargs (dict):  Parameters for dataloader
 
         init_callbacks (list): list of callback function at the begining of the training
         end_of_epoch_callbacks (list): list of callback functions at the end of each epoch
@@ -237,10 +237,10 @@ class Trainer:
         shuffle: bool = True,
         n_train: Optional[int] = None,
         n_val: Optional[int] = None,
+        dataloader_num_workers: int = 1,
         train_idcs: Optional[list] = None,
         val_idcs: Optional[list] = None,
         train_val_split: str = "random",
-        loader_kwargs: Optional[dict] = None,
         init_callbacks: list = [],
         end_of_epoch_callbacks: list = [],
         end_of_batch_callbacks: list = [],
@@ -297,7 +297,6 @@ class Trainer:
         self.kwargs = deepcopy(kwargs)
         self.optimizer_kwargs = deepcopy(optimizer_kwargs)
         self.lr_scheduler_kwargs = deepcopy(lr_scheduler_kwargs)
-        self.loader_kwargs = deepcopy(loader_kwargs)
 
         # initialize the optimizer and scheduler, the params will be updated in the function
         self.init()
@@ -986,27 +985,15 @@ class Trainer:
         self.dataset_train = dataset.index_select(self.train_idcs)
         self.dataset_val = dataset.index_select(self.val_idcs)
 
-        self.dl_train, self.loader_kwargs = instantiate(
-            builder=DataLoader,
-            prefix="loader",
-            positional_args=dict(
-                dataset=self.dataset_train,
-                batch_size=self.batch_size,
-                shuffle=self.shuffle,
-                exclude_keys=self.exclude_keys,
-            ),
-            optional_args=self.loader_kwargs,
-            all_args=self.kwargs,
+        # based on recommendations from
+        # https://pytorch.org/tutorials/recipes/recipes/tuning_guide.html#enable-async-data-loading-and-augmentation
+        dl_kwargs = dict(
+            batch_size=self.batch_size,
+            shuffle=self.shuffle,
+            exclude_keys=self.exclude_keys,
+            num_workers=self.dataloader_num_workers,
+            persistent_workers=(self.max_epochs > 1),
+            pin_memory=(self.device != torch.device("cpu")),
         )
-        self.dl_val, _ = instantiate(
-            builder=DataLoader,
-            prefix="loader",
-            positional_args=dict(
-                dataset=self.dataset_val,
-                batch_size=self.batch_size,
-                shuffle=self.shuffle,
-                exclude_keys=self.exclude_keys,
-            ),
-            optional_args=self.loader_kwargs,
-            all_args=self.kwargs,
-        )
+        self.dl_train = DataLoader(dataset=self.dataset_train, **dl_kwargs)
+        self.dl_val = DataLoader(dataset=self.dataset_val, **dl_kwargs)
