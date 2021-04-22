@@ -34,7 +34,6 @@ def main(args=None):
 
 
 def parse_command_line(args=None):
-
     parser = argparse.ArgumentParser(description="Train a NequIP model.")
     parser.add_argument("config", help="configuration file")
     parser.add_argument(
@@ -57,7 +56,6 @@ def parse_command_line(args=None):
 
 
 def fresh_start(config):
-
     if config.model_debug_mode:
         set_irreps_debug(enabled=True)
     torch.set_default_dtype(
@@ -134,9 +132,10 @@ def fresh_start(config):
     config.update(dict(allowed_species=allowed_species))
 
     # Build a model
-    model_builder = yaml.load(
-        f"!!python/name:{config.model_builder}", Loader=yaml.Loader
-    )
+    if not callable(config.model_builder):
+        model_builder = yaml.load(
+            f"!!python/name:{config.model_builder}", Loader=yaml.Loader
+        )
     assert callable(model_builder), f"Model builder {model_builder} isn't callable"
     core_model = model_builder(**dict(config))
 
