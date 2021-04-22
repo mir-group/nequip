@@ -1,4 +1,4 @@
-from typing import Final
+from typing import Final, Tuple, Dict, Union
 import argparse
 import pathlib
 import logging
@@ -19,6 +19,33 @@ CONFIG_KEY: Final[str] = "config"
 NEQUIP_VERSION_KEY: Final[str] = "nequip_version"
 R_MAX_KEY: Final[str] = "r_max"
 N_SPECIES_KEY: Final[str] = "n_species"
+
+
+def load_deployed_model(
+    model_path: Union[pathlib.Path, str]
+) -> Tuple[torch.nn.Module, Dict[str, str]]:
+    r"""Load a deployed model.
+
+    Args:
+        model_path: the path to the deployed model's ``.pth`` file.
+
+    Returns:
+        model, metadata dictionary
+    """
+    metadata = {CONFIG_KEY: "", NEQUIP_VERSION_KEY: ""}
+    try:
+        model = torch.jit.load(model_path, _extra_files=metadata)
+    except RuntimeError as e:
+        raise ValueError(
+            f"{model_path} does not seem to be a deployed NequIP model file. (Underlying error: {e})"
+        )
+    if metadata[NEQUIP_VERSION_KEY] == "":
+        raise ValueError(
+            f"{model_path} does not seem to be a deployed NequIP model file"
+        )
+    # Everything we store right now is ASCII, so decode for printing
+    metadata = {k: v.decode("ascii") for k, v in metadata.items()}
+    return model, metadata
 
 
 def main(args=None):
@@ -53,20 +80,8 @@ def main(args=None):
     logging.basicConfig(level=logging.INFO)
 
     if args.command == "info":
-        metadata = {CONFIG_KEY: "", NEQUIP_VERSION_KEY: ""}
-        try:
-            model = torch.jit.load(args.model_path, _extra_files=metadata)
-        except RuntimeError as e:
-            raise ValueError(
-                f"{args.model_path} does not seem to be a deployed NequIP model file. (Underlying error: {e})"
-            )
+        model, metadata = load_deployed_model(args.model_path)
         del model
-        if metadata[NEQUIP_VERSION_KEY] == "":
-            raise ValueError(
-                f"{args.model_path} does not seem to be a deployed NequIP model file"
-            )
-        # Everything we store right now is ASCII, so decode for printing
-        metadata = {k: v.decode("ascii") for k, v in metadata.items()}
         config = metadata.pop(CONFIG_KEY)
         logging.info(f"Loaded TorchScript model with metadata {metadata}")
         logging.info("Model was built with config:")
