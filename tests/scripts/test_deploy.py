@@ -9,7 +9,7 @@ import torch
 
 import nequip
 from nequip.data import AtomicDataDict, AtomicData
-from nequip._scripts import deploy
+from nequip.scripts import deploy
 
 
 def test_deploy(nequip_dataset, BENCHMARK_ROOT):

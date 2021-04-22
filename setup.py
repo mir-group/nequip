@@ -19,10 +19,10 @@ setup(
     entry_points={
         # make the scripts available as command line scripts
         "console_scripts": [
-            "nequip-train = nequip._scripts.train:main",
-            "nequip-restart = nequip._scripts.restart:main",
-            "nequip-requeue = nequip._scripts.requeue:main",
-            "nequip-deploy = nequip._scripts.deploy:main",
+            "nequip-train = nequip.scripts.train:main",
+            "nequip-restart = nequip.scripts.restart:main",
+            "nequip-requeue = nequip.scripts.requeue:main",
+            "nequip-deploy = nequip.scripts.deploy:main",
         ]
     },
     install_requires=[
