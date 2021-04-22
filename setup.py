@@ -33,6 +33,7 @@ setup(
         "torch_geometric",
         "e3nn>=0.2.5",
         "pyyaml",
+        "contextlib2;python_version<'3.7'",  # backport of nullcontext
     ],
     zip_safe=True,
 )

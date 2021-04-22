@@ -7,17 +7,24 @@ enable wandb resume
 make an interface with ray
 
 """
-
+import sys
 import inspect
 import logging
-import torch
 import yaml
-import numpy as np
-
 from copy import deepcopy
 from os.path import isfile
 from time import perf_counter
 from typing import Optional, Union
+
+if sys.version_info[1] >= 7:
+    import contextlib
+else:
+    # has backport of nullcontext
+    import contextlib2 as contextlib
+
+import numpy as np
+import torch
+from torch_ema import ExponentialMovingAverage
 
 from nequip.data import DataLoader, AtomicData, AtomicDataDict
 from nequip.utils import (
@@ -222,6 +229,9 @@ class Trainer:
         optim=None,
         optimizer_name: str = "Adam",
         optimizer_kwargs: Optional[dict] = None,
+        use_ema: bool = False,
+        ema_decay: float = 0.999,
+        ema_use_num_updates=True,
         exclude_keys: list = [],
         batch_size: int = 5,
         shuffle: bool = True,
@@ -252,6 +262,9 @@ class Trainer:
 
         for key in self.init_params:
             setattr(self, key, locals()[key])
+
+        if self.use_ema:
+            self.ema = None
 
         output = Output.get_output(timestr, self)
 
@@ -323,9 +336,7 @@ class Trainer:
         """convert instance to a dictionary
         Args:
 
-        state_dict (bool): if True, the weights and bias will also be stored.
-              When best_model_path and last_model_path are not defined,
-              the weights of the model will be explicitly stored in the dictionary
+        state_dict (bool): if True, the state_dicts of the optimizer, lr scheduler, and EMA will be included
         """
 
         dictionary = {}
@@ -344,6 +355,8 @@ class Trainer:
                 dictionary["state_dict"]["cuda_rng_state"] = torch.cuda.get_rng_state(
                     device=self.device
                 )
+            if self.use_ema:
+                dictionary["state_dict"]["ema_state"] = self.ema.state_dict()
 
         if hasattr(self.model, "save") and not issubclass(
             type(self.model), torch.jit.ScriptModule
@@ -358,6 +371,8 @@ class Trainer:
                 "best_val_metrics", float("inf")
             )
             dictionary["progress"]["stop_arg"] = self.__dict__.get("stop_arg", None)
+
+            # TODO: these might not both be available, str defined, but no weights
             dictionary["progress"]["best_model_path"] = self.best_model_path
             dictionary["progress"]["last_model_path"] = self.last_model_path
             dictionary["progress"]["trainer_save_path"] = self.trainer_save_path
@@ -457,9 +472,6 @@ class Trainer:
             if isfile(progress["last_model_path"]):
                 load_path = progress["last_model_path"]
                 iepoch = progress["iepoch"]
-            elif isfile(progress["best_model_path"]):
-                load_path = progress["best_model_path"]
-                iepoch = progress["best_epoch"]
             else:
                 raise AttributeError("model weights & bias are not saved")
 
@@ -479,13 +491,18 @@ class Trainer:
         trainer = Trainer(model=model, **d)
 
         if state_dict is not None and trainer.model is not None:
+            logging.debug("Reload optimizer and scheduler states")
             trainer.optim.load_state_dict(state_dict["optim"])
+
             if trainer.lr_sched is not None:
                 trainer.lr_sched.load_state_dict(state_dict["lr_sched"])
-            logging.debug("Reload optimizer and scheduler states")
+
             torch.set_rng_state(state_dict["rng_state"])
             if torch.cuda.is_available():
                 torch.cuda.set_rng_state(state_dict["cuda_rng_state"])
+
+            if trainer.use_ema:
+                trainer.ema.load_state_dict(state_dict["ema_state"])
 
         if "progress" in d:
             trainer.best_val_metrics = progress["best_val_metrics"]
@@ -499,9 +516,10 @@ class Trainer:
 
     def init(self):
         """ initialize optimizer """
-
         if self.model is None:
             return
+
+        self.model.to(self.device)
 
         if self.optim is None:
             self.optim, self.optimizer_kwargs = instantiate_from_cls_name(
@@ -513,6 +531,13 @@ class Trainer:
                 ),
                 all_args=self.kwargs,
                 optional_args=self.optimizer_kwargs,
+            )
+
+        if self.use_ema and self.ema is None:
+            self.ema = ExponentialMovingAverage(
+                self.model.parameters(),
+                decay=self.ema_decay,
+                use_num_updates=self.ema_use_num_updates,
             )
 
         if self.lr_sched is None:
@@ -542,11 +567,9 @@ class Trainer:
             all_args=self.kwargs,
         )
         self.loss_stat = LossStat(keys=list(self.loss.funcs.keys()))
-
         self._initialized = True
 
     def init_metrics(self):
-
         if self.metrics_components is None:
             self.metrics_components = []
             for key, func in self.loss.funcs.items():
@@ -580,7 +603,6 @@ class Trainer:
         )
 
     def init_model(self):
-
         logger = self.logger
         logger.info(
             "Number of weights: {}".format(
@@ -594,8 +616,6 @@ class Trainer:
             raise RuntimeError("You must call `set_dataset()` before calling `train()`")
         if not self._initialized:
             self.init()
-
-        self.model.to(self.device)
 
         if not self.restart:
             self.init_model()
@@ -668,6 +688,9 @@ class Trainer:
             loss.backward()
             self.optim.step()
 
+            if self.use_ema:
+                self.ema.update()
+
             if self.lr_scheduler_name == "CosineAnnealingWarmRestarts":
                 self.lr_sched.step(self.iepoch + self.ibatch / self.n_batches)
 
@@ -709,29 +732,34 @@ class Trainer:
         self.metrics.to(self.device)
 
     def epoch_step(self):
-
         datasets = [self.dl_train, self.dl_val]
         categories = [TRAIN, VALIDATION]
         self.metrics_dict = {}
         self.loss_dict = {}
+
         for category, dataset in zip(categories, datasets):
+            if category == VALIDATION and self.use_ema:
+                cm = self.ema.average_parameters()
+            else:
+                cm = contextlib.nullcontext()
 
-            self.reset_metrics()
-            self.n_batches = len(dataset)
-            for self.ibatch, batch in enumerate(dataset):
-                self.batch_step(
-                    data=batch,
-                    validation=(category == VALIDATION),
-                )
-                self.end_of_batch_log(batch_type=category)
-                for callback in self.end_of_batch_callbacks:
-                    callback(self)
-            self.metrics_dict[category] = self.metrics.current_result()
-            self.loss_dict[category] = self.loss_stat.current_result()
+            with cm:
+                self.reset_metrics()
+                self.n_batches = len(dataset)
+                for self.ibatch, batch in enumerate(dataset):
+                    self.batch_step(
+                        data=batch,
+                        validation=(category == VALIDATION),
+                    )
+                    self.end_of_batch_log(batch_type=category)
+                    for callback in self.end_of_batch_callbacks:
+                        callback(self)
+                self.metrics_dict[category] = self.metrics.current_result()
+                self.loss_dict[category] = self.loss_stat.current_result()
 
-            if category == TRAIN:
-                for callback in self.end_of_train_callbacks:
-                    callback(self)
+                if category == TRAIN:
+                    for callback in self.end_of_train_callbacks:
+                        callback(self)
 
         self.end_of_epoch_log()
         self.end_of_epoch_save()
@@ -813,10 +841,23 @@ class Trainer:
         if val_metrics < self.best_val_metrics:
             self.best_val_metrics = val_metrics
             self.best_epoch = self.iepoch
-            if hasattr(self.model, "save"):
-                self.model.save(self.best_model_path)
+
+            save_path = self.best_model_path
+
+            if self.use_ema:
+                # If using EMA, store the EMA validation model
+                # that gave us the good val metrics that made the model "best"
+                # in the first place
+                cm = self.ema.average_parameters()
             else:
-                torch.save(self.model, self.best_model_path)
+                cm = contextlib.nullcontext()
+
+            with cm:
+                if hasattr(self.model, "save"):
+                    self.model.save(save_path)
+                else:
+                    torch.save(self.model, save_path)
+
             self.logger.info(
                 f"! Best model {self.best_epoch+1:8d} {self.best_val_metrics:8.3f}"
             )
