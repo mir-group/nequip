@@ -1,5 +1,5 @@
 from copy import deepcopy
-from typing import Union
+from typing import Union, Sequence, Tuple
 
 from nequip.data import AtomicDataDict
 from torch_runstats import RunningStats, Reduction
@@ -48,7 +48,7 @@ class Metrics:
 
     def __init__(
         self,
-        components: Union[list, tuple],
+        components: Sequence[Union[Tuple[str, str], Tuple[str, str, dict]]]
     ):
 
         self.running_stats = {}
