@@ -14,7 +14,7 @@ setup(
     description="NequIP is a software for building SE(3)-equivariant neural network interatomic potentials ",
     download_url="https://github.com/mir-group/nequip",
     author="Simon Batzner, Anders Johansson, Albert Musealian, Lixin Sun, Mario Geiger, Tess Smidt",
-    python_requires=">=3.8",
+    python_requires=">=3.6",
     packages=find_packages(include=["nequip", "nequip.*"]),
     entry_points={
         # make the scripts available as command line scripts
@@ -34,6 +34,7 @@ setup(
         "e3nn>=0.2.5",
         "pyyaml",
         "contextlib2;python_version<'3.7'",  # backport of nullcontext
+        "typing_extensions;python_version<'3.8'",
     ],
     zip_safe=True,
 )
