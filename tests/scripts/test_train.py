@@ -32,7 +32,14 @@ class IdentityModel(GraphModuleMixin, torch.nn.Module):
         return data
 
 
-def test_identity_train(nequip_dataset, BENCHMARK_ROOT):
+@pytest.mark.parametrize(
+    "conffile,field",
+    [
+        ("minimal.yaml", AtomicDataDict.FORCE_KEY),
+        ("minimal_eng.yaml", AtomicDataDict.TOTAL_ENERGY_KEY),
+    ],
+)
+def test_identity_train(nequip_dataset, BENCHMARK_ROOT, conffile, field):
 
     dtype = str(torch.get_default_dtype())[len("torch.") :]
 
@@ -41,7 +48,7 @@ def test_identity_train(nequip_dataset, BENCHMARK_ROOT):
         pytest.skip("CUDA and subprocesses have issues")
 
     path_to_this_file = pathlib.Path(__file__)
-    config_path = path_to_this_file.parents[2] / "configs/minimal.yaml"
+    config_path = path_to_this_file.parents[2] / f"configs/{conffile}"
     true_config = yaml.load(config_path.read_text(), Loader=yaml.Loader)
     with tempfile.TemporaryDirectory() as tmpdir:
         # Save time
