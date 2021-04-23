@@ -56,6 +56,7 @@ def parse_command_line(args=None):
 
 
 def fresh_start(config):
+    # = Set global state =
     if config.model_debug_mode:
         set_irreps_debug(enabled=True)
     torch.set_default_dtype(
@@ -64,7 +65,7 @@ def fresh_start(config):
     output = Output.from_config(config)
     config.update(output.updated_dict())
 
-    # Make the trainer
+    # = Make the trainer =
     if config.wandb:
         import wandb  # noqa: F401
         from nequip.train.trainer_wandb import TrainerWandB
@@ -80,14 +81,14 @@ def fresh_start(config):
 
         trainer = Trainer(model=None, **dict(config))
 
-    # Load the dataset
+    # = Load the dataset =
     dataset = dataset_from_config(config)
     logging.info(f"Successfully loaded the data set of type {dataset}...")
 
-    # Train/test split
+    # = Train/test split =
     trainer.set_dataset(dataset)
 
-    # Determine training type
+    # = Determine training type =
     train_on = config.loss_coeffs
     train_on = [train_on] if isinstance(train_on, str) else train_on
     train_on = set(train_on)
@@ -99,7 +100,7 @@ def fresh_start(config):
     logging.debug(f"Force training mode: {force_training}")
     del train_on
 
-    # Get statistics of training dataset
+    # = Get statistics of training dataset =
     stats_fields = [
         AtomicDataDict.TOTAL_ENERGY_KEY,
         AtomicDataDict.ATOMIC_NUMBERS_KEY,
@@ -112,26 +113,18 @@ def fresh_start(config):
         fields=stats_fields, modes=stats_modes, stride=config.dataset_statistics_stride
     )
     (
-        (energies_mean, energies_scale),
+        (energies_mean, energies_std),
         (allowed_species, Z_count),
     ) = stats[:2]
     if force_training:
         # Scale by the force std instead
-        energies_scale = stats[2][0]
+        force_rms = stats[2][0]
     del stats_modes
     del stats_fields
 
-    RESCALE_THRESHOLD = 1e-6
-    if energies_scale < RESCALE_THRESHOLD:
-        # TODO: move this after merge
-        raise ValueError(
-            f"RMS of forces/stdev of energies in this dataset was very low: {energies_scale}"
-        )
-        # TODO: offer option to disable rescaling?
-
     config.update(dict(allowed_species=allowed_species))
 
-    # Build a model
+    # = Build a model =
     model_builder = config.model_builder
     if callable(model_builder):
         pass
@@ -142,9 +135,55 @@ def fresh_start(config):
     assert callable(model_builder), f"Model builder {model_builder} isn't callable"
     core_model = model_builder(**dict(config))
 
-    global_shift = config.get("global_rescale_shift", energies_mean)
-    global_scale = config.get("global_rescale_scale", energies_scale)
+    # = Determine shifts, scales =
+    # This is a bit awkward, but necessary for there to be a value
+    # in the config that signals "use dataset"
+    global_shift = config.get("global_rescale_shift", "dataset_energy_mean")
+    if global_shift == "dataset_energy_mean":
+        global_shift = energies_mean
+    elif (
+        global_shift is None
+        or isinstance(global_shift, float)
+        or isinstance(global_shift, torch.Tensor)
+    ):
+        # valid values
+        pass
+    else:
+        raise ValueError(f"Invalid global shift `{global_shift}`")
 
+    global_scale = config.get(
+        "global_rescale_scale", force_rms if force_training else energies_std
+    )
+    if global_scale == "dataset_energy_std":
+        global_scale = energies_std
+    elif global_scale == "dataset_force_rms":
+        if not force_training:
+            raise ValueError(
+                "Cannot have global_scale = 'dataset_force_rms' without force training"
+            )
+        global_scale = force_rms
+    elif (
+        global_scale is None
+        or isinstance(global_scale, float)
+        or isinstance(global_scale, torch.Tensor)
+    ):
+        # valid values
+        pass
+    else:
+        raise ValueError(f"Invalid global scale `{global_scale}`")
+
+    RESCALE_THRESHOLD = 1e-6
+    if isinstance(global_scale, float) and global_scale < RESCALE_THRESHOLD:
+        raise ValueError(
+            f"Global energy scaling was very low: {global_scale}. If dataset values were used, does the dataset contain insufficient variation? Maybe try disabling global scaling with global_scale=None."
+        )
+        # TODO: offer option to disable rescaling?
+
+    logging.debug(
+        f"Initially outputs are scaled by: {global_scale}, eneriges are shifted by {global_shift}."
+    )
+
+    # == Build the model ==
     final_model = RescaleOutput(
         model=core_model,
         scale_keys=[AtomicDataDict.TOTAL_ENERGY_KEY]
@@ -169,10 +208,6 @@ def fresh_start(config):
     if config.compile_model:
         final_model = e3nn.util.jit.script(final_model)
         logging.info("Successfully compiled model...")
-
-    logging.debug(
-        f"Initially outputs are scaled by: {energies_scale}, eneriges are shifted by {energies_mean}. Scaling factors derived from statistics of {'forces' if force_training else 'energies'} in the dataset."
-    )
 
     # Record final config
     with open(output.generate_file("config_final.yaml"), "w+") as fp:

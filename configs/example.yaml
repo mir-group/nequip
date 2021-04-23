@@ -44,11 +44,11 @@ PerSpeciesScaleShift_shifts: [0.0, 0.0, 0.0]
 # optional initial atomic energy scale for each species. order should be the same as the allowed_species used in train.py. Defaults to ones.
 PerSpeciesScaleShift_scales: [1.0, 1.0, 1.0]
 
-# global energy shift. When None/null, defaults to the mean energy of the dataset
-global_rescale_shift: null
-# global energy scale. When None/null, defaults to the RMS of force components in the dataset
-# ^ this is the same as the std of force components
-global_rescale_scale: null
+# global energy shift. When "dataset_energy_mean" (the default), the mean energy of the dataset. When None, disables the global shift. When a number, used directly.
+global_rescale_shift: dataset_energy_mean
+# global energy scale. When "dataset_force_rms", the RMS of force components in the dataset. When "dataset_energy_std", the stdev of energies in the dataset. When None, disables the global scale. When a number, used directly.
+# If not provided, defaults to either dataset_force_rms or dataset_energy_std, depending on whether forces are being trained.
+global_rescale_scale: dataset_force_rms
 # whether the shift of the final global energy rescaling should be trainable
 trainable_global_rescale_shift: false
 # whether the scale of the final global energy rescaling should be trainable
@@ -131,11 +131,11 @@ metrics_components:
   - - forces                               # key 
     - rmse                                 # "rmse" or "mse"
     - PerSpecies: True                     # if True, per specie contribution is counted separately
-      report_per_comp: False               # if True, statistics on each component (i.e. fx, fy, fz) will be counted separately
+      report_per_component: False               # if True, statistics on each component (i.e. fx, fy, fz) will be counted separately
   - - forces
     - mae
     - PerSpecies: True
-      report_per_comp: False
+      report_per_component: False
   - - total_energy
     - mae
 
