@@ -1,6 +1,8 @@
 from copy import deepcopy
 from typing import Union, Sequence, Tuple
 
+import torch
+
 from nequip.data import AtomicDataDict
 from torch_runstats import RunningStats, Reduction
 
@@ -78,7 +80,7 @@ class Metrics:
 
             self.per_species[key][reduction] = per_species
 
-    def init_runstat(self, params, error):
+    def init_runstat(self, params, error: torch.Tensor):
 
         kwargs = deepcopy(params)
         if "dim" not in kwargs:
@@ -88,7 +90,9 @@ class Metrics:
             if not kwargs.pop("report_per_component", False):
                 kwargs["reduce_dims"] = tuple(range(len(error.shape) - 1))
 
-        return RunningStats(**kwargs)
+        rs = RunningStats(**kwargs)
+        rs.to(device=error.device)
+        return rs
 
     @staticmethod
     def parse(component):
