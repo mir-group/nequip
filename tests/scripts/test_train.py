@@ -5,6 +5,7 @@ import yaml
 import subprocess
 import os
 
+import numpy as np
 import torch
 
 from nequip.data import AtomicDataDict
@@ -52,7 +53,7 @@ def test_identity_train(nequip_dataset, BENCHMARK_ROOT, conffile, field):
     true_config = yaml.load(config_path.read_text(), Loader=yaml.Loader)
     with tempfile.TemporaryDirectory() as tmpdir:
         # Save time
-        run_name = "test_train" + dtype
+        run_name = "test_train_" + dtype
         true_config["run_name"] = run_name
         true_config["root"] = tmpdir
         true_config["dataset_file_name"] = str(
@@ -61,10 +62,15 @@ def test_identity_train(nequip_dataset, BENCHMARK_ROOT, conffile, field):
         true_config["default_dtype"] = dtype
         true_config["max_epochs"] = 1
         true_config["model_builder"] = IdentityModel
+
+        # to be a true identity, we can't have rescaling
+        true_config["global_rescale_shift"] = None
+        true_config["global_rescale_scale"] = None
+
         config_path = tmpdir + "/conf.yaml"
         with open(config_path, "w+") as fp:
             yaml.dump(true_config, fp)
-        # Train model
+        # == Train model ==
         env = dict(os.environ)
         # make this script available so model builders can be loaded
         env["PYTHONPATH"] = ":".join(
@@ -74,4 +80,39 @@ def test_identity_train(nequip_dataset, BENCHMARK_ROOT, conffile, field):
             ["nequip-train", str(config_path)], cwd=tmpdir, env=env
         )
         retcode.check_returncode()
-        # TODO: check metrics from training run!
+
+        # == Load metrics ==
+        outdir = f"{true_config['root']}/{true_config['run_name']}/"
+
+        for which in ("train", "val"):
+            dat = np.genfromtxt(
+                f"{outdir}/metrics_batch_{which}.csv",
+                delimiter=",",
+                names=True,
+                dtype=None,
+            )
+            for field in dat.dtype.names:
+                if field == "epoch" or field == "batch":
+                    continue
+                # Everything else should be a loss or a metric
+                assert np.allclose(
+                    dat[field], 0.0
+                ), f"Loss/metric `{field}` wasn't all zero for {which}"
+
+        # epoch metrics
+        dat = np.genfromtxt(
+            f"{outdir}/metrics_epoch.csv",
+            delimiter=",",
+            names=True,
+            dtype=None,
+        )
+        for field in dat.dtype.names:
+            if field == "epoch" or field == "wall" or field == "LR":
+                continue
+            # Everything else should be a loss or a metric
+            assert np.allclose(
+                dat[field], 0.0
+            ), f"Loss/metric `{field}` wasn't all zero for epoch"
+
+        # == Check model ==
+        # model = torch.load(outdir + "/last_model.pth")
