@@ -113,10 +113,17 @@ class TestWorkflow:
             # So instead we do a slightly less complete test, loading the saved model here in the original process:
             load_model = torch.jit.load(tmpdir + "/model.pt")
             load_dat = torch.load(tmpdir + "/dat.pt")
+
+            atol = {
+                # tight, but not that tight, since GPU nondet has to pass
+                torch.float32: 1e-6,
+                torch.float64: 1e-10,
+            }[torch.get_default_dtype()]
+
             assert torch.allclose(
                 model_script(data)[out_field],
                 load_model(load_dat)[out_field],
-                atol=1e-7,
+                atol=atol,
             )
 
     def test_submods(self):
