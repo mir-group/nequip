@@ -9,9 +9,7 @@ import numpy as np
 import torch
 
 from nequip.data import AtomicDataDict
-from nequip.nn import GraphModuleMixin
-
-# from nequip.scripts import train
+from nequip.nn import GraphModuleMixin, RescaleOutput
 
 
 class IdentityModel(GraphModuleMixin, torch.nn.Module):
@@ -33,6 +31,51 @@ class IdentityModel(GraphModuleMixin, torch.nn.Module):
         return data
 
 
+class ConstFactorModel(GraphModuleMixin, torch.nn.Module):
+    def __init__(self, **kwargs):
+        super().__init__()
+        self._init_irreps(
+            irreps_in={
+                AtomicDataDict.TOTAL_ENERGY_KEY: "0e",
+                AtomicDataDict.FORCE_KEY: "1o",
+            }
+        )
+        # to keep the optimizer happy:
+        self.dummy = torch.nn.Parameter(torch.zeros(1))
+        self.register_buffer("factor", 3.7777 * torch.randn(1).squeeze())
+
+    def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
+        data[AtomicDataDict.FORCE_KEY] = (
+            self.factor * data[AtomicDataDict.FORCE_KEY] + 0.0 * self.dummy
+        )
+        data[AtomicDataDict.TOTAL_ENERGY_KEY] = (
+            self.factor * data[AtomicDataDict.TOTAL_ENERGY_KEY] + 0.0 * self.dummy
+        )
+        return data
+
+
+class LearningFactorModel(GraphModuleMixin, torch.nn.Module):
+    def __init__(self, **kwargs):
+        super().__init__()
+        self._init_irreps(
+            irreps_in={
+                AtomicDataDict.TOTAL_ENERGY_KEY: "0e",
+                AtomicDataDict.FORCE_KEY: "1o",
+            }
+        )
+        # By using a big factor, we keep it in a nice descending part
+        # of the optimization without too much oscilation in loss at
+        # the beginning
+        self.factor = torch.nn.Parameter(torch.as_tensor(1.111))
+
+    def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
+        data[AtomicDataDict.FORCE_KEY] = self.factor * data[AtomicDataDict.FORCE_KEY]
+        data[AtomicDataDict.TOTAL_ENERGY_KEY] = (
+            self.factor * data[AtomicDataDict.TOTAL_ENERGY_KEY]
+        )
+        return data
+
+
 @pytest.mark.parametrize(
     "conffile,field",
     [
@@ -40,7 +83,10 @@ class IdentityModel(GraphModuleMixin, torch.nn.Module):
         ("minimal_eng.yaml", AtomicDataDict.TOTAL_ENERGY_KEY),
     ],
 )
-def test_identity_train(nequip_dataset, BENCHMARK_ROOT, conffile, field):
+@pytest.mark.parametrize(
+    "builder", [IdentityModel, ConstFactorModel, LearningFactorModel]
+)
+def test_metrics(nequip_dataset, BENCHMARK_ROOT, conffile, field, builder):
 
     dtype = str(torch.get_default_dtype())[len("torch.") :]
 
@@ -60,8 +106,8 @@ def test_identity_train(nequip_dataset, BENCHMARK_ROOT, conffile, field):
             BENCHMARK_ROOT / "aspirin_ccsd-train.npz"
         )
         true_config["default_dtype"] = dtype
-        true_config["max_epochs"] = 1
-        true_config["model_builder"] = IdentityModel
+        true_config["max_epochs"] = 2
+        true_config["model_builder"] = builder
 
         # to be a true identity, we can't have rescaling
         true_config["global_rescale_shift"] = None
@@ -84,20 +130,26 @@ def test_identity_train(nequip_dataset, BENCHMARK_ROOT, conffile, field):
         # == Load metrics ==
         outdir = f"{true_config['root']}/{true_config['run_name']}/"
 
-        for which in ("train", "val"):
-            dat = np.genfromtxt(
-                f"{outdir}/metrics_batch_{which}.csv",
-                delimiter=",",
-                names=True,
-                dtype=None,
-            )
-            for field in dat.dtype.names:
-                if field == "epoch" or field == "batch":
-                    continue
-                # Everything else should be a loss or a metric
-                assert np.allclose(
-                    dat[field], 0.0
-                ), f"Loss/metric `{field}` wasn't all zero for {which}"
+        if builder == IdentityModel or builder == LearningFactorModel:
+            for which in ("train", "val"):
+                dat = np.genfromtxt(
+                    f"{outdir}/metrics_batch_{which}.csv",
+                    delimiter=",",
+                    names=True,
+                    dtype=None,
+                )
+                for field in dat.dtype.names:
+                    if field == "epoch" or field == "batch":
+                        continue
+                    # Everything else should be a loss or a metric
+                    if builder == IdentityModel:
+                        assert np.allclose(
+                            dat[field], 0.0
+                        ), f"Loss/metric `{field}` wasn't all zeros for {which}"
+                    elif builder == LearningFactorModel:
+                        assert (
+                            dat[field][-1] < dat[field][0]
+                        ), f"Loss/metric `{field}` didn't go down for {which}"
 
         # epoch metrics
         dat = np.genfromtxt(
@@ -110,9 +162,29 @@ def test_identity_train(nequip_dataset, BENCHMARK_ROOT, conffile, field):
             if field == "epoch" or field == "wall" or field == "LR":
                 continue
             # Everything else should be a loss or a metric
-            assert np.allclose(
-                dat[field], 0.0
-            ), f"Loss/metric `{field}` wasn't all zero for epoch"
+            if builder == IdentityModel:
+                assert np.allclose(
+                    dat[field], 0.0
+                ), f"Loss/metric `{field}` wasn't all equal to zero for epoch"
+            elif builder == ConstFactorModel:
+                # otherwise just check its constant.
+                # epoch-wise numbers should be the same, since there's no randomness at this level
+                assert np.allclose(
+                    dat[field], dat[field][0]
+                ), f"Loss/metric `{field}` wasn't all equal to {dat[field][0]} for epoch"
+            elif builder == LearningFactorModel:
+                assert (
+                    dat[field][-1] < dat[field][0]
+                ), f"Loss/metric `{field}` didn't go down across epochs"
 
         # == Check model ==
-        # model = torch.load(outdir + "/last_model.pth")
+        model = torch.load(outdir + "/last_model.pth")
+        assert isinstance(
+            model, RescaleOutput
+        )  # make sure trainer and this test aren't out of sync
+
+        if builder == IdentityModel:
+            one = model.model.one
+            # Since the loss is always zero, even though the constant
+            # 1 was trainable, it shouldn't have changed
+            assert torch.allclose(one, torch.ones(1))
