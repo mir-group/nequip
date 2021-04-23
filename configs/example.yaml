@@ -5,7 +5,7 @@
 # process contains processed data sets
 # if 'root'/'run_name' exists, 'root'/'run_name'_'year'-'month'-'day'-'hour'-'min'-'s' will be used instead.
 root: results/aspirin
-run_name: ema-test
+run_name: example-run
 seed: 0                                                                           # random number seed for numpy and torch
 restart: false                                                                    # set True for a restarted run
 append: false                                                                     # set True if a restarted run should append to the previous log file
