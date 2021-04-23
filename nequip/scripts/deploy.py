@@ -116,6 +116,9 @@ def main(args=None):
             model = script(model)
             logging.info("Compiled model to TorchScript")
 
+        model = torch.jit.freeze(model)
+        logging.info("Froze TorchScript model")
+
         # load config
         # TODO: walk module tree if config does not exist to find params?
         config_str = (args.train_dir / "config_final.yaml").read_text()
