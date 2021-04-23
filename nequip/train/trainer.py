@@ -83,8 +83,8 @@ class Trainer:
 
     For a fresh run, the simulation results will be stored in the 'root/run_name' folder. With
     - "log" : plain text information about the whole training process
-    - "metrics_epoch.txt" : txt matrice format (readable by np.loadtxt) with loss/mae from training and validation of each epoch
-    - "metrics_batch.txt" : txt matrice format (readable by np.loadtxt) with training loss/mae of each batch
+    - "metrics_epoch.csv" : txt matrice format (readable by np.loadtxt) with loss/mae from training and validation of each epoch
+    - "metrics_batch.csv" : txt matrice format (readable by np.loadtxt) with training loss/mae of each batch
     - "best_model.pth": the best model. save the model when validation mae goes lower
     - "last_model.pth": the last model. save the model every log_epoch_freq epoch
     - "trainer_save.pth": all the training information. The file used for loading and restart
@@ -274,10 +274,10 @@ class Trainer:
 
         if self.logfile is None:
             self.logfile = output.open_logfile("log", propagate=True)
-        self.epoch_log = output.open_logfile("metrics_epoch.txt", propagate=False)
+        self.epoch_log = output.open_logfile("metrics_epoch.csv", propagate=False)
         self.batch_log = {
-            TRAIN: output.open_logfile("metrics_batch_train.txt", propagate=False),
-            VALIDATION: output.open_logfile("metrics_batch_val.txt", propagate=False),
+            TRAIN: output.open_logfile("metrics_batch_train.csv", propagate=False),
+            VALIDATION: output.open_logfile("metrics_batch_val.csv", propagate=False),
         }
 
         # add filenames if not defined
@@ -775,16 +775,16 @@ class Trainer:
         store all the loss/mae of each batch
         """
 
-        mat_str = f"  {self.iepoch+1:5d} {self.ibatch+1:5d}"
-        log_str = f"{mat_str}"
+        mat_str = f"{self.iepoch+1:5d}, {self.ibatch+1:5d}"
+        log_str = f"{self.iepoch+1:5d} {self.ibatch+1:5d}"
 
-        header = "\n# Epoch\n# batch"
+        header = "epoch, batch"
         log_header = "# Epoch batch"
 
         # print and store loss value
         for name, value in self.batch_losses.items():
-            mat_str += f" {value:16.5g}"
-            header += f"\n# {name}"
+            mat_str += f", {value:16.5g}"
+            header += f", {name}"
             log_str += f" {value:12.3g}"
             log_header += f" {name:>12s}"
 
@@ -797,8 +797,8 @@ class Trainer:
         )
         for key, value in metrics.items():
 
-            mat_str += f" {value:16.5g}"
-            header += f"\n# {key}"
+            mat_str += f", {value:16.5g}"
+            header += f", {key}"
             if key not in skip_keys:
                 log_str += f" {value:12.3g}"
                 log_header += f" {key:>12s}"
@@ -880,18 +880,18 @@ class Trainer:
             wall=wall,
         )
 
-        header = "# Epoch\n# wall\n# LR"
+        header = "epoch, wall, LR"
 
         categories = [TRAIN, VALIDATION]
         log_header = {}
         log_str = {}
 
         strings = ["Epoch", "wal", "LR"]
-        mat_str = f"{self.iepoch+1:10d} {wall:8.3f} {lr:8.3g}"
+        mat_str = f"{self.iepoch+1:10d}, {wall:8.3f}, {lr:8.3g}"
         for cat in categories:
             log_header[cat] = "# "
             log_header[cat] += " ".join([f"{s:>8s}" for s in strings])
-            log_str[cat] = f"{mat_str}"
+            log_str[cat] = f"{self.iepoch+1:10d} {wall:8.3f} {lr:8.3g}"
 
         for category in categories:
 
@@ -904,16 +904,16 @@ class Trainer:
 
             # append details from loss
             for key, value in self.loss_dict[category].items():
-                mat_str += f" {value:16.5g}"
-                header += f"\n# {category}_{key}"
+                mat_str += f", {value:16.5g}"
+                header += f", {category}_{key}"
                 log_str[category] += f" {value:12.3g}"
                 log_header[category] += f" {key:>12s}"
                 self.mae_dict[f"{category}_{key}"] = value
 
             # append details from metrics
             for key, value in met.items():
-                mat_str += f" {value:12.3g}"
-                header += f"\n# {category}_{key}"
+                mat_str += f", {value:12.3g}"
+                header += f", {category}_{key}"
                 if key not in skip_keys:
                     log_str[category] += f" {value:12.3g}"
                     log_header[category] += f" {key:>12s}"
