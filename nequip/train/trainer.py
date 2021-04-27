@@ -305,7 +305,11 @@ class Trainer:
         self.statistics = {}
 
         if not (restart and append):
-            self.log_dictionary(self.as_dict(), name="Initialization")
+            d = self.as_dict()
+            for key in list(d.keys()):
+                if not isinstance(d[key], (float, int, str, list, tuple)):
+                    d[key] = type(d[key])
+            self.log_dictionary(d, name="Initialization")
 
         logging.debug("! Done Initialize Trainer")
 
@@ -414,8 +418,8 @@ class Trainer:
 
         return filename
 
-    @staticmethod
-    def from_file(
+    @classmethod
+    def from_file(cls,
         filename: str, format: Optional[str] = None, append: Optional[bool] = None
     ):
         """load a model from file
@@ -431,7 +435,7 @@ class Trainer:
             filename=filename,
             enforced_format=format,
         )
-        return Trainer.from_dict(dictionary, append)
+        return cls.from_dict(dictionary, append)
 
     @classmethod
     def from_dict(cls, dictionary, append: Optional[bool] = None):
