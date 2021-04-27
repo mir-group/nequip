@@ -32,7 +32,12 @@ def parse_command_line(args=None):
         config = Config.from_file(args.update_config)
     else:
         config = Config()
-    config.wandb_resume = config.get("wandb_resume", False)
+
+    append = config.get("append", False)
+    if append is None:
+        config.append = False
+    config.wandb_resume = config.get("wandb_resume", config.append)
+
     return args.session, config
 
 
@@ -47,7 +52,6 @@ def restart(file_name, config, mode="update"):
 
     dictionary.update(config)
     dictionary["run_time"] = 1 + dictionary.get("run_time", 0)
-
 
     config = Config(dictionary, exclude_keys=["state_dict", "progress"])
 
