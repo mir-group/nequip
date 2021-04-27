@@ -123,6 +123,9 @@ class ConvNetLayer(GraphModuleMixin, torch.nn.Module):
             f" parameters used to initialize {convolution.__name__}={convolution_kwargs}"
         )
 
+        # override defaults for irreps:
+        convolution_kwargs.pop("irreps_in", None)
+        convolution_kwargs.pop("irreps_out", None)
         self.conv = convolution(
             irreps_in=self.irreps_in,
             irreps_out=conv_irreps_out,
