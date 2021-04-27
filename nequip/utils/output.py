@@ -5,8 +5,8 @@ import sys
 
 from logging import FileHandler, StreamHandler
 from os import makedirs
-from os.path import abspath, relpath, isfile, isdir, dirname
-from time import time, perf_counter
+from os.path import abspath, relpath, isfile, isdir
+from time import time
 from typing import Optional
 
 from .config import Config
@@ -73,6 +73,7 @@ class Output:
             root = set_if_none(root, f".")
             run_name = set_if_none(run_name, f"NequIP")
             workdir = set_if_none(workdir, f"{root}/{run_name}")
+
         assert "/" not in run_name
 
         # if folder exists in a non-append-mode or a fresh run
@@ -181,22 +182,22 @@ class Output:
         }
 
     @classmethod
-    def get_output(cls, timestr: str, obj=None):
-        if obj is None:
+    def get_output(cls, timestr: str, kwargs: dict = {}):
+        if len(kwargs) == 0:
             return cls.instances.get(timestr, cls(root="./"))
         else:
-            if hasattr(obj, "timestr"):
-                timestr = getattr(obj, "timestr", "./")
+            if "timestr" in kwargs:
+                timestr = kwargs.get("timestr", "./")
                 if timestr in cls.instances:
                     return cls.instances[timestr]
 
             d = inspect.signature(cls.__init__)
-            kwargs = {
-                key: getattr(obj, key, None)
+            _kwargs = {
+                key: kwargs.get(key, None)
                 for key in list(d.parameters.keys())
                 if key not in ["self", "kwargs"]
             }
-            return cls(**kwargs)
+            return cls(**_kwargs)
 
     @classmethod
     def from_config(cls, config):

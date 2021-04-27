@@ -266,7 +266,13 @@ class Trainer:
         if self.use_ema:
             self.ema = None
 
-        output = Output.get_output(timestr, self)
+        output = Output.get_output(
+            timestr,
+            dict(
+                **locals(),
+                **kwargs,
+            ),
+        )
         self.output = output
 
         # timestr run_name root workdir logfile
@@ -419,8 +425,8 @@ class Trainer:
         return filename
 
     @classmethod
-    def from_file(cls,
-        filename: str, format: Optional[str] = None, append: Optional[bool] = None
+    def from_file(
+        cls, filename: str, format: Optional[str] = None, append: Optional[bool] = None
     ):
         """load a model from file
 
