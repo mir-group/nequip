@@ -267,6 +267,7 @@ class Trainer:
             self.ema = None
 
         output = Output.get_output(timestr, self)
+        self.output = output
 
         # timestr run_name root workdir logfile
         for key, value in output.updated_dict().items():
@@ -432,8 +433,8 @@ class Trainer:
         )
         return Trainer.from_dict(dictionary, append)
 
-    @staticmethod
-    def from_dict(dictionary, append: Optional[bool] = None):
+    @classmethod
+    def from_dict(cls, dictionary, append: Optional[bool] = None):
         """load model from dictionary
 
         Args:
@@ -487,7 +488,7 @@ class Trainer:
 
         state_dict = d.pop("state_dict", None)
 
-        trainer = Trainer(model=model, **d)
+        trainer = cls(model=model, **d)
 
         if state_dict is not None and trainer.model is not None:
             logging.debug("Reload optimizer and scheduler states")
