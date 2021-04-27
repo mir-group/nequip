@@ -23,14 +23,16 @@ class SphericalHarmonicEdgeAttrs(GraphModuleMixin, torch.nn.Module):
         edge_sh_normalize (bool, default: True): whether to normalize the spherical harmonics
         out_field (str, default: AtomicDataDict.EDGE_ATTRS_KEY: data/irreps field
     """
+
     out_field: str
+
     def __init__(
         self,
         irreps_edge_sh: Union[int, str, o3.Irreps],
         edge_sh_normalization: str = "component",
         edge_sh_normalize: bool = True,
         irreps_in=None,
-        out_field: str = AtomicDataDict.EDGE_ATTRS_KEY
+        out_field: str = AtomicDataDict.EDGE_ATTRS_KEY,
     ):
         super().__init__()
         self.out_field = out_field
