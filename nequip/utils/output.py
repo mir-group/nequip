@@ -65,7 +65,7 @@ class Output:
 
         # open root folder for storing
         # if folder exists and not append, the folder name and filename will be updated
-        if not force_append and ((restart and not append) or timestr is None):
+        if ((not force_append) and (restart and not append)) or timestr is None:
             timestr = datetime.datetime.fromtimestamp(time()).strftime(
                 "%Y-%m-%d_%H:%M:%S:%f"
             )
@@ -78,8 +78,10 @@ class Output:
         # if folder exists in a non-append-mode or a fresh run
         # rename the work folder based on run name
         if (
-            isdir(workdir) and ((restart and not append) or (not restart))
-        ) and not force_append:
+            isdir(workdir)
+            and (((restart and not append) or (not restart)))
+            and not force_append
+        ):
             logging.debug(f"  ...renaming workdir from {workdir} to")
 
             workdir = f"{root}/{run_name}_{timestr}"
@@ -91,7 +93,6 @@ class Output:
         self.run_name = run_name
         self.root = root
         self.workdir = workdir
-        self.n_files = {}
 
         self.logfile = logfile
         if logfile is not None:
@@ -120,12 +121,7 @@ class Output:
             raise ValueError("filename should be a relative path file name")
         file_name = f"{self.workdir}/{file_name}"
 
-        # add the counter
-        self.n_files[file_name] = self.n_files.get(file_name, 0) + 1
-
-        if isfile(file_name) and (
-            (self.restart and not self.append) or (not self.restart)
-        ):
+        if isfile(file_name) and not (self.restart and self.append):
             raise RuntimeError(
                 f"Tried to create file `{file_name}` but it already exists and either (1) append is disabled or (2) this run is not a restart"
             )
