@@ -17,7 +17,9 @@ def main(args=None):
 
 def requeue(config):
 
-    assert config.requeue, "This script only works for auto requeue. Be careful!!"
+    assert config.get(
+        "requeue", False
+    ), "This script only works for configs with `requeue` explicitly set to True. Be careful!!"
     for key in ["workdir", "root", "run_name"]:
         assert isinstance(
             config[key], str
