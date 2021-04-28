@@ -33,10 +33,10 @@ def parse_command_line(args=None):
     else:
         config = Config()
 
-    append = config.get("append", False)
-    if append is None:
+    config.append = config.get("append", False)
+    if config.append is None:
         config.append = False
-    config.wandb_resume = config.get("wandb_resume", config.append)
+    config.wandb_resume = config.get("wandb_resume", True)
 
     return args.session, config
 
