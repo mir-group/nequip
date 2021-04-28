@@ -26,8 +26,6 @@ default_config = dict(
     verbose="INFO",
     model_debug_mode=False,
     equivariance_test=False,
-    restart=False,
-    append=False,
     requeue=False,
     wandb_resume=False,
 )

@@ -216,7 +216,7 @@ class Trainer:
         timestr: Optional[str] = None,
         seed: Optional[int] = None,
         restart: bool = False,
-        append: bool = False,
+        append: bool = True,
         loss_coeffs: Union[dict, str] = AtomicDataDict.TOTAL_ENERGY_KEY,
         metrics_components: Optional[Union[dict, str]] = None,
         metrics_key: str = ABBREV.get(LOSS_KEY, LOSS_KEY),

@@ -33,9 +33,9 @@ def parse_command_line(args=None):
     else:
         config = Config()
 
-    config.append = config.get("append", False)
+    config.append = config.get("append", True)
     if config.append is None:
-        config.append = False
+        config.append = True
     config.wandb_resume = config.get("wandb_resume", True)
 
     return args.session, config
