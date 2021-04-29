@@ -8,7 +8,7 @@ from nequip.nn import GraphModuleMixin
 from nequip.data import AtomicData, AtomicDataDict
 
 
-PERMUTATION_FLOAT_TOLERANCE = {torch.float32: 1e-6, torch.float64: 1e-10}
+PERMUTATION_FLOAT_TOLERANCE = {torch.float32: 1e-5, torch.float64: 1e-10}
 
 
 # https://discuss.pytorch.org/t/how-to-quickly-inverse-a-permutation-by-using-pytorch/116205/4
