@@ -260,19 +260,15 @@ class Trainer:
         self.optim = optim
         self.lr_sched = lr_sched
 
+        _local_kwargs = {}
         for key in self.init_params:
             setattr(self, key, locals()[key])
+            _local_kwargs[key] = locals()[key]
 
         if self.use_ema:
             self.ema = None
 
-        output = Output.get_output(
-            timestr,
-            dict(
-                **locals(),
-                **kwargs,
-            ),
-        )
+        output = Output.get_output(timestr, dict(**_local_kwargs, **kwargs))
         self.output = output
 
         # timestr run_name root workdir logfile
