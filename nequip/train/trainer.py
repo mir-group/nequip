@@ -216,7 +216,7 @@ class Trainer:
         timestr: Optional[str] = None,
         seed: Optional[int] = None,
         restart: bool = False,
-        append: bool = False,
+        append: bool = True,
         loss_coeffs: Union[dict, str] = AtomicDataDict.TOTAL_ENERGY_KEY,
         metrics_components: Optional[Union[dict, str]] = None,
         metrics_key: str = ABBREV.get(LOSS_KEY, LOSS_KEY),
@@ -260,13 +260,16 @@ class Trainer:
         self.optim = optim
         self.lr_sched = lr_sched
 
+        _local_kwargs = {}
         for key in self.init_params:
             setattr(self, key, locals()[key])
+            _local_kwargs[key] = locals()[key]
 
         if self.use_ema:
             self.ema = None
 
-        output = Output.get_output(timestr, self)
+        output = Output.get_output(timestr, dict(**_local_kwargs, **kwargs))
+        self.output = output
 
         # timestr run_name root workdir logfile
         for key, value in output.updated_dict().items():
@@ -304,7 +307,11 @@ class Trainer:
         self.statistics = {}
 
         if not (restart and append):
-            self.log_dictionary(self.as_dict(), name="Initialization")
+            d = self.as_dict()
+            for key in list(d.keys()):
+                if not isinstance(d[key], (float, int, str, list, tuple)):
+                    d[key] = type(d[key])
+            self.log_dictionary(d, name="Initialization")
 
         logging.debug("! Done Initialize Trainer")
 
@@ -413,9 +420,9 @@ class Trainer:
 
         return filename
 
-    @staticmethod
+    @classmethod
     def from_file(
-        filename: str, format: Optional[str] = None, append: Optional[bool] = None
+        cls, filename: str, format: Optional[str] = None, append: Optional[bool] = None
     ):
         """load a model from file
 
@@ -430,10 +437,10 @@ class Trainer:
             filename=filename,
             enforced_format=format,
         )
-        return Trainer.from_dict(dictionary, append)
+        return cls.from_dict(dictionary, append)
 
-    @staticmethod
-    def from_dict(dictionary, append: Optional[bool] = None):
+    @classmethod
+    def from_dict(cls, dictionary, append: Optional[bool] = None):
         """load model from dictionary
 
         Args:
@@ -487,7 +494,7 @@ class Trainer:
 
         state_dict = d.pop("state_dict", None)
 
-        trainer = Trainer(model=model, **d)
+        trainer = cls(model=model, **d)
 
         if state_dict is not None and trainer.model is not None:
             logging.debug("Reload optimizer and scheduler states")

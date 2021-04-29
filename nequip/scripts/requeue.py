@@ -8,6 +8,7 @@ from os.path import isfile
 
 from .train import fresh_start, parse_command_line
 from .restart import restart
+from nequip.utils import Config
 
 
 def main(args=None):
@@ -35,7 +36,20 @@ def requeue(config):
         config.run_time = 1
         fresh_start(config)
     else:
-        restart(config.workdir + "/trainer.pth", config, mode="requeue")
+        new_config = Config(
+            dict(wandb_resume=True),
+            allow_list=[
+                "run_name",
+                "run_time",
+                "run_id",
+                "restart",
+                "append",
+                "force_append",
+                "wandb_resume",
+            ],
+        )
+        new_config.update(config)
+        restart(config.workdir + "/trainer.pth", new_config, mode="requeue")
 
     return
 

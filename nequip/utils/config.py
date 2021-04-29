@@ -57,9 +57,6 @@ class Config(object):
 
         if allow_list is not None:
             self.add_allow_list(allow_list, default_values={})
-        else:
-            # set defaults
-            self.__setitem__("wandb", False)
 
         if config is not None and exclude_keys is not None:
             config = {

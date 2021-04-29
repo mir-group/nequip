@@ -5,8 +5,8 @@ import sys
 
 from logging import FileHandler, StreamHandler
 from os import makedirs
-from os.path import abspath, relpath, isfile, isdir, dirname
-from time import time, perf_counter
+from os.path import abspath, relpath, isfile, isdir
+from time import time
 from typing import Optional
 
 from .config import Config
@@ -65,7 +65,7 @@ class Output:
 
         # open root folder for storing
         # if folder exists and not append, the folder name and filename will be updated
-        if not force_append and ((restart and not append) or timestr is None):
+        if ((not force_append) and (restart and not append)) or timestr is None:
             timestr = datetime.datetime.fromtimestamp(time()).strftime(
                 "%Y-%m-%d_%H:%M:%S:%f"
             )
@@ -73,13 +73,16 @@ class Output:
             root = set_if_none(root, f".")
             run_name = set_if_none(run_name, f"NequIP")
             workdir = set_if_none(workdir, f"{root}/{run_name}")
+
         assert "/" not in run_name
 
         # if folder exists in a non-append-mode or a fresh run
         # rename the work folder based on run name
         if (
-            isdir(workdir) and ((restart and not append) or (not restart))
-        ) and not force_append:
+            isdir(workdir)
+            and (((restart and not append) or (not restart)))
+            and not force_append
+        ):
             logging.debug(f"  ...renaming workdir from {workdir} to")
 
             workdir = f"{root}/{run_name}_{timestr}"
@@ -91,7 +94,6 @@ class Output:
         self.run_name = run_name
         self.root = root
         self.workdir = workdir
-        self.n_files = {}
 
         self.logfile = logfile
         if logfile is not None:
@@ -120,12 +122,7 @@ class Output:
             raise ValueError("filename should be a relative path file name")
         file_name = f"{self.workdir}/{file_name}"
 
-        # add the counter
-        self.n_files[file_name] = self.n_files.get(file_name, 0) + 1
-
-        if isfile(file_name) and (
-            (self.restart and not self.append) or (not self.restart)
-        ):
+        if isfile(file_name) and not (self.restart and self.append):
             raise RuntimeError(
                 f"Tried to create file `{file_name}` but it already exists and either (1) append is disabled or (2) this run is not a restart"
             )
@@ -185,22 +182,22 @@ class Output:
         }
 
     @classmethod
-    def get_output(cls, timestr: str, obj=None):
-        if obj is None:
+    def get_output(cls, timestr: str, kwargs: dict = {}):
+        if len(kwargs) == 0:
             return cls.instances.get(timestr, cls(root="./"))
         else:
-            if hasattr(obj, "timestr"):
-                timestr = getattr(obj, "timestr", "./")
+            if "timestr" in kwargs:
+                timestr = kwargs.get("timestr", "./")
                 if timestr in cls.instances:
                     return cls.instances[timestr]
 
             d = inspect.signature(cls.__init__)
-            kwargs = {
-                key: getattr(obj, key, None)
+            _kwargs = {
+                key: kwargs.get(key, None)
                 for key in list(d.parameters.keys())
                 if key not in ["self", "kwargs"]
             }
-            return cls(**kwargs)
+            return cls(**_kwargs)
 
     @classmethod
     def from_config(cls, config):
