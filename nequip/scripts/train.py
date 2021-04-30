@@ -23,6 +23,7 @@ default_config = dict(
     wandb_resume=False,
     compile_model=False,
     model_builder="nequip.models.ForceModel",
+    model_uniform_init=False,
     dataset_statistics_stride=1,
     default_dtype="float32",
     verbose="INFO",
@@ -145,6 +146,13 @@ def fresh_start(config):
         raise TypeError
     assert callable(model_builder), f"Model builder {model_builder} isn't callable"
     core_model = model_builder(**dict(config))
+
+    # = Reinit if wanted =
+    if config.model_uniform_init:
+        from nequip.utils.uniform_init import uniform_initialize
+
+        with torch.no_grad():
+            core_model.apply(uniform_initialize)
 
     # = Determine shifts, scales =
     # This is a bit awkward, but necessary for there to be a value
