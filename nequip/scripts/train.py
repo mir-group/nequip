@@ -26,6 +26,7 @@ default_config = dict(
     verbose="INFO",
     model_debug_mode=False,
     equivariance_test=False,
+    grad_anomaly_mode=False,
 )
 
 
@@ -46,11 +47,16 @@ def parse_command_line(args=None):
         help="enable model debug mode, which can sometimes give much more useful error messages at the cost of some speed. Do not use for production training!",
         action="store_true",
     )
+    parser.add_argument(
+        "--grad-anomaly-mode",
+        help="enable PyTorch autograd anomaly mode to debug NaN gradients. Do not use for production training!",
+        action="store_true",
+    )
     args = parser.parse_args(args=args)
 
     config = Config.from_file(args.config, defaults=default_config)
-    config.model_debug_mode = args.model_debug_mode or config.model_debug_mode
-    config.equivariance_test = args.equivariance_test or config.equivariance_test
+    for flag in ("model_debug_mode", "equivariance_test", "grad_anomaly_mode"):
+        config[flag] = getattr(args, flag) or config[flag]
 
     return config
 
@@ -62,6 +68,8 @@ def fresh_start(config):
     torch.set_default_dtype(
         {"float32": torch.float32, "float64": torch.float64}[config.default_dtype]
     )
+    if config.grad_anomaly_mode:
+        torch.autograd.set_detect_anomaly(True)
     output = Output.from_config(config)
     config.update(output.updated_dict())
 
