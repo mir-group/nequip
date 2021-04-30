@@ -7,13 +7,8 @@ NequIP is an open-source deep learning package for learning interatomic potentia
 
 ### Requirements
 
-* Python, v3.8+
-* PyTorch, v1.8
-* Numpy, v1.19.5
-* Scipy, v1.6.0
-* ASE, v3.20.1
-
-In particular, please be sure to install Python 3.8 and Pytorch 1.8. 
+* Python >= 3.6
+* PyTorch >= 1.8
 
 ### Installation
 
@@ -97,10 +92,10 @@ The best way to learn how to use NequIP is [through the tutorial notebook hosted
 
 ### Training a network
 
-To train a network, all you need to is run train.py with a config file that describes your data set and network, for example: 
+To train a network, all you need to is run `nequip-train` with a config file that describes your data set and network, for example: 
 
 ```
-python scripts/train.py configs/example.yaml
+nequip-train configs/example.yaml
 ```
 
 ### References
