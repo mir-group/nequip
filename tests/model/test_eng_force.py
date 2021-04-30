@@ -13,6 +13,7 @@ from e3nn.util.jit import script
 from nequip.data import AtomicDataDict, AtomicData
 from nequip.models import EnergyModel, ForceModel
 from nequip.nn import GraphModuleMixin, AtomwiseLinear
+from nequip.utils.uniform_init import uniform_initialize
 from nequip.utils.test import assert_AtomicData_equivariant
 
 
@@ -92,6 +93,19 @@ class TestWorkflow:
     def test_init(self, model):
         instance, _ = model
         assert isinstance(instance, GraphModuleMixin)
+
+    def test_weight_init(self, model, atomic_batch, device):
+        instance, out_field = model
+        data = AtomicData.to_AtomicDataDict(atomic_batch.to(device=device))
+        instance = instance.to(device=device)
+
+        out_orig = instance(data)[out_field]
+
+        with torch.no_grad():
+            instance.apply(uniform_initialize)
+
+        out_unif = instance(data)[out_field]
+        assert not torch.allclose(out_orig, out_unif)
 
     def test_jit(self, model, atomic_batch, device):
         instance, out_field = model
