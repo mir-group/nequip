@@ -11,15 +11,17 @@ import torch
 
 import e3nn.util.jit
 
-from nequip.utils import Config, dataset_from_config, Output
+from nequip.utils import Config, dataset_from_config
 from nequip.data import AtomicDataDict
 from nequip.nn import RescaleOutput
 from nequip.utils.test import assert_AtomicData_equivariant, set_irreps_debug
 
 default_config = dict(
+    requeue=False,
     wandb=False,
-    compile_model=False,
     wandb_project="NequIP",
+    wandb_resume=False,
+    compile_model=False,
     model_builder="nequip.models.ForceModel",
     dataset_statistics_stride=1,
     default_dtype="float32",
@@ -70,8 +72,6 @@ def fresh_start(config):
     )
     if config.grad_anomaly_mode:
         torch.autograd.set_detect_anomaly(True)
-    output = Output.from_config(config)
-    config.update(output.updated_dict())
 
     # = Make the trainer =
     if config.wandb:
@@ -88,6 +88,9 @@ def fresh_start(config):
         from nequip.train.trainer import Trainer
 
         trainer = Trainer(model=None, **dict(config))
+
+    output = trainer.output
+    config.update(output.updated_dict())
 
     # = Load the dataset =
     dataset = dataset_from_config(config)

@@ -18,10 +18,11 @@ class TrainerWandB(Trainer):
 
     def __init__(self, **kwargs):
         Trainer.__init__(self, **kwargs)
+        wandb.config.update(self.output.updated_dict(), allow_val_change=True)
 
     def end_of_epoch_log(self):
         Trainer.end_of_epoch_log(self)
-        wandb.log(dict(lr=self.learning_rate, **self.mae_dict))
+        wandb.log(self.mae_dict)
 
     def init_model(self):
 

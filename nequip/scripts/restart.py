@@ -30,9 +30,13 @@ def parse_command_line(args=None):
 
     if args.update_config:
         config = Config.from_file(args.update_config)
-        config.run_name = config.pop("run_name", "NequIP") + "_restart"
     else:
         config = Config()
+
+    config.append = config.get("append", True)
+    if config.append is None:
+        config.append = True
+    config.wandb_resume = config.get("wandb_resume", True)
 
     return args.session, config
 
@@ -46,35 +50,14 @@ def restart(file_name, config, mode="update"):
         enforced_format="torch",
     )
 
-    if mode == "update":
+    dictionary.update(config)
+    dictionary["run_time"] = 1 + dictionary.get("run_time", 0)
 
-        origin_config = Config(dictionary, exclude_keys=["state_dict", "progress"])
-        origin_config.run_name = origin_config.pop("run_name", "NequIP")
-        origin_config.update(config)
-        del config
-        config = origin_config
+    config = Config(dictionary, exclude_keys=["state_dict", "progress"])
 
-    elif mode == "requeue":
-
-        for key in ["workdir", "root", "run_name"]:
-            assert (
-                dictionary[key] == config[key]
-            ), f"{key} is not consistent with the yaml file"
-
-        # fetch run_name, run_time and run_id
-        config.update({k: v for k, v in dictionary.items() if k.startswith("run_")})
-
-        config.run_time += 1
-        dictionary["run_time"] += 1
-
-        torch.set_default_dtype(
-            {"float32": torch.float32, "float64": torch.float64}[config.default_dtype]
-        )
-
-    # open folders
-    output = Output.from_config(config)
-    config.update(output.updated_dict())
-    dictionary.update(output.updated_dict())
+    torch.set_default_dtype(
+        {"float32": torch.float32, "float64": torch.float64}[config.default_dtype]
+    )
 
     # increase max_epochs if training has hit maximum epochs
     if "progress" in dictionary:
@@ -87,15 +70,22 @@ def restart(file_name, config, mode="update"):
         from nequip.train.trainer_wandb import TrainerWandB
 
         # resume wandb run
-        from nequip.utils.wandb import resume
+        if config.wandb_resume:
+            from nequip.utils.wandb import resume
 
-        resume(config)
+            resume(config)
+        else:
+            from nequip.utils.wandb import init_n_update
+
+            config = init_n_update(config)
 
         trainer = TrainerWandB.from_dict(dictionary)
     else:
         from nequip.train.trainer import Trainer
 
         trainer = Trainer.from_dict(dictionary)
+
+    config.update(trainer.output.updated_dict())
 
     dataset = dataset_from_config(config)
     logging.info(f"Successfully reload the data set of type {dataset}...")
