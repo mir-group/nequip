@@ -1,5 +1,7 @@
 from copy import deepcopy
-from typing import Union
+from typing import Union, Sequence, Tuple
+
+import torch
 
 from nequip.data import AtomicDataDict
 from torch_runstats import RunningStats, Reduction
@@ -11,16 +13,47 @@ metrics_to_reduction = {"mae": Reduction.MEAN, "rmse": Reduction.RMS}
 
 
 class Metrics:
-    """Only scalar errors are supported atm."""
+    """Computes all mae, rmse needed for report
+
+    Args:
+        components: a list or a tuples of definition.
+
+    Example:
+
+    ```
+    components = [(key1, "rmse"), (key2, "mse)]
+    ```
+
+    You can also offer more details with a dictionary. The keys can be any keys for RunningStats or
+
+    report_per_component (bool): if True, report the mean on each component (equivalent to mean(axis=0) in numpy),
+                                 otherwise, take the mean across batch and all components for vector data.
+    functional: the function to compute the error. It has to be exactly the same as the one defined in torch.nn.
+                default: "L1Loss"
+    PerSpecies: whether compute the estimation for each species or not
+
+
+    ```
+    components = (
+        (
+            AtomicDataDict.FORCE_KEY,
+            "rmse",
+            {"PerSpecies": True, "functional": "L1Loss", "dim": 3},
+        ),
+        (AtomicDataDict.FORCE_KEY, "mae", {"dim": 3}),
+    )
+    ```
+
+    """
 
     def __init__(
-        self,
-        components: Union[list, tuple],
+        self, components: Sequence[Union[Tuple[str, str], Tuple[str, str, dict]]]
     ):
 
         self.running_stats = {}
         self.per_species = {}
         self.funcs = {}
+        self.kwargs = {}
         for component in components:
 
             key, reduction, params = Metrics.parse(component)
@@ -34,12 +67,32 @@ class Metrics:
                 self.running_stats[key] = {}
                 self.per_species[key] = {}
                 self.funcs[key] = find_loss_function(functional, {})
+                self.kwargs[key] = {}
 
-            self.running_stats[key][reduction] = RunningStats(
+            # store for initialization
+            kwargs = deepcopy(params)
+
+            # by default, report a scalar that is mae and rmse over all component
+            self.kwargs[key][reduction] = dict(
                 reduction=metrics_to_reduction.get(reduction, reduction),
-                **params,
             )
+            self.kwargs[key][reduction].update(kwargs)
+
             self.per_species[key][reduction] = per_species
+
+    def init_runstat(self, params, error: torch.Tensor):
+
+        kwargs = deepcopy(params)
+        if "dim" not in kwargs:
+            kwargs["dim"] = error.shape[1:]
+
+        if "reduce_dims" not in kwargs:
+            if not kwargs.pop("report_per_component", False):
+                kwargs["reduce_dims"] = tuple(range(len(error.shape) - 1))
+
+        rs = RunningStats(**kwargs)
+        rs.to(device=error.device)
+        return rs
 
     @staticmethod
     def parse(component):
@@ -74,7 +127,15 @@ class Metrics:
                 mean=False,
             )
 
-            for reduction, stat in self.running_stats[key].items():
+            for reduction, kwargs in self.kwargs[key].items():
+
+                # initialize the internal run_stat base on the error shape
+                if reduction not in self.running_stats[key]:
+                    self.running_stats[key][reduction] = self.init_runstat(
+                        params=kwargs, error=error
+                    )
+
+                stat = self.running_stats[key][reduction]
 
                 params = {}
                 if self.per_species[key][reduction]:

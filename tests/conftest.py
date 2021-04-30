@@ -1,3 +1,4 @@
+from typing import List
 import numpy as np
 import pathlib
 import pytest
@@ -25,7 +26,9 @@ from e3nn.util.test import float_tolerance
 float_tolerance = float_tolerance
 
 
-BENCHMARK_ROOT = pathlib.Path(__file__).parent / "../benchmark_data/"
+@pytest.fixture()
+def BENCHMARK_ROOT():
+    return pathlib.Path(__file__).parent / "../benchmark_data/"
 
 
 @pytest.fixture(scope="session")
@@ -35,14 +38,14 @@ def temp_data(float_tolerance):
 
 
 @pytest.fixture(scope="session")
-def CH3CHO(float_tolerance):
+def CH3CHO(float_tolerance) -> AtomicData:
     atoms = molecule("CH3CHO")
     data = AtomicData.from_ase(atoms, r_max=2.0)
     return atoms, data
 
 
 @pytest.fixture(scope="session")
-def molecules():
+def molecules() -> List[Atoms]:
     atoms_list = []
     for i in range(8):
         atoms = molecule("CH3CHO" if i % 2 == 0 else "H2")

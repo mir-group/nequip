@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Union, Optional
 
 import torch
 
@@ -11,10 +11,24 @@ from nequip.nn import GraphModuleMixin
 
 @compile_mode("script")
 class GradientOutput(GraphModuleMixin, torch.nn.Module):
+    r"""Wrap a model and include as an output its gradient.
+
+    Args:
+        func: the model to wrap
+        of: the name of the output field of ``func`` to take the gradient with respect to. The field must be a single scalar (i.e. have irreps ``0e``)
+        wrt: the input field(s) of ``func`` to take the gradient of ``of`` with regards to.
+        out_field: the field in which to return the computed gradients. Defaults to ``f"d({of})/d({wrt})"`` for each field in ``wrt``.
+        sign: either 1 or -1; the returned gradient is multiplied by this.
+    """
     sign: float
 
     def __init__(
-        self, func, of, wrt, out_field=None, irreps_in=None, sign: float = 1.0
+        self,
+        func: GraphModuleMixin,
+        of: str,
+        wrt: Union[str, List[str]],
+        out_field: Optional[List[str]] = None,
+        sign: float = 1.0,
     ):
         super().__init__()
         sign = float(sign)
@@ -35,16 +49,14 @@ class GradientOutput(GraphModuleMixin, torch.nn.Module):
                 self.wrt
             ), "Out field names must be given for all w.r.t tensors"
             self.out_field = out_field
-        # Check irreps
-        irreps_of = Irreps(irreps_in[of])
-        if irreps_of.lmax > 0 or irreps_of.num_irreps > 1:
-            raise NotImplementedError(
-                "Currently, GradientOutput only supports taking gradients of single scalar outputs"
-            )
 
+        # check and init irreps
         self._init_irreps(
-            irreps_in=irreps_in,
+            irreps_in=func.irreps_in,
+            my_irreps_in={of: Irreps("0e")},
+            irreps_out=func.irreps_out,
         )
+
         # The gradient of a single scalar w.r.t. something of a given shape and irrep just has that shape and irrep
         # Ex.: gradient of energy (0e) w.r.t. position vector (L=1) is also an L = 1 vector
         self.irreps_out.update(
@@ -85,3 +97,21 @@ class GradientOutput(GraphModuleMixin, torch.nn.Module):
             data[k].requires_grad_(req_grad)
 
         return data
+
+
+def ForceOutput(energy_model: GraphModuleMixin) -> GradientOutput:
+    r"""Convinience constructor for ``GradientOutput`` with settings for forces.
+
+    Args:
+        energy_model: the model to wrap. Must have ``AtomicDataDict.TOTAL_ENERGY_KEY`` as an output.
+
+    Returns:
+        A ``GradientOutput`` wrapping ``energy_model``.
+    """
+    return GradientOutput(
+        func=energy_model,
+        of=AtomicDataDict.TOTAL_ENERGY_KEY,
+        wrt=AtomicDataDict.POSITIONS_KEY,
+        out_field=AtomicDataDict.FORCE_KEY,
+        sign=-1,  # force is the negative gradient
+    )

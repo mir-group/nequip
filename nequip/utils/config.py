@@ -57,9 +57,6 @@ class Config(object):
 
         if allow_list is not None:
             self.add_allow_list(allow_list, default_values={})
-        else:
-            # set defaults
-            self.__setitem__("wandb", False)
 
         if config is not None and exclude_keys is not None:
             config = {
@@ -124,7 +121,7 @@ class Config(object):
 
             k = key[1:-5]
             if (not self._allow_all) and key not in self._allow_list:
-                return
+                return None
 
             self._item_types[k] = val
 
@@ -139,7 +136,7 @@ class Config(object):
             # try to format the variable
             try:
                 val = typehint(val) if typehint is not None else val
-            except:
+            except Exception:
                 raise TypeError(
                     f"Wrong Type: Parameter {key} should be {typehint} type."
                     f"But {type(val)} is given"

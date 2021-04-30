@@ -249,7 +249,7 @@ class AtomicData(Data):
         elif isinstance(data, Mapping):
             keys = data.keys()
         else:
-            raise ValueError(f"Invalid data `{data:r}`")
+            raise ValueError(f"Invalid data `{repr(data)}`")
         return {
             k: data[k] for k in keys if (k not in exclude_keys and data[k] is not None)
         }

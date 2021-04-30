@@ -150,7 +150,10 @@ class AtomicInMemoryDataset(AtomicDataset):
     def processed_file_names(self):
         # TO DO, can be updated to hash all simple terms in extra_fixed_fields
         r_max = self.extra_fixed_fields["r_max"]
-        return [f"{r_max}_data.pt"]
+        dtype = str(torch.get_default_dtype())
+        if dtype.startswith("torch."):
+            dtype = dtype[len("torch.") :]
+        return [f"{r_max}_{dtype}_data.pt"]
 
     def get_data(
         self,
@@ -294,8 +297,14 @@ class AtomicInMemoryDataset(AtomicDataset):
             selector = torch.as_tensor(self.__indices__)[::stride]
         else:
             selector = torch.arange(0, self.len(), stride)
+
+        node_selector = torch.as_tensor(
+            np.in1d(self.data.batch.numpy(), selector.numpy())
+        )
+        # the pure PyTorch alternative to ^ is:
         # hack for in1d: https://github.com/pytorch/pytorch/issues/3025#issuecomment-392601780
-        node_selector = (self.data.batch[..., None] == selector).any(-1)
+        # node_selector = (self.data.batch[..., None] == selector).any(-1)
+        # but this is unnecessary because no backward is done through statistics
 
         if modes is not None:
             assert len(modes) == len(fields)

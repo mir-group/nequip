@@ -67,44 +67,37 @@ def load_file(supported_formats: dict, filename: str, enforced_format: str = Non
     """
     Load file. Current support form
     """
+    if enforced_format is None:
+        format = match_suffix(supported_formats=supported_formats, filename=filename)
+    else:
+        format = enforced_format
 
     if not isfile(filename):
         raise OSError(f"file {filename} is not found")
-
-    if enforced_format is None:
-        format = match_suffix(supported_formats=supported_formats, filename=filename)
-
-    else:
-        format = enforced_format
 
     if format == "json":
         import json
 
         with open(filename) as fin:
             return json.load(fin)
-
     elif format == "yaml":
         import yaml
 
         with open(filename) as fin:
             return yaml.load(fin, Loader=yaml.Loader)
-
     elif format == "torch":
         import torch
 
         return torch.load(filename)
-
     elif format == "pickle":
         import pickle
 
         with open(filename, "rb") as fin:
-            return pickle.load(item, fin)
-
+            return pickle.load(fin)
     elif format == "npz":
         import numpy as np
 
         return np.load(filename, allow_pickle=True)
-
     else:
         raise NotImplementedError(
             f"Input format not supported:" f" try from {supported_formats.keys()}"
@@ -130,10 +123,8 @@ def adjust_format_name(
         newname (str): the adjusted filename
 
     """
-
     if enforced_format is None:
         newformat = match_suffix(supported_formats=supported_formats, filename=filename)
-
     else:
         newformat = enforced_format
 

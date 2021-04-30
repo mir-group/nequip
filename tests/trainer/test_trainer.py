@@ -1,19 +1,19 @@
 """
 Trainer tests
 """
+import pytest
 
 import numpy as np
-import pytest
 import tempfile
+from os.path import isfile
 
 import torch
-
-from os.path import isfile
 from torch.nn import Linear
 
-from nequip.data import NpzDataset, AtomicDataDict
+from nequip.data import NpzDataset, AtomicDataDict, AtomicData
 from nequip.train.trainer import Trainer
 from nequip.utils.savenload import load_file
+from nequip.nn import GraphModuleMixin
 
 # set up two config to test
 DEBUG = False
@@ -288,20 +288,31 @@ def get_param(model):
     return v
 
 
-class DummyNet(torch.nn.Module):
+class DummyNet(GraphModuleMixin, torch.nn.Module):
     def __init__(self, ndim, nydim=1) -> None:
         super().__init__()
         self.ndim = ndim
         self.nydim = nydim
         self.linear1 = Linear(ndim, nydim)
         self.linear2 = Linear(ndim, nydim * 3)
+        self._init_irreps(
+            irreps_in={"pos": "1x1o"},
+            irreps_out={
+                AtomicDataDict.FORCE_KEY: "1x1o",
+                AtomicDataDict.TOTAL_ENERGY_KEY: "1x0e",
+            },
+        )
 
-    def forward(self, data):
+    def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
+        data = data.copy()
         x = data["pos"]
-        return {
-            AtomicDataDict.FORCE_KEY: self.linear2(x),
-            AtomicDataDict.TOTAL_ENERGY_KEY: self.linear1(x),
-        }
+        data.update(
+            {
+                AtomicDataDict.FORCE_KEY: self.linear2(x),
+                AtomicDataDict.TOTAL_ENERGY_KEY: self.linear1(x),
+            }
+        )
+        return data
 
 
 class DummyScale(torch.nn.Module):
@@ -321,22 +332,18 @@ class DummyScale(torch.nn.Module):
             out = out + self.shift_by
         return {self.key: out}
 
-    def scale(self, data, force_process=False, do_shift=True, do_scale=True):
+    def scale(self, data, force_process=False):
         data = data.copy()
         if force_process or not self.training:
-            if do_scale:
-                data[self.key] = data[self.key] * self.scale_by
-            if do_shift:
-                data[self.key] = data[self.key] + self.shift_by
+            data[self.key] = data[self.key] * self.scale_by
+            data[self.key] = data[self.key] + self.shift_by
         return data
 
-    def unscale(self, data, force_process=False, do_shift=True, do_scale=True):
+    def unscale(self, data, force_process=False):
         data = data.copy()
         if force_process or self.training:
-            if do_shift:
-                data[self.key] = data[self.key] - self.shift_by
-            if do_scale:
-                data[self.key] = data[self.key] / self.scale_by
+            data[self.key] = data[self.key] - self.shift_by
+            data[self.key] = data[self.key] / self.scale_by
         return data
 
 

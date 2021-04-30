@@ -1,11 +1,11 @@
-import logging
-import numpy as np
 import pytest
 
+import logging
 import tempfile
 import torch
-
 from os.path import isfile
+
+import numpy as np
 
 from e3nn import o3
 from e3nn.util.jit import script
@@ -13,9 +13,9 @@ from e3nn.util.jit import script
 from nequip.data import AtomicDataDict, AtomicData
 from nequip.models import EnergyModel, ForceModel
 from nequip.nn import GraphModuleMixin, AtomwiseLinear
+from nequip.utils.uniform_init import uniform_initialize
 from nequip.utils.test import assert_AtomicData_equivariant
 
-# from nequip.utils.test import assert_AtomicData_equivariant
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -40,21 +40,29 @@ minimal_config2 = dict(
     irreps_mid_output_block="2x0e",
     feature_irreps_hidden="4x0e + 4x1o",
 )
+minimal_config3 = dict(
+    allowed_species=ALLOWED_SPECIES,
+    irreps_edge_sh="0e + 1o",
+    r_max=4,
+    feature_irreps_hidden="4x0e + 4x1o",
+    resnet=True,
+    num_layers=2,
+    num_basis=8,
+    PolynomialCutoff_p=6,
+    nonlinearity_type="gate",
+)
 
 
-def force_model(**kwargs):
-    energy_model = EnergyModel(**kwargs)
-    return ForceModel(energy_model)
-
-
-@pytest.fixture(scope="module", params=[minimal_config1, minimal_config2])
+@pytest.fixture(
+    scope="module", params=[minimal_config1, minimal_config2, minimal_config3]
+)
 def config(request):
     return request.param
 
 
 @pytest.fixture(
     params=[
-        (force_model, AtomicDataDict.FORCE_KEY),
+        (ForceModel, AtomicDataDict.FORCE_KEY),
         (EnergyModel, AtomicDataDict.TOTAL_ENERGY_KEY),
     ]
 )
@@ -86,28 +94,51 @@ class TestWorkflow:
         instance, _ = model
         assert isinstance(instance, GraphModuleMixin)
 
-    def test_jit(self, model, atomic_batch, device):
-
+    def test_weight_init(self, model, atomic_batch, device):
         instance, out_field = model
-
         data = AtomicData.to_AtomicDataDict(atomic_batch.to(device=device))
+        instance = instance.to(device=device)
 
+        out_orig = instance(data)[out_field]
+
+        with torch.no_grad():
+            instance.apply(uniform_initialize)
+
+        out_unif = instance(data)[out_field]
+        assert not torch.allclose(out_orig, out_unif)
+
+    def test_jit(self, model, atomic_batch, device):
+        instance, out_field = model
+        data = AtomicData.to_AtomicDataDict(atomic_batch.to(device=device))
         instance = instance.to(device=device)
         model_script = script(instance)
-
-        result0 = instance(data)[out_field].flatten()
-        result1 = model_script(data)[out_field].flatten()
-        d = result0 - result1
-        for i in range(result0.shape[0]):
-            print(
-                i,
-                f"({result0[i].item():10.3g})-({result1[i].item():10.3g})=({d[i].item():10.3g})",
-                torch.isclose(result0[i], result1[i]).item(),
-            )
 
         assert torch.allclose(
             instance(data)[out_field], model_script(data)[out_field], atol=1e-7
         )
+
+        # - Try saving, loading in another process, and running -
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Save stuff
+            model_script.save(tmpdir + "/model.pt")
+            torch.save(data, tmpdir + "/dat.pt")
+            # Ideally, this would be tested in a subprocess where nequip isn't imported.
+            # But CUDA + torch plays very badly with subprocesses here and causes a race condition.
+            # So instead we do a slightly less complete test, loading the saved model here in the original process:
+            load_model = torch.jit.load(tmpdir + "/model.pt")
+            load_dat = torch.load(tmpdir + "/dat.pt")
+
+            atol = {
+                # tight, but not that tight, since GPU nondet has to pass
+                torch.float32: 1e-6,
+                torch.float64: 1e-10,
+            }[torch.get_default_dtype()]
+
+            assert torch.allclose(
+                model_script(data)[out_field],
+                load_model(load_dat)[out_field],
+                atol=atol,
+            )
 
     def test_submods(self):
         model = EnergyModel(**minimal_config2)
@@ -142,8 +173,7 @@ class TestWorkflow:
 
 class TestGradient:
     def test_numeric_gradient(self, config, atomic_batch, device, float_tolerance):
-
-        model = force_model(**config)
+        model = ForceModel(**config)
         model.to(device)
         data = atomic_batch.to(device)
         output = model(AtomicData.to_AtomicDataDict(data))
@@ -197,6 +227,104 @@ class TestAutoGradient:
 
 
 class TestEquivariance:
-    def test_forward(self, model, atomic_batch):
+    def test_forward(self, model, atomic_batch, device):
         instance, out_field = model
+        instance = instance.to(device=device)
+        atomic_batch = atomic_batch.to(device=device)
         assert_AtomicData_equivariant(func=instance, data_in=atomic_batch)
+
+
+class TestCutoff:
+    def test_large_separation(self, model, config, molecules):
+        atol = {torch.float32: 1e-6, torch.float64: 1e-10}[torch.get_default_dtype()]
+        instance, _ = model
+        r_max = config["r_max"]
+        atoms1 = molecules[0].copy()
+        atoms2 = molecules[1].copy()
+        # translate atoms2 far away
+        atoms2.positions += 40.0 + np.random.randn(3)
+        atoms_both = atoms1.copy()
+        atoms_both.extend(atoms2)
+        data1 = AtomicData.from_ase(atoms1, r_max=r_max)
+        data2 = AtomicData.from_ase(atoms2, r_max=r_max)
+        data_both = AtomicData.from_ase(atoms_both, r_max=r_max)
+        assert (
+            data_both[AtomicDataDict.EDGE_INDEX_KEY].shape[1]
+            == data1[AtomicDataDict.EDGE_INDEX_KEY].shape[1]
+            + data2[AtomicDataDict.EDGE_INDEX_KEY].shape[1]
+        )
+
+        out1 = instance(AtomicData.to_AtomicDataDict(data1))
+        out2 = instance(AtomicData.to_AtomicDataDict(data2))
+        out_both = instance(AtomicData.to_AtomicDataDict(data_both))
+
+        assert torch.allclose(
+            out1[AtomicDataDict.TOTAL_ENERGY_KEY]
+            + out2[AtomicDataDict.TOTAL_ENERGY_KEY],
+            out_both[AtomicDataDict.TOTAL_ENERGY_KEY],
+            atol=atol,
+        )
+
+        atoms_both2 = atoms1.copy()
+        atoms3 = atoms2.copy()
+        atoms3.positions += np.random.randn(3)
+        atoms_both2.extend(atoms3)
+        data_both2 = AtomicData.from_ase(atoms_both2, r_max=r_max)
+        out_both2 = instance(AtomicData.to_AtomicDataDict(data_both2))
+        assert torch.allclose(
+            out_both2[AtomicDataDict.TOTAL_ENERGY_KEY],
+            out_both[AtomicDataDict.TOTAL_ENERGY_KEY],
+            atol=atol,
+        )
+        assert torch.allclose(
+            out_both2[AtomicDataDict.PER_ATOM_ENERGY_KEY],
+            out_both[AtomicDataDict.PER_ATOM_ENERGY_KEY],
+            atol=atol,
+        )
+
+    def test_embedding_cutoff(self, config):
+        instance = EnergyModel(**config)
+        r_max = config["r_max"]
+
+        # make a synthetic three atom example
+        data = AtomicData(
+            atomic_numbers=np.random.choice(ALLOWED_SPECIES, size=3),
+            pos=np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]),
+            edge_index=np.array([[0, 1, 0, 2], [1, 0, 2, 0]]),
+        )
+        edge_embed = instance(AtomicData.to_AtomicDataDict(data))[
+            AtomicDataDict.EDGE_EMBEDDING_KEY
+        ]
+        data.pos[2, 1] = r_max  # put it past the cutoff
+        edge_embed2 = instance(AtomicData.to_AtomicDataDict(data))[
+            AtomicDataDict.EDGE_EMBEDDING_KEY
+        ]
+
+        assert torch.allclose(edge_embed[:2], edge_embed2[:2])
+        assert edge_embed[2:].abs().sum() > 1e-6  # some nonzero terms
+        assert torch.allclose(edge_embed2[2:], torch.zeros(1))
+
+        # test gradients
+        in_dict = AtomicData.to_AtomicDataDict(data)
+        in_dict[AtomicDataDict.POSITIONS_KEY].requires_grad_(True)
+
+        with torch.autograd.set_detect_anomaly(True):
+            out = instance(in_dict)
+
+            # is the edge embedding of the cutoff length edge unchanged at the cutoff?
+            grads = torch.autograd.grad(
+                outputs=out[AtomicDataDict.EDGE_EMBEDDING_KEY][2:].sum(),
+                inputs=in_dict[AtomicDataDict.POSITIONS_KEY],
+                retain_graph=True,
+            )[0]
+            assert torch.allclose(grads, torch.zeros(1))
+
+            # are the first two atom's energies unaffected by atom at the cutoff?
+            grads = torch.autograd.grad(
+                outputs=out[AtomicDataDict.PER_ATOM_ENERGY_KEY][:2].sum(),
+                inputs=in_dict[AtomicDataDict.POSITIONS_KEY],
+            )[0]
+            print(grads)
+            # only care about gradient wrt moved atom
+            assert grads.shape == (3, 3)
+            assert torch.allclose(grads[2], torch.zeros(1))

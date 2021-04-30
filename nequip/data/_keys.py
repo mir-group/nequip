@@ -35,7 +35,7 @@ NODE_FEATURES_KEY: Final[str] = "node_features"
 NODE_ATTRS_KEY: Final[str] = "node_attrs"
 ATOMIC_NUMBERS_KEY: Final[str] = "atomic_numbers"
 SPECIES_INDEX_KEY: Final[str] = "species_index"
-SPECIES_WEIGHTS_KEY: Final[str] = "species_index"
+PER_ATOM_ENERGY_KEY: Final[str] = "atomic_energy"
 TOTAL_ENERGY_KEY: Final[str] = "total_energy"
 FORCE_KEY: Final[str] = "forces"
 

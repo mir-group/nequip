@@ -34,6 +34,8 @@ class Collater(object):
             batch, exclude_keys=self._exclude_keys.union(new_dim_fixed)
         )
         for f in new_dim_fixed:
+            if f in self._exclude_keys:
+                continue
             out[f] = batch[0][f]
         return out
 

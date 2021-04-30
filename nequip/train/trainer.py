@@ -7,17 +7,24 @@ enable wandb resume
 make an interface with ray
 
 """
-
+import sys
 import inspect
 import logging
-import torch
 import yaml
-import numpy as np
-
 from copy import deepcopy
 from os.path import isfile
 from time import perf_counter
 from typing import Optional, Union
+
+if sys.version_info[1] >= 7:
+    import contextlib
+else:
+    # has backport of nullcontext
+    import contextlib2 as contextlib
+
+import numpy as np
+import torch
+from torch_ema import ExponentialMovingAverage
 
 from nequip.data import DataLoader, AtomicData, AtomicDataDict
 from nequip.utils import (
@@ -28,11 +35,9 @@ from nequip.utils import (
     load_file,
 )
 
-from torch_runstats import RunningStats, Reduction
-
 from .loss import Loss, LossStat
 from .metrics import Metrics
-from ._key import *
+from ._key import ABBREV, LOSS_KEY, TRAIN, VALIDATION
 
 
 class Trainer:
@@ -78,8 +83,8 @@ class Trainer:
 
     For a fresh run, the simulation results will be stored in the 'root/run_name' folder. With
     - "log" : plain text information about the whole training process
-    - "metrics_epoch.txt" : txt matrice format (readable by np.loadtxt) with loss/mae from training and validation of each epoch
-    - "metrics_batch.txt" : txt matrice format (readable by np.loadtxt) with training loss/mae of each batch
+    - "metrics_epoch.csv" : txt matrice format (readable by np.loadtxt) with loss/mae from training and validation of each epoch
+    - "metrics_batch.csv" : txt matrice format (readable by np.loadtxt) with training loss/mae of each batch
     - "best_model.pth": the best model. save the model when validation mae goes lower
     - "last_model.pth": the last model. save the model every log_epoch_freq epoch
     - "trainer_save.pth": all the training information. The file used for loading and restart
@@ -144,11 +149,11 @@ class Trainer:
         shuffle (bool): parameters for dataloader
         n_train (int): # of frames for training
         n_val (int): # of frames for validation
-        exclude_keys (list):  parameters for dataloader
+        exclude_keys (list):  fields from dataset to ignore.
+        dataloader_num_workers (int): `num_workers` for the `DataLoader`s
         train_idcs (optional, list):  list of frames to use for training
         val_idcs (list):  list of frames to use for validation
         train_val_split (str):  "random" or "sequential"
-        loader_kwargs (dict):  Parameters for dataloader
 
         init_callbacks (list): list of callback function at the begining of the training
         end_of_epoch_callbacks (list): list of callback functions at the end of each epoch
@@ -211,7 +216,7 @@ class Trainer:
         timestr: Optional[str] = None,
         seed: Optional[int] = None,
         restart: bool = False,
-        append: bool = False,
+        append: bool = True,
         loss_coeffs: Union[dict, str] = AtomicDataDict.TOTAL_ENERGY_KEY,
         metrics_components: Optional[Union[dict, str]] = None,
         metrics_key: str = ABBREV.get(LOSS_KEY, LOSS_KEY),
@@ -224,15 +229,18 @@ class Trainer:
         optim=None,
         optimizer_name: str = "Adam",
         optimizer_kwargs: Optional[dict] = None,
+        use_ema: bool = False,
+        ema_decay: float = 0.999,
+        ema_use_num_updates=True,
         exclude_keys: list = [],
         batch_size: int = 5,
         shuffle: bool = True,
         n_train: Optional[int] = None,
         n_val: Optional[int] = None,
+        dataloader_num_workers: int = 0,
         train_idcs: Optional[list] = None,
         val_idcs: Optional[list] = None,
         train_val_split: str = "random",
-        loader_kwargs: Optional[dict] = None,
         init_callbacks: list = [],
         end_of_epoch_callbacks: list = [],
         end_of_batch_callbacks: list = [],
@@ -252,10 +260,16 @@ class Trainer:
         self.optim = optim
         self.lr_sched = lr_sched
 
+        _local_kwargs = {}
         for key in self.init_params:
             setattr(self, key, locals()[key])
+            _local_kwargs[key] = locals()[key]
 
-        output = Output.get_output(timestr, self)
+        if self.use_ema:
+            self.ema = None
+
+        output = Output.get_output(timestr, dict(**_local_kwargs, **kwargs))
+        self.output = output
 
         # timestr run_name root workdir logfile
         for key, value in output.updated_dict().items():
@@ -263,10 +277,10 @@ class Trainer:
 
         if self.logfile is None:
             self.logfile = output.open_logfile("log", propagate=True)
-        self.epoch_log = output.open_logfile("metrics_epoch.txt", propagate=False)
+        self.epoch_log = output.open_logfile("metrics_epoch.csv", propagate=False)
         self.batch_log = {
-            TRAIN: output.open_logfile("metrics_batch_train.txt", propagate=False),
-            VALIDATION: output.open_logfile("metrics_batch_val.txt", propagate=False),
+            TRAIN: output.open_logfile("metrics_batch_train.csv", propagate=False),
+            VALIDATION: output.open_logfile("metrics_batch_val.csv", propagate=False),
         }
 
         # add filenames if not defined
@@ -286,7 +300,6 @@ class Trainer:
         self.kwargs = deepcopy(kwargs)
         self.optimizer_kwargs = deepcopy(optimizer_kwargs)
         self.lr_scheduler_kwargs = deepcopy(lr_scheduler_kwargs)
-        self.loader_kwargs = deepcopy(loader_kwargs)
 
         # initialize the optimizer and scheduler, the params will be updated in the function
         self.init()
@@ -294,7 +307,11 @@ class Trainer:
         self.statistics = {}
 
         if not (restart and append):
-            self.log_dictionary(self.as_dict(), name="Initialization")
+            d = self.as_dict()
+            for key in list(d.keys()):
+                if not isinstance(d[key], (float, int, str, list, tuple)):
+                    d[key] = type(d[key])
+            self.log_dictionary(d, name="Initialization")
 
         logging.debug("! Done Initialize Trainer")
 
@@ -325,9 +342,7 @@ class Trainer:
         """convert instance to a dictionary
         Args:
 
-        state_dict (bool): if True, the weights and bias will also be stored.
-              When best_model_path and last_model_path are not defined,
-              the weights of the model will be explicitly stored in the dictionary
+        state_dict (bool): if True, the state_dicts of the optimizer, lr scheduler, and EMA will be included
         """
 
         dictionary = {}
@@ -346,6 +361,8 @@ class Trainer:
                 dictionary["state_dict"]["cuda_rng_state"] = torch.cuda.get_rng_state(
                     device=self.device
                 )
+            if self.use_ema:
+                dictionary["state_dict"]["ema_state"] = self.ema.state_dict()
 
         if hasattr(self.model, "save") and not issubclass(
             type(self.model), torch.jit.ScriptModule
@@ -360,6 +377,8 @@ class Trainer:
                 "best_val_metrics", float("inf")
             )
             dictionary["progress"]["stop_arg"] = self.__dict__.get("stop_arg", None)
+
+            # TODO: these might not both be available, str defined, but no weights
             dictionary["progress"]["best_model_path"] = self.best_model_path
             dictionary["progress"]["last_model_path"] = self.last_model_path
             dictionary["progress"]["trainer_save_path"] = self.trainer_save_path
@@ -401,9 +420,9 @@ class Trainer:
 
         return filename
 
-    @staticmethod
+    @classmethod
     def from_file(
-        filename: str, format: Optional[str] = None, append: Optional[bool] = None
+        cls, filename: str, format: Optional[str] = None, append: Optional[bool] = None
     ):
         """load a model from file
 
@@ -418,10 +437,10 @@ class Trainer:
             filename=filename,
             enforced_format=format,
         )
-        return Trainer.from_dict(dictionary, append)
+        return cls.from_dict(dictionary, append)
 
-    @staticmethod
-    def from_dict(dictionary, append: Optional[bool] = None):
+    @classmethod
+    def from_dict(cls, dictionary, append: Optional[bool] = None):
         """load model from dictionary
 
         Args:
@@ -459,32 +478,37 @@ class Trainer:
             if isfile(progress["last_model_path"]):
                 load_path = progress["last_model_path"]
                 iepoch = progress["iepoch"]
-            elif isfile(progress["best_model_path"]):
-                load_path = progress["best_model_path"]
-                iepoch = progress["best_epoch"]
             else:
                 raise AttributeError("model weights & bias are not saved")
 
             if "model_class" in d:
                 model = d["model_class"].load(load_path)
             else:
-                model = torch.load(load_path)
+                if dictionary.get("compile_model", False):
+                    model = torch.jit.load(load_path)
+                else:
+                    model = torch.load(load_path)
             logging.debug(f"Reload the model from {load_path}")
 
             d.pop("progress")
 
         state_dict = d.pop("state_dict", None)
 
-        trainer = Trainer(model=model, **d)
+        trainer = cls(model=model, **d)
 
         if state_dict is not None and trainer.model is not None:
+            logging.debug("Reload optimizer and scheduler states")
             trainer.optim.load_state_dict(state_dict["optim"])
+
             if trainer.lr_sched is not None:
                 trainer.lr_sched.load_state_dict(state_dict["lr_sched"])
-            logging.debug("Reload optimizer and scheduler states")
+
             torch.set_rng_state(state_dict["rng_state"])
             if torch.cuda.is_available():
                 torch.cuda.set_rng_state(state_dict["cuda_rng_state"])
+
+            if trainer.use_ema:
+                trainer.ema.load_state_dict(state_dict["ema_state"])
 
         if "progress" in d:
             trainer.best_val_metrics = progress["best_val_metrics"]
@@ -498,9 +522,10 @@ class Trainer:
 
     def init(self):
         """ initialize optimizer """
-
         if self.model is None:
             return
+
+        self.model.to(self.device)
 
         if self.optim is None:
             self.optim, self.optimizer_kwargs = instantiate_from_cls_name(
@@ -512,6 +537,13 @@ class Trainer:
                 ),
                 all_args=self.kwargs,
                 optional_args=self.optimizer_kwargs,
+            )
+
+        if self.use_ema and self.ema is None:
+            self.ema = ExponentialMovingAverage(
+                self.model.parameters(),
+                decay=self.ema_decay,
+                use_num_updates=self.ema_use_num_updates,
             )
 
         if self.lr_sched is None:
@@ -541,35 +573,17 @@ class Trainer:
             all_args=self.kwargs,
         )
         self.loss_stat = LossStat(keys=list(self.loss.funcs.keys()))
-
         self._initialized = True
 
     def init_metrics(self):
-
         if self.metrics_components is None:
             self.metrics_components = []
             for key, func in self.loss.funcs.items():
-                dim = (
-                    self.dataset_train[0][key].shape[1:]
-                    if hasattr(self, "dataset_train")
-                    else tuple()
-                )
                 params = {
-                    "dim": dim,
                     "PerSpecies": type(func).__name__.startswith("PerSpecies"),
                 }
-                if key == AtomicDataDict.FORCE_KEY:
-                    params["reduce_dims"] = 0
                 self.metrics_components.append((key, "mae", params))
                 self.metrics_components.append((key, "rmse", params))
-        elif hasattr(self, "dataset_train"):
-            # update the metric dim based on dataset data
-            new_list = []
-            for component in self.metrics_components:
-                key, reduction, params = Metrics.parse(component)
-                params["dim"] = self.dataset_train[0][key].shape[1:]
-                new_list.append((key, reduction, params))
-            self.metrics_components = new_list
 
         self.metrics, _ = instantiate(
             builder=Metrics,
@@ -579,7 +593,6 @@ class Trainer:
         )
 
     def init_model(self):
-
         logger = self.logger
         logger.info(
             "Number of weights: {}".format(
@@ -593,8 +606,6 @@ class Trainer:
             raise RuntimeError("You must call `set_dataset()` before calling `train()`")
         if not self._initialized:
             self.init()
-
-        self.model.to(self.device)
 
         if not self.restart:
             self.init_model()
@@ -632,6 +643,9 @@ class Trainer:
         self.save(self.trainer_save_path)
 
     def batch_step(self, data, validation=False):
+        # no need to have gradients from old steps taking up memory
+        self.optim.zero_grad(set_to_none=True)
+
         if validation:
             self.model.eval()
         else:
@@ -651,7 +665,10 @@ class Trainer:
             data_unscaled = data
 
         # Run model
-        out = self.model(data_unscaled)
+        # We make a shallow copy of the input dict in case the model modifies it
+        input_data = data_unscaled.copy()
+        out = self.model(input_data)
+        del input_data
 
         # If we're in evaluation mode (i.e. validation), then
         # data_unscaled's target prop is unnormalized, and out's has been rescaled to be in the same units
@@ -660,9 +677,13 @@ class Trainer:
 
         if not validation:
             loss, loss_contrib = self.loss(pred=out, ref=data_unscaled)
-            self.optim.zero_grad()
+            # see https://pytorch.org/tutorials/recipes/recipes/tuning_guide.html#use-parameter-grad-none-instead-of-model-zero-grad-or-optimizer-zero-grad
+            self.optim.zero_grad(set_to_none=True)
             loss.backward()
             self.optim.step()
+
+            if self.use_ema:
+                self.ema.update()
 
             if self.lr_scheduler_name == "CosineAnnealingWarmRestarts":
                 self.lr_sched.step(self.iepoch + self.ibatch / self.n_batches)
@@ -705,29 +726,34 @@ class Trainer:
         self.metrics.to(self.device)
 
     def epoch_step(self):
-
         datasets = [self.dl_train, self.dl_val]
         categories = [TRAIN, VALIDATION]
         self.metrics_dict = {}
         self.loss_dict = {}
+
         for category, dataset in zip(categories, datasets):
+            if category == VALIDATION and self.use_ema:
+                cm = self.ema.average_parameters()
+            else:
+                cm = contextlib.nullcontext()
 
-            self.reset_metrics()
-            self.n_batches = len(dataset)
-            for self.ibatch, batch in enumerate(dataset):
-                self.batch_step(
-                    data=batch,
-                    validation=(category == VALIDATION),
-                )
-                self.end_of_batch_log(batch_type=category)
-                for callback in self.end_of_batch_callbacks:
-                    callback(self)
-            self.metrics_dict[category] = self.metrics.current_result()
-            self.loss_dict[category] = self.loss_stat.current_result()
+            with cm:
+                self.reset_metrics()
+                self.n_batches = len(dataset)
+                for self.ibatch, batch in enumerate(dataset):
+                    self.batch_step(
+                        data=batch,
+                        validation=(category == VALIDATION),
+                    )
+                    self.end_of_batch_log(batch_type=category)
+                    for callback in self.end_of_batch_callbacks:
+                        callback(self)
+                self.metrics_dict[category] = self.metrics.current_result()
+                self.loss_dict[category] = self.loss_stat.current_result()
 
-            if category == TRAIN:
-                for callback in self.end_of_train_callbacks:
-                    callback(self)
+                if category == TRAIN:
+                    for callback in self.end_of_train_callbacks:
+                        callback(self)
 
         self.end_of_epoch_log()
         self.end_of_epoch_save()
@@ -756,16 +782,16 @@ class Trainer:
         store all the loss/mae of each batch
         """
 
-        mat_str = f"  {self.iepoch+1:5d} {self.ibatch+1:5d}"
-        log_str = f"{mat_str}"
+        mat_str = f"{self.iepoch+1:5d}, {self.ibatch+1:5d}"
+        log_str = f"{self.iepoch+1:5d} {self.ibatch+1:5d}"
 
-        header = f"\n# Epoch\n# batch"
-        log_header = f"# Epoch batch"
+        header = "epoch, batch"
+        log_header = "# Epoch batch"
 
         # print and store loss value
         for name, value in self.batch_losses.items():
-            mat_str += f" {value:16.5g}"
-            header += f"\n# {name}"
+            mat_str += f", {value:16.5g}"
+            header += f", {name}"
             log_str += f" {value:12.3g}"
             log_header += f" {name:>12s}"
 
@@ -778,8 +804,8 @@ class Trainer:
         )
         for key, value in metrics.items():
 
-            mat_str += f" {value:16.5g}"
-            header += f"\n# {key}"
+            mat_str += f", {value:16.5g}"
+            header += f", {key}"
             if key not in skip_keys:
                 log_str += f" {value:12.3g}"
                 log_header += f" {key:>12s}"
@@ -809,10 +835,23 @@ class Trainer:
         if val_metrics < self.best_val_metrics:
             self.best_val_metrics = val_metrics
             self.best_epoch = self.iepoch
-            if hasattr(self.model, "save"):
-                self.model.save(self.best_model_path)
+
+            save_path = self.best_model_path
+
+            if self.use_ema:
+                # If using EMA, store the EMA validation model
+                # that gave us the good val metrics that made the model "best"
+                # in the first place
+                cm = self.ema.average_parameters()
             else:
-                torch.save(self.model, self.best_model_path)
+                cm = contextlib.nullcontext()
+
+            with cm:
+                if hasattr(self.model, "save"):
+                    self.model.save(save_path)
+                else:
+                    torch.save(self.model, save_path)
+
             self.logger.info(
                 f"! Best model {self.best_epoch+1:8d} {self.best_val_metrics:8.3f}"
             )
@@ -848,18 +887,18 @@ class Trainer:
             wall=wall,
         )
 
-        header = "# Epoch\n# wall\n# LR"
+        header = "epoch, wall, LR"
 
         categories = [TRAIN, VALIDATION]
         log_header = {}
         log_str = {}
 
         strings = ["Epoch", "wal", "LR"]
-        mat_str = f"{self.iepoch+1:10d} {wall:8.3f} {lr:8.3g}"
+        mat_str = f"{self.iepoch+1:10d}, {wall:8.3f}, {lr:8.3g}"
         for cat in categories:
             log_header[cat] = "# "
             log_header[cat] += " ".join([f"{s:>8s}" for s in strings])
-            log_str[cat] = f"{mat_str}"
+            log_str[cat] = f"{self.iepoch+1:10d} {wall:8.3f} {lr:8.3g}"
 
         for category in categories:
 
@@ -872,16 +911,16 @@ class Trainer:
 
             # append details from loss
             for key, value in self.loss_dict[category].items():
-                mat_str += f" {value:16.5g}"
-                header += f"\n# {category}_{key}"
+                mat_str += f", {value:16.5g}"
+                header += f", {category}_{key}"
                 log_str[category] += f" {value:12.3g}"
                 log_header[category] += f" {key:>12s}"
                 self.mae_dict[f"{category}_{key}"] = value
 
             # append details from metrics
             for key, value in met.items():
-                mat_str += f" {value:12.3g}"
-                header += f"\n# {category}_{key}"
+                mat_str += f", {value:12.3g}"
+                header += f", {category}_{key}"
                 if key not in skip_keys:
                     log_str[category] += f" {value:12.3g}"
                     log_header[category] += f" {key:>12s}"
@@ -937,27 +976,19 @@ class Trainer:
         self.dataset_train = dataset.index_select(self.train_idcs)
         self.dataset_val = dataset.index_select(self.val_idcs)
 
-        self.dl_train, self.loader_kwargs = instantiate(
-            builder=DataLoader,
-            prefix="loader",
-            positional_args=dict(
-                dataset=self.dataset_train,
-                batch_size=self.batch_size,
-                shuffle=self.shuffle,
-                exclude_keys=self.exclude_keys,
-            ),
-            optional_args=self.loader_kwargs,
-            all_args=self.kwargs,
+        # based on recommendations from
+        # https://pytorch.org/tutorials/recipes/recipes/tuning_guide.html#enable-async-data-loading-and-augmentation
+        if self.dataloader_num_workers != 0:
+            # some issues with timeouts need to be investigated
+            raise NotImplementedError
+        dl_kwargs = dict(
+            batch_size=self.batch_size,
+            shuffle=self.shuffle,
+            exclude_keys=self.exclude_keys,
+            # num_workers=self.dataloader_num_workers,
+            # persistent_workers=(self.max_epochs > 1),
+            pin_memory=(self.device != torch.device("cpu")),
+            # timeout=10,  # just so you don't get stuck
         )
-        self.dl_val, _ = instantiate(
-            builder=DataLoader,
-            prefix="loader",
-            positional_args=dict(
-                dataset=self.dataset_val,
-                batch_size=self.batch_size,
-                shuffle=self.shuffle,
-                exclude_keys=self.exclude_keys,
-            ),
-            optional_args=self.loader_kwargs,
-            all_args=self.kwargs,
-        )
+        self.dl_train = DataLoader(dataset=self.dataset_train, **dl_kwargs)
+        self.dl_val = DataLoader(dataset=self.dataset_val, **dl_kwargs)

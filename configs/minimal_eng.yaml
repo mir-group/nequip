@@ -1,11 +1,10 @@
 # general
-root: results/
-wandb_project: aspirin
-workdir: results/requeue
-run_name: minimal_requeue
-requeue: True
+root: results/aspirin
+run_name: minimal_eng
+seed: 0
 
 # network
+model_builder: nequip.models.EnergyModel
 num_basis: 8
 r_max: 4.0
 irreps_edge_sh: 0e + 1o
@@ -14,7 +13,6 @@ feature_irreps_hidden: 16x0o + 16x0e
 
 # data
 dataset: aspirin
-dataset_file_name: benchmark_data/aspirin_ccsd-train.npz
 
 # logging
 wandb: false
@@ -28,7 +26,7 @@ batch_size: 1
 max_epochs: 10
 
 # loss function
-loss_coeffs: forces
+loss_coeffs: total_energy
 
 # optimizer
 optimizer_name: Adam

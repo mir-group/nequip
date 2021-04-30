@@ -7,13 +7,8 @@ NequIP is an open-source deep learning package for learning interatomic potentia
 
 ### Requirements
 
-* Python, v3.8+
-* PyTorch, v1.8
-* Numpy, v1.19.5
-* Scipy, v1.6.0
-* ASE, v3.20.1
-
-In particular, please be sure to install Python 3.8 and Pytorch 1.8. 
+* Python >= 3.6
+* PyTorch >= 1.8
 
 ### Installation
 
@@ -55,6 +50,11 @@ $ cd pytorch_runstats/
 $ pip install .
 ```
 
+* Install our fork of [`pytorch_ema`](https://github.com/Linux-cpp-lisp/pytorch_ema) for using an Exponential Moving Average on the weights: 
+```bash
+$ pip install -U git+https://github.com/Linux-cpp-lisp/pytorch_ema
+```
+
 * We use [Weights&Biases](https://wandb.ai) to keep track of experiments. This is not a strict requirement, you can use our software without this, but it may make your life easier. If you want to use it, create an account [here](https://wandb.ai) and install it: 
 
 ```
@@ -92,10 +92,10 @@ The best way to learn how to use NequIP is [through the tutorial notebook hosted
 
 ### Training a network
 
-To train a network, all you need to is run train.py with a config file that describes your data set and network, for example: 
+To train a network, all you need to is run `nequip-train` with a config file that describes your data set and network, for example: 
 
 ```
-python scripts/train.py configs/example.yaml
+nequip-train configs/example.yaml
 ```
 
 ### References

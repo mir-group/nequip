@@ -5,10 +5,12 @@
 # process contains processed data sets
 # if 'root'/'run_name' exists, 'root'/'run_name'_'year'-'month'-'day'-'hour'-'min'-'s' will be used instead.
 root: results/aspirin
-run_name: maximal
+run_name: example-run
 seed: 0                                                                           # random number seed for numpy and torch
 restart: false                                                                    # set True for a restarted run
 append: false                                                                     # set True if a restarted run should append to the previous log file
+
+default_dtype: float32                                                             # type of float, e.g. float32 and float64
 
 # network
 compile_model: False                                                              # whether to compile the constructed model to TorchScript
@@ -16,21 +18,43 @@ num_basis: 8                                                                    
 r_max: 4.0                                                                        # cutoff radius
 irreps_edge_sh: 0e + 1o + 2e                                                      # irreps of the spherical harmonics used for edges. If a single integer, indicates the full SH up to L_max=that_integer
 conv_to_output_hidden_irreps_out: 16x0e                                           # irreps used in hidden layer of output block
-feature_irreps_hidden: 16x0o + 16x0e + 16x1o + 16x1e + 16x2o + 16x2e              # irreps used for hidden features, here we go up to lmax=2, with even and odd parities
+feature_irreps_hidden: 32x0o + 32x0e + 16x1o + 16x1e + 8x2o + 8x2e              # irreps used for hidden features, here we go up to lmax=2, with even and odd parities
 BesselBasis_trainable: true                                                       # set true to train the bessel weights
 nonlinearity_type: gate                                                           # may be 'gate' or 'norm', 'gate' is recommended
-num_layers: 6                                                                     # number of interaction blocks, we found 5-6 to work best
+num_layers: 3                                                                     # number of interaction blocks, we found 5-6 to work best
 resnet: false                                                                     # set True to make interaction block a resnet-style update
 PolynomialCutoff_p: 6                                                             # p-value used in polynomial cutoff function
 invariant_layers: 1                                                               # number of radial layers, we found it important to keep this small, 1 or 2
 invariant_neurons: 8                                                              # number of hidden neurons in radial function, again keep this small for MD applications, 8 - 32, smaller is faster
 avg_num_neighbors: null                                                           # number of neighbors to divide by, None => no normalization.
 use_sc: true                                                                      # use self-connection or not, usually gives big improvement
+model_uniform_init: false                         # whether to use uniform (instead of normal) initialization for e3nn operations
 
 # to specify different parameters for each convolutional layer, try examples below
 # layer1_use_sc: true                                                             # use "layer{i}_" prefix to specify parameters for only one of the layer, 
 # priority for different definition: 
 #   invariant_neurons < InteractionBlock_invariant_neurons < layer{i}_invariant_neurons 
+
+
+# whether to apply a shift and scale, defined per-species, to the atomic energies
+PerSpeciesScaleShift_enable: false
+# if the PerSpeciesScaleShift is enabled, whether the shifts and scales are trainable
+PerSpeciesScaleShift_trainable: true
+# optional initial atomic energy shift for each species. order should be the same as the allowed_species used in train.py. Defaults to zeros.
+PerSpeciesScaleShift_shifts: [0.0, 0.0, 0.0]
+# optional initial atomic energy scale for each species. order should be the same as the allowed_species used in train.py. Defaults to ones.
+PerSpeciesScaleShift_scales: [1.0, 1.0, 1.0]
+
+# global energy shift. When "dataset_energy_mean" (the default), the mean energy of the dataset. When None, disables the global shift. When a number, used directly.
+global_rescale_shift: dataset_energy_mean
+# global energy scale. When "dataset_force_rms", the RMS of force components in the dataset. When "dataset_energy_std", the stdev of energies in the dataset. When None, disables the global scale. When a number, used directly.
+# If not provided, defaults to either dataset_force_rms or dataset_energy_std, depending on whether forces are being trained.
+global_rescale_scale: dataset_force_rms
+# whether the shift of the final global energy rescaling should be trainable
+trainable_global_rescale_shift: false
+# whether the scale of the final global energy rescaling should be trainable
+trainable_global_rescale_scale: false
+
 
 # data set
 # the keys used need to be stated at least once in key_mapping, npz_fixed_field_keys or npz_keys
@@ -54,27 +78,31 @@ npz_fixed_field_keys:                                                           
 #   format: extxyz
 
 # logging
-wandb: false                                                                       # we recommend using wandb for logging, we'll turn it off here as it's optional
+wandb: true                                                                     # we recommend using wandb for logging, we'll turn it off here as it's optional
 wandb_project: aspirin                                                             # project name used in wandb
+wandb_resume: true                                                                 # if True and restart is true, wandb run data will be restarted and updated. 
+                                                                                   # if False, a new wandb run will be generated
 verbose: info                                                                      # the same as python logging, e.g. warning, info, debug, error. case insensitive
 log_batch_freq: 1                                                                  # batch frequency, how often to print training errors withinin the same epoch
 log_epoch_freq: 1                                                                  # epoch frequency, how often to print and save the model
 
 # training
-n_train: 975                                                                       # number of training data
-n_val: 25                                                                          # number of validation data
+n_train: 100                                                                       # number of training data
+n_val: 50                                                                          # number of validation data
 learning_rate: 0.01                                                                # learning rate, we found 0.01 to work best - this is often one of the most important hyperparameters to tune
 batch_size: 5                                                                      # batch size, we found it important to keep this small for most applications 
 max_epochs: 1000000                                                                # stop training after _ number of epochs
 train_val_split: random                                                            # can be random or sequential. if sequential, first n_train elements are training, next n_val are val, else random 
 shuffle: true                                                                      # If true, the data loader will shuffle the data
-metrics_key: loss                                                                  # metrics used for scheduling and saving best model. Options: loss, or anything appear in the
-                                                                                   # validation batch step header, such as f_mae, f_rmse, e_mae, e_rmse
+metrics_key: loss                                                                  # metrics used for scheduling and saving best model. Options: loss, or anything that appears in the validation batch step header, such as f_mae, f_rmse, e_mae, e_rmse
+use_ema: False                                                                     # if true, use exponential moving average on weights for val/test
+ema_decay: 0.999                                                                  # ema weight, commonly set to 0.999
+ema_use_num_updates: True                                                          # whether to use number of updates when computing averages
 
 # loss function
 loss_coeffs:                                                                       # different weights to use in a weighted loss functions
-  forces: 1.0                                                                      # for MD applications, we recommed a force weight of 1
-  total_energy: 0.0                                                                # and an energy weight of 0., this usually gives the best errors in the forces
+  forces: 100                                                                      # for MD applications, we recommed a force weight of 1
+  total_energy: 1                                                               # and an energy weight of 0., this usually gives the best errors in the forces
 
 # # default loss function is MSELoss, the name has to be exactly the same as those in torch.nn. 
 # the only supprted targets are forces and total_energy
@@ -105,12 +133,12 @@ loss_coeffs:                                                                    
 metrics_components:
   - - forces                               # key 
     - rmse                                 # "rmse" or "mse"
-    - PerSpecies: True                     # whether per specie contribution is counted
-      reduce_dims: 0                       # axes to average over 
+    - PerSpecies: True                     # if True, per specie contribution is counted separately
+      report_per_component: False               # if True, statistics on each component (i.e. fx, fy, fz) will be counted separately
   - - forces
     - mae
     - PerSpecies: True
-      reduce_dims: 0
+      report_per_component: False
   - - total_energy
     - mae
 

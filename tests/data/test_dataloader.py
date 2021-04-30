@@ -23,6 +23,19 @@ class TestLoop:
             print(i)
             print(batch)
 
+    def test_non_divisor(self, npz_dataset):
+        dataset = [npz_dataset.get(i) for i in range(7)]  # make it odd length
+        dl = DataLoader(dataset, batch_size=2, shuffle=True, exclude_keys=["energy"])
+        dl_iter = iter(dl)
+        for _ in range(3):
+            batch = next(dl_iter)
+            assert batch.num_graphs == 2
+        last_batch = next(dl_iter)
+        assert last_batch.num_graphs == 1
+        assert last_batch.batch.max() == 0
+        with pytest.raises(StopIteration):
+            next(dl_iter)
+
     def test_subset(self, npz_dataset):
         dloader = DataLoader(
             npz_dataset[:4], batch_size=2, shuffle=True, exclude_keys=["energy"]

@@ -25,7 +25,7 @@ class InteractionBlock(GraphModuleMixin, torch.nn.Module):
         invariant_layers=1,
         invariant_neurons=8,
         avg_num_neighbors=None,
-        use_sc=False
+        use_sc=False,
     ) -> None:
         """
         InteractionBlock.
