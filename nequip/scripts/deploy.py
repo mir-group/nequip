@@ -2,6 +2,7 @@ from typing import Final, Tuple, Dict, Union
 import argparse
 import pathlib
 import logging
+import warnings
 import yaml
 
 # This is a weird hack to avoid Intel MKL issues on the cluster when this is called as a subprocess of a process that has itself initialized PyTorch.
@@ -20,6 +21,8 @@ NEQUIP_VERSION_KEY: Final[str] = "nequip_version"
 R_MAX_KEY: Final[str] = "r_max"
 N_SPECIES_KEY: Final[str] = "n_species"
 
+_ALL_METADATA_KEYS = [CONFIG_KEY, NEQUIP_VERSION_KEY, R_MAX_KEY, N_SPECIES_KEY]
+
 
 def load_deployed_model(
     model_path: Union[pathlib.Path, str]
@@ -32,18 +35,25 @@ def load_deployed_model(
     Returns:
         model, metadata dictionary
     """
-    metadata = {CONFIG_KEY: "", NEQUIP_VERSION_KEY: ""}
+    metadata = {k: "" for k in _ALL_METADATA_KEYS}
     try:
         model = torch.jit.load(model_path, _extra_files=metadata)
     except RuntimeError as e:
         raise ValueError(
-            f"{model_path} does not seem to be a deployed NequIP model file. (Underlying error: {e})"
+            f"{model_path} does not seem to be a deployed NequIP model file. Did you forget to deploy it using `nequip-deploy`? \n\n(Underlying error: {e})"
         )
     # Confirm nequip made it
     if metadata[NEQUIP_VERSION_KEY] == "":
         raise ValueError(
             f"{model_path} does not seem to be a deployed NequIP model file"
         )
+    # Remove missing metadata
+    for k in metadata:
+        # TODO: some better semver based checking of versions here, or something
+        if metadata[k] == "":
+            warnings.warn(
+                f"Metadata key `{k}` wasn't present in the saved model; this may indicate compatability issues."
+            )
     # Confirm its TorchScript
     assert isinstance(model, torch.jit.ScriptModule)
     # Make sure we're in eval mode
@@ -136,6 +146,7 @@ def main(args=None):
         metadata[R_MAX_KEY] = str(float(config["r_max"]))
         metadata[N_SPECIES_KEY] = str(len(config["allowed_species"]))
         metadata[CONFIG_KEY] = config_str
+        metadata = {k: v.encode("ascii") for k, v in metadata.items()}
         torch.jit.save(model, args.out_file, _extra_files=metadata)
     else:
         raise ValueError
