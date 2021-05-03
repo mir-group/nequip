@@ -23,7 +23,7 @@ N_SPECIES_KEY: Final[str] = "n_species"
 
 def load_deployed_model(
     model_path: Union[pathlib.Path, str]
-) -> Tuple[torch.nn.Module, Dict[str, str]]:
+) -> Tuple[torch.jit.ScriptModule, Dict[str, str]]:
     r"""Load a deployed model.
 
     Args:
@@ -39,10 +39,15 @@ def load_deployed_model(
         raise ValueError(
             f"{model_path} does not seem to be a deployed NequIP model file. (Underlying error: {e})"
         )
+    # Confirm nequip made it
     if metadata[NEQUIP_VERSION_KEY] == "":
         raise ValueError(
             f"{model_path} does not seem to be a deployed NequIP model file"
         )
+    # Confirm its TorchScript
+    assert isinstance(model, torch.jit.ScriptModule)
+    # Make sure we're in eval mode
+    model.eval()
     # Everything we store right now is ASCII, so decode for printing
     metadata = {k: v.decode("ascii") for k, v in metadata.items()}
     return model, metadata
