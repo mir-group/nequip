@@ -1,10 +1,28 @@
 """
 utilities that involve file searching and operations (i.e. save/load)
 """
+from typing import Union
 import logging
-
+import contextlib
+from pathlib import Path
 from os import makedirs
 from os.path import isfile, isdir, dirname, realpath
+
+
+@contextlib.contextmanager
+def atomic_write(filename: Union[Path, str]):
+    filename = Path(filename)
+    tmp_path = filename.parent / (f".tmp-{filename.name}~")
+    # Create the temp file
+    open(tmp_path, "w").close()
+    try:
+        # do the IO
+        yield tmp_path
+        # move the temp file to the final output path, which also removes the temp file
+        tmp_path.rename(filename)
+    finally:
+        # clean up
+        tmp_path.unlink(missing_ok=True)
 
 
 def save_file(
@@ -26,39 +44,35 @@ def save_file(
         enforced_format=enforced_format,
     )
 
-    if format == "json":
-        import json
+    with atomic_write(filename) as write_to:
+        if format == "json":
+            import json
 
-        with open(filename, "w+") as fout:
-            json.dump(item, fout)
+            with open(write_to, "w+") as fout:
+                json.dump(item, fout)
+        elif format == "yaml":
+            import yaml
 
-    elif format == "yaml":
-        import yaml
+            with open(write_to, "w+") as fout:
+                yaml.dump(item, fout)
+        elif format == "torch":
+            import torch
 
-        with open(filename, "w+") as fout:
-            yaml.dump(item, fout)
+            torch.save(item, write_to)
+        elif format == "pickle":
+            import pickle
 
-    elif format == "torch":
-        import torch
+            with open(write_to, "wb") as fout:
+                pickle.save(item, fout)
+        elif format == "npz":
+            import numpy as np
 
-        torch.save(item, filename)
-
-    elif format == "pickle":
-        import pickle
-
-        with open(filename, "wb") as fout:
-            pickle.save(item, fout)
-
-    elif format == "npz":
-        import numpy as np
-
-        np.savez(filename, item)
-
-    else:
-        raise NotImplementedError(
-            f"Output format {format} not supported:"
-            f" try from {supported_formats.keys()}"
-        )
+            np.savez(write_to, item)
+        else:
+            raise NotImplementedError(
+                f"Output format {format} not supported:"
+                f" try from {supported_formats.keys()}"
+            )
 
     return filename
 
