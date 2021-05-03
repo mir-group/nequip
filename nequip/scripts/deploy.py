@@ -116,6 +116,8 @@ def main(args=None):
             model = script(model)
             logging.info("Compiled model to TorchScript")
 
+        model.eval()  # just to be sure
+
         model = torch.jit.freeze(model)
         logging.info("Froze TorchScript model")
 
