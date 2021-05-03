@@ -149,7 +149,7 @@ def fresh_start(config):
 
     # = Reinit if wanted =
     if config.model_uniform_init:
-        from nequip.utils.uniform_init import uniform_initialize
+        from nequip.utils.initialization import uniform_initialize
 
         with torch.no_grad():
             core_model.apply(uniform_initialize)
