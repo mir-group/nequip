@@ -23,14 +23,13 @@ if __name__ == "__main__":
 
     logdir = './md_runs/example/'
     logfilename = os.path.join(logdir, f'ase_md_run_{time.time()}.log')
-    prefix = "nvt_langevin"
+    prefix = "nvt_nosehoover"
     filename = 'path/to/deployed/model/deployed.pth'
     atoms_path = 'path/to/starting/atoms.xyz'
     force_units_to_eva = (units.kcal/units.mol)
     temperature = 300
     dt = 0.5
     friction = 0.01
-    langevin_fix_com = True
     n_steps = 500000
     nvt_q = 43.06225052549201
 
