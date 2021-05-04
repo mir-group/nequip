@@ -25,7 +25,7 @@ _ALL_METADATA_KEYS = [CONFIG_KEY, NEQUIP_VERSION_KEY, R_MAX_KEY, N_SPECIES_KEY]
 
 
 def load_deployed_model(
-    model_path: Union[pathlib.Path, str]
+    model_path: Union[pathlib.Path, str], device: Union[str, torch.device] = "cpu"
 ) -> Tuple[torch.jit.ScriptModule, Dict[str, str]]:
     r"""Load a deployed model.
 
@@ -37,7 +37,7 @@ def load_deployed_model(
     """
     metadata = {k: "" for k in _ALL_METADATA_KEYS}
     try:
-        model = torch.jit.load(model_path, _extra_files=metadata)
+        model = torch.jit.load(model_path, map_location=device, _extra_files=metadata)
     except RuntimeError as e:
         raise ValueError(
             f"{model_path} does not seem to be a deployed NequIP model file. Did you forget to deploy it using `nequip-deploy`? \n\n(Underlying error: {e})"
