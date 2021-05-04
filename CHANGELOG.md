@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Most recent change on the bottom.
 
+## [Unreleased]
+### Changed
+- Training now uses atomic file writes to avoid corruption if interupted
+
 ## [0.2.1] - 2021-05-03
 ### Fixed
 - `load_deployed_model` now correctly loads all metadata

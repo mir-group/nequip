@@ -33,6 +33,7 @@ from nequip.utils import (
     instantiate,
     save_file,
     load_file,
+    atomic_write,
 )
 
 from .loss import Loss, LossStat
@@ -410,13 +411,14 @@ class Trainer:
             filename=filename,
             enforced_format=format,
         )
-        logger.debug(f"Saving trainer to {filename}")
+        logger.debug(f"Saved trainer to {filename}")
 
-        if hasattr(self.model, "save"):
-            self.model.save(self.last_model_path)
-        else:
-            torch.save(self.model, self.last_model_path)
-        logger.debug(f"Saving last model to to {self.last_model_path}")
+        with atomic_write(self.last_model_path) as write_to:
+            if hasattr(self.model, "save"):
+                self.model.save(write_to)
+            else:
+                torch.save(self.model, write_to)
+        logger.debug(f"Saved last model to to {self.last_model_path}")
 
         return filename
 
@@ -836,21 +838,21 @@ class Trainer:
             self.best_val_metrics = val_metrics
             self.best_epoch = self.iepoch
 
-            save_path = self.best_model_path
-
             if self.use_ema:
                 # If using EMA, store the EMA validation model
                 # that gave us the good val metrics that made the model "best"
                 # in the first place
                 cm = self.ema.average_parameters()
             else:
+                # otherwise, do nothing
                 cm = contextlib.nullcontext()
 
             with cm:
-                if hasattr(self.model, "save"):
-                    self.model.save(save_path)
-                else:
-                    torch.save(self.model, save_path)
+                with atomic_write(self.best_model_path) as save_path:
+                    if hasattr(self.model, "save"):
+                        self.model.save(save_path)
+                    else:
+                        torch.save(self.model, save_path)
 
             self.logger.info(
                 f"! Best model {self.best_epoch+1:8d} {self.best_val_metrics:8.3f}"

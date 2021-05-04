@@ -5,7 +5,7 @@ Authors: Albert Musaelian
 
 import warnings
 from copy import deepcopy
-from typing import Union, Tuple, Dict
+from typing import Union, Tuple, Dict, Optional
 from collections.abc import Mapping
 
 import numpy as np
@@ -132,7 +132,7 @@ class AtomicData(Data):
         self_interaction: bool = False,
         strict_self_interaction: bool = True,
         cell=None,
-        pbc: PBC = False,
+        pbc: Optional[PBC] = None,
         **kwargs,
     ):
         """Build neighbor graph from points, optionally with PBC.
@@ -154,6 +154,15 @@ class AtomicData(Data):
         """
         if pos is None or r_max is None:
             raise ValueError("pos and r_max must be given.")
+
+        if pbc is None:
+            if cell is not None:
+                raise ValueError(
+                    "A cell was provided, but pbc weren't. Please explicitly probide PBC."
+                )
+            # there are no PBC if cell and pbc are not provided
+            pbc = False
+
         if isinstance(pbc, bool):
             pbc = (pbc,) * 3
         else:
