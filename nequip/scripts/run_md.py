@@ -21,15 +21,14 @@ if __name__ == "__main__":
     log_freq = 1
     save_freq = 1
 
-    logdir = './md_runs/example/'
+    logdir = './md_runs/lips_example/'
     logfilename = os.path.join(logdir, f'ase_md_run_{time.time()}.log')
-    prefix = "nvt_langevin"
-    filename = 'path/to/deployed/model/deployed.pth'
-    atoms_path = 'path/to/starting/atoms.xyz'
-    force_units_to_eva = (units.kcal/units.mol)
-    temperature = 300
-    dt = 0.5
-    friction = 0.01
+    prefix = "nvt_nose_hoover"
+    filename = '/n/home09/sbatzner/nequip/results/lips/lips-1000-lr0.005-bs1/lipos_lr0.005_bs1_unfinished_deployed.pth'
+    atoms_path = '/n/holystore01/LABS/kozinsky_lab/Lab/Data/LiPS/lps_atoms.xyz'
+    force_units_to_eva = 1.
+    temperature = 520
+    dt = 0.25
     langevin_fix_com = True
     n_steps = 500000
     nvt_q = 43.06225052549201
@@ -37,7 +36,7 @@ if __name__ == "__main__":
     np.random.seed(seed)
     torch.manual_seed(seed)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
+    
     if not os.path.exists(logdir):
         os.makedirs(logdir)
         os.makedirs(os.path.join(logdir, 'xyz_strucs'))
@@ -51,7 +50,8 @@ if __name__ == "__main__":
     # load model
     model, metadata = load_deployed_model(model_path=filename)
     r_max = float(metadata[nequip.scripts.deploy.R_MAX_KEY])
-
+    model = model.to(device)
+    
     # load atoms
     atoms = read(atoms_path, index=0)
 
