@@ -1,6 +1,5 @@
 import os
 import logging
-import numpy as np
 
 from ase.io import write
 
@@ -46,11 +45,7 @@ def write_ase_md_config(curr_atoms, curr_step, dt):
     # header
     log_txt += 'El \t\t\t\t'
     log_txt += 'Position [A] \t\t\t\t\t\t\t\t   '
-    log_txt += 'Predicted Force [eV/A]\t\t\t'
-    log_txt += 'Atomic Kinetic Energy [eV]\n'
-
-    # compute atomic kinetic energies in [eV]
-    atomic_kinetic_energies = 0.5 * curr_atoms.get_masses() * np.linalg.norm(curr_atoms.get_velocities(), axis=1)**2
+    log_txt += 'Predicted Force [eV/A]\n'
 
     forces = curr_atoms.get_forces()
     atomic_numbers = curr_atoms.get_atomic_numbers()
@@ -67,9 +62,6 @@ def write_ase_md_config(curr_atoms, curr_step, dt):
 
         for j in range(3):
             log_txt += '{:.8f}  \t'.format(forces[i][j])
-
-        log_txt += '\t\t'
-        log_txt += '{:.8f}  '.format(atomic_kinetic_energies[i])
         log_txt += '\n'
 
     logging.info(log_txt)
