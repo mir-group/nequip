@@ -200,6 +200,8 @@ class AtomicInMemoryDataset(AtomicDataset):
                 if key in data_list[0]:
                     fixed_fields[key] = data_list[0][key]
 
+            fixed_fields.update(self.extra_fixed_fields)
+
         elif len(data) == 2:
 
             # It's fields and fixed_fields
