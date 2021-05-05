@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Most recent change on the bottom.
 
 ## [Unreleased]
+### Added
+- More flexible model initialization
+
 ### Changed
 - Training now uses atomic file writes to avoid corruption if interupted
 

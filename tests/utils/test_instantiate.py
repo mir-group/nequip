@@ -223,7 +223,7 @@ class BadKwargs1:
 
 
 class BadKwargs2:
-    def __init__(self, thing=None, thing_kwargs={}):
+    def __init__(self, thing="a string", thing_kwargs={}):
         pass
 
 
