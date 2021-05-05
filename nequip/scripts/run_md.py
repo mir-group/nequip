@@ -18,8 +18,8 @@ from nequip.dynamics.nosehoover import NoseHoover
 
 if __name__ == "__main__":
     seed = int(sys.argv[1])
-    log_freq = 1
-    save_freq = 1
+    log_freq = 1000
+    save_freq = 1000
 
     logdir = './md_runs/lips_example/'
     logfilename = os.path.join(logdir, f'ase_md_run_{time.time()}.log')
@@ -48,9 +48,8 @@ if __name__ == "__main__":
     )
 
     # load model
-    model, metadata = load_deployed_model(model_path=filename)
+    model, metadata = load_deployed_model(model_path=filename, device=device)
     r_max = float(metadata[nequip.scripts.deploy.R_MAX_KEY])
-    model = model.to(device)
     
     # load atoms
     atoms = read(atoms_path, index=0)
