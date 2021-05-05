@@ -208,9 +208,13 @@ def instantiate(
     search_keys = [key for key in init_args if key + "_kwargs" in config.allow_list()]
     for key in search_keys:
         sub_builder = init_args[key]
+        if sub_builder is None:
+            # if the builder is None, skip it
+            continue
+
         if not (callable(sub_builder) or inspect.isclass(sub_builder)):
             raise ValueError(
-                f"Builder for submodule `{key}` must be a callable or a class, got `{builder!r}` instead."
+                f"Builder for submodule `{key}` must be a callable or a class, got `{sub_builder!r}` instead."
             )
 
         # add double check to avoid cycle

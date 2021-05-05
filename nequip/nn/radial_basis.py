@@ -1,5 +1,6 @@
+import math
+
 import torch
-import numpy as np
 
 from torch import nn
 
@@ -31,12 +32,13 @@ class BesselBasis(nn.Module):
         self.r_max = float(r_max)
         self.prefactor = 2.0 / self.r_max
 
-        self.bessel_weights = torch.linspace(
-            start=1.0, end=num_basis, steps=num_basis
-        ) * torch.Tensor([np.pi])
-
+        bessel_weights = (
+            torch.linspace(start=1.0, end=num_basis, steps=num_basis) * math.pi
+        )
         if self.trainable:
-            self.bessel_weights = nn.Parameter(self.bessel_weights)
+            self.bessel_weights = nn.Parameter(bessel_weights)
+        else:
+            self.register_buffer("bessel_weights", bessel_weights)
 
     def forward(self, x):
         """
