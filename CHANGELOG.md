@@ -10,6 +10,9 @@ Most recent change on the bottom.
 ### Changed
 - Training now uses atomic file writes to avoid corruption if interupted
 
+### Fixed
+- Dataset `extra_fixed_fields` are now added even if `get_data()` returns `AtomicData` objects
+
 ## [0.2.1] - 2021-05-03
 ### Fixed
 - `load_deployed_model` now correctly loads all metadata
