@@ -1,4 +1,5 @@
 """ Train a network."""
+from typing import Union, Callable
 import logging
 import argparse
 import yaml
@@ -23,7 +24,7 @@ default_config = dict(
     wandb_resume=False,
     compile_model=False,
     model_builder="nequip.models.ForceModel",
-    model_uniform_init=False,
+    model_initializers=[],
     dataset_statistics_stride=1,
     default_dtype="float32",
     verbose="INFO",
@@ -62,6 +63,17 @@ def parse_command_line(args=None):
         config[flag] = getattr(args, flag) or config[flag]
 
     return config
+
+
+def _load_callable(obj: Union[str, Callable]) -> Callable:
+    if callable(obj):
+        pass
+    elif isinstance(obj, str):
+        obj = yaml.load(f"!!python/name:{obj}", Loader=yaml.Loader)
+    else:
+        raise TypeError
+    assert callable(obj), f"{obj} isn't callable"
+    return obj
 
 
 def fresh_start(config):
@@ -137,22 +149,14 @@ def fresh_start(config):
     config.update(dict(allowed_species=allowed_species))
 
     # = Build a model =
-    model_builder = config.model_builder
-    if callable(model_builder):
-        pass
-    elif isinstance(model_builder, str):
-        model_builder = yaml.load(f"!!python/name:{model_builder}", Loader=yaml.Loader)
-    else:
-        raise TypeError
-    assert callable(model_builder), f"Model builder {model_builder} isn't callable"
+    model_builder = _load_callable(config.model_builder)
     core_model = model_builder(**dict(config))
 
     # = Reinit if wanted =
-    if config.model_uniform_init:
-        from nequip.utils.initialization import uniform_initialize
-
-        with torch.no_grad():
-            core_model.apply(uniform_initialize)
+    with torch.no_grad():
+        for initer in config.model_initializers:
+            initer = _load_callable(initer)
+            core_model.apply(initer)
 
     # = Determine shifts, scales =
     # This is a bit awkward, but necessary for there to be a value

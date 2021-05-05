@@ -28,13 +28,20 @@ invariant_layers: 1                                                             
 invariant_neurons: 8                                                              # number of hidden neurons in radial function, again keep this small for MD applications, 8 - 32, smaller is faster
 avg_num_neighbors: null                                                           # number of neighbors to divide by, None => no normalization.
 use_sc: true                                                                      # use self-connection or not, usually gives big improvement
-model_uniform_init: false                         # whether to use uniform (instead of normal) initialization for e3nn operations
 
 # to specify different parameters for each convolutional layer, try examples below
 # layer1_use_sc: true                                                             # use "layer{i}_" prefix to specify parameters for only one of the layer, 
 # priority for different definition: 
 #   invariant_neurons < InteractionBlock_invariant_neurons < layer{i}_invariant_neurons 
 
+
+# how to initialize the weights of the model:
+# this can be the importable name of any function that can be `model.apply`ed to initialize some weights in the model. NequIP provides a number of useful initializers:
+model_initializers:
+  - nequip.utils.initialization.uniform_initialize_fcs
+  - nequip.utils.initialization.uniform_initialize_tps
+  - nequip.utils.initialization.orthogonal_initialize_linears
+#  - nequip.utils.initialization.uniform_initialize_linears
 
 # whether to apply a shift and scale, defined per-species, to the atomic energies
 PerSpeciesScaleShift_enable: false
