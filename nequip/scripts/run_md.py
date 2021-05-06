@@ -18,18 +18,19 @@ from nequip.dynamics.nosehoover import NoseHoover
 
 if __name__ == "__main__":
     seed = int(sys.argv[1])
+    
     log_freq = 1000
     save_freq = 1000
 
     logdir = './md_runs/lips_example/'
     logfilename = os.path.join(logdir, f'ase_md_run_{time.time()}.log')
+    
     prefix = "nvt_nose_hoover"
-    filename = '/n/home09/sbatzner/nequip/results/lips/lips-1000-lr0.005-bs1/lipos_lr0.005_bs1_unfinished_deployed.pth'
-    atoms_path = '/n/holystore01/LABS/kozinsky_lab/Lab/Data/LiPS/lps_atoms.xyz'
+    filename = 'path/to/deployed/model.pth'
+    atoms_path = 'path/to/atoms.xyz'
     force_units_to_eva = 1.
-    temperature = 520
-    dt = 0.25
-    langevin_fix_com = True
+    temperature = 300
+    dt = 1.0
     n_steps = 500000
     nvt_q = 43.06225052549201
 
