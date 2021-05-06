@@ -41,16 +41,17 @@ class NoseHoover(MolecularDynamics):
         )
 
     """
+
     def __init__(
-            self,
-            atoms,
-            timestep,
-            temperature,
-            nvt_q,
-            trajectory=None,
-            logfile=None,
-            loginterval=1,
-            append_trajectory=False
+        self,
+        atoms,
+        timestep,
+        temperature,
+        nvt_q,
+        trajectory=None,
+        logfile=None,
+        loginterval=1,
+        append_trajectory=False,
     ):
         # set angular and com momentum to zero, necessary for nose-hoover dynamics.
         ZeroRotation(atoms)
@@ -61,7 +62,7 @@ class NoseHoover(MolecularDynamics):
         self.nvt_q = nvt_q
         self.dt = timestep
         self.dtdt = np.power(self.dt, 2)
-        self.nvt_bath = 0.
+        self.nvt_bath = 0.0
 
         self.natoms = len(atoms)
 
@@ -72,22 +73,43 @@ class NoseHoover(MolecularDynamics):
             trajectory,
             logfile,
             loginterval,
-            append_trajectory=append_trajectory
+            append_trajectory=append_trajectory,
         )
 
     def step(self):
-        """ Perform a MD step. """
+        """Perform a MD step."""
         masses = self.atoms.get_masses()
 
-        modified_acc = self.atoms.get_forces() / masses[:, np.newaxis] - self.nvt_bath * self.atoms.get_velocities()
-        pos_fullstep = self.atoms.get_positions() + self.dt * self.atoms.get_velocities() + 0.5 * self.dtdt * modified_acc
+        modified_acc = (
+            self.atoms.get_forces() / masses[:, np.newaxis]
+            - self.nvt_bath * self.atoms.get_velocities()
+        )
+        pos_fullstep = (
+            self.atoms.get_positions()
+            + self.dt * self.atoms.get_velocities()
+            + 0.5 * self.dtdt * modified_acc
+        )
         vel_halfstep = self.atoms.get_velocities() + 0.5 * self.dt * modified_acc
 
         self.atoms.set_positions(pos_fullstep)
 
-        e_kin_diff = 0.5 * (np.sum(masses * np.sum(self.atoms.get_velocities()**2, axis=1)) - (3 * self.natoms + 1) * units.kB * self.temp)
+        e_kin_diff = 0.5 * (
+            np.sum(masses * np.sum(self.atoms.get_velocities() ** 2, axis=1))
+            - (3 * self.natoms + 1) * units.kB * self.temp
+        )
 
         nvt_bath_halfstep = self.nvt_bath + 0.5 * self.dt * e_kin_diff / self.nvt_q
-        e_kin_diff_halfstep = 0.5 * (np.sum(masses * np.sum(vel_halfstep ** 2, axis=1)) - (3 * self.natoms + 1) * units.kB * self.temp)
-        self.nvt_bath = nvt_bath_halfstep + 0.5 * self.dt * e_kin_diff_halfstep / self.nvt_q
-        self.atoms.set_velocities((vel_halfstep + 0.5 * self.dt * (self.atoms.get_forces() / masses[:, np.newaxis])) / (1 + 0.5 * self.dt * self.nvt_bath))
+        e_kin_diff_halfstep = 0.5 * (
+            np.sum(masses * np.sum(vel_halfstep ** 2, axis=1))
+            - (3 * self.natoms + 1) * units.kB * self.temp
+        )
+        self.nvt_bath = (
+            nvt_bath_halfstep + 0.5 * self.dt * e_kin_diff_halfstep / self.nvt_q
+        )
+        self.atoms.set_velocities(
+            (
+                vel_halfstep
+                + 0.5 * self.dt * (self.atoms.get_forces() / masses[:, np.newaxis])
+            )
+            / (1 + 0.5 * self.dt * self.nvt_bath)
+        )

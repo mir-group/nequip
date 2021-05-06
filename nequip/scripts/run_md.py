@@ -18,17 +18,17 @@ from nequip.dynamics.nosehoover import NoseHoover
 
 if __name__ == "__main__":
     seed = int(sys.argv[1])
-    
+
     log_freq = 1000
     save_freq = 1000
 
-    logdir = './md_runs/lips_example/'
-    logfilename = os.path.join(logdir, f'ase_md_run_{time.time()}.log')
-    
+    logdir = "./md_runs/lips_example/"
+    logfilename = os.path.join(logdir, f"ase_md_run_{time.time()}.log")
+
     prefix = "nvt_nose_hoover"
-    filename = 'path/to/deployed/model.pth'
-    atoms_path = 'path/to/atoms.xyz'
-    force_units_to_eva = 1.
+    filename = "path/to/deployed/model.pth"
+    atoms_path = "path/to/atoms.xyz"
+    force_units_to_eva = 1.0
     temperature = 300
     dt = 1.0
     n_steps = 500000
@@ -37,21 +37,17 @@ if __name__ == "__main__":
     np.random.seed(seed)
     torch.manual_seed(seed)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    
+
     if not os.path.exists(logdir):
         os.makedirs(logdir)
-        os.makedirs(os.path.join(logdir, 'xyz_strucs'))
+        os.makedirs(os.path.join(logdir, "xyz_strucs"))
 
-    logging.basicConfig(
-        filename=logfilename,
-        format="%(message)s",
-        level=logging.INFO
-    )
+    logging.basicConfig(filename=logfilename, format="%(message)s", level=logging.INFO)
 
     # load model
     model, metadata = load_deployed_model(model_path=filename, device=device)
     r_max = float(metadata[nequip.scripts.deploy.R_MAX_KEY])
-    
+
     # load atoms
     atoms = read(atoms_path, index=0)
 
@@ -66,23 +62,19 @@ if __name__ == "__main__":
     atoms.set_calculator(calc=calc)
 
     # set starting temperature
-    MaxwellBoltzmannDistribution(
-        atoms=atoms,
-        temp=temperature * units.kB
-    )
+    MaxwellBoltzmannDistribution(atoms=atoms, temp=temperature * units.kB)
 
     ZeroRotation(atoms)
     Stationary(atoms)
 
     nvt_dyn = NoseHoover(
-        atoms=atoms,
-        timestep=dt * units.fs,
-        temperature=temperature,
-        nvt_q=nvt_q
+        atoms=atoms, timestep=dt * units.fs, temperature=temperature, nvt_q=nvt_q
     )
 
     # log first frame
-    logging.info(f"\n\nStarting dynamics with Nose-Hoover Thermostat with nvt_q: {nvt_q}\n\n")
+    logging.info(
+        f"\n\nStarting dynamics with Nose-Hoover Thermostat with nvt_q: {nvt_q}\n\n"
+    )
     write_ase_md_config(curr_atoms=atoms, curr_step=0, dt=dt)
     logging.info(f"COM [A]: {atoms.get_center_of_mass()}\n")
 
@@ -92,21 +84,12 @@ if __name__ == "__main__":
         nvt_dyn.run(steps=1)
 
         if not i % log_freq:
-            write_ase_md_config(
-                curr_atoms=atoms,
-                curr_step=i,
-                dt=dt
-            )
+            write_ase_md_config(curr_atoms=atoms, curr_step=i, dt=dt)
 
             logging.info(f"COM [A]: {atoms.get_center_of_mass()}\n")
 
         # append current structure to xyz file
         if not i % save_freq:
-            save_to_xyz(
-                atoms,
-                logdir=logdir,
-                prefix="nvt_"
-            )
+            save_to_xyz(atoms, logdir=logdir, prefix="nvt_")
 
-    print('finished...')
-
+    print("finished...")
