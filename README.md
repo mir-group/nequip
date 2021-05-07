@@ -35,7 +35,7 @@ pip install git+https://github.com/rusty1s/pytorch_geometric.git
 pip install git+https://github.com/e3nn/e3nn.git 
 ```
 
-* Install [`opt_einsum_fx`](https://github.com/Linux-cpp-lisp/opt_einsum_fx) for optimized `e3nn` operations:
+* Install [`opt_einsum_fx`](https://github.com/Linux-cpp-lisp/opt_einsum_fx) for optimized `e3nn` operations, that greatly accelerate the code:
 
 ```bash
 $ git clone https://github.com/Linux-cpp-lisp/opt_einsum_fx.git
@@ -55,7 +55,7 @@ $ pip install .
 $ pip install -U git+https://github.com/Linux-cpp-lisp/pytorch_ema
 ```
 
-* We use [Weights&Biases](https://wandb.ai) to keep track of experiments. This is not a strict requirement, you can use our software without this, but it may make your life easier. If you want to use it, create an account [here](https://wandb.ai) and install it: 
+* We use [Weights&Biases](https://wandb.ai) to keep track of experiments. This is not a strict requirement, you can use the package without this, but it may make your life easier. If you want to use it, create an account [here](https://wandb.ai) and install it: 
 
 ```
 pip install wandb
@@ -77,14 +77,6 @@ We recommend running the tests using ```pytest``` on a CPU:
 pip install pytest
 pytest ./tests
 ```
-
-One some platforms, the installation may complain about the scikit learn installation. If that's the case, specifically install the following scikit-learn version:
-
-```
-pip install -U scikit-learn==0.23.0
-```
-
-That should fix it.
 
 ### Tutorial 
 
