@@ -1,7 +1,7 @@
 import logging
-import sys
 import os
 import time
+import argparse
 import numpy as np
 
 import torch
@@ -73,80 +73,103 @@ def write_ase_md_config(curr_atoms, curr_step, dt):
     logging.info(log_txt)
 
 
-if __name__ == "__main__":
-    seed = int(sys.argv[1])
+def main(args=None):
+    parser = argparse.ArgumentParser(
+        description="Run Nose-Hoover MD using a deployed NequIP model."
+    )
+    parser.add_argument("model", help="The deployed NequIP model.", type=str)
+    parser.add_argument(
+        "initial_xyz", help="Initial positions in XYZ format.", type=str
+    )
+    parser.add_argument("logdir", help="Output directory.", type=str)
+    parser.add_argument("--seed", help="Seed for PRNGs.", type=int, default=0)
+    parser.add_argument(
+        "--log-frequency", help="Log every n steps.", type=int, default=1000
+    )
+    parser.add_argument(
+        "--save-frequency", help="Save every n steps.", type=int, default=1000
+    )
+    parser.add_argument(
+        "--force-units-to-eV-A",
+        help="Conversion factor from model units into eV/A",
+        type=float,
+        default=1.0,
+    )
+    parser.add_argument(
+        "--temperature", help="Temperature (Kelvin)", type=float, default=300.0
+    )
+    parser.add_argument("--dt", help="Timestep (fs)", type=float, default=1.0)
+    parser.add_argument(
+        "--n-steps", help="Number of steps to run", type=int, default=500000
+    )
+    parser.add_argument("--nvt-q", type=float, default=43.06225052549201)
+    args = parser.parse_args(args=args)
 
-    log_freq = 1000
-    save_freq = 1000
+    logfilename = os.path.join(args.logdir, f"ase_md_run_{time.time()}.log")
 
-    logdir = "./md_runs/lips_example/"
-    logfilename = os.path.join(logdir, f"ase_md_run_{time.time()}.log")
-
-    prefix = "nvt_nose_hoover"
-    filename = "path/to/deployed/model.pth"
-    atoms_path = "path/to/atoms.xyz"
-    force_units_to_eV_A = 1.0
-    temperature = 300
-    dt = 1.0
-    n_steps = 500000
-    nvt_q = 43.06225052549201
-
-    np.random.seed(seed)
-    torch.manual_seed(seed)
+    np.random.seed(args.seed)
+    torch.manual_seed(args.seed)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    if not os.path.exists(logdir):
-        os.makedirs(logdir)
-        os.makedirs(os.path.join(logdir, "xyz_strucs"))
+    if not os.path.exists(args.logdir):
+        os.makedirs(args.logdir)
+        os.makedirs(os.path.join(args.logdir, "xyz_strucs"))
 
     logging.basicConfig(filename=logfilename, format="%(message)s", level=logging.INFO)
 
     # load model
-    model, metadata = load_deployed_model(model_path=filename, device=device)
+    model, metadata = load_deployed_model(model_path=args.model, device=device)
     r_max = float(metadata[nequip.scripts.deploy.R_MAX_KEY])
 
     # load atoms
-    atoms = read(atoms_path, index=0)
+    atoms = read(args.initial_xyz, index=0)
 
     # build nequip calculator
     calc = NequIPCalculator(
         predictor=model,
         r_max=r_max,
         device=device,
-        force_units_to_eV_A=force_units_to_eV_A,
+        force_units_to_eV_A=args.force_units_to_eV_A,
     )
 
     atoms.set_calculator(calc=calc)
 
     # set starting temperature
-    MaxwellBoltzmannDistribution(atoms=atoms, temp=temperature * units.kB)
+    MaxwellBoltzmannDistribution(atoms=atoms, temp=args.temperature * units.kB)
 
     ZeroRotation(atoms)
     Stationary(atoms)
 
     nvt_dyn = NoseHoover(
-        atoms=atoms, timestep=dt * units.fs, temperature=temperature, nvt_q=nvt_q
+        atoms=atoms,
+        timestep=args.dt * units.fs,
+        temperature=args.temperature,
+        nvt_q=args.nvt_q,
     )
 
     # log first frame
     logging.info(
-        f"\n\nStarting dynamics with Nose-Hoover Thermostat with nvt_q: {nvt_q}\n\n"
+        f"\n\nStarting dynamics with Nose-Hoover Thermostat with nvt_q: {args.nvt_q}\n\n"
     )
-    write_ase_md_config(curr_atoms=atoms, curr_step=0, dt=dt)
+    write_ase_md_config(curr_atoms=atoms, curr_step=0, dt=args.dt)
     logging.info(f"COM [A]: {atoms.get_center_of_mass()}\n")
 
-    save_to_xyz(atoms, logdir=logdir, prefix="nvt_")
+    save_to_xyz(atoms, logdir=args.logdir, prefix="nvt_")
 
-    for i in range(1, n_steps):
+    for i in range(1, args.n_steps):
         nvt_dyn.run(steps=1)
 
-        if not i % log_freq:
-            write_ase_md_config(curr_atoms=atoms, curr_step=i, dt=dt)
+        if not i % args.log_frequency:
+            write_ase_md_config(curr_atoms=atoms, curr_step=i, dt=args.dt)
 
             logging.info(f"COM [A]: {atoms.get_center_of_mass()}\n")
 
         # append current structure to xyz file
-        if not i % save_freq:
-            save_to_xyz(atoms, logdir=logdir, prefix="nvt_")
+        if not i % args.save_frequency:
+            save_to_xyz(atoms, logdir=args.logdir, prefix="nvt_")
 
     print("finished...")
+
+
+if __name__ == "__main__":
+    main()
