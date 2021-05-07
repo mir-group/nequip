@@ -10,14 +10,17 @@ Most recent change on the bottom.
 
 ## [0.3.0] - 2021-05-07
 ### Added
+- Sub-builders can be skipped in `instantiate` by setting them to `None`
 - More flexible model initialization
 - Add MD w/ Nequip-ASE-calculator + run-MD script w/ custom Nose-Hoover
 
 ### Changed
+- PBC must be explicit if a cell is provided
 - Training now uses atomic file writes to avoid corruption if interupted
 - `feature_embedding` renamed to `chemical_embedding` in default models
 
 ### Fixed
+- `BesselBasis` now works on GPU when `trainable=False`
 - Dataset `extra_fixed_fields` are now added even if `get_data()` returns `AtomicData` objects
 
 ## [0.2.1] - 2021-05-03
