@@ -32,7 +32,7 @@ pip install git+https://github.com/rusty1s/pytorch_geometric.git
 * Install [e3nn](https://github.com/e3nn/e3nn): 
 
 ```
-pip install git+https://github.com/e3nn/e3nn.git 
+pip install --no-deps git+https://github.com/e3nn/e3nn.git 
 ```
 
 * Install [`opt_einsum_fx`](https://github.com/Linux-cpp-lisp/opt_einsum_fx) for optimized `e3nn` operations --- this is very important for performance:
