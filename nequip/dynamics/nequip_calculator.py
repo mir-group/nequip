@@ -1,9 +1,6 @@
-import torch
-import numpy as np
-
 from ase.calculators.calculator import Calculator, all_changes
 
-from nequip.data import AtomicData, AtomicDataDict
+from nequip.data import AtomicData
 
 
 class NequIPCalculator(Calculator):
@@ -11,13 +8,13 @@ class NequIPCalculator(Calculator):
 
     implemented_properties = ["energy", "forces"]
 
-    def __init__(self, predictor, r_max, device, force_units_to_eva=1.0, **kwargs):
+    def __init__(self, predictor, r_max, device, force_units_to_eV_A=1.0, **kwargs):
         Calculator.__init__(self, **kwargs)
         self.results = {}
         self.predictor = predictor
         self.r_max = r_max
         self.device = device
-        self.force_units_to_eva = force_units_to_eva
+        self.force_units_to_eV_A = force_units_to_eV_A
 
     def calculate(self, atoms=None, properties=["energy"], system_changes=all_changes):
         """
@@ -43,6 +40,6 @@ class NequIPCalculator(Calculator):
 
         # store results
         self.results = {
-            "energy": energy * self.force_units_to_eva,
-            "forces": forces * self.force_units_to_eva,
+            "energy": energy * self.force_units_to_eV_A,
+            "forces": forces * self.force_units_to_eV_A,
         }
