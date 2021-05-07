@@ -378,6 +378,8 @@ class AtomicInMemoryDataset(AtomicDataset):
 class NpzDataset(AtomicInMemoryDataset):
     """Load data from an npz file.
 
+    To avoid loading unneeded data, keys are ignored by default unless they are in ``key_mapping``, ``npz_keys``, or ``npz_fixed_fields``.
+
     Args:
         file_name (str): file name of the npz file
         key_mapping (Dict[str, str]): mapping of npz keys to ``AtomicData`` keys
