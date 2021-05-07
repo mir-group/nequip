@@ -33,7 +33,7 @@ def EnergyModel(**shared_params) -> SequentialGraphNetwork:
         "spharm_edges": SphericalHarmonicEdgeAttrs,
         "radial_basis": RadialBasisEdgeEncoding,
         # -- Embed features --
-        "feature_embedding": AtomwiseLinear,
+        "chemical_embedding": AtomwiseLinear,
     }
 
     # add convnet layers
