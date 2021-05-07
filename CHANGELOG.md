@@ -9,9 +9,11 @@ Most recent change on the bottom.
 ## [Unreleased]
 ### Added
 - More flexible model initialization
+- Add MD w/ Nequip-ASE-calculator + run-MD script w/ custom Nose-Hoover
 
 ### Changed
 - Training now uses atomic file writes to avoid corruption if interupted
+- `feature_embedding` -> `chemical_embedding` in default models
 
 ### Fixed
 - Dataset `extra_fixed_fields` are now added even if `get_data()` returns `AtomicData` objects
