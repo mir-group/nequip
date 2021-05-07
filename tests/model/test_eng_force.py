@@ -36,7 +36,7 @@ minimal_config2 = dict(
     allowed_species=ALLOWED_SPECIES,
     irreps_edge_sh="0e + 1o",
     r_max=4,
-    feature_embedding_irreps_out="8x0e + 8x0o + 8x1e + 8x1o",
+    chemical_embedding_irreps_out="8x0e + 8x0o + 8x1e + 8x1o",
     irreps_mid_output_block="2x0e",
     feature_irreps_hidden="4x0e + 4x1o",
 )
@@ -142,15 +142,15 @@ class TestWorkflow:
 
     def test_submods(self):
         model = EnergyModel(**minimal_config2)
-        assert isinstance(model.feature_embedding, AtomwiseLinear)
-        true_irreps = o3.Irreps(minimal_config2["feature_embedding_irreps_out"])
+        assert isinstance(model.chemical_embedding, AtomwiseLinear)
+        true_irreps = o3.Irreps(minimal_config2["chemical_embedding_irreps_out"])
         assert (
-            model.feature_embedding.irreps_out[model.feature_embedding.out_field]
+            model.chemical_embedding.irreps_out[model.chemical_embedding.out_field]
             == true_irreps
         )
         # Make sure it propagates
         assert (
-            model.layer0_convnet.irreps_in[model.feature_embedding.out_field]
+            model.layer0_convnet.irreps_in[model.chemical_embedding.out_field]
             == true_irreps
         )
 
