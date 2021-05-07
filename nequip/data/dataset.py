@@ -200,6 +200,8 @@ class AtomicInMemoryDataset(AtomicDataset):
                 if key in data_list[0]:
                     fixed_fields[key] = data_list[0][key]
 
+            fixed_fields.update(self.extra_fixed_fields)
+
         elif len(data) == 2:
 
             # It's fields and fixed_fields
@@ -375,6 +377,8 @@ class AtomicInMemoryDataset(AtomicDataset):
 # TODO: document fixed field mapped key behavior more clearly
 class NpzDataset(AtomicInMemoryDataset):
     """Load data from an npz file.
+
+    To avoid loading unneeded data, keys are ignored by default unless they are in ``key_mapping``, ``npz_keys``, or ``npz_fixed_fields``.
 
     Args:
         file_name (str): file name of the npz file

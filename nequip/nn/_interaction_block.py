@@ -89,9 +89,12 @@ class InteractionBlock(GraphModuleMixin, torch.nn.Module):
                         irreps_mid.append((mul, ir_out))
                         instructions.append((i, j, k, "uvu", True))
 
+        # We sort the output irreps of the tensor product so that we can simplify them
+        # when they are provided to the second o3.Linear
         irreps_mid = o3.Irreps(irreps_mid)
         irreps_mid, p, _ = irreps_mid.sort()
 
+        # Permute the output indexes of the instructions to match the sorted irreps:
         instructions = [
             (i_in1, i_in2, p[i_out], mode, train)
             for i_in1, i_in2, i_out, mode, train in instructions
@@ -106,7 +109,7 @@ class InteractionBlock(GraphModuleMixin, torch.nn.Module):
             internal_weights=False,
         )
 
-        # init_irreps confirmed that the edge embeddding is all invariant scalars
+        # init_irreps already confirmed that the edge embeddding is all invariant scalars
         self.fc = FullyConnectedNet(
             [self.irreps_in[AtomicDataDict.EDGE_EMBEDDING_KEY].num_irreps]
             + invariant_layers * [invariant_neurons]
@@ -117,7 +120,11 @@ class InteractionBlock(GraphModuleMixin, torch.nn.Module):
         self.tp = tp
 
         self.linear_2 = Linear(
-            irreps_in=irreps_mid,
+            # irreps_mid has uncoallesed irreps because of the uvu instructions,
+            # but there's no reason to treat them seperately for the Linear
+            # Note that normalization of o3.Linear changes if irreps are coallesed
+            # (likely for the better)
+            irreps_in=irreps_mid.simplify(),
             irreps_out=feature_irreps_out,
             internal_weights=True,
             shared_weights=True,
