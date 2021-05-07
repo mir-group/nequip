@@ -1,6 +1,10 @@
+from typing import Union
+import torch
+
 from ase.calculators.calculator import Calculator, all_changes
 
-from nequip.data import AtomicData
+from nequip.data import AtomicData, AtomicDataDict
+import nequip.scripts.deploy
 
 
 class NequIPCalculator(Calculator):
@@ -8,13 +12,35 @@ class NequIPCalculator(Calculator):
 
     implemented_properties = ["energy", "forces"]
 
-    def __init__(self, predictor, r_max, device, force_units_to_eV_A=1.0, **kwargs):
+    def __init__(
+        self,
+        model: torch.jit.ScriptModule,
+        r_max: float,
+        device: Union[str, torch.device],
+        energy_units_to_eV: float = 1.0,
+        length_units_to_A: float = 1.0,
+        **kwargs
+    ):
         Calculator.__init__(self, **kwargs)
         self.results = {}
-        self.predictor = predictor
+        self.model = model
         self.r_max = r_max
         self.device = device
-        self.force_units_to_eV_A = force_units_to_eV_A
+        self.energy_units_to_eV = energy_units_to_eV
+        self.length_units_to_A = length_units_to_A
+
+    @classmethod
+    def from_deployed_model(
+        cls, model_path, device: Union[str, torch.device] = "cpu", **kwargs
+    ):
+        # load model
+        model, metadata = nequip.scripts.deploy.load_deployed_model(
+            model_path=model_path, device=device
+        )
+        r_max = float(metadata[nequip.scripts.deploy.R_MAX_KEY])
+
+        # build nequip calculator
+        return cls(model=model, r_max=r_max, device=device, **kwargs)
 
     def calculate(self, atoms=None, properties=["energy"], system_changes=all_changes):
         """
@@ -34,12 +60,13 @@ class NequIPCalculator(Calculator):
         data = data.to(self.device)
 
         # predict + extract data
-        out = self.predictor(AtomicData.to_AtomicDataDict(data))
-        forces = out["forces"].detach().cpu().numpy()
-        energy = out["total_energy"].detach().cpu().item()
+        out = self.model(AtomicData.to_AtomicDataDict(data))
+        forces = out[AtomicDataDict.FORCE_KEY].detach().cpu().numpy()
+        energy = out[AtomicDataDict.TOTAL_ENERGY_KEY].detach().cpu().item()
 
         # store results
         self.results = {
-            "energy": energy * self.force_units_to_eV_A,
-            "forces": forces * self.force_units_to_eV_A,
+            "energy": energy * self.energy_units_to_eV,
+            # force has units eng / len:
+            "forces": forces * (self.energy_units_to_eV / self.length_units_to_A),
         }

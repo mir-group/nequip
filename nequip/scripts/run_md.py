@@ -90,14 +90,18 @@ def main(args=None):
         "--save-frequency", help="Save every n steps.", type=int, default=1000
     )
     parser.add_argument(
-        "--force-units-to-eV-A",
-        help="Conversion factor from model units into eV/A",
+        "--energy-units-to-eV",
+        help="Conversion factor from model energy units into eV",
         type=float,
         default=1.0,
     )
     parser.add_argument(
-        "--temperature", help="Temperature (Kelvin)", type=float, default=300.0
+        "--length-units-to-A",
+        help="Conversion factor from model length units into Angstrom",
+        type=float,
+        default=1.0,
     )
+    parser.add_argument("--temperature", help="Temperature", type=float, default=300.0)
     parser.add_argument("--dt", help="Timestep (fs)", type=float, default=1.0)
     parser.add_argument(
         "--n-steps", help="Number of steps to run", type=int, default=500000
@@ -117,19 +121,15 @@ def main(args=None):
 
     logging.basicConfig(filename=logfilename, format="%(message)s", level=logging.INFO)
 
-    # load model
-    model, metadata = load_deployed_model(model_path=args.model, device=device)
-    r_max = float(metadata[nequip.scripts.deploy.R_MAX_KEY])
-
     # load atoms
     atoms = read(args.initial_xyz, index=0)
 
     # build nequip calculator
-    calc = NequIPCalculator(
-        predictor=model,
-        r_max=r_max,
+    calc = NequIPCalculator.from_deployed_model(
+        model_path=args.model,
         device=device,
-        force_units_to_eV_A=args.force_units_to_eV_A,
+        energy_units_to_eV=args.energy_units_to_eV,
+        length_units_to_A=args.length_units_to_A,
     )
 
     atoms.set_calculator(calc=calc)
