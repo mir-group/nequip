@@ -20,6 +20,7 @@ chemical_embedding_irreps_out: 32x0e                                            
 feature_irreps_hidden: 32x0o + 32x0e + 16x1o + 16x1e + 8x2o + 8x2e                # irreps used for hidden features, here we go up to lmax=2, with even and odd parities
 irreps_edge_sh: 0e + 1o + 2e                                                      # irreps of the spherical harmonics used for edges. If a single integer, indicates the full SH up to L_max=that_integer
 conv_to_output_hidden_irreps_out: 16x0e                                           # irreps used in hidden layer of output block
+edge_sh_normalization: integral                                                   # how to normalize the spherical harmonics, integral typically works best, other options are 'norm' and 'component', see e3nn for details
 
 nonlinearity_type: gate                                                           # may be 'gate' or 'norm', 'gate' is recommended
 resnet: false                                                                     # set true to make interaction block a resnet-style update
