@@ -1,12 +1,13 @@
-# an example yaml file
-# for a full yaml file containing all possible features check out full.yaml
+# a full yaml file with all nequip options
+# this is primarily intested to serve as documentation/reference for all options
+# for a simpler yaml file containing all necessary feature to get you started check out example.yaml
 
 # Two folders will be used during the training: 'root'/process and 'root'/'run_name'
 # run_name contains logfiles and saved models
 # process contains processed data sets
 # if 'root'/'run_name' exists, 'root'/'run_name'_'year'-'month'-'day'-'hour'-'min'-'s' will be used instead.
 root: results/aspirin
-run_name: example-run
+run_name: example-run-full
 seed: 0                                                                           # random number seed for numpy and torch
 restart: false                                                                    # set True for a restarted run
 append: false                                                                     # set True if a restarted run should append to the previous log file
@@ -23,7 +24,10 @@ conv_to_output_hidden_irreps_out: 16x0e                                         
 
 nonlinearity_type: gate                                                           # may be 'gate' or 'norm', 'gate' is recommended
 resnet: false                                                                     # set true to make interaction block a resnet-style update
+
 num_basis: 8                                                                      # number of basis functions used in the radial basis
+BesselBasis_trainable: true                                                       # set true to train the bessel weights
+PolynomialCutoff_p: 6                                                             # p-exponent used in polynomial cutoff function
 
 # radial network
 invariant_layers: 2                                                               # number of radial layers, we found it important to keep this small, 1 or 2
@@ -76,14 +80,42 @@ n_val: 50                                                                       
 learning_rate: 0.01                                                                # learning rate, we found values between 0.01 and 0.005 to work best - this is often one of the most important hyperparameters to tune
 batch_size: 5                                                                      # batch size, we found it important to keep this small for most applications (1-5)
 max_epochs: 1000000                                                                # stop training after _ number of epochs
+train_val_split: random                                                            # can be random or sequential. if sequential, first n_train elements are training, next n_val are val, else random, usually random is the right choice
+shuffle: true                                                                      # If true, the data loader will shuffle the data, usually a good idea
 metrics_key: loss                                                                  # metrics used for scheduling and saving best model. Options: loss, or anything that appears in the validation batch step header, such as f_mae, f_rmse, e_mae, e_rmse
 use_ema: false                                                                     # if true, use exponential moving average on weights for val/test, usually helps a lot with training, in particular for energy errors
 ema_decay: 0.999                                                                   # ema weight, commonly set to 0.999
+ema_use_num_updates: true                                                          # whether to use number of updates when computing averages
 
 # loss function
 loss_coeffs:                                                                       # different weights to use in a weighted loss functions
   forces: 100                                                                      # for MD applications, we recommed a force weight of 100 and an energy weight of 1
   total_energy: 1                                                                  # alternatively, if energies are not of importance, a force weight 1 and an energy weight of 0 also works.
+
+# # default loss function is MSELoss, the name has to be exactly the same as those in torch.nn.
+# the only supprted targets are forces and total_energy
+
+# here are some example of more ways to declare different types of loss functions, depending on your application:
+# loss_coeffs:
+#   total_energy: MSELoss
+#
+# loss_coeffs:
+#   total_energy:
+#   - 3.0
+#   - MSELoss
+#
+# loss_coeffs:
+#   forces:
+#   - 1.0
+#   - PerSpeciesL1Loss
+#
+# loss_coeffs: total_energy
+#
+# loss_coeffs:
+#   total_energy:
+#   - 3.0
+#   - L1Loss
+#   forces: 1.0
 
 # output metrics
 metrics_components:
@@ -100,11 +132,55 @@ metrics_components:
 
 # optimizer, may be any optimizer defined in torch.optim
 # the name `optimizer_name`is case sensitive
-optimizer_name: Adam
+optimizer_name: Adam                                                               # default optimizer is Adam in the amsgrad mode
 optimizer_amsgrad: true
+optimizer_betas: !!python/tuple
+  - 0.9
+  - 0.999
+optimizer_eps: 1.0e-08
+optimizer_weight_decay: 0
 
-# lr scheduler, on plateau
+# weight initialization
+# this can be the importable name of any function that can be `model.apply`ed to initialize some weights in the model. NequIP provides a number of useful initializers:
+#model_initializers:
+#  - nequip.utils.initialization.uniform_initialize_fcs
+#  - nequip.utils.initialization.uniform_initialize_tps
+#  - nequip.utils.initialization.orthogonal_initialize_linears
+#  - nequip.utils.initialization.uniform_initialize_linears
+
+# lr scheduler, currently only supports the two options listed below, if you need more please file an issue
+# first: on-plateau, reduce lr by factory of lr_scheduler_factor if metrics_key hasn't improved for lr_scheduler_patience epoch
 lr_scheduler_name: ReduceLROnPlateau
 lr_scheduler_patience: 100
 lr_scheduler_factor: 0.5
 
+# second, consine annealing with warm restart
+# lr_scheduler_name: CosineAnnealingWarmRestarts
+# lr_scheduler_T_0: 10000
+# lr_scheduler_T_mult: 2
+# lr_scheduler_eta_min: 0
+# lr_scheduler_last_epoch: -1
+
+# we provide a series of options to shift and scale the data
+# these are for advanced use and usually the defaults work very well
+# the deafult is to scale the energies and forces by scaling them by the force standard deviation and to shift the energy by its mean
+# in certain cases, it can be useful to have a trainable shift/scale and to also have species-dependent shifts/scales for each atom
+
+# whether to apply a shift and scale, defined per-species, to the atomic energies
+PerSpeciesScaleShift_enable: false
+# if the PerSpeciesScaleShift is enabled, whether the shifts and scales are trainable
+PerSpeciesScaleShift_trainable: true
+# optional initial atomic energy shift for each species. order should be the same as the allowed_species used in train.py. Defaults to zeros.
+PerSpeciesScaleShift_shifts: [0.0, 0.0, 0.0]
+# optional initial atomic energy scale for each species. order should be the same as the allowed_species used in train.py. Defaults to ones.
+PerSpeciesScaleShift_scales: [1.0, 1.0, 1.0]
+
+# global energy shift. When "dataset_energy_mean" (the default), the mean energy of the dataset. When None, disables the global shift. When a number, used directly.
+global_rescale_shift: dataset_energy_mean
+# global energy scale. When "dataset_force_rms", the RMS of force components in the dataset. When "dataset_energy_std", the stdev of energies in the dataset. When None, disables the global scale. When a number, used directly.
+# If not provided, defaults to either dataset_force_rms or dataset_energy_std, depending on whether forces are being trained.
+global_rescale_scale: dataset_force_rms
+# whether the shift of the final global energy rescaling should be trainable
+trainable_global_rescale_shift: false
+# whether the scale of the final global energy rescaling should be trainable
+trainable_global_rescale_scale: false
