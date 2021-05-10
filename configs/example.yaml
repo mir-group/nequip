@@ -30,7 +30,6 @@ invariant_layers: 2                                                             
 invariant_neurons: 64                                                             # number of hidden neurons in radial function, smaller is faster
 avg_num_neighbors: null                                                           # number of neighbors to divide by, None => no normalization.
 use_sc: true                                                                      # use self-connection or not, usually gives big improvement
-compile_model: false                                                              # whether to compile the constructed model to TorchScript
 
 # to specify different parameters for each convolutional layer, try examples below
 # layer1_use_sc: true                                                             # use "layer{i}_" prefix to specify parameters for only one of the layer,
@@ -107,4 +106,3 @@ optimizer_amsgrad: true
 lr_scheduler_name: ReduceLROnPlateau
 lr_scheduler_patience: 100
 lr_scheduler_factor: 0.5
-
