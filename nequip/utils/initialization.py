@@ -51,3 +51,17 @@ def orthogonal_initialize_linears(mod: torch.nn.Module):
     if isinstance(mod, e3nn.o3.Linear) and mod.internal_weights:
         for w in mod.weight_views():
             unit_uniform_init_(w)
+
+
+def orthogonal_initialize_fcs(mod: torch.nn.Module):
+    if isinstance(mod, e3nn.nn.FullyConnectedNet):
+        for w in mod.weights:
+            torch.nn.init.orthogonal_(w)
+    elif isinstance(mod, torch.nn.Linear):
+        torch.nn.init.orthogonal_(mod.weight)
+
+
+def unit_orthogonal_initialize_e3nn_fcs(mod: torch.nn.Module):
+    if isinstance(mod, e3nn.nn.FullyConnectedNet):
+        for w in mod.weights:
+            unit_orthogonal_init_(w)
