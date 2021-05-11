@@ -619,19 +619,23 @@ class Trainer:
         self.wall = perf_counter()
 
         stop = False
+
         if not self.restart:
             self.best_val_metrics = float("inf")
             self.best_epoch = 0
             self.iepoch = 0
+        else:
+            # if a restart, iepoch is the index of the last epoch that was *completed*
+            # our first epoch will be the epoch after that
+            self.iepoch += 1
+
         self.init_metrics()
 
         while self.iepoch < self.max_epochs and not stop:
-
             early_stop = self.epoch_step()
             if early_stop:
                 stop = False
                 self.stop_arg = "early stop"
-
             self.iepoch += 1
 
         if not stop:
@@ -642,7 +646,12 @@ class Trainer:
 
         self.final_log()
 
+        # This is a painful hack to avoid an off-by-one error when restarting a run that ran out of frames.
+        # `iepoch` is supposed to be the index of the last completed epoch when `.save()` is called.
+        # But this `.save()` comes after `iepoch += 1` in the training loop above.
+        self.iepoch -= 1
         self.save(self.trainer_save_path)
+        self.iepoch += 1
 
     def batch_step(self, data, validation=False):
         # no need to have gradients from old steps taking up memory
