@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Most recent change on the bottom.
 
 ## [Unreleased]
+### Fixed
+- `iepoch` is no longer off-by-one when restarting a training run that hit `max_epochs`
 
 ## [0.3.0] - 2021-05-07
 ### Added
