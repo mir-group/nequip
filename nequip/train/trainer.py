@@ -782,8 +782,8 @@ class Trainer:
         store all the loss/mae of each batch
         """
 
-        mat_str = f"{self.iepoch:5d}, {self.ibatch+1:5d}"
-        log_str = f"{self.iepoch:5d} {self.ibatch+1:5d}"
+        mat_str = f"{self.iepoch+1:5d}, {self.ibatch+1:5d}"
+        log_str = f"{self.iepoch+1:5d} {self.ibatch+1:5d}"
 
         header = "epoch, batch"
         log_header = "# Epoch batch"
