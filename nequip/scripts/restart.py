@@ -63,8 +63,13 @@ def restart(file_name, config, mode="update"):
     if "progress" in dictionary:
         stop_args = dictionary["progress"].pop("stop_arg", None)
         if stop_args is not None:
-            dictionary["progress"]["stop_arg"] = None
-            dictionary["max_epochs"] *= 2
+            if stop_args == "max epochs":
+                raise RuntimeError(
+                    f"Previous run reach max epochs. Please use the update config to increase max epochs"
+                )
+            else:
+                logging.warning(f"Restart by ignoring previous stop {stop_args}")
+                dictionary["progress"]["stop_arg"] = None
 
     if config.wandb:
         from nequip.train.trainer_wandb import TrainerWandB
