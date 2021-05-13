@@ -221,7 +221,7 @@ class Trainer:
         loss_coeffs: Union[dict, str] = AtomicDataDict.TOTAL_ENERGY_KEY,
         metrics_components: Optional[Union[dict, str]] = None,
         metrics_key: str = ABBREV.get(LOSS_KEY, LOSS_KEY),
-        early_stop_lower_threshold: Optional[float] = None,
+        early_stop_threshold: Optional[float] = None,
         max_epochs: int = 1000000,
         lr_sched=None,
         learning_rate: float = 1e-2,
@@ -716,9 +716,9 @@ class Trainer:
     def early_stop_cond(self):
         """ kill the training early """
 
-        if self.early_stop_lower_threshold is not None:
-            if self.best_val_metrics < self.early_stop_lower_threshold:
-                self.stop_arg = "reach lower_thrdshold"
+        if self.early_stop_threshold is not None:
+            if self.best_val_metrics < self.early_stop_threshold:
+                self.stop_arg = "reach early stop thrdshold"
                 return True
         return False
 
