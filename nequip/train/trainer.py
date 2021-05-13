@@ -618,27 +618,23 @@ class Trainer:
         self.init_log()
         self.wall = perf_counter()
 
-        stop = False
-
         if not self.restart:
             self.best_val_metrics = float("inf")
             self.best_epoch = 0
             self.iepoch = 0
-        else:
-            # if a restart, iepoch is the index of the last epoch that was *completed*
-            # our first epoch will be the epoch after that
-            self.iepoch += 1
 
         self.init_metrics()
 
-        while self.iepoch < self.max_epochs and not stop:
+        early_stop = False
+        while self.iepoch < self.max_epochs and not early_stop:
+
             early_stop = self.epoch_step()
-            if early_stop:
-                stop = False
-                self.stop_arg = "early stop"
             self.iepoch += 1
 
-        if not stop:
+            self.end_of_epoch_log()
+            self.end_of_epoch_save()
+
+        if not early_stop:
             self.stop_arg = "max epochs"
 
         for callback in self.final_callbacks:
@@ -646,12 +642,7 @@ class Trainer:
 
         self.final_log()
 
-        # This is a painful hack to avoid an off-by-one error when restarting a run that ran out of frames.
-        # `iepoch` is supposed to be the index of the last completed epoch when `.save()` is called.
-        # But this `.save()` comes after `iepoch += 1` in the training loop above.
-        self.iepoch -= 1
         self.save(self.trainer_save_path)
-        self.iepoch += 1
 
     def batch_step(self, data, validation=False):
         # no need to have gradients from old steps taking up memory
@@ -727,6 +718,7 @@ class Trainer:
 
         if self.early_stop_lower_threshold is not None:
             if self.best_val_metrics < self.early_stop_lower_threshold:
+                self.stop_arg = "reach lower_thrdshold"
                 return True
         return False
 
@@ -766,9 +758,6 @@ class Trainer:
                     for callback in self.end_of_train_callbacks:
                         callback(self)
 
-        self.end_of_epoch_log()
-        self.end_of_epoch_save()
-
         if self.lr_scheduler_name == "ReduceLROnPlateau":
             self.lr_sched.step(
                 metrics=self.mae_dict[f"{VALIDATION}_{self.metrics_key}"]
@@ -793,8 +782,8 @@ class Trainer:
         store all the loss/mae of each batch
         """
 
-        mat_str = f"{self.iepoch+1:5d}, {self.ibatch+1:5d}"
-        log_str = f"{self.iepoch+1:5d} {self.ibatch+1:5d}"
+        mat_str = f"{self.iepoch:5d}, {self.ibatch+1:5d}"
+        log_str = f"{self.iepoch:5d} {self.ibatch+1:5d}"
 
         header = "epoch, batch"
         log_header = "# Epoch batch"
@@ -864,7 +853,7 @@ class Trainer:
                         torch.save(self.model, save_path)
 
             self.logger.info(
-                f"! Best model {self.best_epoch+1:8d} {self.best_val_metrics:8.3f}"
+                f"! Best model {self.best_epoch:8d} {self.best_val_metrics:8.3f}"
             )
 
         if (self.iepoch + 1) % self.log_epoch_freq == 0:
@@ -905,11 +894,11 @@ class Trainer:
         log_str = {}
 
         strings = ["Epoch", "wal", "LR"]
-        mat_str = f"{self.iepoch+1:10d}, {wall:8.3f}, {lr:8.3g}"
+        mat_str = f"{self.iepoch:10d}, {wall:8.3f}, {lr:8.3g}"
         for cat in categories:
             log_header[cat] = "# "
             log_header[cat] += " ".join([f"{s:>8s}" for s in strings])
-            log_str[cat] = f"{self.iepoch+1:10d} {wall:8.3f} {lr:8.3g}"
+            log_str[cat] = f"{self.iepoch:10d} {wall:8.3f} {lr:8.3g}"
 
         for category in categories:
 
