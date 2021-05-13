@@ -38,8 +38,6 @@ class EarlyStopping:
         self.upper_bounds = deepcopy(upper_bounds)
         self.cumulative_delta = cumulative_delta
 
-        # self.keys = set(list(self.lower_bounds.keys())) + set(list(self.upper_bounds.keys()))+set(list(self.patiences.keys()))
-
         self.delta = {}
         self.counters = {}
         self.minimums = {}
