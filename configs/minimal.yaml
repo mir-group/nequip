@@ -21,8 +21,7 @@ dataset: aspirin
 dataset_file_name: benchmark_data/aspirin_ccsd-train.npz
 
 # logging
-wandb: true
-wandb_project: aspirin
+wandb: false
 # verbose: debug
 
 # training
