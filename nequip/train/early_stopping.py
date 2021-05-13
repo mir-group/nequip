@@ -50,7 +50,9 @@ class EarlyStopping:
             self.min_delta[key] = min_delta.get(key, 0.0)
 
             if pat < 1:
-                raise ValueError(f"Argument patience for {key} should be positive integer.")
+                raise ValueError(
+                    f"Argument patience for {key} should be positive integer."
+                )
             if self.min_delta[key] < 0.0:
                 raise ValueError("Argument min_delta should not be a negative number.")
 
@@ -79,7 +81,7 @@ class EarlyStopping:
                 self.counter[key] += 1
                 debug_args = f"EarlyStopping: {self.counter[key]} / {pat}"
                 if self.counter[key] >= pat:
-                    stop_args += " {key} has not reduced for {pat} epochs")
+                    stop_args += " {key} has not reduced for {pat} epochs"
                     stop = True
             else:
                 self.minimums[key] = value
@@ -98,9 +100,7 @@ class EarlyStopping:
         return stop, stop_args, debug_args
 
     def state_dict(self) -> "OrderedDict[dict, dict]":
-        return OrderedDict(
-            [("counter", self.counter), ("minimums", self.minimums)]
-        )
+        return OrderedDict([("counter", self.counter), ("minimums", self.minimums)])
 
     def load_state_dict(self, state_dict: Mapping) -> None:
         self.counter = state_dict["counter"]

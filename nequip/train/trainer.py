@@ -367,6 +367,10 @@ class Trainer:
                 )
             if self.use_ema:
                 dictionary["state_dict"]["ema_state"] = self.ema.state_dict()
+            if self.early_stopping is not None:
+                dictionary["state_dict"][
+                    "early_stopping"
+                ] = self.early_stopping.state_dict()
 
         if hasattr(self.model, "save") and not issubclass(
             type(self.model), torch.jit.ScriptModule
@@ -502,6 +506,9 @@ class Trainer:
             if trainer.lr_sched is not None:
                 trainer.lr_sched.load_state_dict(state_dict["lr_sched"])
 
+            if trainer.early_stopping is not None:
+                trainer.early_stopping.load_state_dict(state_dict["early_stopping"])
+
             torch.set_rng_state(state_dict["rng_state"])
             if torch.cuda.is_available():
                 torch.cuda.set_rng_state(state_dict["cuda_rng_state"])
@@ -585,16 +592,27 @@ class Trainer:
 
         if self.early_stopping is None:
             key_mapping, kwargs = instantiate(
-                EarlyStopping, 
+                EarlyStopping,
                 prefix="early_stopping",
                 optional_args=self.early_stopping_kwargs,
                 all_args=self.kwargs,
-                return_args_only=True
+                return_args_only=True,
             )
             for key, item in kwargs.items():
-                if key not in ['cumulative_delta']:
-                    kwargs["{VALIDATION}_{key}"]
-                              self.early_stopping_kwargs[]
+                # prepand VALIDATION string if k is not with
+                if isinstance(item, dict):
+                    new_dict = {}
+                    for k, v in item.items():
+                        if (
+                            k.startswith(VALIDATION)
+                            or k.startswith(TRAIN)
+                            or k in ["LR", "wall"]
+                        ):
+                            new_dict[k] = item[k]
+                        else:
+                            new_dict[f"{VALIDATION}_{k}"] = item[k]
+                    kwargs[key] = new_dict
+            self.early_stopping = EarlyStopping(**kwargs)
 
     def init_metrics(self):
         if self.metrics_components is None:
@@ -612,6 +630,12 @@ class Trainer:
             positional_args=dict(components=self.metrics_components),
             all_args=self.kwargs,
         )
+
+        if not (
+            self.metrics_key.startswith(VALIDATION)
+            or self.metrics_key.startswith(TRAIN)
+        ):
+            self.metrics_key = f"{VALIDATION}_{self.metrics_key}"
 
     def init_model(self):
         logger = self.logger
@@ -728,9 +752,12 @@ class Trainer:
     def stop_cond(self):
         """ kill the training early """
 
-        if self.early_stop_threshold is not None:
-            if self.best_val_metrics < self.early_stop_threshold:
-                self.stop_arg = "reach early stop thrdshold"
+        if self.early_stopping is not None and hasattr(self, mae_dict):
+            early_stop, early_stop_args, debug_args = self.early_stopping(mae_dict)
+            if debug_args is not None:
+                self.logger.debug(debug_args)
+            if early_stop:
+                self.stop_args = early_stop_args
                 return True
 
         if self.iepoch >= self.max_epochs:
@@ -781,9 +808,7 @@ class Trainer:
         self.end_of_epoch_log()
 
         if self.lr_scheduler_name == "ReduceLROnPlateau":
-            self.lr_sched.step(
-                metrics=self.mae_dict[f"{VALIDATION}_{self.metrics_key}"]
-            )
+            self.lr_sched.step(metrics=self.mae_dict[self.metrics_key])
 
         for callback in self.end_of_epoch_callbacks:
             callback(self)
@@ -851,7 +876,7 @@ class Trainer:
         save model and trainer details
         """
 
-        val_metrics = self.mae_dict[f"{VALIDATION}_{self.metrics_key}"]
+        val_metrics = self.mae_dict[self.metrics_key]
         if val_metrics < self.best_val_metrics:
             self.best_val_metrics = val_metrics
             self.best_epoch = self.iepoch
