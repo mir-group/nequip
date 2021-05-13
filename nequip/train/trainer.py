@@ -468,12 +468,6 @@ class Trainer:
             model = d.pop("model")
         elif "progress" in d:
             progress = d["progress"]
-            stop_arg = progress.pop("stop_arg", None)
-            if stop_arg is not None:
-                raise RuntimeError(
-                    f"The previous run has properly stopped with {stop_arg}."
-                    "Please either increase the max_epoch or change early stop criteria"
-                )
 
             # load the model from file
             iepoch = progress["iepoch"]
@@ -515,10 +509,19 @@ class Trainer:
         if "progress" in d:
             trainer.best_val_metrics = progress["best_val_metrics"]
             trainer.best_epoch = progress["best_epoch"]
+            stop_arg = progress.pop("stop_arg", None)
         else:
             trainer.best_val_metrics = float("inf")
             trainer.best_epoch = 0
+            stop_arg = None
         trainer.iepoch = iepoch
+
+        # final sanity check
+        if trainer.stop_cond:
+            raise RuntimeError(
+                f"The previous run has properly stopped with {stop_arg}."
+                "Please either increase the max_epoch or change early stop criteria"
+            )
 
         return trainer
 
@@ -625,17 +628,14 @@ class Trainer:
 
         self.init_metrics()
 
-        early_stop = False
-        while self.iepoch < self.max_epochs and not early_stop:
+        stop = False
+        while not stop:
 
-            early_stop = self.epoch_step()
+            stop = self.epoch_step()
             self.iepoch += 1
 
             self.end_of_epoch_log()
             self.end_of_epoch_save()
-
-        if not early_stop:
-            self.stop_arg = "max epochs"
 
         for callback in self.final_callbacks:
             callback(self)
@@ -713,13 +713,18 @@ class Trainer:
             self.batch_metrics = self.metrics(pred=out, ref=data)
 
     @property
-    def early_stop_cond(self):
+    def stop_cond(self):
         """ kill the training early """
 
         if self.early_stop_lower_threshold is not None:
             if self.best_val_metrics < self.early_stop_lower_threshold:
                 self.stop_arg = "reach lower_thrdshold"
                 return True
+
+        if self.iepoch >= self.max_epochs:
+            self.stop_arg = "max epochs"
+            return True
+
         return False
 
     def reset_metrics(self):
@@ -766,7 +771,7 @@ class Trainer:
         for callback in self.end_of_epoch_callbacks:
             callback(self)
 
-        return self.early_stop_cond
+        return self.stop_cond
 
     def log_dictionary(self, dictionary: dict, name: str = ""):
         """
