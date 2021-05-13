@@ -1,6 +1,6 @@
 from collections import OrderedDict
 from copy import deepcopy
-from typing import Callable, Mapping, Optional, cast
+from typing import Mapping, Optional, cast
 
 
 class EarlyStopping:
@@ -41,11 +41,11 @@ class EarlyStopping:
         # self.keys = set(list(self.lower_bounds.keys())) + set(list(self.upper_bounds.keys()))+set(list(self.patiences.keys()))
 
         self.min_delta = {}
-        self.counter = {}
+        self.counters = {}
         self.minimums = {}
         for key, pat in self.patiences.items():
             self.patiences[key] = int(pat)
-            self.counter[key] = 0
+            self.counters[key] = 0
             self.minimums[key] = None
             self.min_delta[key] = min_delta.get(key, 0.0)
 
@@ -70,22 +70,22 @@ class EarlyStopping:
         for key, pat in self.patiences.items():
 
             value = metrics[key]
-            minimums = self.minimums[key]
+            minimum = self.minimums[key]
             min_delta = self.min_delta[key]
 
-            if minimums is None:
-                minimums = value
-            elif value >= (minimums - self.min_delta[key]):
-                if not self.cumulative_delta and value > minimums:
+            if minimum is None:
+                self.minimums[key] = value
+            elif value >= (minimum - min_delta):
+                if not self.cumulative_delta and value > minimum:
                     self.minimums[key] = value
-                self.counter[key] += 1
-                debug_args = f"EarlyStopping: {self.counter[key]} / {pat}"
-                if self.counter[key] >= pat:
+                self.counters[key] += 1
+                debug_args = f"EarlyStopping: {self.counters[key]} / {pat}"
+                if self.counters[key] >= pat:
                     stop_args += " {key} has not reduced for {pat} epochs"
                     stop = True
             else:
                 self.minimums[key] = value
-                self.counter[key] = 0
+                self.counters[key] = 0
 
         for key, bound in self.lower_bounds.items():
             if metrics[key] < bound:
@@ -100,8 +100,8 @@ class EarlyStopping:
         return stop, stop_args, debug_args
 
     def state_dict(self) -> "OrderedDict[dict, dict]":
-        return OrderedDict([("counter", self.counter), ("minimums", self.minimums)])
+        return OrderedDict([("counters", self.counters), ("minimums", self.minimums)])
 
     def load_state_dict(self, state_dict: Mapping) -> None:
-        self.counter = state_dict["counter"]
+        self.counters = state_dict["counters"]
         self.minimums = state_dict["minimums"]
