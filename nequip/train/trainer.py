@@ -39,6 +39,7 @@ from nequip.utils import (
 from .loss import Loss, LossStat
 from .metrics import Metrics
 from ._key import ABBREV, LOSS_KEY, TRAIN, VALIDATION
+from .early_stopping import EarlyStopping
 
 
 class Trainer:
@@ -221,7 +222,8 @@ class Trainer:
         loss_coeffs: Union[dict, str] = AtomicDataDict.TOTAL_ENERGY_KEY,
         metrics_components: Optional[Union[dict, str]] = None,
         metrics_key: str = ABBREV.get(LOSS_KEY, LOSS_KEY),
-        early_stop_threshold: Optional[float] = None,
+        early_stopping: Optional[EarlyStopping] = None,
+        early_stopping_kwargs: Optional[dict] = None,
         max_epochs: int = 1000000,
         lr_sched=None,
         learning_rate: float = 1e-2,
@@ -301,6 +303,7 @@ class Trainer:
         self.kwargs = deepcopy(kwargs)
         self.optimizer_kwargs = deepcopy(optimizer_kwargs)
         self.lr_scheduler_kwargs = deepcopy(lr_scheduler_kwargs)
+        self.early_stopping_kwargs = deepcopy(early_stopping_kwargs)
 
         # initialize the optimizer and scheduler, the params will be updated in the function
         self.init()
@@ -579,6 +582,19 @@ class Trainer:
         )
         self.loss_stat = LossStat(keys=list(self.loss.funcs.keys()))
         self._initialized = True
+
+        if self.early_stopping is None:
+            key_mapping, kwargs = instantiate(
+                EarlyStopping, 
+                prefix="early_stopping",
+                optional_args=self.early_stopping_kwargs,
+                all_args=self.kwargs,
+                return_args_only=True
+            )
+            for key, item in kwargs.items():
+                if key not in ['cumulative_delta']:
+                    kwargs["{VALIDATION}_{key}"]
+                              self.early_stopping_kwargs[]
 
     def init_metrics(self):
         if self.metrics_components is None:
