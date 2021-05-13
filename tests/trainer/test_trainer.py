@@ -32,7 +32,8 @@ minimal_config = dict(
     T_0=50,
     T_mult=2,
     loss_coeffs={"forces": 2},
-    early_stopping_patience={"LR": 1e-10},
+    early_stopping_patiences={"loss": 50},
+    early_stopping_lower_bounds={"LR": 1e-10},
 )
 configs_to_test = [dict(), minimal_config]
 loop_config = pytest.mark.parametrize("trainer", configs_to_test, indirect=True)

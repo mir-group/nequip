@@ -598,6 +598,7 @@ class Trainer:
                 all_args=self.kwargs,
                 return_args_only=True,
             )
+            n_args = 0
             for key, item in kwargs.items():
                 # prepand VALIDATION string if k is not with
                 if isinstance(item, dict):
@@ -612,7 +613,8 @@ class Trainer:
                         else:
                             new_dict[f"{VALIDATION}_{k}"] = item[k]
                     kwargs[key] = new_dict
-            self.early_stopping = EarlyStopping(**kwargs)
+                    n_args += len(new_dict)
+            self.early_stopping = EarlyStopping(**kwargs) if n_args > 0 else None
 
     def init_metrics(self):
         if self.metrics_components is None:
