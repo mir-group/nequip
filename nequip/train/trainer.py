@@ -646,10 +646,7 @@ class Trainer:
 
         while not self.stop_cond:
 
-            stop = self.epoch_step()
-            self.iepoch += 1
-
-            self.end_of_epoch_log()
+            self.epoch_step()
             self.end_of_epoch_save()
 
         for callback in self.final_callbacks:
@@ -749,6 +746,7 @@ class Trainer:
         self.metrics.to(self.device)
 
     def epoch_step(self):
+
         datasets = [self.dl_train, self.dl_val]
         categories = [TRAIN, VALIDATION]
         self.metrics_dict = {}
@@ -778,6 +776,10 @@ class Trainer:
                     for callback in self.end_of_train_callbacks:
                         callback(self)
 
+        self.iepoch += 1
+
+        self.end_of_epoch_log()
+
         if self.lr_scheduler_name == "ReduceLROnPlateau":
             self.lr_sched.step(
                 metrics=self.mae_dict[f"{VALIDATION}_{self.metrics_key}"]
@@ -785,7 +787,6 @@ class Trainer:
 
         for callback in self.end_of_epoch_callbacks:
             callback(self)
-
 
     def log_dictionary(self, dictionary: dict, name: str = ""):
         """
