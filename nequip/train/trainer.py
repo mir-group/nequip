@@ -628,8 +628,7 @@ class Trainer:
 
         self.init_metrics()
 
-        stop = False
-        while not stop:
+        while not self.stop_cond:
 
             stop = self.epoch_step()
             self.iepoch += 1
@@ -771,7 +770,6 @@ class Trainer:
         for callback in self.end_of_epoch_callbacks:
             callback(self)
 
-        return self.stop_cond
 
     def log_dictionary(self, dictionary: dict, name: str = ""):
         """
