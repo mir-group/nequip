@@ -10,7 +10,7 @@ from os.path import isfile
 import torch
 from torch.nn import Linear
 
-from nequip.data import NpzDataset, AtomicDataDict, AtomicData
+from nequip.data import AtomicDataDict
 from nequip.train.trainer import Trainer
 from nequip.utils.savenload import load_file
 from nequip.nn import GraphModuleMixin
@@ -32,6 +32,7 @@ minimal_config = dict(
     T_0=50,
     T_mult=2,
     loss_coeffs={"forces": 2},
+    early_stopping_patience={"LR": 1e-10},
 )
 configs_to_test = [dict(), minimal_config]
 loop_config = pytest.mark.parametrize("trainer", configs_to_test, indirect=True)

@@ -752,8 +752,8 @@ class Trainer:
     def stop_cond(self):
         """ kill the training early """
 
-        if self.early_stopping is not None and hasattr(self, mae_dict):
-            early_stop, early_stop_args, debug_args = self.early_stopping(mae_dict)
+        if self.early_stopping is not None and hasattr(self, "mae_dict"):
+            early_stop, early_stop_args, debug_args = self.early_stopping(self.mae_dict)
             if debug_args is not None:
                 self.logger.debug(debug_args)
             if early_stop:
