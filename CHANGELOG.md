@@ -9,6 +9,7 @@ Most recent change on the bottom.
 ## [Unreleased]
 ### Fixed
 - `iepoch` is no longer off-by-one when restarting a training run that hit `max_epochs`
+- Builders, and not just sub-builders, use the class name as a default prefix
 ### Added
 - `early_stopping_xxx` arguments added to enable early stop for platued values or values that out of lower/upper bounds.
 
