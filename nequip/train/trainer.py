@@ -39,6 +39,7 @@ from nequip.utils import (
 from .loss import Loss, LossStat
 from .metrics import Metrics
 from ._key import ABBREV, LOSS_KEY, TRAIN, VALIDATION
+from .early_stopping import EarlyStopping
 
 
 class Trainer:
@@ -221,7 +222,8 @@ class Trainer:
         loss_coeffs: Union[dict, str] = AtomicDataDict.TOTAL_ENERGY_KEY,
         metrics_components: Optional[Union[dict, str]] = None,
         metrics_key: str = ABBREV.get(LOSS_KEY, LOSS_KEY),
-        early_stop_lower_threshold: Optional[float] = None,
+        early_stopping: Optional[EarlyStopping] = None,
+        early_stopping_kwargs: Optional[dict] = None,
         max_epochs: int = 1000000,
         lr_sched=None,
         learning_rate: float = 1e-2,
@@ -301,6 +303,7 @@ class Trainer:
         self.kwargs = deepcopy(kwargs)
         self.optimizer_kwargs = deepcopy(optimizer_kwargs)
         self.lr_scheduler_kwargs = deepcopy(lr_scheduler_kwargs)
+        self.early_stopping_kwargs = deepcopy(early_stopping_kwargs)
 
         # initialize the optimizer and scheduler, the params will be updated in the function
         self.init()
@@ -364,6 +367,10 @@ class Trainer:
                 )
             if self.use_ema:
                 dictionary["state_dict"]["ema_state"] = self.ema.state_dict()
+            if self.early_stopping is not None:
+                dictionary["state_dict"][
+                    "early_stopping"
+                ] = self.early_stopping.state_dict()
 
         if hasattr(self.model, "save") and not issubclass(
             type(self.model), torch.jit.ScriptModule
@@ -468,12 +475,6 @@ class Trainer:
             model = d.pop("model")
         elif "progress" in d:
             progress = d["progress"]
-            stop_arg = progress.pop("stop_arg", None)
-            if stop_arg is not None:
-                raise RuntimeError(
-                    f"The previous run has properly stopped with {stop_arg}."
-                    "Please either increase the max_epoch or change early stop criteria"
-                )
 
             # load the model from file
             iepoch = progress["iepoch"]
@@ -505,6 +506,9 @@ class Trainer:
             if trainer.lr_sched is not None:
                 trainer.lr_sched.load_state_dict(state_dict["lr_sched"])
 
+            if trainer.early_stopping is not None:
+                trainer.early_stopping.load_state_dict(state_dict["early_stopping"])
+
             torch.set_rng_state(state_dict["rng_state"])
             if torch.cuda.is_available():
                 torch.cuda.set_rng_state(state_dict["cuda_rng_state"])
@@ -515,10 +519,19 @@ class Trainer:
         if "progress" in d:
             trainer.best_val_metrics = progress["best_val_metrics"]
             trainer.best_epoch = progress["best_epoch"]
+            stop_arg = progress.pop("stop_arg", None)
         else:
             trainer.best_val_metrics = float("inf")
             trainer.best_epoch = 0
+            stop_arg = None
         trainer.iepoch = iepoch
+
+        # final sanity check
+        if trainer.stop_cond:
+            raise RuntimeError(
+                f"The previous run has properly stopped with {stop_arg}."
+                "Please either increase the max_epoch or change early stop criteria"
+            )
 
         return trainer
 
@@ -577,6 +590,32 @@ class Trainer:
         self.loss_stat = LossStat(keys=list(self.loss.funcs.keys()))
         self._initialized = True
 
+        if self.early_stopping is None:
+            key_mapping, kwargs = instantiate(
+                EarlyStopping,
+                prefix="early_stopping",
+                optional_args=self.early_stopping_kwargs,
+                all_args=self.kwargs,
+                return_args_only=True,
+            )
+            n_args = 0
+            for key, item in kwargs.items():
+                # prepand VALIDATION string if k is not with
+                if isinstance(item, dict):
+                    new_dict = {}
+                    for k, v in item.items():
+                        if (
+                            k.startswith(VALIDATION)
+                            or k.startswith(TRAIN)
+                            or k in ["LR", "wall"]
+                        ):
+                            new_dict[k] = item[k]
+                        else:
+                            new_dict[f"{VALIDATION}_{k}"] = item[k]
+                    kwargs[key] = new_dict
+                    n_args += len(new_dict)
+            self.early_stopping = EarlyStopping(**kwargs) if n_args > 0 else None
+
     def init_metrics(self):
         if self.metrics_components is None:
             self.metrics_components = []
@@ -593,6 +632,12 @@ class Trainer:
             positional_args=dict(components=self.metrics_components),
             all_args=self.kwargs,
         )
+
+        if not (
+            self.metrics_key.startswith(VALIDATION)
+            or self.metrics_key.startswith(TRAIN)
+        ):
+            self.metrics_key = f"{VALIDATION}_{self.metrics_key}"
 
     def init_model(self):
         logger = self.logger
@@ -618,24 +663,17 @@ class Trainer:
         self.init_log()
         self.wall = perf_counter()
 
-        stop = False
         if not self.restart:
             self.best_val_metrics = float("inf")
             self.best_epoch = 0
             self.iepoch = 0
+
         self.init_metrics()
 
-        while self.iepoch < self.max_epochs and not stop:
+        while not self.stop_cond:
 
-            early_stop = self.epoch_step()
-            if early_stop:
-                stop = False
-                self.stop_arg = "early stop"
-
-            self.iepoch += 1
-
-        if not stop:
-            self.stop_arg = "max epochs"
+            self.epoch_step()
+            self.end_of_epoch_save()
 
         for callback in self.final_callbacks:
             callback(self)
@@ -713,12 +751,21 @@ class Trainer:
             self.batch_metrics = self.metrics(pred=out, ref=data)
 
     @property
-    def early_stop_cond(self):
+    def stop_cond(self):
         """ kill the training early """
 
-        if self.early_stop_lower_threshold is not None:
-            if self.best_val_metrics < self.early_stop_lower_threshold:
+        if self.early_stopping is not None and hasattr(self, "mae_dict"):
+            early_stop, early_stop_args, debug_args = self.early_stopping(self.mae_dict)
+            if debug_args is not None:
+                self.logger.debug(debug_args)
+            if early_stop:
+                self.stop_args = early_stop_args
                 return True
+
+        if self.iepoch >= self.max_epochs:
+            self.stop_arg = "max epochs"
+            return True
+
         return False
 
     def reset_metrics(self):
@@ -728,6 +775,7 @@ class Trainer:
         self.metrics.to(self.device)
 
     def epoch_step(self):
+
         datasets = [self.dl_train, self.dl_val]
         categories = [TRAIN, VALIDATION]
         self.metrics_dict = {}
@@ -757,18 +805,15 @@ class Trainer:
                     for callback in self.end_of_train_callbacks:
                         callback(self)
 
+        self.iepoch += 1
+
         self.end_of_epoch_log()
-        self.end_of_epoch_save()
 
         if self.lr_scheduler_name == "ReduceLROnPlateau":
-            self.lr_sched.step(
-                metrics=self.mae_dict[f"{VALIDATION}_{self.metrics_key}"]
-            )
+            self.lr_sched.step(metrics=self.mae_dict[self.metrics_key])
 
         for callback in self.end_of_epoch_callbacks:
             callback(self)
-
-        return self.early_stop_cond
 
     def log_dictionary(self, dictionary: dict, name: str = ""):
         """
@@ -833,7 +878,7 @@ class Trainer:
         save model and trainer details
         """
 
-        val_metrics = self.mae_dict[f"{VALIDATION}_{self.metrics_key}"]
+        val_metrics = self.mae_dict[self.metrics_key]
         if val_metrics < self.best_val_metrics:
             self.best_val_metrics = val_metrics
             self.best_epoch = self.iepoch
@@ -855,7 +900,7 @@ class Trainer:
                         torch.save(self.model, save_path)
 
             self.logger.info(
-                f"! Best model {self.best_epoch+1:8d} {self.best_val_metrics:8.3f}"
+                f"! Best model {self.best_epoch:8d} {self.best_val_metrics:8.3f}"
             )
 
         if (self.iepoch + 1) % self.log_epoch_freq == 0:
@@ -896,11 +941,11 @@ class Trainer:
         log_str = {}
 
         strings = ["Epoch", "wal", "LR"]
-        mat_str = f"{self.iepoch+1:10d}, {wall:8.3f}, {lr:8.3g}"
+        mat_str = f"{self.iepoch:10d}, {wall:8.3f}, {lr:8.3g}"
         for cat in categories:
             log_header[cat] = "# "
             log_header[cat] += " ".join([f"{s:>8s}" for s in strings])
-            log_str[cat] = f"{self.iepoch+1:10d} {wall:8.3f} {lr:8.3g}"
+            log_str[cat] = f"{self.iepoch:10d} {wall:8.3f} {lr:8.3g}"
 
         for category in categories:
 
