@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Most recent change on the bottom.
 
 ## [Unreleased]
+
+## [0.3.1]
 ### Fixed
 - `iepoch` is no longer off-by-one when restarting a training run that hit `max_epochs`
 - Builders, and not just sub-builders, use the class name as a default prefix
