@@ -141,10 +141,11 @@ def instantiate(
         return_args_only (bool): if True, do not instantiate, only return the arguments
     """
 
+    prefix_list = [builder.__name__] if inspect.isclass(builder) else []
     if isinstance(prefix, str):
-        prefix_list = [prefix]
+        prefix_list += [prefix]
     else:
-        prefix_list = prefix
+        prefix_list += prefix
 
     # detect the input parameters needed from params
     config = Config.from_class(builder, remove_kwargs=remove_kwargs)
@@ -226,8 +227,8 @@ def instantiate(
             sub_prefix_list = [sub_builder.__name__, key]
             for prefix in prefix_list:
                 sub_prefix_list = sub_prefix_list + [
-                    prefix + "_" + key,
                     prefix,
+                    prefix + "_" + key,
                 ]
 
             nested_km, nested_kwargs = instantiate(
