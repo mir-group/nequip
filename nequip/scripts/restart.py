@@ -59,13 +59,6 @@ def restart(file_name, config, mode="update"):
         {"float32": torch.float32, "float64": torch.float64}[config.default_dtype]
     )
 
-    # increase max_epochs if training has hit maximum epochs
-    if "progress" in dictionary:
-        stop_args = dictionary["progress"].pop("stop_arg", None)
-        if stop_args is not None:
-            dictionary["progress"]["stop_arg"] = None
-            dictionary["max_epochs"] *= 2
-
     if config.wandb:
         from nequip.train.trainer_wandb import TrainerWandB
 

@@ -8,6 +8,13 @@ Most recent change on the bottom.
 
 ## [Unreleased]
 
+## [0.3.1]
+### Fixed
+- `iepoch` is no longer off-by-one when restarting a training run that hit `max_epochs`
+- Builders, and not just sub-builders, use the class name as a default prefix
+### Added
+- `early_stopping_xxx` arguments added to enable early stop for platued values or values that out of lower/upper bounds.
+
 ## [0.3.0] - 2021-05-07
 ### Added
 - Sub-builders can be skipped in `instantiate` by setting them to `None`

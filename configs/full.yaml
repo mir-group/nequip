@@ -87,6 +87,21 @@ use_ema: false                                                                  
 ema_decay: 0.999                                                                   # ema weight, commonly set to 0.999
 ema_use_num_updates: true                                                          # whether to use number of updates when computing averages
 
+# early stopping based on metrics values. 
+# LR, wall and any keys printed in the log file can be used. 
+# The key can start with Training or Validation. If not defined, the validation value will be used.
+early_stopping_patiences:                                                          # stop early if a metric value stopped decreasing for n epochs
+  Validation_loss: 50                                                              # 
+  Training_loss: 100                                                               # 
+  e_mae: 100                                                                         # 
+early_stopping_delta:                                                              # If delta is defined, a tiny decrease smaller than delta will not be considered as a decrease
+  Training_loss: 0.005                                                             # 
+early_stopping_cumulative_delta: false                                             # If True, the minimum value recorded will not be updated when the decrease is smaller than delta
+early_stopping_lower_bounds:                                                       # stop early if a metric value is lower than the bound
+  LR: 1.0e-10                                                                        # 
+early_stopping_upper_bounds:                                                       # stop early if a metric value is higher than the bound
+  wall: 1.0e+100                                                                      # 
+
 # loss function
 loss_coeffs:                                                                       # different weights to use in a weighted loss functions
   forces: 100                                                                      # for MD applications, we recommed a force weight of 100 and an energy weight of 1
