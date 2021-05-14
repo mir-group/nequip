@@ -141,7 +141,7 @@ def instantiate(
         return_args_only (bool): if True, do not instantiate, only return the arguments
     """
 
-    prefix_list = [builder.__name__] if inspect.isclass(builder)) else []
+    prefix_list = [builder.__name__] if inspect.isclass(builder) else []
     if isinstance(prefix, str):
         prefix_list += [prefix]
     else:
