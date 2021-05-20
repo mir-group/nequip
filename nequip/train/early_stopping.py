@@ -86,11 +86,13 @@ class EarlyStopping:
                 self.counters[key] = 0
 
         for key, bound in self.lower_bounds.items():
+            print(key, bound, type(bound), metrics[key], type(metrics[key]))
             if metrics[key] < bound:
                 stop_args += f" {key} is smaller than {bound}"
                 stop = True
 
         for key, bound in self.upper_bounds.items():
+            print(key, bound, type(bound), metrics[key], type(metrics[key]))
             if metrics[key] > bound:
                 stop_args += f" {key} is larger than {bound}"
                 stop = True
