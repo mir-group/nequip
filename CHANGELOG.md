@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Most recent change on the bottom.
 
 ## [Unreleased]
+- examples of `end_of_epoch_callbacks` are listed in nequip.train.callbacks
 
 ## [0.3.1]
 ### Fixed
