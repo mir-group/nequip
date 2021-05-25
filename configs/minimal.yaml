@@ -19,8 +19,6 @@ model_initializers:
 # data
 dataset: aspirin
 dataset_file_name: benchmark_data/aspirin_ccsd-train.npz
-end_of_epoch_callbacks:                                                            # call back functions to adjust hyper-parameters
-- !!python/name:nequip.train.callbacks.cos_sin                                     # two examples (equal_loss and cos_sin) are listed in nequip.train.callbacks
 
 # logging
 wandb: false
@@ -33,9 +31,7 @@ batch_size: 1
 max_epochs: 10
 
 # loss function
-loss_coeffs: 
-- forces
-- total_energy
+loss_coeffs: forces
 
 # optimizer
 optimizer_name: Adam

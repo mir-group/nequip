@@ -21,7 +21,11 @@ def cos_sin(self):
     e = self.kwargs.get("loss_e_mag", 1)
     phi_f = self.kwargs.get("loss_f_phi", 0)
     phi_e = self.kwargs.get("loss_e_phi", 0)
-    pi = self.kwargs.get("loss_coeff_cycle", 20)
+    cycle = self.kwargs.get("loss_coeff_cycle", 20)
+
+    if phi_f == phi_e:
+
+        return
 
     dtype = torch.get_default_dtype()
 
