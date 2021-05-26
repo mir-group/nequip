@@ -199,3 +199,8 @@ global_rescale_scale: dataset_force_rms
 trainable_global_rescale_shift: false
 # whether the scale of the final global energy rescaling should be trainable
 trainable_global_rescale_scale: false
+
+
+# Options for e3nn's set_optimization_defaults. A dict:
+# e3nn_optimization_defaults:
+#   explicit_backward: True
