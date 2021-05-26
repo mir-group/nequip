@@ -24,13 +24,12 @@ def cos_sin(self):
     cycle = self.kwargs.get("loss_coeff_cycle", 20)
 
     if phi_f == phi_e:
-
         return
 
     dtype = torch.get_default_dtype()
 
-    f = torch.as_tensor(f * (cos((self.iepoch + phi_f) / cycle * pi)+1), dtype=dtype)
-    e = torch.as_tensor(e * (cos((self.iepoch + phi_e) / cycle * pi)+1), dtype=dtype)
+    f = torch.as_tensor(f * (cos((self.iepoch + phi_f) / cycle * pi) + 1), dtype=dtype)
+    e = torch.as_tensor(e * (cos((self.iepoch + phi_e) / cycle * pi) + 1), dtype=dtype)
 
     self.loss.coeffs["forces"] = f
     self.loss.coeffs["total_energy"] = e
