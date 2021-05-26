@@ -101,8 +101,15 @@ early_stopping_lower_bounds:                                                    
   LR: 1.0e-10                                                                      # 
 early_stopping_upper_bounds:                                                       # stop early if a metric value is higher than the bound
   wall: 1.0e+100                                                                   # 
-end_of_epoch_callbacks:                                                            # call back functions to adjust hyper-parameters
-- !!python/name:nequip.train.callbacks.cos_sin                                     # two examples (equal_loss and cos_sin) are listed in nequip.train.callbacks
+end_of_epoch_callbacks:                                                           # call back functions to adjust hyper-parameters
+- !!python/name:nequip.utils.callbacks.cos_sin                                    # two examples (equal_loss and cos_sin) are listed in nequip.train.callbacks
+
+# for cos_sin callback: the coefficient will be mag*(cos((iepoch+phi)/cycle*pi)+1)
+loss_f_mag: 1
+loss_e_mag: 1
+loss_f_phi: 0
+loss_e_phi: -10
+loss_coeff_cycle: 20
 
 # loss function
 loss_coeffs:                                                                       # different weights to use in a weighted loss functions
