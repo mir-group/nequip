@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Most recent change on the bottom.
 
 ## [Unreleased]
+### Fixed
+- Using `wandb` no longer breaks the inclusion of special objects like callables in configs
 
 ## [0.3.1]
 ### Fixed
