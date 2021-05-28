@@ -9,9 +9,10 @@ NequIP
 NequIP is an open-source package for creating, training, and using E(3)-equivariant machine learning interatomic potentials.
 
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 3
    :caption: Contents:
 
+   guide/guide
    api/nequip
 
 
