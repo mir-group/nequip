@@ -23,6 +23,16 @@ irreps_edge_sh: 0e + 1o + 2e                                                    
 conv_to_output_hidden_irreps_out: 16x0e                                           # irreps used in hidden layer of output block
 
 nonlinearity_type: gate                                                           # may be 'gate' or 'norm', 'gate' is recommended
+
+# scalar nonlinearities to use — available options are silu, ssp (shifted softplus), tanh, and abs.
+# Different nonlinearities can be specified for 1 (even) and -1 (odd) parity;
+# note that only tanh and abs are correct for -1 (odd parity).
+nonlinearity_scalars:
+  1: ssp
+  -1: tanh
+nonlinearity_gates:
+  1: ssp
+  -1: abs
 resnet: false                                                                     # set true to make interaction block a resnet-style update
 
 num_basis: 8                                                                      # number of basis functions used in the radial basis
@@ -66,7 +76,7 @@ npz_fixed_field_keys:                                                           
 #   format: extxyz
 
 # logging
-wandb: true                                                                        # we recommend using wandb for logging, we'll turn it off here as it's optional
+wandb: false                                                                        # we recommend using wandb for logging, we'll turn it off here as it's optional
 wandb_project: aspirin                                                             # project name used in wandb
 wandb_resume: true                                                                 # if true and restart is true, wandb run data will be restarted and updated.
                                                                                    # if false, a new wandb run will be generated
