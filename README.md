@@ -5,12 +5,16 @@ NequIP is an open-source deep learning package for learning interatomic potentia
 
 ![nequip](./nequip.png)
 
-### Requirements
+**PLEASE NOTE:** the NequIP code is under active development and is still in beta versions 0.x.x. In general changes to the patch version (the third number) indicate backward compatible beta releases, but please be aware that file formats and APIs may change. Bug reports are also welcomed in the GitHub issues!
+
+## Installation
+
+NequIP requires:
 
 * Python >= 3.6
 * PyTorch >= 1.8
 
-### Installation
+To install:
 
 * Install [PyTorch Geometric](https://github.com/rusty1s/pytorch_geometric), make sure to install this with your correct version of CUDA/CPU: 
 
@@ -32,27 +36,12 @@ pip install git+https://github.com/rusty1s/pytorch_geometric.git
 * Install [e3nn](https://github.com/e3nn/e3nn): 
 
 ```
-pip install --no-deps git+https://github.com/e3nn/e3nn.git 
-```
-
-* Install [`opt_einsum_fx`](https://github.com/Linux-cpp-lisp/opt_einsum_fx) for optimized `e3nn` operations --- this is very important for performance:
-
-```bash
-$ git clone https://github.com/Linux-cpp-lisp/opt_einsum_fx.git
-$ cd opt_einsum_fx/
-$ pip install .
-```
-
-* Install [`pytorch_runstats`](https://github.com/mir-group/pytorch_runstats):
-```bash
-$ git clone https://github.com/mir-group/pytorch_runstats
-$ cd pytorch_runstats/
-$ pip install .
+pip install git+https://github.com/e3nn/e3nn.git 
 ```
 
 * Install our fork of [`pytorch_ema`](https://github.com/Linux-cpp-lisp/pytorch_ema) for using an Exponential Moving Average on the weights: 
 ```bash
-$ pip install -U git+https://github.com/Linux-cpp-lisp/pytorch_ema
+$ pip install git+https://github.com/Linux-cpp-lisp/pytorch_ema
 ```
 
 * We use [Weights&Biases](https://wandb.ai) to keep track of experiments. This is not a strict requirement, you can use our package without this, but it may make your life easier. If you want to use it, create an account [here](https://wandb.ai) and install it: 
@@ -66,7 +55,7 @@ pip install wandb
 ```
 git clone https://github.com/mir-group/nequip.git
 cd nequip
-pip install -e . 
+pip install . 
 ```
 
 ### Installation Issues
@@ -75,8 +64,10 @@ We recommend running the tests using ```pytest``` on a CPU:
 
 ```
 pip install pytest
-pytest ./tests
+pytest ./tests/
 ```
+
+## Usage
 
 ### Tutorial 
 
@@ -90,14 +81,14 @@ To train a network, all you need to is run `nequip-train` with a config file tha
 nequip-train configs/example.yaml
 ```
 
-### References
+## References
 
 The theory behind NequIP is described in our preprint [1]. NequIP's backend builds on e3nn, a general framework for building E(3)-equivariant neural networks [2]. 
 
     [1] https://arxiv.org/abs/2101.03164
     [2] https://github.com/e3nn/e3nn
 
-### Authors
+## Authors
 
 NequIP is being developed by:
 
@@ -111,15 +102,15 @@ NequIP is being developed by:
 under the guidance of Boris Kozinsky at Harvard.
 
 
-### Contact
+## Contact
 
 If you have questions, please don't hesitate to reach out at batzner[at]g[dot]harvard[dot]edu. 
 
 
-### Citing
+## Citing
 
 If you use this repository in your work, please consider citing NequIP (1) and e3nn (2): 
 
     [1] https://arxiv.org/abs/2101.03164
-    [2] https://zenodo.org/record/4557591#.YFDmoZNKi3I
+    [2] https://doi.org/10.5281/zenodo.3724963
 
