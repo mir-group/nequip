@@ -913,7 +913,11 @@ class Trainer:
             and (self.iepoch + 1) % self.save_checkpoint_freq == 0
         ):
             ckpt_path = self.output.generate_file(f"ckpt{self.iepoch+1}.pth")
-            self.save(ckpt_path)
+            with atomic_write(ckpt_path) as write_to:
+                if hasattr(self.model, "save"):
+                    self.model.save(write_to)
+                else:
+                    torch.save(self.model, write_to)
 
     def init_log(self):
 
