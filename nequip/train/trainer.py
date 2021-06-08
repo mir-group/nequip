@@ -908,6 +908,7 @@ class Trainer:
             self.save_model(ckpt_path)
 
     def save_model(self, path):
+
         with atomic_write(path) as write_to:
             if hasattr(self.model, "save"):
                 self.model.save(write_to)
