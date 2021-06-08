@@ -908,7 +908,10 @@ class Trainer:
         if (self.iepoch + 1) % self.log_epoch_freq == 0:
             self.save(self.trainer_save_path)
 
-        if self.save_checkpoint_freq > 0 and (self.iepoch+1) % self.save_checkpoint_freq == 0:
+        if (
+            self.save_checkpoint_freq > 0
+            and (self.iepoch + 1) % self.save_checkpoint_freq == 0
+        ):
             ckpt_path = self.output.generate_file(f"ckpt{self.iepoch+1}.pth")
             self.save(ckpt_path)
 
