@@ -165,6 +165,7 @@ class Trainer:
 
         log_batch_freq (int): frequency to log at the end of a batch
         log_epoch_freq (int): frequency to save at the end of an epoch
+        save_checkpoint_freq (int): frequency to save the intermediate checkpoint. no saving when the value is not positive.
 
         verbose (str): verbosity level, i.e. "INFO", "WARNING", "DEBUG". case insensitive
 
