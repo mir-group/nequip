@@ -69,6 +69,8 @@ pytest ./tests/
 
 ## Usage
 
+**! PLEASE NOTE:** the first few training epochs/calls to a NequIP model can be painfully slow. This is expected behaviour as the [profile-guided optimization of TorchScript models](https://program-transformations.github.io/slides/pytorch_neurips.pdf) takes a number of calls to warm up before optimizing the model. This occurs regardless of whether the entire model is compiled because many core components from e3nn are compiled and optimized through TorchScript.
+
 ### Tutorial 
 
 The best way to learn how to use NequIP is [through the tutorial notebook hosted here](https://deepnote.com/project/2412ca93-7ad1-4458-972c-5d5add5a667e) 
