@@ -422,11 +422,7 @@ class Trainer:
         )
         logger.debug(f"Saved trainer to {filename}")
 
-        with atomic_write(self.last_model_path) as write_to:
-            if hasattr(self.model, "save"):
-                self.model.save(write_to)
-            else:
-                torch.save(self.model, write_to)
+        self.save_model(self.last_model_path)
         logger.debug(f"Saved last model to to {self.last_model_path}")
 
         return filename
@@ -895,11 +891,7 @@ class Trainer:
                 cm = contextlib.nullcontext()
 
             with cm:
-                with atomic_write(self.best_model_path) as save_path:
-                    if hasattr(self.model, "save"):
-                        self.model.save(save_path)
-                    else:
-                        torch.save(self.model, save_path)
+                self.save_model(self.best_model_path)
 
             self.logger.info(
                 f"! Best model {self.best_epoch:8d} {self.best_val_metrics:8.3f}"
@@ -913,11 +905,14 @@ class Trainer:
             and (self.iepoch + 1) % self.save_checkpoint_freq == 0
         ):
             ckpt_path = self.output.generate_file(f"ckpt{self.iepoch+1}.pth")
-            with atomic_write(ckpt_path) as write_to:
-                if hasattr(self.model, "save"):
-                    self.model.save(write_to)
-                else:
-                    torch.save(self.model, write_to)
+            self.save_model(ckpt_path)
+
+    def save_model(self, path):
+        with atomic_write(path) as write_to:
+            if hasattr(self.model, "save"):
+                self.model.save(write_to)
+            else:
+                torch.save(self.model, write_to)
 
     def init_log(self):
 
