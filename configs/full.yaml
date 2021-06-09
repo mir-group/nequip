@@ -83,7 +83,8 @@ wandb_resume: true                                                              
 verbose: info                                                                      # the same as python logging, e.g. warning, info, debug, error. case insensitive
 log_batch_freq: 1                                                                  # batch frequency, how often to print training errors withinin the same epoch
 log_epoch_freq: 1                                                                  # epoch frequency, how often to print and save the model
-save_checkpoint_freq: -1                                                           # frequency to save train model checkpoint; negative value means only the latest epoch is saved in the last_model.pth; positive value: checkpoint_epoch.pth
+save_checkpoint_freq: -1                                                           # frequency to save the intermediate checkpoint. no saving when the value is not positive.
+save_ema_checkpoint_freq: -1                                                       # frequency to save the intermediate ema checkpoint. no saving when the value is not positive.
 
 # training
 n_train: 100                                                                       # number of training data
