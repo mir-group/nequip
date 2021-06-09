@@ -166,6 +166,7 @@ class Trainer:
         log_batch_freq (int): frequency to log at the end of a batch
         log_epoch_freq (int): frequency to save at the end of an epoch
         save_checkpoint_freq (int): frequency to save the intermediate checkpoint. no saving when the value is not positive.
+        save_ema_checkpoint_freq (int): frequency to save the intermediate ema checkpoint. no saving when the value is not positive.
 
         verbose (str): verbosity level, i.e. "INFO", "WARNING", "DEBUG". case insensitive
 
@@ -253,6 +254,7 @@ class Trainer:
         log_batch_freq: int = 1,
         log_epoch_freq: int = 1,
         save_checkpoint_freq: int = -1,
+        save_ema_checkpoint_freq: int = -1,
         verbose="INFO",
         **kwargs,
     ):
@@ -881,17 +883,7 @@ class Trainer:
             self.best_val_metrics = val_metrics
             self.best_epoch = self.iepoch
 
-            if self.use_ema:
-                # If using EMA, store the EMA validation model
-                # that gave us the good val metrics that made the model "best"
-                # in the first place
-                cm = self.ema.average_parameters()
-            else:
-                # otherwise, do nothing
-                cm = contextlib.nullcontext()
-
-            with cm:
-                self.save_model(self.best_model_path)
+            self.save_ema_model(self.best_model_path)
 
             self.logger.info(
                 f"! Best model {self.best_epoch:8d} {self.best_val_metrics:8.3f}"
@@ -906,6 +898,27 @@ class Trainer:
         ):
             ckpt_path = self.output.generate_file(f"ckpt{self.iepoch+1}.pth")
             self.save_model(ckpt_path)
+
+        if (
+            self.save_ema_checkpoint_freq > 0
+            and (self.iepoch + 1) % self.save_ema_checkpoint_freq == 0
+        ):
+            ckpt_path = self.output.generate_file(f"ckpt_ema_{self.iepoch+1}.pth")
+            self.save_ema_model(ckpt_path)
+
+    def save_ema_model(self, path):
+
+        if self.use_ema:
+            # If using EMA, store the EMA validation model
+            # that gave us the good val metrics that made the model "best"
+            # in the first place
+            cm = self.ema.average_parameters()
+        else:
+            # otherwise, do nothing
+            cm = contextlib.nullcontext()
+
+        with cm:
+            self.save_model(path)
 
     def save_model(self, path):
 
