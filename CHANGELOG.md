@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Most recent change on the bottom.
 
 ## [Unreleased]
+
+## [0.3.2] - 2021-06-09
 ### Added
 - Option for which nonlinearities to use
 - Option to save models every *n* epochs in training
