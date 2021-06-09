@@ -165,6 +165,8 @@ class Trainer:
 
         log_batch_freq (int): frequency to log at the end of a batch
         log_epoch_freq (int): frequency to save at the end of an epoch
+        save_checkpoint_freq (int): frequency to save the intermediate checkpoint. no saving when the value is not positive.
+        save_ema_checkpoint_freq (int): frequency to save the intermediate ema checkpoint. no saving when the value is not positive.
 
         verbose (str): verbosity level, i.e. "INFO", "WARNING", "DEBUG". case insensitive
 
@@ -251,6 +253,8 @@ class Trainer:
         final_callbacks: list = [],
         log_batch_freq: int = 1,
         log_epoch_freq: int = 1,
+        save_checkpoint_freq: int = -1,
+        save_ema_checkpoint_freq: int = -1,
         verbose="INFO",
         **kwargs,
     ):
@@ -420,11 +424,7 @@ class Trainer:
         )
         logger.debug(f"Saved trainer to {filename}")
 
-        with atomic_write(self.last_model_path) as write_to:
-            if hasattr(self.model, "save"):
-                self.model.save(write_to)
-            else:
-                torch.save(self.model, write_to)
+        self.save_model(self.last_model_path)
         logger.debug(f"Saved last model to to {self.last_model_path}")
 
         return filename
@@ -883,21 +883,7 @@ class Trainer:
             self.best_val_metrics = val_metrics
             self.best_epoch = self.iepoch
 
-            if self.use_ema:
-                # If using EMA, store the EMA validation model
-                # that gave us the good val metrics that made the model "best"
-                # in the first place
-                cm = self.ema.average_parameters()
-            else:
-                # otherwise, do nothing
-                cm = contextlib.nullcontext()
-
-            with cm:
-                with atomic_write(self.best_model_path) as save_path:
-                    if hasattr(self.model, "save"):
-                        self.model.save(save_path)
-                    else:
-                        torch.save(self.model, save_path)
+            self.save_ema_model(self.best_model_path)
 
             self.logger.info(
                 f"! Best model {self.best_epoch:8d} {self.best_val_metrics:8.3f}"
@@ -905,6 +891,42 @@ class Trainer:
 
         if (self.iepoch + 1) % self.log_epoch_freq == 0:
             self.save(self.trainer_save_path)
+
+        if (
+            self.save_checkpoint_freq > 0
+            and (self.iepoch + 1) % self.save_checkpoint_freq == 0
+        ):
+            ckpt_path = self.output.generate_file(f"ckpt{self.iepoch+1}.pth")
+            self.save_model(ckpt_path)
+
+        if (
+            self.save_ema_checkpoint_freq > 0
+            and (self.iepoch + 1) % self.save_ema_checkpoint_freq == 0
+        ):
+            ckpt_path = self.output.generate_file(f"ckpt_ema_{self.iepoch+1}.pth")
+            self.save_ema_model(ckpt_path)
+
+    def save_ema_model(self, path):
+
+        if self.use_ema:
+            # If using EMA, store the EMA validation model
+            # that gave us the good val metrics that made the model "best"
+            # in the first place
+            cm = self.ema.average_parameters()
+        else:
+            # otherwise, do nothing
+            cm = contextlib.nullcontext()
+
+        with cm:
+            self.save_model(path)
+
+    def save_model(self, path):
+
+        with atomic_write(path) as write_to:
+            if hasattr(self.model, "save"):
+                self.model.save(write_to)
+            else:
+                torch.save(self.model, write_to)
 
     def init_log(self):
 

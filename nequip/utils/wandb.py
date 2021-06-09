@@ -1,5 +1,7 @@
 import os
 import wandb
+import logging
+from wandb.util import json_friendly_val
 
 
 def init_n_update(config):
@@ -13,9 +15,20 @@ def init_n_update(config):
         resume="allow",
         id=config.run_id,
     )
-    # download from wandb set up
-    config.update(dict(wandb.config))
-    wandb.config.update(dict(run_id=config.run_id), allow_val_change=True)
+    # # download from wandb set up
+    updated_parameters = dict(wandb.config)
+    for k, v_new in updated_parameters.items():
+        skip = False
+        if k in config.keys():
+            # double check the one sanitized by wandb
+            v_old = json_friendly_val(config[k])
+            if repr(v_new) == repr(v_old):
+                skip = True
+        if skip:
+            logging.info(f"# skipping wandb update {k} from {v_old} to {v_new}")
+        else:
+            config.update({k: v_new})
+            logging.info(f"# wandb update {k} from {v_old} to {v_new}")
     return config
 
 

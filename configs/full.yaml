@@ -23,6 +23,16 @@ irreps_edge_sh: 0e + 1o + 2e                                                    
 conv_to_output_hidden_irreps_out: 16x0e                                           # irreps used in hidden layer of output block
 
 nonlinearity_type: gate                                                           # may be 'gate' or 'norm', 'gate' is recommended
+
+# scalar nonlinearities to use — available options are silu, ssp (shifted softplus), tanh, and abs.
+# Different nonlinearities can be specified for 1 (even) and -1 (odd) parity;
+# note that only tanh and abs are correct for -1 (odd parity).
+nonlinearity_scalars:
+  1: ssp
+  -1: tanh
+nonlinearity_gates:
+  1: ssp
+  -1: abs
 resnet: false                                                                     # set true to make interaction block a resnet-style update
 
 num_basis: 8                                                                      # number of basis functions used in the radial basis
@@ -66,13 +76,15 @@ npz_fixed_field_keys:                                                           
 #   format: extxyz
 
 # logging
-wandb: true                                                                        # we recommend using wandb for logging, we'll turn it off here as it's optional
+wandb: false                                                                        # we recommend using wandb for logging, we'll turn it off here as it's optional
 wandb_project: aspirin                                                             # project name used in wandb
 wandb_resume: true                                                                 # if true and restart is true, wandb run data will be restarted and updated.
                                                                                    # if false, a new wandb run will be generated
 verbose: info                                                                      # the same as python logging, e.g. warning, info, debug, error. case insensitive
 log_batch_freq: 1                                                                  # batch frequency, how often to print training errors withinin the same epoch
 log_epoch_freq: 1                                                                  # epoch frequency, how often to print and save the model
+save_checkpoint_freq: -1                                                           # frequency to save the intermediate checkpoint. no saving when the value is not positive.
+save_ema_checkpoint_freq: -1                                                       # frequency to save the intermediate ema checkpoint. no saving when the value is not positive.
 
 # training
 n_train: 100                                                                       # number of training data
@@ -199,3 +211,8 @@ global_rescale_scale: dataset_force_rms
 trainable_global_rescale_shift: false
 # whether the scale of the final global energy rescaling should be trainable
 trainable_global_rescale_scale: false
+
+
+# Options for e3nn's set_optimization_defaults. A dict:
+# e3nn_optimization_defaults:
+#   explicit_backward: True

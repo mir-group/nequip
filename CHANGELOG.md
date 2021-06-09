@@ -8,6 +8,15 @@ Most recent change on the bottom.
 
 ## [Unreleased]
 
+## [0.3.2] - 2021-06-09
+### Added
+- Option for which nonlinearities to use
+- Option to save models every *n* epochs in training
+- Option to specify optimization defaults for `e3nn`
+
+### Fixed
+- Using `wandb` no longer breaks the inclusion of special objects like callables in configs
+
 ## [0.3.1]
 ### Fixed
 - `iepoch` is no longer off-by-one when restarting a training run that hit `max_epochs`

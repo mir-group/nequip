@@ -10,6 +10,7 @@ import numpy as np  # noqa: F401
 
 import torch
 
+import e3nn
 import e3nn.util.jit
 
 from nequip.utils import Config, dataset_from_config
@@ -85,6 +86,8 @@ def fresh_start(config):
     )
     if config.grad_anomaly_mode:
         torch.autograd.set_detect_anomaly(True)
+
+    e3nn.set_optimization_defaults(**config.get("e3nn_optimization_defaults", {}))
 
     # = Make the trainer =
     if config.wandb:

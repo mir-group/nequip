@@ -11,9 +11,9 @@ del version_dict
 setup(
     name="nequip",
     version=version,
-    description="NequIP is a software for building SE(3)-equivariant neural network interatomic potentials ",
+    description="NequIP is an open-source code for building E(3)-equivariant interatomic potentials.",
     download_url="https://github.com/mir-group/nequip",
-    author="Simon Batzner, Anders Johansson, Albert Musealian, Lixin Sun, Mario Geiger, Tess Smidt",
+    author="Simon Batzner, Albert Musealian, Lixin Sun, Mario Geiger, Anders Johansson, Tess Smidt",
     python_requires=">=3.6",
     packages=find_packages(include=["nequip", "nequip.*"]),
     entry_points={
@@ -27,14 +27,14 @@ setup(
     },
     install_requires=[
         "numpy",
-        "scipy",
         "ase",
-        "torch",
+        "torch>=1.8",
         "torch_geometric",
-        "e3nn>=0.2.5",
+        "e3nn>=0.3",
         "pyyaml",
         "contextlib2;python_version<'3.7'",  # backport of nullcontext
         "typing_extensions;python_version<'3.8'",
+        "torch-runstats",
     ],
     zip_safe=True,
 )

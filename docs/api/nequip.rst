@@ -1,0 +1,6 @@
+nequip API
+==========
+
+ .. toctree::
+
+    data

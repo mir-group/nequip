@@ -1,18 +1,22 @@
 # NequIP
 
-NequIP is an open-source deep learning package for learning interatomic potentials using E(3)-equivariant convolutions.
+NequIP is an open-source code for building E(3)-equivariant interatomic potentials.
 
 
 ![nequip](./nequip.png)
 
-### Requirements
+**PLEASE NOTE:** the NequIP code is under active development and is still in beta versions 0.x.x. In general changes to the patch version (the third number) indicate backward compatible beta releases, but please be aware that file formats and APIs may change. Bug reports are also welcomed in the GitHub issues!
+
+## Installation
+
+NequIP requires:
 
 * Python >= 3.6
 * PyTorch >= 1.8
 
-### Installation
+To install:
 
-* Install [PyTorch Geometric](https://github.com/rusty1s/pytorch_geometric), make sure to install this with your correct version of CUDA/CPU: 
+* Install [PyTorch Geometric](https://github.com/rusty1s/pytorch_geometric), make sure to install this with your correct version of CUDA/CPU:
 
 ```
 pip install torch-scatter -f https://pytorch-geometric.com/whl/torch-1.8.0+${CUDA}.html
@@ -32,27 +36,12 @@ pip install git+https://github.com/rusty1s/pytorch_geometric.git
 * Install [e3nn](https://github.com/e3nn/e3nn): 
 
 ```
-pip install --no-deps git+https://github.com/e3nn/e3nn.git 
-```
-
-* Install [`opt_einsum_fx`](https://github.com/Linux-cpp-lisp/opt_einsum_fx) for optimized `e3nn` operations --- this is very important for performance:
-
-```bash
-$ git clone https://github.com/Linux-cpp-lisp/opt_einsum_fx.git
-$ cd opt_einsum_fx/
-$ pip install .
-```
-
-* Install [`pytorch_runstats`](https://github.com/mir-group/pytorch_runstats):
-```bash
-$ git clone https://github.com/mir-group/pytorch_runstats
-$ cd pytorch_runstats/
-$ pip install .
+pip install git+https://github.com/e3nn/e3nn.git 
 ```
 
 * Install our fork of [`pytorch_ema`](https://github.com/Linux-cpp-lisp/pytorch_ema) for using an Exponential Moving Average on the weights: 
 ```bash
-$ pip install -U git+https://github.com/Linux-cpp-lisp/pytorch_ema
+$ pip install git+https://github.com/Linux-cpp-lisp/pytorch_ema
 ```
 
 * We use [Weights&Biases](https://wandb.ai) to keep track of experiments. This is not a strict requirement, you can use our package without this, but it may make your life easier. If you want to use it, create an account [here](https://wandb.ai) and install it: 
@@ -66,7 +55,7 @@ pip install wandb
 ```
 git clone https://github.com/mir-group/nequip.git
 cd nequip
-pip install -e . 
+pip install . 
 ```
 
 ### Installation Issues
@@ -75,29 +64,41 @@ We recommend running the tests using ```pytest``` on a CPU:
 
 ```
 pip install pytest
-pytest ./tests
+pytest ./tests/
 ```
 
-### Tutorial 
+## Usage
 
-The best way to learn how to use NequIP is [through the tutorial notebook hosted here](https://deepnote.com/project/2412ca93-7ad1-4458-972c-5d5add5a667e) 
+**! PLEASE NOTE:** the first few training epochs/calls to a NequIP model can be painfully slow. This is expected behaviour as the [profile-guided optimization of TorchScript models](https://program-transformations.github.io/slides/pytorch_neurips.pdf) takes a number of calls to warm up before optimizing the model. This occurs regardless of whether the entire model is compiled because many core components from e3nn are compiled and optimized through TorchScript.
 
-### Training a network
+### Basic network training
 
-To train a network, all you need to is run `nequip-train` with a config file that describes your data set and network, for example: 
+To train a network, you run `nequip-train` with a YAML config file that describes your data set, model hyperparameters, and training options. 
 
+```bash
+$ nequip-train configs/example.yaml
 ```
-nequip-train configs/example.yaml
-```
 
-### References
+A number of example configuration files are provided:
+ - [`configs/minimal.yaml`](configs/minimal.yaml): A minimal example of training a toy model on force data.
+ - [`configs/minimal_eng.yaml`](configs/minimal_eng.yaml): The same, but for a toy model that predicts and trains on only energy labels.
+ - [`configs/example.yaml`](configs/example.yaml): Training a more realistic model on forces and energies.
+ - [`configs/full.yaml`](configs/full.yaml): A complete configuration file containing all available options along with documenting comments.
+
+Training runs can be restarted using `nequip-restart`; training that starts fresh or restarts depending on the existance of the working directory can be launched using `nequip-requeue`. All `nequip-*` commands accept the `--help` option to show their call signatures and options.
+
+### In-depth tutorial 
+
+A more in-depth introduction to the internals of NequIP can be found in the [tutorial notebook](https://deepnote.com/project/2412ca93-7ad1-4458-972c-5d5add5a667e).
+
+## References
 
 The theory behind NequIP is described in our preprint [1]. NequIP's backend builds on e3nn, a general framework for building E(3)-equivariant neural networks [2]. 
 
     [1] https://arxiv.org/abs/2101.03164
     [2] https://github.com/e3nn/e3nn
 
-### Authors
+## Authors
 
 NequIP is being developed by:
 
@@ -111,15 +112,15 @@ NequIP is being developed by:
 under the guidance of Boris Kozinsky at Harvard.
 
 
-### Contact
+## Contact
 
 If you have questions, please don't hesitate to reach out at batzner[at]g[dot]harvard[dot]edu. 
 
 
-### Citing
+## Citing
 
 If you use this repository in your work, please consider citing NequIP (1) and e3nn (2): 
 
     [1] https://arxiv.org/abs/2101.03164
-    [2] https://zenodo.org/record/4557591#.YFDmoZNKi3I
+    [2] https://doi.org/10.5281/zenodo.3724963
 

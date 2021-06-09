@@ -51,10 +51,25 @@ minimal_config3 = dict(
     PolynomialCutoff_p=6,
     nonlinearity_type="gate",
 )
+minimal_config4 = dict(
+    allowed_species=ALLOWED_SPECIES,
+    irreps_edge_sh="0e + 1o + 2e",
+    r_max=4,
+    feature_irreps_hidden="2x0e + 2x1o + 2x2e",
+    resnet=False,
+    num_layers=2,
+    num_basis=3,
+    PolynomialCutoff_p=6,
+    nonlinearity_type="gate",
+    # test custom nonlinearities
+    nonlinearity_scalars={1: "silu", -1: "tanh"},
+    nonlinearity_gates={1: "silu", -1: "abs"},
+)
 
 
 @pytest.fixture(
-    scope="module", params=[minimal_config1, minimal_config2, minimal_config3]
+    scope="module",
+    params=[minimal_config1, minimal_config2, minimal_config3, minimal_config4],
 )
 def config(request):
     return request.param
