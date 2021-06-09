@@ -118,8 +118,8 @@ class AtomicData(Data):
             assert self.batch.dim() == 1 and self.batch.shape[0] == self.num_nodes
             # Check that there are the right number of cells
             if "cell" in self and self.cell is not None:
-                assert self.cell.ndim == 3
-                assert self.cell.shape[0] == self.batch.max() + 1
+                cell = self.cell.view(-1, 3, 3)
+                assert cell.shape[0] == self.batch.max() + 1
 
         # Validate irreps
         # __*__ is the only way to hide from torch_geometric
