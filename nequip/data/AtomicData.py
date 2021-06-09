@@ -116,6 +116,10 @@ class AtomicData(Data):
             assert self.atomic_numbers.dtype in _TORCH_INTEGER_DTYPES
         if "batch" in self and self.batch is not None:
             assert self.batch.dim() == 1 and self.batch.shape[0] == self.num_nodes
+            # Check that there are the right number of cells
+            if "cell" in self and self.cell is not None:
+                assert self.cell.ndim == 3
+                assert self.cell.shape[0] == self.batch.max() + 1
 
         # Validate irreps
         # __*__ is the only way to hide from torch_geometric
