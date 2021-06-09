@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Most recent change on the bottom.
 
 ## [Unreleased]
+### Added
+- Option for which nonlinearities to use
+- Option to save models every *n* epochs in training
+- Option to specify optimization defaults for `e3nn`
+
 ### Fixed
 - Using `wandb` no longer breaks the inclusion of special objects like callables in configs
 
