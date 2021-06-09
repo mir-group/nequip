@@ -16,7 +16,7 @@ NequIP requires:
 
 To install:
 
-* Install [PyTorch Geometric](https://github.com/rusty1s/pytorch_geometric), make sure to install this with your correct version of CUDA/CPU: 
+* Install [PyTorch Geometric](https://github.com/rusty1s/pytorch_geometric), make sure to install this with your correct version of CUDA/CPU:
 
 ```
 pip install torch-scatter -f https://pytorch-geometric.com/whl/torch-1.8.0+${CUDA}.html
@@ -71,17 +71,25 @@ pytest ./tests/
 
 **! PLEASE NOTE:** the first few training epochs/calls to a NequIP model can be painfully slow. This is expected behaviour as the [profile-guided optimization of TorchScript models](https://program-transformations.github.io/slides/pytorch_neurips.pdf) takes a number of calls to warm up before optimizing the model. This occurs regardless of whether the entire model is compiled because many core components from e3nn are compiled and optimized through TorchScript.
 
-### Tutorial 
+### Basic network training
 
-The best way to learn how to use NequIP is [through the tutorial notebook hosted here](https://deepnote.com/project/2412ca93-7ad1-4458-972c-5d5add5a667e) 
+To train a network, you run `nequip-train` with a YAML config file that describes your data set, model hyperparameters, and training options. 
 
-### Training a network
-
-To train a network, all you need to is run `nequip-train` with a config file that describes your data set and network, for example: 
-
+```bash
+$ nequip-train configs/example.yaml
 ```
-nequip-train configs/example.yaml
-```
+
+A number of example configuration files are provided:
+ - [`configs/minimal.yaml`](configs/minimal.yaml): A minimal example of training a toy model on force data.
+ - [`configs/minimal_eng.yaml`](configs/minimal.yaml): The same, but for a toy model that predicts and trains on only energy labels.
+ - [`configs/example.yaml`](configs/example.yaml): Training a more realistic model on forces and energies.
+ - [`configs/full.yaml`](configs/minimal.yaml): A complete configuration file containing all available options along with documenting comments.
+
+Training runs can be restarted using `nequip-restart`; training that starts fresh or restarts depending on the existance of the working directory can be launched using `nequip-requeue`. All `nequip-*` commands accept the `--help` option to show their call signatures and options.
+
+### In-depth tutorial 
+
+A more in-depth introduction to the internals of NequIP can be found in the [tutorial notebook](https://deepnote.com/project/2412ca93-7ad1-4458-972c-5d5add5a667e).
 
 ## References
 
