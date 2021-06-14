@@ -708,6 +708,14 @@ class Trainer:
         # We make a shallow copy of the input dict in case the model modifies it
         input_data = data_unscaled.copy()
         out = self.model(input_data)
+        if self.ibatch == 0:
+            np.savez('aspirin_atomic_numbers', out[AtomicDataDict.ATOMIC_NUMBERS_KEY].detach().numpy())
+            np.savez('aspirin_batch', out[AtomicDataDict.BATCH_KEY].detach().numpy())
+            np.savez('aspirin_positions', out[AtomicDataDict.POSITIONS_KEY].detach().numpy())
+            np.savez('aspirin_cell', out[AtomicDataDict.CELL_KEY].detach().numpy())
+            np.savez('aspirin_pbc', out[AtomicDataDict.PBC_KEY].detach().numpy())
+            np.savez('aspirin_edge_index', out[AtomicDataDict.EDGE_INDEX_KEY].detach().numpy())
+
         del input_data
 
         # If we're in evaluation mode (i.e. validation), then

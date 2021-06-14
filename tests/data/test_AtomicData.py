@@ -29,8 +29,22 @@ def test_to_ase(CH3CHO):
     assert np.array_equal(atoms.get_cell(), to_ase_atoms.get_cell())
 
 
-# def test_to_ase_batches():
-#
+def test_to_ase_batches():
+    atomic_numbers = np.load("C:/Users/alber/nequip/nequip/scripts/aspirin_atomic_numbers.npz")['arr_0']
+    pos = np.load("C:/Users/alber/nequip/nequip/scripts/aspirin_positions.npz")['arr_0']
+    batch = np.load("C:/Users/alber/nequip/nequip/scripts/aspirin_batch.npz")['arr_0']
+    cell = np.load("C:/Users/alber/nequip/nequip/scripts/aspirin_cell.npz")['arr_0']
+    pbc = np.load("C:/Users/alber/nequip/nequip/scripts/aspirin_pbc.npz")['arr_0']
+    edge_index = np.load("C:/Users/alber/nequip/nequip/scripts/aspirin_edge_index.npz")['arr_0']
+    data = AtomicData(pos=pos, atomic_numbers=atomic_numbers, batch=batch, cell=cell, pbc=pbc, edge_index=edge_index)
+
+    to_ase_atoms_batches = data.to_ase()
+    for atoms_batch in to_ase_atoms_batches:
+        assert np.shape(atoms_batch.get_positions()) == (len(atoms_batch), 3)
+        assert np.shape(atoms_batch.get_atomic_numbers()) == (len(atoms_batch),)
+        assert np.array_equal(atoms_batch.get_cell(), np.zeros((3, 3)))
+        assert np.array_equal(atoms_batch.get_pbc(), np.zeros(3, dtype=bool))
+
 
 def test_non_periodic_edge(CH3CHO):
     atoms, data = CH3CHO
