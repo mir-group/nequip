@@ -46,7 +46,10 @@ def EnergyModel(**shared_params) -> SequentialGraphNetwork:
         {
             # TODO: the next linear throws out all L > 0, don't create them in the last layer of convnet
             # -- output block --
-            "conv_to_output_hidden": AtomwiseLinear,
+            "conv_to_output_hidden": (
+                AtomwiseLinear,
+                dict(out_field="out_block_hidden")
+            ),
             "output_hidden_to_scalar": (
                 AtomwiseLinear,
                 dict(irreps_out="1x0e", out_field=AtomicDataDict.PER_ATOM_ENERGY_KEY),

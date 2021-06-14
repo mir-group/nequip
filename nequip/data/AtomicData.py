@@ -11,6 +11,7 @@ from collections.abc import Mapping
 import numpy as np
 import ase.neighborlist
 from ase.calculators.singlepoint import SinglePointCalculator, SinglePointDFTCalculator
+from ase import Atoms, Atom
 
 import torch
 from torch_geometric.data import Data
@@ -248,6 +249,32 @@ class AtomicData(Data):
             **kwargs,
             **add_fields,
         )
+
+    def to_ase(self):
+        """Build a list of ase.Atoms objects from an AtomicData object"""
+        positions = self.pos.tolist()
+        batches = self.batch.tolist() if "batch" in self and self.batch is not None else None
+        atomic_nums = self.atomic_numbers.tolist() \
+            if AtomicDataDict.ATOMIC_NUMBERS_KEY in self and self.atomic_numbers is not None else None
+        pbc = self.pbc if "pbc" in self and self.pbc is not None else None
+        cell = self.cell if "cell" in self and self.cell is not None else None
+
+        unique_batches = [0]
+        if batches is not None:
+            unique_batches = list(set(batches))
+
+        num_atoms = int(len(positions) / len(unique_batches))
+        batch_atoms = []
+
+        for batch in unique_batches:
+            atoms = []
+            for i in range(num_atoms):
+                atom_index = batch * num_atoms + i
+                atoms.append(Atom(atomic_nums[atom_index], position=positions[atom_index]))
+            mol = Atoms(atoms, cell=cell[batch], pbc=pbc[batch])
+            batch_atoms.append(mol)
+
+        return batch_atoms
 
     def get_edge_vectors(data: Data) -> torch.Tensor:
         data = AtomicDataDict.with_edge_vectors(AtomicData.to_AtomicDataDict(data))

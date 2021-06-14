@@ -61,7 +61,7 @@ npz_fixed_field_keys:                                                           
 #   format: extxyz
 
 # logging
-wandb: true                                                                        # we recommend using wandb for logging, we'll turn it off here as it's optional
+wandb: false                                                                       # we recommend using wandb for logging, we'll turn it off here as it's optional
 wandb_project: aspirin                                                             # project name used in wandb
 wandb_resume: true                                                                 # if true and restart is true, wandb run data will be restarted and updated.
                                                                                    # if false, a new wandb run will be generated
@@ -74,7 +74,7 @@ n_train: 100                                                                    
 n_val: 50                                                                          # number of validation data
 learning_rate: 0.01                                                                # learning rate, we found values between 0.01 and 0.005 to work best - this is often one of the most important hyperparameters to tune
 batch_size: 5                                                                      # batch size, we found it important to keep this small for most applications (1-5)
-max_epochs: 1000000                                                                # stop training after _ number of epochs
+max_epochs: 1                                                                      # stop training after _ number of epochs
 metrics_key: loss                                                                  # metrics used for scheduling and saving best model. Options: loss, or anything that appears in the validation batch step header, such as f_mae, f_rmse, e_mae, e_rmse
 use_ema: false                                                                     # if true, use exponential moving average on weights for val/test, usually helps a lot with training, in particular for energy errors
 ema_decay: 0.999                                                                   # ema weight, commonly set to 0.999

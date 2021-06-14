@@ -19,6 +19,19 @@ def test_from_ase(CuFcc):
         assert data[key].shape == (len(atoms), 3)  # 4 species in this atoms
 
 
+def test_to_ase(CH3CHO):
+    atoms, data = CH3CHO
+    to_ase = data.to_ase()
+    to_ase_atoms = to_ase[0]
+    assert np.allclose(atoms.get_positions(), to_ase_atoms.get_positions())
+    assert np.array_equal(atoms.get_atomic_numbers(), to_ase_atoms.get_atomic_numbers())
+    assert np.array_equal(atoms.get_pbc(), to_ase_atoms.get_pbc())
+    assert np.array_equal(atoms.get_cell(), to_ase_atoms.get_cell())
+
+
+# def test_to_ase_batches():
+#
+
 def test_non_periodic_edge(CH3CHO):
     atoms, data = CH3CHO
     # check edges
