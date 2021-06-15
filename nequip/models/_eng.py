@@ -52,7 +52,7 @@ def EnergyModel(**shared_params) -> SequentialGraphNetwork:
             ),
             "output_hidden_to_scalar": (
                 AtomwiseLinear,
-                dict(irreps_out="1x0e", out_field=AtomicDataDict.PER_ATOM_ENERGY_KEY),
+                dict(field="out_block_hidden", irreps_out="1x0e", out_field=AtomicDataDict.PER_ATOM_ENERGY_KEY),
             ),
         }
     )
