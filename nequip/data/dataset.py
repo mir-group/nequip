@@ -318,7 +318,7 @@ class AtomicInMemoryDataset(AtomicDataset):
                 obj = self.fixed_fields
             else:
                 obj = self.data
-            
+
             if callable(field):
                 arr = field(obj)
             else:
