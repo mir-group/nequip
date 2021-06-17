@@ -312,8 +312,6 @@ class Trainer:
         # initialize the optimizer and scheduler, the params will be updated in the function
         self.init()
 
-        self.statistics = {}
-
         if not (restart and append):
             d = self.as_dict()
             for key in list(d.keys()):

@@ -32,6 +32,6 @@ class AspirinDataset(AtomicInMemoryDataset):
         fixed_fields = {
             AtomicDataDict.ATOMIC_NUMBERS_KEY: np.asarray(data["z"], dtype=np.int),
             AtomicDataDict.PBC_KEY: np.array([False, False, False]),
-            AtomicDataDict.CELL_KEY: None,
+        #    AtomicDataDict.CELL_KEY: None,
         }
         return arrays, fixed_fields
