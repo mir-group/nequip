@@ -29,8 +29,8 @@ setup(
         "numpy",
         "ase",
         "torch>=1.8",
-        "torch_geometric",
-        "e3nn>=0.3",
+        "torch_geometric>=1.7",
+        "e3nn>=0.3.2",
         "pyyaml",
         "contextlib2;python_version<'3.7'",  # backport of nullcontext
         "typing_extensions;python_version<'3.8'",
