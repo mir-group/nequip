@@ -15,8 +15,9 @@ def unit_uniform_init_(t: torch.Tensor):
 def uniform_initialize_fcs(mod: torch.nn.Module):
     """Initialize ``e3nn.nn.FullyConnectedNet``s with ``unit_uniform_init_``"""
     if isinstance(mod, e3nn.nn.FullyConnectedNet):
-        for w in mod.weights:
-            unit_uniform_init_(w)
+        for ilayer, layer in mod._modules.items():
+            for w in layer.weight:
+                unit_uniform_init_(w)
     # no need to do torch.nn.Linear, which is uniform by default
 
 
