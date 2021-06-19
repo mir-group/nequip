@@ -252,26 +252,29 @@ class AtomicData(Data):
 
     def to_ase(self):
         """Build a list of ase.Atoms objects from an AtomicData object"""
-        positions = self.pos.tolist()
-        batches = self.batch.tolist() if "batch" in self and self.batch is not None else None
-        atomic_nums = self.atomic_numbers.tolist() \
+        positions = self.pos
+        batches = self.batch if AtomicDataDict.BATCH_KEY in self and self.batch is not None else None
+        atomic_nums = self.atomic_numbers \
             if AtomicDataDict.ATOMIC_NUMBERS_KEY in self and self.atomic_numbers is not None else None
-        pbc = self.pbc if "pbc" in self and self.pbc is not None else None
-        cell = self.cell if "cell" in self and self.cell is not None else None
+        pbc = self.pbc if AtomicDataDict.PBC_KEY in self and self.pbc is not None else None
+        cell = self.cell if AtomicDataDict.CELL_KEY in self and self.cell is not None else None
 
         unique_batches = [0]
         if batches is not None:
-            unique_batches = list(set(batches))
+            unique_batches = list(set(batches.tolist()))
 
-        num_atoms = int(len(positions) / len(unique_batches))
+        # Number of atoms per batch
+        num_atoms = int(list(positions.shape)[0] / len(unique_batches))
+
         batch_atoms = []
-
         for batch in unique_batches:
             atoms = []
             for i in range(num_atoms):
                 atom_index = batch * num_atoms + i
-                atoms.append(Atom(atomic_nums[atom_index], position=positions[atom_index]))
-            mol = Atoms(atoms, cell=cell[batch], pbc=pbc[batch])
+                atoms.append(Atom(atomic_nums[atom_index], position=positions[atom_index, :]))
+            mol = Atoms(atoms,
+                        cell=cell[batch] if cell is not None else None,
+                        pbc=pbc[batch] if pbc is not None else None)
             batch_atoms.append(mol)
 
         return batch_atoms

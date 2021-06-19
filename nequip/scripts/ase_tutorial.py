@@ -54,23 +54,23 @@ pos = np.array([[1.9351, -1.3223, -0.2434],
                 [-3.2100,  0.7930,  1.2202],
                 [-3.5192,  2.4355,  0.9832]])
 
-positions = torch.tensor(pos).tolist()
-batches = torch.tensor([0], dtype=torch.int32).tolist()
-atomic_nums = torch.tensor(aspirin_atoms).tolist()
+positions = torch.tensor(pos)
+batches = torch.tensor([0], dtype=torch.int32)
+atomic_nums = torch.tensor(aspirin_atoms)
 pbc = torch.tensor([[False, False, False]]).numpy()
 cell = torch.tensor([[[0, 0, 0], [0, 0, 0], [0, 0, 0]]]).numpy()
 
-unique_batches = list(set(batches)) if batches is not None else [0]
+unique_batches = list(set(batches.tolist())) if batches is not None else [0]
 
-num_atoms = int(len(positions) / len(unique_batches))
+num_atoms = int(list(positions.shape)[0] / len(unique_batches))
 batch_atoms = []
 
 for batch in unique_batches:
     atoms = []
     for i in range(num_atoms):
         atom_index = batch * num_atoms + i
-        atoms.append(Atom(atomic_nums[atom_index], position=positions[atom_index]))
-    mol = Atoms(atoms, cell=cell[batch], pbc=pbc[batch])
+        atoms.append(Atom(atomic_nums[atom_index], position=positions[atom_index, :]))
+    mol = Atoms(atoms, cell=cell[batch] if cell is not None else None, pbc=pbc[batch] if pbc is not None else None)
     batch_atoms.append(mol)
 
 view(batch_atoms[0])
