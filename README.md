@@ -12,31 +12,27 @@ NequIP is an open-source code for building E(3)-equivariant interatomic potentia
 NequIP requires:
 
 * Python >= 3.6
-* PyTorch >= 1.8
+* PyTorch = 1.8
 
 To install:
 
-* Install [PyTorch Geometric](https://github.com/rusty1s/pytorch_geometric), make sure to install this with your correct version of CUDA/CPU:
+* Install [PyTorch Geometric](https://github.com/rusty1s/pytorch_geometric), make sure to install this with your correct version of CUDA/CPU and to use PyTorch Geometric version 1.7.0:
 
-```
+``
 pip install torch-scatter -f https://pytorch-geometric.com/whl/torch-1.8.0+${CUDA}.html
 pip install torch-sparse -f https://pytorch-geometric.com/whl/torch-1.8.0+${CUDA}.html
 pip install torch-cluster -f https://pytorch-geometric.com/whl/torch-1.8.0+${CUDA}.html
 pip install torch-spline-conv -f https://pytorch-geometric.com/whl/torch-1.8.0+${CUDA}.html
+pip install torch-geometric==1.7.0
+pip install e3nn==0.2.9
 ```
 
 where ```${CUDA}``` should be replaced by either ```cpu```, ```cu101```, ```cu102```, or ```cu111``` depending on your PyTorch installation, for details see [here](https://github.com/rusty1s/pytorch_geometric). 
 
-Then install Pytorch-Geometric from source (do not install it via ```pip install torch-geometric```)
+* Install [e3nn](https://github.com/e3nn/e3nn), version 0.2.9: 
 
 ```
-pip install git+https://github.com/rusty1s/pytorch_geometric.git
-```
-
-* Install [e3nn](https://github.com/e3nn/e3nn): 
-
-```
-pip install git+https://github.com/e3nn/e3nn.git 
+pip install e3nn==0.2.9
 ```
 
 * Install our fork of [`pytorch_ema`](https://github.com/Linux-cpp-lisp/pytorch_ema) for using an Exponential Moving Average on the weights: 
