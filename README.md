@@ -29,7 +29,7 @@ pip install e3nn==0.3.2
 
 where ```${CUDA}``` should be replaced by either ```cpu```, ```cu101```, ```cu102```, or ```cu111``` depending on your PyTorch installation, for details see [here](https://github.com/rusty1s/pytorch_geometric). 
 
-* Install [e3nn](https://github.com/e3nn/e3nn), version 0.2.9: 
+* Install [e3nn](https://github.com/e3nn/e3nn), version 0.3.2: 
 
 ```
 pip install e3nn==0.3.2
