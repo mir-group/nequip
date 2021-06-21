@@ -154,8 +154,8 @@ class InteractionBlock(GraphModuleMixin, torch.nn.Module):
         weight = self.fc(data[AtomicDataDict.EDGE_EMBEDDING_KEY])
 
         x = data[AtomicDataDict.NODE_FEATURES_KEY]
-        edge_src = data[AtomicDataDict.EDGE_INDEX_KEY][0]
-        edge_dst = data[AtomicDataDict.EDGE_INDEX_KEY][1]
+        edge_src = data[AtomicDataDict.EDGE_INDEX_KEY][1]
+        edge_dst = data[AtomicDataDict.EDGE_INDEX_KEY][0]
 
         if self.sc is not None:
             sc = self.sc(x, data[AtomicDataDict.NODE_ATTRS_KEY])
