@@ -5,12 +5,19 @@ from wandb.util import json_friendly_val
 
 
 def init_n_update(config):
+    conf_dict = dict(config)
+    # wandb mangles keys (in terms of type) as well, but we can't easily correct that because there are many ambiguous edge cases. (E.g. string "-1" vs int -1 as keys, are they different config keys?)
+    if any(not isinstance(k, str) for k in conf_dict.keys()):
+        raise TypeError(
+            "Due to wandb limitations, only string keys are supported in configurations."
+        )
+
     # download from wandb set up
     config.run_id = wandb.util.generate_id()
 
     wandb.init(
         project=config.wandb_project,
-        config=dict(config),
+        config=conf_dict,
         name=config.run_name,
         resume="allow",
         id=config.run_id,

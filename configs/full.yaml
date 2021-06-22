@@ -25,14 +25,15 @@ conv_to_output_hidden_irreps_out: 16x0e                                         
 nonlinearity_type: gate                                                           # may be 'gate' or 'norm', 'gate' is recommended
 
 # scalar nonlinearities to use — available options are silu, ssp (shifted softplus), tanh, and abs.
-# Different nonlinearities can be specified for 1 (even) and -1 (odd) parity;
-# note that only tanh and abs are correct for -1 (odd parity).
+# Different nonlinearities are specified for e (even) and o (odd) parity;
+# note that only tanh and abs are correct for o (odd parity).
 nonlinearity_scalars:
-  1: ssp
-  -1: tanh
+  e: ssp
+  o: tanh
 nonlinearity_gates:
-  1: ssp
-  -1: abs
+  e: ssp
+  o: abs
+
 resnet: false                                                                     # set true to make interaction block a resnet-style update
 
 num_basis: 8                                                                      # number of basis functions used in the radial basis
