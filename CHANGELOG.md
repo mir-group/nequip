@@ -8,6 +8,11 @@ Most recent change on the bottom.
 
 ## [Unreleased]
 
+## [0.3.3] - 2021-06-24
+### Added
+- `to_ase` method in `AtomicData.py` to convert `AtomicData` object to (list of) `ase.Atoms` object(s)
+- Two unit tests in `test_AtomicData.py` to test the above
+
 ## [0.3.2] - 2021-06-09
 ### Added
 - Option for which nonlinearities to use
