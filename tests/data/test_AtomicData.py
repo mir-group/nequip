@@ -29,34 +29,16 @@ def test_to_ase(CH3CHO):
 
 
 def test_to_ase_batches(atomic_batch):
-    x = atomic_batch
-    # atomic_numbers = np.load(
-    #     "C:/Users/alber/nequip/nequip/scripts/aspirin_atomic_numbers.npz"
-    # )["arr_0"]
-    # pos = np.load("C:/Users/alber/nequip/nequip/scripts/aspirin_positions.npz")["arr_0"]
-    # batch = np.load("C:/Users/alber/nequip/nequip/scripts/aspirin_batch.npz")["arr_0"]
-    # cell = np.load("C:/Users/alber/nequip/nequip/scripts/aspirin_cell.npz")["arr_0"]
-    # pbc = np.load("C:/Users/alber/nequip/nequip/scripts/aspirin_pbc.npz")["arr_0"]
-    # edge_index = np.load("C:/Users/alber/nequip/nequip/scripts/aspirin_edge_index.npz")[
-    #     "arr_0"
-    # ]
-    # data = AtomicData(
-    #     pos=pos,
-    #     atomic_numbers=atomic_numbers,
-    #     batch=batch,
-    #     cell=cell,
-    #     pbc=pbc,
-    #     edge_index=edge_index,
-    # )
-
-    # atomic_batch fixture
-    assert True
-    # to_ase_atoms_batches = data.to_ase()
-    # for atoms_batch in to_ase_atoms_batches:
-    #     assert atoms_batch.get_positions().shape == (len(atoms_batch), 3)
-    #     assert atoms_batch.get_atomic_numbers().shape == (len(atoms_batch),)
-    #     assert np.array_equal(atoms_batch.get_cell(), np.zeros((3, 3)))
-    #     assert np.array_equal(atoms_batch.get_pbc(), np.zeros(3, dtype=bool))
+    atomic_data = AtomicData.from_dict(vars(atomic_batch))
+    to_ase_atoms_batch = atomic_data.to_ase()
+    for batch_idx, atoms in enumerate(to_ase_atoms_batch):
+        mask = atomic_data.batch == batch_idx
+        assert atoms.get_positions().shape == (len(atoms), 3)
+        assert np.allclose(atoms.get_positions(), atomic_data.pos[mask])
+        assert atoms.get_atomic_numbers().shape == (len(atoms),)
+        assert np.array_equal(atoms.get_atomic_numbers(), atomic_data.atomic_numbers[mask])
+        assert np.array_equal(atoms.get_cell(), atomic_data.cell[batch_idx])
+        assert np.array_equal(atoms.get_pbc(), atomic_data.pbc[batch_idx])
 
 
 def test_non_periodic_edge(CH3CHO):
