@@ -61,7 +61,7 @@ npz_fixed_field_keys:                                                           
 #   format: extxyz
 
 # logging
-wandb: false                                                                       # we recommend using wandb for logging, we'll turn it off here as it's optional
+wandb: true                                                                        # we recommend using wandb for logging, we'll turn it off here as it's optional
 wandb_project: aspirin                                                             # project name used in wandb
 wandb_resume: true                                                                 # if true and restart is true, wandb run data will be restarted and updated.
                                                                                    # if false, a new wandb run will be generated

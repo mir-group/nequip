@@ -11,7 +11,7 @@ from collections.abc import Mapping
 import numpy as np
 import ase.neighborlist
 from ase.calculators.singlepoint import SinglePointCalculator, SinglePointDFTCalculator
-from ase import Atoms, Atom
+from ase import Atoms
 
 import torch
 from torch_geometric.data import Data
@@ -250,34 +250,43 @@ class AtomicData(Data):
             **add_fields,
         )
 
-    def to_ase(self):
-        """Build a list of ase.Atoms objects from an AtomicData object"""
+    def to_ase(self) -> Union[list, ase.Atoms]:
+        """Build a (list of) ``ase.Atoms`` object(s) from an ``AtomicData`` object.
+
+        For each unique batch number associated with AtomicDataDict.BATCH_KEY,
+        an ``ase.Atoms`` object is created. If AtomicDataDict.BATCH_KEY does not
+        exist in self, a single ``ase.Atoms`` object is created.
+
+        Returns:
+            A list of ``ase.Atoms`` objects if AtomicDataDict.BATCH_KEY is in self
+            and is not None. Otherwise, a single ``ase.Atoms`` object is returned.
+        """
         positions = self.pos
-        batches = self.batch if AtomicDataDict.BATCH_KEY in self and self.batch is not None else None
-        atomic_nums = self.atomic_numbers \
-            if AtomicDataDict.ATOMIC_NUMBERS_KEY in self and self.atomic_numbers is not None else None
-        pbc = self.pbc if AtomicDataDict.PBC_KEY in self and self.pbc is not None else None
-        cell = self.cell if AtomicDataDict.CELL_KEY in self and self.cell is not None else None
+        atomic_nums = self.atomic_numbers
+        pbc = self.pbc if AtomicDataDict.PBC_KEY in self else None
+        cell = self.cell if AtomicDataDict.CELL_KEY in self else None
+        batch = self.batch if AtomicDataDict.BATCH_KEY in self else None
 
-        unique_batches = [0]
-        if batches is not None:
-            unique_batches = list(set(batches.tolist()))
-
-        # Number of atoms per batch
-        num_atoms = int(list(positions.shape)[0] / len(unique_batches))
-
-        batch_atoms = []
-        for batch in unique_batches:
-            atoms = []
-            for i in range(num_atoms):
-                atom_index = batch * num_atoms + i
-                atoms.append(Atom(atomic_nums[atom_index], position=positions[atom_index, :]))
-            mol = Atoms(atoms,
-                        cell=cell[batch] if cell is not None else None,
-                        pbc=pbc[batch] if pbc is not None else None)
-            batch_atoms.append(mol)
-
-        return batch_atoms
+        if batch is not None:
+            unique_batches = range(batch.max() + 1)
+            batch_atoms = []
+            for batch_idx in unique_batches:
+                mask = batch == batch_idx
+                mol = Atoms(
+                    numbers=atomic_nums[mask],
+                    positions=positions[mask],
+                    cell=cell[batch_idx] if cell is not None else None,
+                    pbc=pbc[batch_idx] if pbc is not None else None,
+                )
+                batch_atoms.append(mol)
+            return batch_atoms
+        else:
+            return Atoms(
+                numbers=atomic_nums,
+                positions=positions,
+                cell=cell[0] if cell is not None else None,
+                pbc=pbc[0] if pbc is not None else None,
+            )
 
     def get_edge_vectors(data: Data) -> torch.Tensor:
         data = AtomicDataDict.with_edge_vectors(AtomicData.to_AtomicDataDict(data))
