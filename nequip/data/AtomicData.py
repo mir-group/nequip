@@ -5,7 +5,7 @@ Authors: Albert Musaelian
 
 import warnings
 from copy import deepcopy
-from typing import Union, Tuple, Dict, Optional
+from typing import Union, Tuple, Dict, Optional, List
 from collections.abc import Mapping
 
 import numpy as np
@@ -250,7 +250,7 @@ class AtomicData(Data):
             **add_fields,
         )
 
-    def to_ase(self) -> Union[list, ase.Atoms]:
+    def to_ase(self) -> Union[List[ase.Atoms], ase.Atoms]:
         """Build a (list of) ``ase.Atoms`` object(s) from an ``AtomicData`` object.
 
         For each unique batch number associated with AtomicDataDict.BATCH_KEY,

@@ -36,7 +36,9 @@ def test_to_ase_batches(atomic_batch):
         assert atoms.get_positions().shape == (len(atoms), 3)
         assert np.allclose(atoms.get_positions(), atomic_data.pos[mask])
         assert atoms.get_atomic_numbers().shape == (len(atoms),)
-        assert np.array_equal(atoms.get_atomic_numbers(), atomic_data.atomic_numbers[mask])
+        assert np.array_equal(
+            atoms.get_atomic_numbers(), atomic_data.atomic_numbers[mask]
+        )
         assert np.array_equal(atoms.get_cell(), atomic_data.cell[batch_idx])
         assert np.array_equal(atoms.get_pbc(), atomic_data.pbc[batch_idx])
 
