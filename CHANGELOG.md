@@ -12,6 +12,7 @@ Most recent change on the bottom.
 
 ### Fixed
 - Fix specifying nonlinearities when wandb enabled
+- `Final` backport for <3.8 compatability
 
 ## [0.3.2] - 2021-06-09
 ### Added

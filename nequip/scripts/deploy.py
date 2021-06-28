@@ -1,4 +1,10 @@
-from typing import Final, Tuple, Dict, Union
+import sys
+
+if sys.version_info[1] >= 8:
+    from typing import Final
+else:
+    from typing_extensions import Final
+from typing import Tuple, Dict, Union
 import argparse
 import pathlib
 import logging
