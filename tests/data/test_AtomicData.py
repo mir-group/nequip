@@ -29,7 +29,7 @@ def test_to_ase(CH3CHO):
 
 
 def test_to_ase_batches(atomic_batch):
-    atomic_data = AtomicData.from_dict(vars(atomic_batch))
+    atomic_data = AtomicData.from_dict(atomic_batch.to_dict())
     to_ase_atoms_batch = atomic_data.to_ase()
     for batch_idx, atoms in enumerate(to_ase_atoms_batch):
         mask = atomic_data.batch == batch_idx
