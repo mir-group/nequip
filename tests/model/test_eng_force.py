@@ -62,8 +62,8 @@ minimal_config4 = dict(
     PolynomialCutoff_p=6,
     nonlinearity_type="gate",
     # test custom nonlinearities
-    nonlinearity_scalars={1: "silu", -1: "tanh"},
-    nonlinearity_gates={1: "silu", -1: "abs"},
+    nonlinearity_scalars={"e": "silu", "o": "tanh"},
+    nonlinearity_gates={"e": "silu", "o": "abs"},
 )
 
 
