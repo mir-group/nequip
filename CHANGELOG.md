@@ -7,7 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Most recent change on the bottom.
 
 ## [Unreleased]
-- update interfaces with torch_geometric 1.7 and e3nn 0.3.2
+### Changed
+- Nonlinearities now specified with `e` and `o` instead of `1` and `-1`
+- Update interfaces for `torch_geometric` 1.7 and `e3nn` 0.3.3
+
+### Fixed
+- Fix specifying nonlinearities when wandb enabled
+- `Final` backport for <3.8 compatability
 
 ## [0.3.2] - 2021-06-09
 ### Added
