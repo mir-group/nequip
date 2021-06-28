@@ -328,10 +328,8 @@ class AtomicData(Data):
                 ]
             elif k == AtomicDataDict.CELL_KEY:
                 new_dict[k] = self[k]
-            elif k == "num_nodes":
-                pass
             else:
-                if len(self[k]) == self.num_nodes:
+                if isinstance(self[k], torch.Tensor) and len(self[k]) == self.num_nodes:
                     new_dict[k] = self[k][mask]
                 else:
                     new_dict[k] = self[k]
