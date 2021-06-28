@@ -1,7 +1,9 @@
 import pytest
+import copy
 
 import numpy as np
 import torch
+from torch_geometric.data import Batch
 
 import ase.build
 import ase.geometry
@@ -155,6 +157,21 @@ def test_silicon_neighbors(Si):
     )
     assert edge_index_set_equiv(edge_index, edge_index_true)
     assert edge_index_set_equiv(data.edge_index, edge_index_true)
+
+
+def test_batching(Si):
+    _, orig = Si
+    N = 4
+    datas = []
+    for _ in range(N):
+        new = copy.deepcopy(orig)
+        new.pos += torch.randn_like(new.pos)
+        datas.append(new)
+    batch = Batch.from_data_list(datas)
+    for i, orig in enumerate(datas):
+        new = batch.get_example(i)
+        for k, v in orig:
+            assert torch.equal(v, new[k])
 
 
 def edge_index_set_equiv(a, b):
