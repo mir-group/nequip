@@ -273,9 +273,11 @@ class AtomicData(Data):
             pbc = pbc.view(-1, 3)
 
         if batch is not None:
-            unique_batches = range(batch.max() + 1)
+            n_batches = batch.max() + 1
+            cell = cell.expand(n_batches, 3, 3) if cell is not None else None
+            pbc = pbc.expand(n_batches, 3) if pbc is not None else None
             batch_atoms = []
-            for batch_idx in unique_batches:
+            for batch_idx in range(n_batches):
                 mask = batch == batch_idx
                 mol = ase.Atoms(
                     numbers=atomic_nums[mask],
