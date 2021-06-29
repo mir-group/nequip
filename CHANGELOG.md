@@ -12,6 +12,7 @@ Most recent change on the bottom.
 
 ### Fixed
 - Fix specifying nonlinearities when wandb enabled
+- Fixed `nequip-*` commands when using `pip install`
 
 ## [0.3.2] - 2021-06-09
 ### Added
