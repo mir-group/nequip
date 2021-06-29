@@ -2,9 +2,6 @@ import numpy as np
 
 from os.path import dirname, basename, abspath
 
-from ase import units
-from ase.io import read
-
 from nequip.data import AtomicDataDict, AtomicInMemoryDataset
 
 
@@ -32,6 +29,5 @@ class AspirinDataset(AtomicInMemoryDataset):
         fixed_fields = {
             AtomicDataDict.ATOMIC_NUMBERS_KEY: np.asarray(data["z"], dtype=np.int),
             AtomicDataDict.PBC_KEY: np.array([False, False, False]),
-            AtomicDataDict.CELL_KEY: None,
         }
         return arrays, fixed_fields

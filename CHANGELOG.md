@@ -9,6 +9,7 @@ Most recent change on the bottom.
 ## [Unreleased]
 ### Changed
 - Nonlinearities now specified with `e` and `o` instead of `1` and `-1`
+- Update interfaces for `torch_geometric` 1.7 and `e3nn` 0.3.3
 
 ### Fixed
 - Fix specifying nonlinearities when wandb enabled

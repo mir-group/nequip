@@ -312,13 +312,11 @@ class Trainer:
         # initialize the optimizer and scheduler, the params will be updated in the function
         self.init()
 
-        self.statistics = {}
-
         if not (restart and append):
             d = self.as_dict()
             for key in list(d.keys()):
                 if not isinstance(d[key], (float, int, str, list, tuple)):
-                    d[key] = type(d[key])
+                    d[key] = repr(d[key])
             self.log_dictionary(d, name="Initialization")
 
         logging.debug("! Done Initialize Trainer")

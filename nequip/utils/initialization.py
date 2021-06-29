@@ -15,8 +15,8 @@ def unit_uniform_init_(t: torch.Tensor):
 def uniform_initialize_fcs(mod: torch.nn.Module):
     """Initialize ``e3nn.nn.FullyConnectedNet``s with ``unit_uniform_init_``"""
     if isinstance(mod, e3nn.nn.FullyConnectedNet):
-        for w in mod.weights:
-            unit_uniform_init_(w)
+        for layer in mod:
+            unit_uniform_init_(layer.weight)
     # no need to do torch.nn.Linear, which is uniform by default
 
 
@@ -36,11 +36,13 @@ def uniform_initialize_tps(mod: torch.nn.Module):
 def xavier_initialize_fcs(mod: torch.nn.Module):
     """Initialize ``e3nn.nn.FullyConnectedNet``s and ``torch.nn.Linear``s with Xavier uniform initialization"""
     if isinstance(mod, e3nn.nn.FullyConnectedNet):
-        for w in mod.weights:
+        for layer in mod:
             # in FC:
             # h_in, _h_out = W.shape
             # W = W / h_in**0.5
-            torch.nn.init.xavier_uniform_(w, gain=w.shape[0] ** 0.5)
+            torch.nn.init.xavier_uniform_(
+                layer.weight, gain=layer.weight.shape[0] ** 0.5
+            )
     elif isinstance(mod, torch.nn.Linear):
         torch.nn.init.xavier_uniform_(mod.weight)
 
@@ -62,8 +64,8 @@ def orthogonal_initialize_linears(mod: torch.nn.Module):
 def orthogonal_initialize_fcs(mod: torch.nn.Module):
     """Initialize ``e3nn.nn.FullyConnectedNet``s and ``torch.nn.Linear``s with orthogonal initialization"""
     if isinstance(mod, e3nn.nn.FullyConnectedNet):
-        for w in mod.weights:
-            torch.nn.init.orthogonal_(w)
+        for layer in mod:
+            torch.nn.init.orthogonal_(layer.weight)
     elif isinstance(mod, torch.nn.Linear):
         torch.nn.init.orthogonal_(mod.weight)
 
@@ -71,5 +73,5 @@ def orthogonal_initialize_fcs(mod: torch.nn.Module):
 def unit_orthogonal_initialize_e3nn_fcs(mod: torch.nn.Module):
     """Initialize only ``e3nn.nn.FullyConnectedNet``s with ``unit_orthogonal_init_``"""
     if isinstance(mod, e3nn.nn.FullyConnectedNet):
-        for w in mod.weights:
-            unit_orthogonal_init_(w)
+        for layer in mod:
+            unit_orthogonal_init_(layer.weight)

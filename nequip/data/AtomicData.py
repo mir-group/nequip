@@ -263,8 +263,15 @@ class AtomicData(Data):
             keys = data.keys()
         else:
             raise ValueError(f"Invalid data `{repr(data)}`")
+
         return {
-            k: data[k] for k in keys if (k not in exclude_keys and data[k] is not None)
+            k: data[k]
+            for k in keys
+            if (
+                k not in exclude_keys
+                and data[k] is not None
+                and isinstance(data[k], torch.Tensor)
+            )
         }
 
     @classmethod
@@ -322,7 +329,7 @@ class AtomicData(Data):
             elif k == AtomicDataDict.CELL_KEY:
                 new_dict[k] = self[k]
             else:
-                if len(self[k]) == self.num_nodes:
+                if isinstance(self[k], torch.Tensor) and len(self[k]) == self.num_nodes:
                     new_dict[k] = self[k][mask]
                 else:
                     new_dict[k] = self[k]
