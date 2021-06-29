@@ -9,6 +9,7 @@ Most recent change on the bottom.
 ## [Unreleased]
 ### Added
 - `SequentialGraphNetwork` now has insertion methods
+- `nn.SaveForOutput`
 
 ### Changed
 - Nonlinearities now specified with `e` and `o` instead of `1` and `-1`
