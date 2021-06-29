@@ -212,7 +212,7 @@ def fresh_start(config):
     # == Build the model ==
     final_model = RescaleOutput(
         model=core_model,
-        scale_keys=[AtomicDataDict.TOTAL_ENERGY_KEY]
+        scale_keys=[AtomicDataDict.TOTAL_ENERGY_KEY, AtomicDataDict.PER_ATOM_ENERGY_KEY]
         + (
             [AtomicDataDict.FORCE_KEY]
             if AtomicDataDict.FORCE_KEY in core_model.irreps_out

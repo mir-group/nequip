@@ -18,6 +18,7 @@ Most recent change on the bottom.
 - Fix specifying nonlinearities when wandb enabled
 - `Final` backport for <3.8 compatability
 - Fixed `nequip-*` commands when using `pip install`
+- Default models rescale per-atom energies, and not just total
 
 ## [0.3.2] - 2021-06-09
 ### Added
