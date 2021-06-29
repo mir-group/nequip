@@ -2,6 +2,7 @@
 
 NequIP is an open-source code for building E(3)-equivariant interatomic potentials.
 
+[![Documentation Status](https://readthedocs.org/projects/nequip/badge/?version=latest)](https://nequip.readthedocs.io/en/latest/?badge=latest)
 
 ![nequip](./nequip.png)
 
