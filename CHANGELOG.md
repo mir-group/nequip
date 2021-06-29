@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Most recent change on the bottom.
 
 ## [Unreleased]
+### Added
+- `SequentialGraphNetwork` now has insertion methods
+
 ### Changed
 - Nonlinearities now specified with `e` and `o` instead of `1` and `-1`
 - Update interfaces for `torch_geometric` 1.7 and `e3nn` 0.3.3

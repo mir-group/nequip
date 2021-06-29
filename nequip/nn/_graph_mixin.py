@@ -229,6 +229,52 @@ class SequentialGraphNetwork(GraphModuleMixin, torch.nn.Sequential):
         self.append(name, instance)
         return
 
+    def insert(self, after: str, name: str, module: GraphModuleMixin) -> None:
+        """Insert a module after the module with name ``after``.
+
+        Args:
+            after: the module to insert after
+            name: the name of the module to insert
+            module: the moldule to insert
+        """
+        # This checks names, etc.
+        self.add_module(name, module)
+        # Now insert in the right place by overwriting
+        names = list(self._modules.keys())
+        modules = list(self._modules.values())
+        idx = names.index(after)
+        names.insert(idx + 1, name)
+        modules.insert(idx + 1, module)
+        self._modules = OrderedDict(zip(names, modules))
+        return
+
+    def insert_from_parameters(
+        self,
+        after: str,
+        shared_params: Mapping,
+        name: str,
+        builder: Callable,
+        params: Dict[str, Any] = {},
+    ) -> None:
+        r"""Build a module from parameters and insert it after ``after``.
+
+        Args:
+            after: the name of the module to insert after
+            shared_params (dict-like): shared parameters from which to pull when instantiating the module
+            name (str): the name for the module
+            builder (callable): a class or function to build a module
+            params (dict, optional): extra specific parameters for this module that take priority over those in ``shared_params``
+        """
+        instance, _ = instantiate(
+            builder=builder,
+            prefix=name,
+            positional_args=(dict(irreps_in=self[-1].irreps_out)),
+            optional_args=params,
+            all_args=shared_params,
+        )
+        self.insert(after, name, instance)
+        return
+
     # Copied from https://pytorch.org/docs/stable/_modules/torch/nn/modules/container.html#Sequential
     # with type annotations added
     def forward(self, input: AtomicDataDict.Type) -> AtomicDataDict.Type:
