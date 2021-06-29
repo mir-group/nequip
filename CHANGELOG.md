@@ -14,6 +14,7 @@ Most recent change on the bottom.
 ### Changed
 - Nonlinearities now specified with `e` and `o` instead of `1` and `-1`
 - Update interfaces for `torch_geometric` 1.7 and `e3nn` 0.3.3
+- `nonlinearity_scalars` now also affects the nonlinearity used in the radial net of `InteractionBlock`
 
 ### Fixed
 - Fix specifying nonlinearities when wandb enabled

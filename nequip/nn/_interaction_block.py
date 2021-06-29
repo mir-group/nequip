@@ -1,5 +1,5 @@
 """ Interaction Block """
-from typing import Optional
+from typing import Optional, Dict, Callable
 
 import torch
 
@@ -26,6 +26,7 @@ class InteractionBlock(GraphModuleMixin, torch.nn.Module):
         invariant_neurons=8,
         avg_num_neighbors=None,
         use_sc=False,
+        nonlinearity_scalars: Dict[int, Callable] = {"e": "ssp"},
     ) -> None:
         """
         InteractionBlock.
@@ -114,7 +115,10 @@ class InteractionBlock(GraphModuleMixin, torch.nn.Module):
             [self.irreps_in[AtomicDataDict.EDGE_EMBEDDING_KEY].num_irreps]
             + invariant_layers * [invariant_neurons]
             + [tp.weight_numel],
-            ShiftedSoftPlus,
+            {
+                "ssp": ShiftedSoftPlus,
+                "silu": torch.nn.functional.silu,
+            }[nonlinearity_scalars["e"]],
         )
 
         self.tp = tp
