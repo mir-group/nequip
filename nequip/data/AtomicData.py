@@ -5,11 +5,12 @@ Authors: Albert Musaelian
 
 import warnings
 from copy import deepcopy
-from typing import Union, Tuple, Dict, Optional
+from typing import Union, Tuple, Dict, Optional, List
 from collections.abc import Mapping
 
 import numpy as np
 import ase.neighborlist
+import ase
 from ase.calculators.singlepoint import SinglePointCalculator, SinglePointDFTCalculator
 
 import torch
@@ -248,6 +249,51 @@ class AtomicData(Data):
             **kwargs,
             **add_fields,
         )
+
+    def to_ase(self) -> Union[List[ase.Atoms], ase.Atoms]:
+        """Build a (list of) ``ase.Atoms`` object(s) from an ``AtomicData`` object.
+
+        For each unique batch number provided in ``AtomicDataDict.BATCH_KEY``,
+        an ``ase.Atoms`` object is created. If ``AtomicDataDict.BATCH_KEY`` does not
+        exist in self, a single ``ase.Atoms`` object is created.
+
+        Returns:
+            A list of ``ase.Atoms`` objects if ``AtomicDataDict.BATCH_KEY`` is in self
+            and is not None. Otherwise, a single ``ase.Atoms`` object is returned.
+        """
+        positions = self.pos
+        atomic_nums = self.atomic_numbers
+        pbc = getattr(self, AtomicDataDict.PBC_KEY, None)
+        cell = getattr(self, AtomicDataDict.CELL_KEY, None)
+        batch = getattr(self, AtomicDataDict.BATCH_KEY, None)
+
+        if cell is not None:
+            cell = cell.view(-1, 3, 3)
+        if pbc is not None:
+            pbc = pbc.view(-1, 3)
+
+        if batch is not None:
+            n_batches = batch.max() + 1
+            cell = cell.expand(n_batches, 3, 3) if cell is not None else None
+            pbc = pbc.expand(n_batches, 3) if pbc is not None else None
+            batch_atoms = []
+            for batch_idx in range(n_batches):
+                mask = batch == batch_idx
+                mol = ase.Atoms(
+                    numbers=atomic_nums[mask],
+                    positions=positions[mask],
+                    cell=cell[batch_idx] if cell is not None else None,
+                    pbc=pbc[batch_idx] if pbc is not None else None,
+                )
+                batch_atoms.append(mol)
+            return batch_atoms
+        else:
+            return ase.Atoms(
+                numbers=atomic_nums,
+                positions=positions,
+                cell=cell[0] if cell is not None else None,
+                pbc=pbc[0] if pbc is not None else None,
+            )
 
     def get_edge_vectors(data: Data) -> torch.Tensor:
         data = AtomicDataDict.with_edge_vectors(AtomicData.to_AtomicDataDict(data))

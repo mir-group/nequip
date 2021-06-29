@@ -21,6 +21,30 @@ def test_from_ase(CuFcc):
         assert data[key].shape == (len(atoms), 3)  # 4 species in this atoms
 
 
+def test_to_ase(CH3CHO):
+    atoms, data = CH3CHO
+    to_ase_atoms = data.to_ase()
+    assert np.allclose(atoms.get_positions(), to_ase_atoms.get_positions())
+    assert np.array_equal(atoms.get_atomic_numbers(), to_ase_atoms.get_atomic_numbers())
+    assert np.array_equal(atoms.get_pbc(), to_ase_atoms.get_pbc())
+    assert np.array_equal(atoms.get_cell(), to_ase_atoms.get_cell())
+
+
+def test_to_ase_batches(atomic_batch):
+    atomic_data = AtomicData.from_dict(atomic_batch.to_dict())
+    to_ase_atoms_batch = atomic_data.to_ase()
+    for batch_idx, atoms in enumerate(to_ase_atoms_batch):
+        mask = atomic_data.batch == batch_idx
+        assert atoms.get_positions().shape == (len(atoms), 3)
+        assert np.allclose(atoms.get_positions(), atomic_data.pos[mask])
+        assert atoms.get_atomic_numbers().shape == (len(atoms),)
+        assert np.array_equal(
+            atoms.get_atomic_numbers(), atomic_data.atomic_numbers[mask]
+        )
+        assert np.array_equal(atoms.get_cell(), atomic_data.cell[batch_idx])
+        assert np.array_equal(atoms.get_pbc(), atomic_data.pbc[batch_idx])
+
+
 def test_non_periodic_edge(CH3CHO):
     atoms, data = CH3CHO
     # check edges
