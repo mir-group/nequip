@@ -265,10 +265,11 @@ class SequentialGraphNetwork(GraphModuleMixin, torch.nn.Sequential):
             builder (callable): a class or function to build a module
             params (dict, optional): extra specific parameters for this module that take priority over those in ``shared_params``
         """
+        idx = list(self._modules.keys()).index(after)
         instance, _ = instantiate(
             builder=builder,
             prefix=name,
-            positional_args=(dict(irreps_in=self[-1].irreps_out)),
+            positional_args=(dict(irreps_in=self[idx].irreps_out)),
             optional_args=params,
             all_args=shared_params,
         )
