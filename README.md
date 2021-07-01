@@ -37,7 +37,7 @@ pip install e3nn==0.2.9
 
 * Install our fork of [`pytorch_ema`](https://github.com/Linux-cpp-lisp/pytorch_ema) for using an Exponential Moving Average on the weights: 
 ```bash
-$ pip install git+https://github.com/Linux-cpp-lisp/pytorch_ema
+$ pip install git+https://github.com/Linux-cpp-lisp/pytorch_ema@context_manager#egg=torch_ema
 ```
 
 * We use [Weights&Biases](https://wandb.ai) to keep track of experiments. This is not a strict requirement, you can use our package without this, but it may make your life easier. If you want to use it, create an account [here](https://wandb.ai) and install it: 
