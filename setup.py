@@ -22,6 +22,7 @@ setup(
             "nequip-train = nequip.scripts.train:main",
             "nequip-restart = nequip.scripts.restart:main",
             "nequip-requeue = nequip.scripts.requeue:main",
+            "nequip-test-error = nequip.scripts.test_error:main",
             "nequip-deploy = nequip.scripts.deploy:main",
         ]
     },
