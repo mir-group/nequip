@@ -12,7 +12,7 @@ class Collater(object):
         self._exclude_keys = set(exclude_keys)
 
     @classmethod
-    def for_dataset(cls, dataset, exclude_keys=None):
+    def for_dataset(cls, dataset, exclude_keys=[]):
         return cls(
             fixed_fields=list(getattr(dataset, "fixed_fields", {}).keys()),
             exclude_keys=exclude_keys,
