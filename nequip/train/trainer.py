@@ -472,7 +472,7 @@ class Trainer:
         for code in [e3nn, nequip, torch, torch_geometric]:
             version = d.get(f"{code.__name__}_version", None)
             if version is not None and version != code.__version__:
-                raise NotImplementedError(
+                logging.warning(
                     "Parsing model from a different library version is not supported."
                     f"current {code.__name__} verion: {code.__version} "
                     f"vs  version nedded {version}"
