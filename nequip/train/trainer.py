@@ -473,9 +473,9 @@ class Trainer:
             version = d.get(f"{code.__name__}_version", None)
             if version is not None and version != code.__version__:
                 logging.warning(
-                    "Parsing model from a different library version is not supported."
-                    f"current {code.__name__} verion: {code.__version} "
-                    f"vs  version nedded {version}"
+                    "Loading a pickled model created with different library version(s) may cause issues."
+                    f"current {code.__name__} verion: {code.__version__} "
+                    f"vs  original version: {version}"
                 )
 
         # update the restart and append option
