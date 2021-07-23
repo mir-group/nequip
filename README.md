@@ -100,7 +100,7 @@ The result is an optimized model file that has no Python dependency and can be u
 nequip-deploy build path/to/training/session/ path/to/deployed.pth
 ```
 
-2. Change the LAMMPS input file to the nequip `pair_stlyle` and point it to the deployed NequIP model:
+2. Change the LAMMPS input file to the nequip `pair_style` and point it to the deployed NequIP model:
 
 ```
 pair_style	nequip
