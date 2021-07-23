@@ -87,6 +87,29 @@ Training runs can be restarted using `nequip-restart`; training that starts fres
 
 A more in-depth introduction to the internals of NequIP can be found in the [tutorial notebook](https://deepnote.com/project/2412ca93-7ad1-4458-972c-5d5add5a667e).
 
+### LAMMPS Integration 
+
+NequIP is integrated with the popular Molecular Dynamics code [LAMMPS](https://www.lammps.org/) which allows for MD simulations over large time- and length-scales and gives users access to the full suite of LAMMPS features. 
+
+The interface is implemented as `pair_style nequip`. Using it requires two simple steps: 
+
+1. Deploy a trained NequIP model. This step compiles a NequIP model trained in Python to [TorchScript](https://pytorch.org/docs/stable/jit.html). 
+The result is an optimized model file that has no Python dependency and can be used by standalone C++ programs such as LAMMPS: 
+
+```
+nequip-deploy build path/to/training/session/ path/to/deployed.pth
+```
+
+2. Change the LAMMPS input file to the nequip `pair_stlyle` and point it to the deployed NequIP model:
+
+```
+pair_style	nequip
+pair_coeff	* * deployed.pth
+```
+
+For installation instructions, please see the NequIP `pair_style` repo at https://github.com/mir-group/pair_nequip.
+
+
 ## References
 
 The theory behind NequIP is described in our preprint [1]. NequIP's backend builds on e3nn, a general framework for building E(3)-equivariant neural networks [2]. 
@@ -101,8 +124,8 @@ NequIP is being developed by:
     - Simon Batzner
     - Albert Musaelian
     - Lixin Sun
-    - Mario Geiger
     - Anders Johansson
+    - Mario Geiger
     - Tess Smidt
 
 under the guidance of Boris Kozinsky at Harvard.
@@ -119,4 +142,3 @@ If you use this repository in your work, please consider citing NequIP (1) and e
 
     [1] https://arxiv.org/abs/2101.03164
     [2] https://doi.org/10.5281/zenodo.3724963
-
