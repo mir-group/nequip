@@ -139,10 +139,7 @@ def fresh_start(config):
     stats = trainer.dataset_train.statistics(
         fields=stats_fields, modes=stats_modes, stride=config.dataset_statistics_stride
     )
-    (
-        (energies_mean, energies_std),
-        (allowed_species, Z_count),
-    ) = stats[:2]
+    ((energies_mean, energies_std), (allowed_species, Z_count),) = stats[:2]
     if force_training:
         # Scale by the force std instead
         force_rms = stats[2][0]
