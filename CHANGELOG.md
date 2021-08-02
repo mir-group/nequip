@@ -22,6 +22,10 @@ Most recent change on the bottom.
 - Fixed `nequip-*` commands when using `pip install`
 - Default models rescale per-atom energies, and not just total
 
+## [0.3.3] - 2021-06-24
+### Added
+- `to_ase` method in `AtomicData.py` to convert `AtomicData` object to (list of) `ase.Atoms` object(s)
+
 ## [0.3.2] - 2021-06-09
 ### Added
 - Option for which nonlinearities to use
