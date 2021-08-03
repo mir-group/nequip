@@ -12,6 +12,7 @@ seed: 0                                                                         
 restart: false                                                                    # set True for a restarted run
 append: false                                                                     # set True if a restarted run should append to the previous log file
 default_dtype: float32                                                            # type of float to use, e.g. float32 and float64
+allow_tf32: True                                                                  # whether to use TensorFloat32 if it is available
 
 # network
 r_max: 4.0                                                                        # cutoff radius in length units
