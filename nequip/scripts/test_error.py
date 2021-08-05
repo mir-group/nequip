@@ -174,7 +174,7 @@ def main(args=None):
     print("--- Final result: ---")
     print(
         "\n".join(
-            f"{k[0]}_{k[1]} = {v.cpu().item():f}"
+            f"{k[0] + '_' + k[1]:>20s}  = {v.cpu().item():< 20f}"
             for k, v in metrics.current_result().items()
         )
     )
