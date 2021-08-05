@@ -51,7 +51,13 @@ def main(args=None):
         "--batch-size",
         help="Batch size to use. Larger is usually faster on GPU.",
         type=int,
-        default=5,
+        default=50,
+    )
+    parser.add_argument(
+        "--device",
+        help="Device to run the model on. If not provided, defaults to CUDA if available and CPU otherwise. Please note that results of CUDA models are rarely exactly reproducible, and that even CPU models can be nondeterministic.",
+        type=str,
+        default=None,
     )
     args = parser.parse_args(args=args)
 
@@ -80,8 +86,16 @@ def main(args=None):
     if args.model is None:
         raise ValueError("--model or --train-dir must be provided")
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if args.device is None:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    else:
+        device = torch.device(args.device)
     print(f"Using device: {device}", file=sys.stderr)
+    if device.type == "cuda":
+        print(
+            "WARNING: please note that models running on CUDA are usually nondeterministc and that this manifests in the final test errors; for a _more_ deterministic result, please use `--device cpu`",
+            file=sys.stderr,
+        )
 
     # Load model:
     print("Loading model... ", file=sys.stderr, end="")
@@ -90,6 +104,7 @@ def main(args=None):
         print("loaded deployed model.", file=sys.stderr)
     except ValueError:  # its not a deployed model
         model = torch.load(args.model, map_location=device)
+        model = model.to(device)
         print("loaded pickled Python model.", file=sys.stderr)
 
     # Load a config file
