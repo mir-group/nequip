@@ -136,7 +136,9 @@ class RescaleOutput(GraphModuleMixin, torch.nn.Module):
 
     @torch.jit.export
     def scale(
-        self, data: AtomicDataDict.Type, force_process: bool = False,
+        self,
+        data: AtomicDataDict.Type,
+        force_process: bool = False,
     ) -> AtomicDataDict.Type:
         """Apply rescaling to ``data``, in place.
 
@@ -164,7 +166,9 @@ class RescaleOutput(GraphModuleMixin, torch.nn.Module):
 
     @torch.jit.export
     def unscale(
-        self, data: AtomicDataDict.Type, force_process: bool = False,
+        self,
+        data: AtomicDataDict.Type,
+        force_process: bool = False,
     ) -> AtomicDataDict.Type:
         """Apply the inverse of the rescaling operation to ``data``, in place.
 
