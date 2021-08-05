@@ -1,7 +1,7 @@
 import sys
 import argparse
+import textwrap
 from pathlib import Path
-from numpy import disp
 from tqdm.auto import tqdm
 
 import torch
@@ -16,7 +16,16 @@ from nequip.train.metrics import Metrics
 
 def main(args=None):
     # in results dir, do: nequip-deploy build . deployed.pth
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        description=textwrap.dedent(
+            """Compute the error of a model on a test set using various metrics.
+
+            The model, metrics, dataset, etc. can specified individually, or a training session can be indicated with `--train-dir`.
+
+            WARNING: Please note that results of CUDA models are rarely exactly reproducible, and that even CPU models can be nondeterministic.
+            """
+        )
+    )
     parser.add_argument(
         "--train-dir",
         help="Path to a working directory from a training session.",
@@ -55,10 +64,16 @@ def main(args=None):
     )
     parser.add_argument(
         "--device",
-        help="Device to run the model on. If not provided, defaults to CUDA if available and CPU otherwise. Please note that results of CUDA models are rarely exactly reproducible, and that even CPU models can be nondeterministic.",
+        help="Device to run the model on. If not provided, defaults to CUDA if available and CPU otherwise.",
         type=str,
         default=None,
     )
+    # Something has to be provided
+    # See https://stackoverflow.com/questions/22368458/how-to-make-argparse-print-usage-when-no-option-is-given-to-the-code
+    if len(sys.argv) == 1:
+        parser.print_help()
+        parser.exit()
+    # Parse the args
     args = parser.parse_args(args=args)
 
     # Do the defaults:
