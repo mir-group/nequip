@@ -26,7 +26,7 @@ from e3nn.util.test import float_tolerance
 float_tolerance = float_tolerance
 
 
-@pytest.fixture()
+@pytest.fixture(scope="session")
 def BENCHMARK_ROOT():
     return pathlib.Path(__file__).parent / "../benchmark_data/"
 
