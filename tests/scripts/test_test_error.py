@@ -104,15 +104,7 @@ def test_metrics(training_session, do_test_idcs, do_metrics):
                 for line in retcode.stdout.decode().splitlines()
             ]
         )
-        metrics = {
-            tuple(k.split("_")): (
-                float(v)  # normal case
-                if "x" not in v
-                # per component case
-                else np.array([float(e.split("=")[-1]) for e in v[1:-1].split(", ")])
-            )
-            for k, v in metrics.items()
-        }
+        metrics = {k: float(v) for k, v in metrics.items()}
         return metrics
 
     # Test idcs
@@ -144,11 +136,11 @@ def test_metrics(training_session, do_test_idcs, do_metrics):
                     """
                 )
             )
-        expect_metrics = {("forces", "rmse")}
+        expect_metrics = {"f_rmse_0", "f_rmse_1", "f_rmse_2"}
     else:
         metrics_yaml = None
         # Regardless of builder, with minimal.yaml, we should have RMSE and MAE
-        expect_metrics = {("forces", "mae"), ("forces", "rmse")}
+        expect_metrics = {"f_mae", "f_rmse"}
     default_params["metrics-config"] = metrics_yaml
 
     # First run
