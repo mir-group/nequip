@@ -129,7 +129,7 @@ def test_metrics(training_session, do_test_idcs, do_metrics):
     # Metrics
     if do_metrics:
         # Write an explicit metrics file
-        metrics_yaml = tmpdir + "my-metrics.yaml"
+        metrics_yaml = tmpdir + "/my-metrics.yaml"
         with open(metrics_yaml, "w") as f:
             # Write out a fancier metrics file
             # We don't use PerSpecies here since the simple models don't fill SPECIES_INDEX right now
