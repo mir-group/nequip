@@ -199,6 +199,19 @@ def main(args=None):
     batch_i: int = 0
     batch_size: int = args.batch_size
 
+    def _format_err(err: torch.Tensor, specifier: str):
+        specifier = "{:" + specifier + "}"
+        if err.nelement() == 1:
+            return specifier.format(err.cpu().item())
+        elif err.nelement() == 3:
+            return (f"(x={specifier}, y={specifier}, z={specifier})").format(
+                *err.cpu().squeeze().tolist()
+            )
+        else:
+            raise AssertionError(
+                "Somehow this metric configuration is unsupported, please file an issue!"
+            )
+
     print("Starting...", file=sys.stderr)
     with tqdm(bar_format="{desc}") as display_bar:
         with tqdm(total=len(test_idcs)) as prog:
@@ -221,7 +234,7 @@ def main(args=None):
                 batch_i += 1
                 display_bar.set_description_str(
                     " | ".join(
-                        f"{k[0]}_{k[1]} = {v.cpu().item(): 4.2f}"
+                        f"{k[0]}_{k[1]} = {_format_err(v, '4.2f')}"
                         for k, v in metrics.current_result().items()
                     )
                 )
@@ -230,10 +243,10 @@ def main(args=None):
         prog.close()
 
     print(file=sys.stderr)
-    print(" " * 12 + "--- Final result: ---", file=sys.stderr)
+    print("--- Final result: ---", file=sys.stderr)
     print(
         "\n".join(
-            f"{k[0] + '_' + k[1]:>20s}  = {v.cpu().item():< 20f}"
+            f"{k[0] + '_' + k[1]:>20s} = {_format_err(v, 'f'):<20s}"
             for k, v in metrics.current_result().items()
         )
     )

@@ -4,6 +4,7 @@ import pathlib
 import yaml
 import subprocess
 import os
+import textwrap
 
 import numpy as np
 import torch
@@ -71,7 +72,8 @@ def training_session(request, BENCHMARK_ROOT, conffile):
 
 
 @pytest.mark.parametrize("do_test_idcs", [True, False])
-def test_metrics(training_session, do_test_idcs):
+@pytest.mark.parametrize("do_metrics", [True, False])
+def test_metrics(training_session, do_test_idcs, do_metrics):
     builder, true_config, tmpdir, env = training_session
     # == Run test error ==
     outdir = f"{true_config['root']}/{true_config['run_name']}/"
@@ -98,11 +100,19 @@ def test_metrics(training_session, do_test_idcs):
         # Check the output
         metrics = dict(
             [
-                tuple(e.strip() for e in line.split("="))
+                tuple(e.strip() for e in line.split("=", 1))
                 for line in retcode.stdout.decode().splitlines()
             ]
         )
-        metrics = {tuple(k.split("_")): float(v) for k, v in metrics.items()}
+        metrics = {
+            tuple(k.split("_")): (
+                float(v)  # normal case
+                if "x" not in v
+                # per component case
+                else np.array([float(e.split("=")[-1]) for e in v[1:-1].split(", ")])
+            )
+            for k, v in metrics.items()
+        }
         return metrics
 
     # Test idcs
@@ -116,11 +126,35 @@ def test_metrics(training_session, do_test_idcs):
         test_idcs = None  # ignore and use default
     default_params["test-indexes"] = test_idcs
 
+    # Metrics
+    if do_metrics:
+        # Write an explicit metrics file
+        metrics_yaml = tmpdir + "my-metrics.yaml"
+        with open(metrics_yaml, "w") as f:
+            # Write out a fancier metrics file
+            # We don't use PerSpecies here since the simple models don't fill SPECIES_INDEX right now
+            # ^ TODO!
+            f.write(
+                textwrap.dedent(
+                    """
+                    metrics_components:
+                      - - forces
+                        - rmse
+                        - report_per_component: True
+                    """
+                )
+            )
+        expect_metrics = {("forces", "rmse")}
+    else:
+        metrics_yaml = None
+        # Regardless of builder, with minimal.yaml, we should have RMSE and MAE
+        expect_metrics = {("forces", "mae"), ("forces", "rmse")}
+    default_params["metrics-config"] = metrics_yaml
+
     # First run
     metrics = runit({"train-dir": outdir, "batch-size": 200, "device": "cpu"})
 
-    # Regardless of builder, with minimal.yaml, we should have RMSE and MAE
-    assert set(metrics.keys()) == {("forces", "mae"), ("forces", "rmse")}
+    assert set(metrics.keys()) == expect_metrics
 
     if builder == IdentityModel:
         for metric, err in metrics.items():
@@ -135,10 +169,10 @@ def test_metrics(training_session, do_test_idcs):
             {"train-dir": outdir, "batch-size": batch_size, "device": "cpu"}
         )
         for k, v in metrics.items():
-            assert abs(v - metrics2[k]) < 1e-5
+            assert np.all(np.abs(v - metrics2[k]) < 1e-5)
 
     # Check GPU
     if torch.cuda.is_available():
         metrics_gpu = runit({"train-dir": outdir, "batch-size": 17, "device": "cuda"})
         for k, v in metrics.items():
-            assert abs(v - metrics_gpu[k]) < 1e-3  # GPU nondeterminism
+            assert np.all(np.abs(v - metrics_gpu[k]) < 1e-3)  # GPU nondeterminism
