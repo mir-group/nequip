@@ -29,6 +29,7 @@ setup(
     install_requires=[
         "numpy",
         "ase",
+        "tqdm",
         "torch>=1.8",
         "torch_geometric>=1.7.1",
         "e3nn>=0.3.3",
