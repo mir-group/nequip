@@ -201,9 +201,10 @@ class AtomicData(Data):
 
         Respects ``atoms``'s ``pbc`` and ``cell``.
 
-        Automatically recognize force, energy (overridden by free energy tag)
-        get_atomic_numbers() will be stored as the atomic_numbers attributes
+        First tries to extract energies and forces from a single-point calculator associated with the ``Atoms`` if one is present and has those fields.
+        If either is not found, the method will look for ``energy``/``energies`` and ``force``/``forces`` in ``atoms.arrays``.
 
+        `get_atomic_numbers()` will be stored as the atomic_numbers attribute.
 
         Args:
             atoms (ase.Atoms): the input.
@@ -234,10 +235,19 @@ class AtomicData(Data):
                         "energy"
                     )
 
-        elif "forces" in atoms.arrays:
-            add_fields[AtomicDataDict.FORCE_KEY] = atoms.arrays["forces"]
-        elif "force" in atoms.arrays:
-            add_fields[AtomicDataDict.FORCE_KEY] = atoms.arrays["force"]
+        if AtomicDataDict.FORCE_KEY not in add_fields:
+            # Get it from arrays
+            for k in ("force", "forces"):
+                if k in atoms.arrays:
+                    add_fields[AtomicDataDict.FORCE_KEY] = atoms.arrays[k]
+                    break
+
+        if AtomicDataDict.TOTAL_ENERGY_KEY not in add_fields:
+            # Get it from arrays
+            for k in ("energy", "energies"):
+                if k in atoms.arrays:
+                    add_fields[AtomicDataDict.TOTAL_ENERGY_KEY] = atoms.arrays[k]
+                    break
 
         add_fields[AtomicDataDict.ATOMIC_NUMBERS_KEY] = atoms.get_atomic_numbers()
 
