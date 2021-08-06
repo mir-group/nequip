@@ -88,7 +88,7 @@ def test_without_nodes(CH3CHO):
     assert new_data.edge_index.min() >= 0
     assert new_data.edge_index.max() == new_data.num_nodes - 1
 
-    which_nodes_mask = np.zeros(len(atoms), dtype=np.bool)
+    which_nodes_mask = np.zeros(len(atoms), dtype=bool)
     which_nodes_mask[[0, 1, 2, 4]] = True
     new_data = data.without_nodes(which_nodes=which_nodes_mask)
     assert new_data.num_nodes == len(atoms) - np.sum(which_nodes_mask)
