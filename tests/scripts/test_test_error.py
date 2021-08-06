@@ -1,3 +1,5 @@
+from _pytest.mark import param
+from py import test
 import pytest
 import tempfile
 import pathlib
@@ -9,6 +11,7 @@ import numpy as np
 import torch
 
 from nequip.data import AtomicDataDict
+from nequip.utils import Config
 
 from test_train import ConstFactorModel, IdentityModel  # noqa
 
@@ -70,27 +73,54 @@ def training_session(request, BENCHMARK_ROOT, conffile):
         yield builder, true_config, tmpdir, env
 
 
-def test_metrics(training_session):
+@pytest.mark.parametrize("do_test_idcs", [True, False])
+def test_metrics(training_session, do_test_idcs):
     builder, true_config, tmpdir, env = training_session
     # == Run test error ==
     outdir = f"{true_config['root']}/{true_config['run_name']}/"
 
-    retcode = subprocess.run(
-        ["nequip-test-error", "--train-dir", outdir],
-        cwd=tmpdir,
-        env=env,
-        stdout=subprocess.PIPE,
-    )
-    retcode.check_returncode()
+    default_params = {"train-dir": outdir}
 
-    # Check the output
-    metrics = dict(
-        [
-            tuple(e.strip() for e in line.split("="))
-            for line in retcode.stdout.decode().splitlines()
-        ]
-    )
-    metrics = {tuple(k.split("_")): float(v) for k, v in metrics.items()}
+    def runit(params: dict):
+        tmp = default_params.copy()
+        tmp.update(params)
+        params = tmp
+        del tmp
+        retcode = subprocess.run(
+            ["nequip-test-error"]
+            + sum(
+                (["--" + k, str(v)] for k, v in params.items() if v is not None),
+                start=[],
+            ),
+            cwd=tmpdir,
+            env=env,
+            stdout=subprocess.PIPE,
+        )
+        retcode.check_returncode()
+
+        # Check the output
+        metrics = dict(
+            [
+                tuple(e.strip() for e in line.split("="))
+                for line in retcode.stdout.decode().splitlines()
+            ]
+        )
+        metrics = {tuple(k.split("_")): float(v) for k, v in metrics.items()}
+        return metrics
+
+    # Test idcs
+    if do_test_idcs:
+        # The Aspirin dataset is 1000 frames long
+        # Pick some arbitrary number of frames
+        test_idcs_arr = torch.randperm(1000)[:257]
+        test_idcs = tmpdir + "/some-test-idcs.pth"
+        torch.save(test_idcs_arr, test_idcs)
+    else:
+        test_idcs = None  # ignore and use default
+    default_params["test-indexes"] = test_idcs
+
+    # First run
+    metrics = runit({"train-dir": outdir, "batch-size": 200, "device": "cpu"})
 
     # Regardless of builder, with minimal.yaml, we should have RMSE and MAE
     assert set(metrics.keys()) == {("forces", "mae"), ("forces", "rmse")}
@@ -99,5 +129,19 @@ def test_metrics(training_session):
         for metric, err in metrics.items():
             assert np.allclose(err, 0.0), f"Metric `{metric}` wasn't zero!"
     elif builder == ConstFactorModel:
+        # TODO: check comperable to naive numpy compute
         pass
-        # TODO: check against naive numpy metrics
+
+    # Check insensitive to batch size
+    for batch_size in (13, 1000):
+        metrics2 = runit(
+            {"train-dir": outdir, "batch-size": batch_size, "device": "cpu"}
+        )
+        for k, v in metrics.items():
+            assert abs(v - metrics2[k]) < 1e-5
+
+    # Check GPU
+    if torch.cuda.is_available():
+        metrics_gpu = runit({"train-dir": outdir, "batch-size": 17, "device": "cuda"})
+        for k, v in metrics.items():
+            assert abs(v - metrics_gpu[k]) < 1e-3  # GPU nondeterminism
