@@ -22,6 +22,8 @@ def main(args=None):
 
             The model, metrics, dataset, etc. can specified individually, or a training session can be indicated with `--train-dir`.
 
+            Prints only the final result in `name = num` format to stdout; all other information is printed to stderr.
+
             WARNING: Please note that results of CUDA models are rarely exactly reproducible, and that even CPU models can be nondeterministic.
             """
         )
@@ -77,9 +79,11 @@ def main(args=None):
     args = parser.parse_args(args=args)
 
     # Do the defaults:
+    dataset_is_from_training: bool = False
     if args.train_dir:
         if args.dataset_config is None:
             args.dataset_config = args.train_dir / "config_final.yaml"
+            dataset_is_from_training = True
         if args.metrics_config is None:
             args.metrics_config = args.train_dir / "config_final.yaml"
         if args.model is None:
@@ -123,22 +127,34 @@ def main(args=None):
         print("loaded pickled Python model.", file=sys.stderr)
 
     # Load a config file
-    print("Loading dataset...", file=sys.stderr)
+    print(
+        f"Loading {'original training ' if dataset_is_from_training else ''}dataset...",
+        file=sys.stderr,
+    )
     config = Config.from_file(str(args.dataset_config))
     dataset = dataset_from_config(config)
     c = Collater.for_dataset(dataset, exclude_keys=[])
 
     # Determine the test set
-    if train_idcs is not None:
+    # this makes no sense if a dataset is given seperately
+    if train_idcs is not None and dataset_is_from_training:
         # we know the train and val, get the rest
         all_idcs = set(range(len(dataset)))
         # set operations
         test_idcs = list(all_idcs - train_idcs - val_idcs)
         assert set(test_idcs).isdisjoint(train_idcs)
         assert set(test_idcs).isdisjoint(val_idcs)
+        print(
+            f"Using training dataset minus training and validation frames, yielding a test set size of {len(test_idcs)} frames.",
+            file=sys.stderr,
+        )
     else:
         # load from file
         test_idcs = load_file(args.test_indexes)
+        print(
+            f"Using provided test set indexes, yielding a test set size of {len(test_idcs)} frames.",
+            file=sys.stderr,
+        )
 
     # Figure out what metrics we're actually computing
     metrics_config = Config.from_file(str(args.metrics_config))
@@ -201,7 +217,8 @@ def main(args=None):
             display_bar.close()
         prog.close()
 
-    print("--- Final result: ---")
+    print(file=sys.stderr)
+    print(" " * 12 + "--- Final result: ---", file=sys.stderr)
     print(
         "\n".join(
             f"{k[0] + '_' + k[1]:>20s}  = {v.cpu().item():< 20f}"
