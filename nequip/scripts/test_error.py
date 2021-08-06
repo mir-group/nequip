@@ -2,6 +2,7 @@ import sys
 import argparse
 import textwrap
 from pathlib import Path
+import contextlib
 from tqdm.auto import tqdm
 
 import torch
@@ -132,7 +133,13 @@ def main(args=None):
         file=sys.stderr,
     )
     config = Config.from_file(str(args.dataset_config))
-    dataset = dataset_from_config(config)
+
+    # Currently, pytorch_geometric prints some status messages to stdout while loading the dataset
+    # TODO: fix may come soon: https://github.com/rusty1s/pytorch_geometric/pull/2950
+    # Until it does, just redirect them.
+    with contextlib.redirect_stdout(sys.stderr):
+        dataset = dataset_from_config(config)
+
     c = Collater.for_dataset(dataset, exclude_keys=[])
 
     # Determine the test set
