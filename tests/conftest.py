@@ -9,6 +9,7 @@ from ase.build import molecule
 from ase.calculators.singlepoint import SinglePointCalculator
 from ase.io import write
 
+import torch
 from torch_geometric.data import Batch
 
 from nequip.utils.test import set_irreps_debug
@@ -23,6 +24,22 @@ from e3nn.util.test import float_tolerance
 
 # Suppress linter errors
 float_tolerance = float_tolerance
+
+# - Ampere and TF32 -
+# Many of the tests for NequIP involve numerically checking
+# algebraic properties— normalization, equivariance,
+# continuity, etc.
+# With the added numerical noise of TF32, some of those tests fail
+# with the current (and usually generous) thresholds.
+#
+# Thus we go on the assumption that PyTorch + NVIDIA got everything
+# right, that this setting DOES NOT AFFECT the model outputs except
+# for increased numerical noise, and only test without it.
+#
+# TODO: consider running tests with and without
+# TODO: check how much thresholds have to be changed to accomidate TF32
+torch.backends.cuda.matmul.allow_tf32 = False
+torch.backends.cudnn.allow_tf32 = False
 
 
 @pytest.fixture(scope="session")
