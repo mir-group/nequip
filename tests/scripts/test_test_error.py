@@ -1,5 +1,3 @@
-from _pytest.mark import param
-from py import test
 import pytest
 import tempfile
 import pathlib
@@ -11,7 +9,6 @@ import numpy as np
 import torch
 
 from nequip.data import AtomicDataDict
-from nequip.utils import Config
 
 from test_train import ConstFactorModel, IdentityModel  # noqa
 

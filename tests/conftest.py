@@ -3,7 +3,6 @@ import numpy as np
 import pathlib
 import pytest
 import tempfile
-import torch
 
 from ase.atoms import Atoms
 from ase.build import molecule
