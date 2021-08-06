@@ -157,7 +157,12 @@ def main(args=None):
         )
     else:
         # load from file
-        test_idcs = load_file(args.test_indexes)
+        test_idcs = load_file(
+            supported_formats=dict(
+                torch=["pt", "pth"], yaml=["yaml", "yml"], json=["json"]
+            ),
+            filename=str(args.test_indexes),
+        )
         print(
             f"Using provided test set indexes, yielding a test set size of {len(test_idcs)} frames.",
             file=sys.stderr,
