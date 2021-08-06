@@ -10,6 +10,7 @@ Most recent change on the bottom.
 ### Added
 - `SequentialGraphNetwork` now has insertion methods
 - `nn.SaveForOutput`
+- `nequip-test-error` command for evaluating metrics on trained models
 
 ### Changed
 - Nonlinearities now specified with `e` and `o` instead of `1` and `-1`
