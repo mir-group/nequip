@@ -270,6 +270,9 @@ class AtomicData(Data):
         pbc = getattr(self, AtomicDataDict.PBC_KEY, None)
         cell = getattr(self, AtomicDataDict.CELL_KEY, None)
         batch = getattr(self, AtomicDataDict.BATCH_KEY, None)
+        energy = getattr(self, AtomicDataDict.TOTAL_ENERGY_KEY, None)
+        force = getattr(self, AtomicDataDict.FORCE_KEY, None)
+        do_calc = energy is not None or force is not None
 
         if cell is not None:
             cell = cell.view(-1, 3, 3)
@@ -289,12 +292,22 @@ class AtomicData(Data):
                 mask = batch == batch_idx
             else:
                 mask = slice(None)
+
             mol = ase.Atoms(
                 numbers=atomic_nums[mask],
                 positions=positions[mask],
                 cell=cell[batch_idx] if cell is not None else None,
                 pbc=pbc[batch_idx] if pbc is not None else None,
             )
+
+            if do_calc:
+                fields = {}
+                if energy is not None:
+                    fields["energy"] = energy[batch_idx].cpu().numpy()
+                if force is not None:
+                    fields["forces"] = force[mask].cpu().numpy()
+                mol.calc = SinglePointCalculator(mol, **fields)
+
             batch_atoms.append(mol)
 
         if batch is not None:

@@ -45,6 +45,16 @@ def test_to_ase_batches(atomic_batch):
         assert np.array_equal(atoms.get_pbc(), atomic_data.pbc[batch_idx])
 
 
+def test_ase_roundtrip(CuFcc):
+    atoms, data = CuFcc
+    atoms2 = data.to_ase()
+    assert np.allclose(atoms.get_positions(), atoms2.get_positions())
+    assert np.array_equal(atoms.get_atomic_numbers(), atoms2.get_atomic_numbers())
+    assert np.array_equal(atoms.get_pbc(), atoms2.get_pbc())
+    assert np.allclose(atoms.get_cell(), atoms2.get_cell())
+    assert np.allclose(atoms.calc.results["forces"], atoms2.calc.results["forces"])
+
+
 def test_non_periodic_edge(CH3CHO):
     atoms, data = CH3CHO
     # check edges
