@@ -51,8 +51,8 @@ def main(args=None):
     )
     parser.add_argument(
         "--metrics-config",
-        help="A YAML config file specifying the metrics to compute. If omitted, `config_final.yaml` in `train_dir` will be used. If the config does not specify `metrics_components`, the default is to print MAEs and RMSEs for all fields given in the loss function.",
-        type=Path,
+        help="A YAML config file specifying the metrics to compute. If omitted, `config_final.yaml` in `train_dir` will be used. If the config does not specify `metrics_components`, the default is to print MAEs and RMSEs for all fields given in the loss function. If the literal string `None`, no metrics will be computed.",
+        type=str,
         default=None,
     )
     parser.add_argument(
@@ -106,11 +106,18 @@ def main(args=None):
             val_idcs = set(trainer["val_idcs"].tolist())
         else:
             train_idcs = val_idcs = None
+    # update
+    if args.metrics_config == "None":
+        args.metrics_config = None
+    else:
+        args.metrics_config = Path(args.metrics_config)
     # validate
     if args.dataset_config is None:
         raise ValueError("--dataset-config or --train-dir must be provided")
-    if args.metrics_config is None:
-        raise ValueError("--metrics-config or --train-dir must be provided")
+    if args.metrics_config is None and args.output is None:
+        raise ValueError(
+            "Nothing to do! Must provide at least one of --metrics-config, --train-dir (to use training config for metrics), or --output"
+        )
     if args.model is None:
         raise ValueError("--model or --train-dir must be provided")
     if args.output is not None:
@@ -180,32 +187,34 @@ def main(args=None):
         )
 
     # Figure out what metrics we're actually computing
-    metrics_config = Config.from_file(str(args.metrics_config))
-    metrics_components = metrics_config.get("metrics_components", None)
-    # See trainer.py: init() and init_metrics()
-    # Default to loss functions if no metrics specified:
-    if metrics_components is None:
-        loss, _ = instantiate(
-            builder=Loss,
-            prefix="loss",
-            positional_args=dict(coeffs=metrics_config.loss_coeffs),
+    do_metrics = args.metrics_config is not None
+    if do_metrics:
+        metrics_config = Config.from_file(str(args.metrics_config))
+        metrics_components = metrics_config.get("metrics_components", None)
+        # See trainer.py: init() and init_metrics()
+        # Default to loss functions if no metrics specified:
+        if metrics_components is None:
+            loss, _ = instantiate(
+                builder=Loss,
+                prefix="loss",
+                positional_args=dict(coeffs=metrics_config.loss_coeffs),
+                all_args=metrics_config,
+            )
+            metrics_components = []
+            for key, func in loss.funcs.items():
+                params = {
+                    "PerSpecies": type(func).__name__.startswith("PerSpecies"),
+                }
+                metrics_components.append((key, "mae", params))
+                metrics_components.append((key, "rmse", params))
+
+        metrics, _ = instantiate(
+            builder=Metrics,
+            prefix="metrics",
+            positional_args=dict(components=metrics_components),
             all_args=metrics_config,
         )
-        metrics_components = []
-        for key, func in loss.funcs.items():
-            params = {
-                "PerSpecies": type(func).__name__.startswith("PerSpecies"),
-            }
-            metrics_components.append((key, "mae", params))
-            metrics_components.append((key, "rmse", params))
-
-    metrics, _ = instantiate(
-        builder=Metrics,
-        prefix="metrics",
-        positional_args=dict(components=metrics_components),
-        all_args=metrics_config,
-    )
-    metrics.to(device=device)
+        metrics.to(device=device)
 
     batch_i: int = 0
     batch_size: int = args.batch_size
@@ -213,7 +222,8 @@ def main(args=None):
     print("Starting...", file=sys.stderr)
     context_stack = contextlib.ExitStack()
     with contextlib.ExitStack() as context_stack:
-        display_bar = context_stack.enter_context(tqdm(bar_format="{desc}"))
+        if do_metrics:
+            display_bar = context_stack.enter_context(tqdm(bar_format="{desc}"))
         prog = context_stack.enter_context(tqdm(total=len(test_idcs)))
 
         if args.output is not None:
@@ -242,30 +252,33 @@ def main(args=None):
                         append=True,
                     )
                 # Accumulate metrics
-                metrics(out, batch)
+                if do_metrics:
+                    metrics(out, batch)
+                    display_bar.set_description_str(
+                        " | ".join(
+                            f"{k} = {v:4.2f}"
+                            for k, v in metrics.flatten_metrics(
+                                metrics.current_result()
+                            )[0].items()
+                        )
+                    )
 
             batch_i += 1
-            display_bar.set_description_str(
-                " | ".join(
-                    f"{k} = {v:4.2f}"
-                    for k, v in metrics.flatten_metrics(metrics.current_result())[
-                        0
-                    ].items()
-                )
-            )
             prog.update(batch.num_graphs)
 
-        display_bar.close()
+        if do_metrics:
+            display_bar.close()
         prog.close()
 
-    print(file=sys.stderr)
-    print("--- Final result: ---", file=sys.stderr)
-    print(
-        "\n".join(
-            f"{k:>20s} = {v:< 20f}"
-            for k, v in metrics.flatten_metrics(metrics.current_result())[0].items()
+    if do_metrics:
+        print(file=sys.stderr)
+        print("--- Final result: ---", file=sys.stderr)
+        print(
+            "\n".join(
+                f"{k:>20s} = {v:< 20f}"
+                for k, v in metrics.flatten_metrics(metrics.current_result())[0].items()
+            )
         )
-    )
 
 
 if __name__ == "__main__":
