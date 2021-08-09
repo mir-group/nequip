@@ -87,7 +87,7 @@ def test_metrics(training_session, do_test_idcs, do_metrics):
         params = tmp
         del tmp
         retcode = subprocess.run(
-            ["nequip-test-error"]
+            ["nequip-evaluate"]
             + sum(
                 (["--" + k, str(v)] for k, v in params.items() if v is not None),
                 start=[],
