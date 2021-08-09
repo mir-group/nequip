@@ -5,6 +5,7 @@ import yaml
 import subprocess
 import os
 import textwrap
+import shutil
 
 import numpy as np
 import torch
@@ -78,7 +79,7 @@ def test_metrics(training_session, do_test_idcs, do_metrics):
     # == Run test error ==
     outdir = f"{true_config['root']}/{true_config['run_name']}/"
 
-    default_params = {"train-dir": outdir}
+    default_params = {"train-dir": outdir, "output": tmpdir + "/out.xyz"}
 
     def runit(params: dict):
         tmp = default_params.copy()
@@ -145,6 +146,8 @@ def test_metrics(training_session, do_test_idcs, do_metrics):
 
     # First run
     metrics = runit({"train-dir": outdir, "batch-size": 200, "device": "cpu"})
+    # move out.xyz to out-orig.xyz
+    shutil.move(tmpdir + "/out.xyz", tmpdir + "/out-orig.xyz")
 
     assert set(metrics.keys()) == expect_metrics
 
@@ -162,6 +165,21 @@ def test_metrics(training_session, do_test_idcs, do_metrics):
         )
         for k, v in metrics.items():
             assert np.all(np.abs(v - metrics2[k]) < 1e-5)
+        # Diff the output XYZ, which shouldn't change at all
+        # Use `cmp`, which is UNIX standard, to make efficient
+        # See https://stackoverflow.com/questions/12900538/fastest-way-to-tell-if-two-files-have-the-same-contents-in-unix-linux
+        cmp_retval = subprocess.run(
+            ["cmp", "--silent", tmpdir + "/out-orig.xyz", tmpdir + "/out.xyz"]
+        )
+        if cmp_retval.returncode == 0:
+            # same
+            pass
+        if cmp_retval.returncode == 1:
+            raise AssertionError(
+                f"Changing batch size to {batch_size} changed out.xyz!"
+            )
+        else:
+            cmp_retval.check_returncode()  # error out for subprocess problem
 
     # Check GPU
     if torch.cuda.is_available():

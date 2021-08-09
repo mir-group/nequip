@@ -5,6 +5,8 @@ from pathlib import Path
 import contextlib
 from tqdm.auto import tqdm
 
+import ase.io
+
 import torch
 
 from nequip.utils import Config, dataset_from_config
@@ -71,6 +73,12 @@ def main(args=None):
         type=str,
         default=None,
     )
+    parser.add_argument(
+        "--output",
+        help="XYZ file to write out the test set and model predicted forces, energies, etc. to.",
+        type=Path,
+        default=None,
+    )
     # Something has to be provided
     # See https://stackoverflow.com/questions/22368458/how-to-make-argparse-print-usage-when-no-option-is-given-to-the-code
     if len(sys.argv) == 1:
@@ -105,6 +113,9 @@ def main(args=None):
         raise ValueError("--metrics-config or --train-dir must be provided")
     if args.model is None:
         raise ValueError("--model or --train-dir must be provided")
+    if args.output is not None:
+        if args.output.suffix != ".xyz":
+            raise ValueError("Only extxyz format for `--output` is supported.")
 
     if args.device is None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -200,35 +211,51 @@ def main(args=None):
     batch_size: int = args.batch_size
 
     print("Starting...", file=sys.stderr)
-    with tqdm(bar_format="{desc}") as display_bar:
-        with tqdm(total=len(test_idcs)) as prog:
-            while True:
-                datas = [
-                    dataset.get(int(idex))
-                    for idex in test_idcs[
-                        batch_i * batch_size : (batch_i + 1) * batch_size
-                    ]
-                ]
-                if len(datas) == 0:
-                    break
-                batch = c.collate(datas)
-                batch = batch.to(device)
-                out = model(AtomicData.to_AtomicDataDict(batch))
-                # Accumulate metrics
-                with torch.no_grad():
-                    metrics(out, batch)
+    context_stack = contextlib.ExitStack()
+    with contextlib.ExitStack() as context_stack:
+        display_bar = context_stack.enter_context(tqdm(bar_format="{desc}"))
+        prog = context_stack.enter_context(tqdm(total=len(test_idcs)))
 
-                batch_i += 1
-                display_bar.set_description_str(
-                    " | ".join(
-                        f"{k} = {v:4.2f}"
-                        for k, v in metrics.flatten_metrics(metrics.current_result())[
-                            0
-                        ].items()
+        if args.output is not None:
+            output = context_stack.enter_context(open(args.output, "w"))
+        else:
+            output = None
+
+        while True:
+            datas = [
+                dataset.get(int(idex))
+                for idex in test_idcs[batch_i * batch_size : (batch_i + 1) * batch_size]
+            ]
+            if len(datas) == 0:
+                break
+            batch = c.collate(datas)
+            batch = batch.to(device)
+            out = model(AtomicData.to_AtomicDataDict(batch))
+
+            with torch.no_grad():
+                # Write output
+                if output is not None:
+                    ase.io.write(
+                        output,
+                        AtomicData.from_AtomicDataDict(out).to(device="cpu").to_ase(),
+                        format="extxyz",
+                        append=True,
                     )
+                # Accumulate metrics
+                metrics(out, batch)
+
+            batch_i += 1
+            display_bar.set_description_str(
+                " | ".join(
+                    f"{k} = {v:4.2f}"
+                    for k, v in metrics.flatten_metrics(metrics.current_result())[
+                        0
+                    ].items()
                 )
-                prog.update(batch.num_graphs)
-            display_bar.close()
+            )
+            prog.update(batch.num_graphs)
+
+        display_bar.close()
         prog.close()
 
     print(file=sys.stderr)
