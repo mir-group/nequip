@@ -23,6 +23,7 @@ Most recent change on the bottom.
 - `Final` backport for <3.8 compatability
 - Fixed `nequip-*` commands when using `pip install`
 - Default models rescale per-atom energies, and not just total
+- Fixed Python <3.8 backward compatability with `atomic_save` 
 
 ## [0.3.3] - 2021-06-24
 ### Added
