@@ -6,9 +6,11 @@ This module requre the torch_geometric to catch up with the github main branch f
 """
 import numpy as np
 import logging
-
+import tempfile
 from os.path import dirname, basename, abspath
-from typing import Tuple, Dict, Any, List, Callable, Union, Optional
+from typing import Tuple, Dict, Any, List, Callable, Union, Optional, Sequence
+
+import ase
 
 import torch
 from torch_geometric.data import Batch, Dataset, download_url, extract_zip
@@ -467,6 +469,41 @@ class ASEDataset(AtomicInMemoryDataset):
             extra_fixed_fields=extra_fixed_fields,
             include_frames=include_frames,
         )
+
+    @classmethod
+    def from_atoms_list(cls, atoms: Sequence[ase.Atoms], **kwargs):
+        """Make an ``ASEDataset`` from a list of ``ase.Atoms`` objects.
+
+        If `root` is not provided, a temporary directory will be used.
+
+        Please note that this is a convinience method that does NOT avoid a round-trip to disk; the provided ``atoms`` will be written out to a file.
+
+        Ignores ``kwargs["file_name"]`` if it is provided.
+
+        Args:
+            atoms
+            **kwargs: passed through to the constructor
+        Returns:
+            The constructed ``ASEDataset``.
+        """
+        if "root" not in kwargs:
+            tmpdir = tempfile.TemporaryDirectory()
+            kwargs["root"] = tmpdir.name
+        else:
+            tmpdir = None
+        kwargs["file_name"] = tmpdir.name + "/atoms.xyz"
+        atoms = list(atoms)
+        # Write them out
+        ase.io.write(kwargs["file_name"], atoms, format="extxyz")
+        # Read them in
+        obj = cls(**kwargs)
+        if tmpdir is not None:
+            # Make it keep a reference to the tmpdir to keep it alive
+            # When the dataset is garbage collected, the tmpdir will
+            # be too, and will (hopefully) get deleted eventually.
+            # Or at least by end of program...
+            obj._tmpdir_ref = tmpdir
+        return obj
 
     @property
     def raw_file_names(self):
