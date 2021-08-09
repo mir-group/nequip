@@ -30,10 +30,11 @@ def validate_keys(keys, graph_required=True):
             raise KeyError("At least pos and edge_index must be supplied")
     if _keys.EDGE_CELL_SHIFT_KEY in keys and "cell" not in keys:
         raise ValueError("If `edge_cell_shift` given, `cell` must be given.")
-    if _keys.ATOMIC_NUMBERS_KEY in keys and _keys.SPECIES_INDEX_KEY in keys:
-        raise ValueError(
-            "'atomic_numbers' and 'species_index' cannot be simultaneously provided"
-        )
+    # This is in flux; TODO
+    # if _keys.ATOMIC_NUMBERS_KEY in keys and _keys.SPECIES_INDEX_KEY in keys:
+    #     raise ValueError(
+    #         "'atomic_numbers' and 'species_index' cannot be simultaneously provided"
+    #     )
 
 
 _SPECIAL_IRREPS = [None]
