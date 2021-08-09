@@ -109,8 +109,9 @@ def main(args=None):
     # update
     if args.metrics_config == "None":
         args.metrics_config = None
-    else:
+    elif args.metrics_config is not None:
         args.metrics_config = Path(args.metrics_config)
+    do_metrics = args.metrics_config is not None
     # validate
     if args.dataset_config is None:
         raise ValueError("--dataset-config or --train-dir must be provided")
@@ -173,6 +174,11 @@ def main(args=None):
             f"Using training dataset minus training and validation frames, yielding a test set size of {len(test_idcs)} frames.",
             file=sys.stderr,
         )
+        if do_metrics:
+            print(
+                "WARNING: using the automatic test set ^^^ but not computing metrics, is this really what you wanted to do?",
+                file=sys.stderr,
+            )
     else:
         # load from file
         test_idcs = load_file(
@@ -187,7 +193,6 @@ def main(args=None):
         )
 
     # Figure out what metrics we're actually computing
-    do_metrics = args.metrics_config is not None
     if do_metrics:
         metrics_config = Config.from_file(str(args.metrics_config))
         metrics_components = metrics_config.get("metrics_components", None)
