@@ -90,9 +90,9 @@ def test_metrics(nequip_dataset, BENCHMARK_ROOT, conffile, field, builder):
 
     dtype = str(torch.get_default_dtype())[len("torch.") :]
 
-    if torch.cuda.is_available():
-        # TODO: is this true?
-        pytest.skip("CUDA and subprocesses have issues")
+    # if torch.cuda.is_available():
+    #     # TODO: is this true?
+    #     pytest.skip("CUDA and subprocesses have issues")
 
     path_to_this_file = pathlib.Path(__file__)
     config_path = path_to_this_file.parents[2] / f"configs/{conffile}"
@@ -187,4 +187,6 @@ def test_metrics(nequip_dataset, BENCHMARK_ROOT, conffile, field, builder):
             one = model.model.one
             # Since the loss is always zero, even though the constant
             # 1 was trainable, it shouldn't have changed
-            assert torch.allclose(one, torch.ones(1))
+            assert torch.allclose(
+                one, torch.ones(1, device=one.device, dtype=one.dtype)
+            )
