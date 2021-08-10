@@ -6,9 +6,11 @@ This module requre the torch_geometric to catch up with the github main branch f
 """
 import numpy as np
 import logging
-
+import tempfile
 from os.path import dirname, basename, abspath
-from typing import Tuple, Dict, Any, List, Callable, Union, Optional
+from typing import Tuple, Dict, Any, List, Callable, Union, Optional, Sequence
+
+import ase
 
 import torch
 from torch_geometric.data import Batch, Dataset, download_url, extract_zip
@@ -54,6 +56,7 @@ class AtomicDataset(Dataset):
 class AtomicInMemoryDataset(AtomicDataset):
     r"""Base class for all datasets that fit in memory.
 
+    Please note that, as a ``pytorch_geometric`` dataset, it must be backed by some kind of disk storage.
     By default, the raw file will be stored at root/raw and the processed torch
     file will be at root/process.
 
@@ -64,10 +67,10 @@ class AtomicInMemoryDataset(AtomicDataset):
     Subclasses may implement:
      - ``download()`` or ``self.url`` or ``ClassName.URL``
 
-     Args:
+    Args:
+        root (str, optional): Root directory where the dataset should be saved. Defaults to current working directory.
         file_name (str, optional): file name of data source. only used in children class
         url (str, optional): url to download data source
-        root (str, optional): Root directory where the dataset should be saved. Defaults to current working directory.
         force_fixed_keys (list, optional): keys to move from AtomicData to fixed_fields dictionary
         extra_fixed_fields (dict, optional): extra key that are not stored in data but needed for AtomicData initialization
         include_frames (list, optional): the frames to process with the constructor.
@@ -122,20 +125,6 @@ class AtomicInMemoryDataset(AtomicDataset):
                     f"the include_frames is changed. "
                     f"please delete the processed folder and rerun {self.processed_paths[0]}"
                 )
-
-    @classmethod
-    def from_data_list(cls, data_list: List[AtomicData], **kwargs):
-        """Make an ``AtomicInMemoryDataset`` from a list of ``AtomicData`` objects.
-
-        Args:
-            data_list (List[AtomicData])
-            **kwargs: passed through to the constructor
-        Returns:
-            The constructed ``AtomicInMemoryDataset``.
-        """
-        obj = cls(**kwargs)
-        obj.get_data = lambda: (data_list,)
-        return obj
 
     def len(self):
         if self.data is None:
@@ -482,18 +471,38 @@ class ASEDataset(AtomicInMemoryDataset):
         )
 
     @classmethod
-    def from_atoms(cls, atoms: list, **kwargs):
+    def from_atoms_list(cls, atoms: Sequence[ase.Atoms], **kwargs):
         """Make an ``ASEDataset`` from a list of ``ase.Atoms`` objects.
 
+        If `root` is not provided, a temporary directory will be used.
+
+        Please note that this is a convinience method that does NOT avoid a round-trip to disk; the provided ``atoms`` will be written out to a file.
+
+        Ignores ``kwargs["file_name"]`` if it is provided.
+
         Args:
-            atoms (List[ase.Atoms])
+            atoms
             **kwargs: passed through to the constructor
         Returns:
             The constructed ``ASEDataset``.
         """
-        # TO DO, this funciton fails. It also needs to be unit tested
+        if "root" not in kwargs:
+            tmpdir = tempfile.TemporaryDirectory()
+            kwargs["root"] = tmpdir.name
+        else:
+            tmpdir = None
+        kwargs["file_name"] = tmpdir.name + "/atoms.xyz"
+        atoms = list(atoms)
+        # Write them out
+        ase.io.write(kwargs["file_name"], atoms, format="extxyz")
+        # Read them in
         obj = cls(**kwargs)
-        obj.get_atoms = lambda: atoms
+        if tmpdir is not None:
+            # Make it keep a reference to the tmpdir to keep it alive
+            # When the dataset is garbage collected, the tmpdir will
+            # be too, and will (hopefully) get deleted eventually.
+            # Or at least by end of program...
+            obj._tmpdir_ref = tmpdir
         return obj
 
     @property
