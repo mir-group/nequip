@@ -174,7 +174,7 @@ def main(args=None):
             f"Using training dataset minus training and validation frames, yielding a test set size of {len(test_idcs)} frames.",
             file=sys.stderr,
         )
-        if do_metrics:
+        if not do_metrics:
             print(
                 "WARNING: using the automatic test set ^^^ but not computing metrics, is this really what you wanted to do?",
                 file=sys.stderr,
