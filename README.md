@@ -131,10 +131,12 @@ NequIP is being developed by:
 under the guidance of Boris Kozinsky at Harvard.
 
 
-## Contact
+## Contact & questions
 
 If you have questions, please don't hesitate to reach out at batzner[at]g[dot]harvard[dot]edu. 
 
+If you find a bug or have a proposal for a feature, please post it in the [Issues](https://github.com/mir-group/nequip/issues).
+If you have a question, topic, or issue that isn't obviously one of those, try our [GitHub Disucssions](https://github.com/mir-group/nequip/discussions).
 
 ## Citing
 
