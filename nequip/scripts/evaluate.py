@@ -227,9 +227,11 @@ def main(args=None):
     print("Starting...", file=sys.stderr)
     context_stack = contextlib.ExitStack()
     with contextlib.ExitStack() as context_stack:
-        if do_metrics:
-            display_bar = context_stack.enter_context(tqdm(bar_format="{desc}"))
         prog = context_stack.enter_context(tqdm(total=len(test_idcs)))
+        if do_metrics:
+            display_bar = context_stack.enter_context(
+                tqdm(bar_format="{desc:." + str(prog.ncols) + "}")
+            )
 
         if args.output is not None:
             output = context_stack.enter_context(open(args.output, "w"))
@@ -271,9 +273,9 @@ def main(args=None):
             batch_i += 1
             prog.update(batch.num_graphs)
 
+        prog.close()
         if do_metrics:
             display_bar.close()
-        prog.close()
 
     if do_metrics:
         print(file=sys.stderr)
