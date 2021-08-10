@@ -22,12 +22,14 @@ setup(
             "nequip-train = nequip.scripts.train:main",
             "nequip-restart = nequip.scripts.restart:main",
             "nequip-requeue = nequip.scripts.requeue:main",
+            "nequip-evaluate = nequip.scripts.evaluate:main",
             "nequip-deploy = nequip.scripts.deploy:main",
         ]
     },
     install_requires=[
         "numpy",
         "ase",
+        "tqdm",
         "torch>=1.8",
         "torch_geometric>=1.7.1",
         "e3nn>=0.3.3",

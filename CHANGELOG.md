@@ -10,6 +10,7 @@ Most recent change on the bottom.
 ### Added
 - `SequentialGraphNetwork` now has insertion methods
 - `nn.SaveForOutput`
+- `nequip-evaluate` command for evaluating (metrics on) trained models
 - `AtomicData.from_ase` now catches `energy`/`energies` arrays
 
 ### Changed

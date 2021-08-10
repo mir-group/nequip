@@ -6,7 +6,7 @@ from nequip.data import AtomicDataDict, AtomicInMemoryDataset
 
 
 class AspirinDataset(AtomicInMemoryDataset):
-    """Aspirin DFT/CCSD(T) data """
+    """Aspirin DFT/CCSD(T) data"""
 
     URL = "http://quantum-machine.org/gdml/data/npz/aspirin_ccsd.zip"
     FILE_NAME = "benchmark_data/aspirin_ccsd-train.npz"
@@ -27,7 +27,7 @@ class AspirinDataset(AtomicInMemoryDataset):
             AtomicDataDict.TOTAL_ENERGY_KEY: data["E"].reshape([-1, 1]),
         }
         fixed_fields = {
-            AtomicDataDict.ATOMIC_NUMBERS_KEY: np.asarray(data["z"], dtype=np.int),
+            AtomicDataDict.ATOMIC_NUMBERS_KEY: np.asarray(data["z"], dtype=int),
             AtomicDataDict.PBC_KEY: np.array([False, False, False]),
         }
         return arrays, fixed_fields

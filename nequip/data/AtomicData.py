@@ -272,10 +272,17 @@ class AtomicData(Data):
             and is not None. Otherwise, a single ``ase.Atoms`` object is returned.
         """
         positions = self.pos
+        if positions.device != torch.device("cpu"):
+            raise TypeError(
+                "Explicitly move this `AtomicData` to CPU using `.to()` before calling `to_ase()`."
+            )
         atomic_nums = self.atomic_numbers
         pbc = getattr(self, AtomicDataDict.PBC_KEY, None)
         cell = getattr(self, AtomicDataDict.CELL_KEY, None)
         batch = getattr(self, AtomicDataDict.BATCH_KEY, None)
+        energy = getattr(self, AtomicDataDict.TOTAL_ENERGY_KEY, None)
+        force = getattr(self, AtomicDataDict.FORCE_KEY, None)
+        do_calc = energy is not None or force is not None
 
         if cell is not None:
             cell = cell.view(-1, 3, 3)
@@ -286,24 +293,38 @@ class AtomicData(Data):
             n_batches = batch.max() + 1
             cell = cell.expand(n_batches, 3, 3) if cell is not None else None
             pbc = pbc.expand(n_batches, 3) if pbc is not None else None
-            batch_atoms = []
-            for batch_idx in range(n_batches):
+        else:
+            n_batches = 1
+
+        batch_atoms = []
+        for batch_idx in range(n_batches):
+            if batch is not None:
                 mask = batch == batch_idx
-                mol = ase.Atoms(
-                    numbers=atomic_nums[mask],
-                    positions=positions[mask],
-                    cell=cell[batch_idx] if cell is not None else None,
-                    pbc=pbc[batch_idx] if pbc is not None else None,
-                )
-                batch_atoms.append(mol)
+            else:
+                mask = slice(None)
+
+            mol = ase.Atoms(
+                numbers=atomic_nums[mask],
+                positions=positions[mask],
+                cell=cell[batch_idx] if cell is not None else None,
+                pbc=pbc[batch_idx] if pbc is not None else None,
+            )
+
+            if do_calc:
+                fields = {}
+                if energy is not None:
+                    fields["energy"] = energy[batch_idx].cpu().numpy()
+                if force is not None:
+                    fields["forces"] = force[mask].cpu().numpy()
+                mol.calc = SinglePointCalculator(mol, **fields)
+
+            batch_atoms.append(mol)
+
+        if batch is not None:
             return batch_atoms
         else:
-            return ase.Atoms(
-                numbers=atomic_nums,
-                positions=positions,
-                cell=cell[0] if cell is not None else None,
-                pbc=pbc[0] if pbc is not None else None,
-            )
+            assert len(batch_atoms) == 1
+            return batch_atoms[0]
 
     def get_edge_vectors(data: Data) -> torch.Tensor:
         data = AtomicDataDict.with_edge_vectors(AtomicData.to_AtomicDataDict(data))
