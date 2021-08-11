@@ -13,35 +13,18 @@ NequIP is an open-source code for building E(3)-equivariant interatomic potentia
 NequIP requires:
 
 * Python >= 3.6
-* PyTorch = 1.8
+* PyTorch >= 1.8
 
 To install:
 
-* Install [PyTorch Geometric](https://github.com/rusty1s/pytorch_geometric), make sure to install this with your correct version of CUDA/CPU and to use PyTorch Geometric version 1.7.1:
-
-```
-pip install torch-scatter -f https://pytorch-geometric.com/whl/torch-1.8.0+${CUDA}.html
-pip install torch-sparse -f https://pytorch-geometric.com/whl/torch-1.8.0+${CUDA}.html
-pip install torch-cluster -f https://pytorch-geometric.com/whl/torch-1.8.0+${CUDA}.html
-pip install torch-spline-conv -f https://pytorch-geometric.com/whl/torch-1.8.0+${CUDA}.html
-pip install torch-geometric==1.7.1
-pip install e3nn==0.3.3
-```
-
-where ```${CUDA}``` should be replaced by either ```cpu```, ```cu101```, ```cu102```, or ```cu111``` depending on your PyTorch installation, for details see [here](https://github.com/rusty1s/pytorch_geometric). 
-
-* Install [e3nn](https://github.com/e3nn/e3nn), version 0.3.3:
-
-```
-pip install e3nn==0.3.3
-```
+* Install [PyTorch Geometric](https://github.com/rusty1s/pytorch_geometric), following [their installation instructions](https://pytorch-geometric.readthedocs.io/en/latest/notes/installation.html) and making sure to install with the correct version of CUDA. (Please note that `torch_geometric>=1.7.1)` is required.)
 
 * Install our fork of [`pytorch_ema`](https://github.com/Linux-cpp-lisp/pytorch_ema) for using an Exponential Moving Average on the weights: 
 ```bash
-$ pip install git+https://github.com/Linux-cpp-lisp/pytorch_ema@context_manager#egg=torch_ema
+$ pip install "git+https://github.com/Linux-cpp-lisp/pytorch_ema@context_manager#egg=torch_ema"
 ```
 
-* We use [Weights&Biases](https://wandb.ai) to keep track of experiments. This is not a strict requirement, you can use our package without this, but it may make your life easier. If you want to use it, create an account [here](https://wandb.ai) and install it: 
+* We use [Weights&Biases](https://wandb.ai) to keep track of experiments. This is not a strict requirement — you can use our package without it — but it may make your life easier. If you want to use it, create an account [here](https://wandb.ai) and install the Python package:
 
 ```
 pip install wandb
@@ -57,12 +40,14 @@ pip install .
 
 ### Installation Issues
 
-We recommend running the tests using ```pytest``` on a CPU: 
+We recommend running the tests using ```pytest```: 
 
 ```
 pip install pytest
 pytest ./tests/
 ```
+
+While the tests are somewhat compute intensive, we've known them to hang on certain systems that have GPUs. If this happens to you, please report it along with information on your software environment in the [Issues](https://github.com/mir-group/nequip/issues)!
 
 ## Usage
 
@@ -84,9 +69,33 @@ A number of example configuration files are provided:
 
 Training runs can be restarted using `nequip-restart`; training that starts fresh or restarts depending on the existance of the working directory can be launched using `nequip-requeue`. All `nequip-*` commands accept the `--help` option to show their call signatures and options.
 
-### In-depth tutorial 
+### Evaluating trained models (and their error)
 
-A more in-depth introduction to the internals of NequIP can be found in the [tutorial notebook](https://deepnote.com/project/2412ca93-7ad1-4458-972c-5d5add5a667e).
+The `nequip-evaluate` command can be used to evaluate a trained model on a specified dataset, optionally computing error metrics or writing the results to an XYZ file for further processing.
+
+The simplest command is:
+```bash
+$ nequip-evaluate --train-dir /path/to/training/session/
+```
+which will evaluate the original training error metrics over any part of the original dataset not used in the training or validation sets.
+
+For more details on this command, please run `nequip-evaluate --help`.
+
+### Deploying models
+
+The `nequip-deploy` command is used to deploy the result of a training session into a model that can be stored and used for inference.
+It compiles a NequIP model trained in Python to [TorchScript](https://pytorch.org/docs/stable/jit.html).
+The result is an optimized model file that has no dependency on the `nequip` Python library, or even on Python itself:
+```bash
+nequip-deploy build path/to/training/session/ path/to/deployed.pth
+```
+For more details on this command, please run `nequip-deploy --help`.
+
+### Using models in Python
+
+Both deployed and undeployed models can be used in Python code; for details, see the end of the [Developer's tutorial](https://deepnote.com/project/2412ca93-7ad1-4458-972c-5d5add5a667e) mentioned again below.
+
+An ASE calculator is also provided in `nequip.dynamics`.
 
 ### LAMMPS Integration 
 
@@ -94,12 +103,11 @@ NequIP is integrated with the popular Molecular Dynamics code [LAMMPS](https://w
 
 The interface is implemented as `pair_style nequip`. Using it requires two simple steps: 
 
-1. Deploy a trained NequIP model. This step compiles a NequIP model trained in Python to [TorchScript](https://pytorch.org/docs/stable/jit.html). 
-The result is an optimized model file that has no Python dependency and can be used by standalone C++ programs such as LAMMPS: 
-
+1. Deploy a trained NequIP model, as discussed above.
 ```
 nequip-deploy build path/to/training/session/ path/to/deployed.pth
 ```
+The result is an optimized model file that has no Python dependency and can be used by standalone C++ programs such as LAMMPS.
 
 2. Change the LAMMPS input file to the nequip `pair_style` and point it to the deployed NequIP model:
 
@@ -108,29 +116,35 @@ pair_style	nequip
 pair_coeff	* * deployed.pth
 ```
 
-For installation instructions, please see the NequIP `pair_style` repo at https://github.com/mir-group/pair_nequip.
+For installation instructions, please see the [`pair_nequip` repository](https://github.com/mir-group/pair_nequip).
 
 
-## References
+## Developer's tutorial 
 
-The theory behind NequIP is described in our preprint [1]. NequIP's backend builds on e3nn, a general framework for building E(3)-equivariant neural networks [2]. 
+A more in-depth introduction to the internals of NequIP can be found in the [tutorial notebook](https://deepnote.com/project/2412ca93-7ad1-4458-972c-5d5add5a667e). This notebook discusses theoretical background as well as the Python interfaces that can be used to train and call models.
 
-    [1] https://arxiv.org/abs/2101.03164
-    [2] https://github.com/e3nn/e3nn
+Please note that for most common usecases, including customized models, the `nequip-*` commands should be prefered for training models.
+
+## References & citing
+
+The theory behind NequIP is described in our preprint (1). NequIP's backend builds on e3nn, a general framework for building E(3)-equivariant neural networks (2). If you use this repository in your work, please consider citing NequIP (1) and e3nn (3):
+
+ 1. https://arxiv.org/abs/2101.03164
+ 2. https://e3nn.org
+ 3. https://doi.org/10.5281/zenodo.3724963
 
 ## Authors
 
 NequIP is being developed by:
 
-    - Simon Batzner
-    - Albert Musaelian
-    - Lixin Sun
-    - Anders Johansson
-    - Mario Geiger
-    - Tess Smidt
+ - Simon Batzner
+ - Albert Musaelian
+ - Lixin Sun
+ - Anders Johansson
+ - Mario Geiger
+ - Tess Smidt
 
-under the guidance of Boris Kozinsky at Harvard.
-
+under the guidance of [Boris Kozinsky at Harvard](https://bkoz.seas.harvard.edu/).
 
 ## Contact & questions
 
@@ -138,10 +152,3 @@ If you have questions, please don't hesitate to reach out at batzner[at]g[dot]ha
 
 If you find a bug or have a proposal for a feature, please post it in the [Issues](https://github.com/mir-group/nequip/issues).
 If you have a question, topic, or issue that isn't obviously one of those, try our [GitHub Disucssions](https://github.com/mir-group/nequip/discussions).
-
-## Citing
-
-If you use this repository in your work, please consider citing NequIP (1) and e3nn (2): 
-
-    [1] https://arxiv.org/abs/2101.03164
-    [2] https://doi.org/10.5281/zenodo.3724963
