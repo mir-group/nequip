@@ -227,10 +227,16 @@ def main(args=None):
     print("Starting...", file=sys.stderr)
     context_stack = contextlib.ExitStack()
     with contextlib.ExitStack() as context_stack:
-        prog = context_stack.enter_context(tqdm(total=len(test_idcs)))
+        # "None" checks if in a TTY and disables if not
+        prog = context_stack.enter_context(tqdm(total=len(test_idcs), disable=None))
         if do_metrics:
             display_bar = context_stack.enter_context(
-                tqdm(bar_format="{desc:." + str(prog.ncols) + "}")
+                tqdm(
+                    bar_format=""
+                    if prog.disable  # prog.ncols doesn't exist if disabled
+                    else ("{desc:." + str(prog.ncols) + "}"),
+                    disable=None,
+                )
             )
 
         if args.output is not None:
