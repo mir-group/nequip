@@ -7,12 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Most recent change on the bottom.
 
 ## [Unreleased]
+
+## [0.3.3] - 2021-08-11
+### Added
+- `to_ase` method in `AtomicData.py` to convert `AtomicData` object to (list of) `ase.Atoms` object(s)
+- `SequentialGraphNetwork` now has insertion methods
+- `nn.SaveForOutput`
+- `nequip-evaluate` command for evaluating (metrics on) trained models
+- `AtomicData.from_ase` now catches `energy`/`energies` arrays
+
 ### Changed
 - Nonlinearities now specified with `e` and `o` instead of `1` and `-1`
+- Update interfaces for `torch_geometric` 1.7.1 and `e3nn` 0.3.3
+- `nonlinearity_scalars` now also affects the nonlinearity used in the radial net of `InteractionBlock`
+- Cleaned up naming of initializers
 
 ### Fixed
 - Fix specifying nonlinearities when wandb enabled
+- `Final` backport for <3.8 compatability
 - Fixed `nequip-*` commands when using `pip install`
+- Default models rescale per-atom energies, and not just total
+- Fixed Python <3.8 backward compatability with `atomic_save`
 
 ## [0.3.2] - 2021-06-09
 ### Added

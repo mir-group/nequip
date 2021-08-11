@@ -29,6 +29,9 @@ class RescaleOutput(GraphModuleMixin, torch.nn.Module):
 
     scale_keys: List[str]
     shift_keys: List[str]
+    trainable_global_rescale_scale: bool
+    trainable_global_rescale_shift: bool
+
     _has_scale: bool
     _has_shift: bool
 
@@ -103,6 +106,19 @@ class RescaleOutput(GraphModuleMixin, torch.nn.Module):
         else:
             # register dummy for TorchScript
             self.register_buffer("shift_by", torch.Tensor())
+
+        # Finally, we tell all the modules in the model that there is rescaling
+        # This allows them to update parameters, like physical constants with units,
+        # that need to be scaled
+        #
+        # Note that .modules() walks the full tree, including self
+        for mod in self.model.modules():
+            if isinstance(mod, GraphModuleMixin):
+                callback = getattr(mod, "update_for_rescale", None)
+                if callable(callback):
+                    # It gets the `RescaleOutput` as an argument,
+                    # since that contains all relevant information
+                    callback(self)
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
         data = self.model(data)

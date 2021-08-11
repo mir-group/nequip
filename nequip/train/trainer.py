@@ -13,8 +13,9 @@ import logging
 import yaml
 from copy import deepcopy
 from os.path import isfile
-from time import perf_counter
+from time import perf_counter, gmtime, strftime
 from typing import Optional, Union
+
 
 if sys.version_info[1] >= 7:
     import contextlib
@@ -23,9 +24,12 @@ else:
     import contextlib2 as contextlib
 
 import numpy as np
+import e3nn
+import torch_geometric
 import torch
 from torch_ema import ExponentialMovingAverage
 
+import nequip
 from nequip.data import DataLoader, AtomicData, AtomicDataDict
 from nequip.utils import (
     Output,
@@ -312,13 +316,15 @@ class Trainer:
         # initialize the optimizer and scheduler, the params will be updated in the function
         self.init()
 
-        self.statistics = {}
-
         if not (restart and append):
+
             d = self.as_dict()
             for key in list(d.keys()):
                 if not isinstance(d[key], (float, int, str, list, tuple)):
-                    d[key] = type(d[key])
+                    d[key] = repr(d[key])
+
+            d["start_time"] = strftime("%a, %d %b %Y %H:%M:%S", gmtime())
+
             self.log_dictionary(d, name="Initialization")
 
         logging.debug("! Done Initialize Trainer")
@@ -395,6 +401,9 @@ class Trainer:
             dictionary["progress"]["last_model_path"] = self.last_model_path
             dictionary["progress"]["trainer_save_path"] = self.trainer_save_path
 
+        for code in [e3nn, nequip, torch, torch_geometric]:
+            dictionary[f"{code.__name__}_version"] = code.__version__
+
         return dictionary
 
     def save(self, filename, format=None):
@@ -459,6 +468,15 @@ class Trainer:
         """
 
         d = deepcopy(dictionary)
+
+        for code in [e3nn, nequip, torch, torch_geometric]:
+            version = d.get(f"{code.__name__}_version", None)
+            if version is not None and version != code.__version__:
+                logging.warning(
+                    "Loading a pickled model created with different library version(s) may cause issues."
+                    f"current {code.__name__} verion: {code.__version__} "
+                    f"vs  original version: {version}"
+                )
 
         # update the restart and append option
         d["restart"] = True

@@ -67,9 +67,9 @@ def npz_dataset():
         Z=np.random.randint(1, 108, size=(nframes, natoms)),
     )
     with tempfile.TemporaryDirectory() as folder:
-        np.savez(folder + "npzdata.npz", **npz)
+        np.savez(folder + "/npzdata.npz", **npz)
         a = NpzDataset(
-            file_name=folder + "npzdata.npz",
+            file_name=folder + "/npzdata.npz",
             root=folder,
             extra_fixed_fields={"r_max": 3},
         )

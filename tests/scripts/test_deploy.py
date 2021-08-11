@@ -16,9 +16,9 @@ def test_deploy(nequip_dataset, BENCHMARK_ROOT):
 
     dtype = str(torch.get_default_dtype())[len("torch.") :]
 
-    if torch.cuda.is_available():
-        # TODO: is this true?
-        pytest.skip("CUDA and subprocesses have issues")
+    # if torch.cuda.is_available():
+    #     # TODO: is this true?
+    #     pytest.skip("CUDA and subprocesses have issues")
 
     config_path = pathlib.Path(__file__).parents[2] / "configs/minimal.yaml"
     true_config = yaml.load(config_path.read_text(), Loader=yaml.Loader)
@@ -50,12 +50,13 @@ def test_deploy(nequip_dataset, BENCHMARK_ROOT):
         assert deployed_path.is_file(), "Deploy didn't create file"
 
         # now test predictions the same
-        data = AtomicData.to_AtomicDataDict(nequip_dataset.get(0))
+        best_mod = torch.load(f"{tmpdir}/{run_name}/best_model.pth")
+        device = next(best_mod.parameters()).device
+        data = AtomicData.to_AtomicDataDict(nequip_dataset.get(0).to(device))
         # Needed because of debug mode:
         data[AtomicDataDict.TOTAL_ENERGY_KEY] = data[
             AtomicDataDict.TOTAL_ENERGY_KEY
         ].unsqueeze(0)
-        best_mod = torch.load(f"{tmpdir}/{run_name}/best_model.pth")
         train_pred = best_mod(data)[AtomicDataDict.TOTAL_ENERGY_KEY]
 
         # load model and check that metadata saved
@@ -63,14 +64,17 @@ def test_deploy(nequip_dataset, BENCHMARK_ROOT):
             deploy.NEQUIP_VERSION_KEY: "",
             deploy.R_MAX_KEY: "",
         }
-        deploy_mod = torch.jit.load(deployed_path, _extra_files=metadata)
+        deploy_mod = torch.jit.load(
+            deployed_path, _extra_files=metadata, map_location="cpu"
+        )
         # Everything we store right now is ASCII, so decode for printing
         metadata = {k: v.decode("ascii") for k, v in metadata.items()}
         assert metadata[deploy.NEQUIP_VERSION_KEY] == nequip.__version__
         assert np.allclose(float(metadata[deploy.R_MAX_KEY]), true_config["r_max"])
 
+        data = AtomicData.to_AtomicDataDict(nequip_dataset.get(0).to("cpu"))
         deploy_pred = deploy_mod(data)[AtomicDataDict.TOTAL_ENERGY_KEY]
-        assert torch.allclose(train_pred, deploy_pred, atol=1e-7)
+        assert torch.allclose(train_pred.to("cpu"), deploy_pred, atol=1e-7)
 
         # now test info
         retcode = subprocess.run(

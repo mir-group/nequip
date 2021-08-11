@@ -180,3 +180,15 @@ class TestFromConfig:
         a = dataset_from_config(config)
         assert isdir(a.root)
         assert isdir(f"{a.root}/processed")
+
+
+class TestFromList:
+    def test_from_atoms(self, molecules):
+        dataset = ASEDataset.from_atoms_list(
+            molecules, extra_fixed_fields={"r_max": 4.5}
+        )
+        assert len(dataset) == len(molecules)
+        for i, mol in enumerate(molecules):
+            assert np.array_equal(
+                mol.get_atomic_numbers(), dataset.get(i).to_ase().get_atomic_numbers()
+            )

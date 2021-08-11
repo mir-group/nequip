@@ -5,11 +5,12 @@ Authors: Albert Musaelian
 
 import warnings
 from copy import deepcopy
-from typing import Union, Tuple, Dict, Optional
+from typing import Union, Tuple, Dict, Optional, List
 from collections.abc import Mapping
 
 import numpy as np
 import ase.neighborlist
+import ase
 from ase.calculators.singlepoint import SinglePointCalculator, SinglePointDFTCalculator
 
 import torch
@@ -200,9 +201,10 @@ class AtomicData(Data):
 
         Respects ``atoms``'s ``pbc`` and ``cell``.
 
-        Automatically recognize force, energy (overridden by free energy tag)
-        get_atomic_numbers() will be stored as the atomic_numbers attributes
+        First tries to extract energies and forces from a single-point calculator associated with the ``Atoms`` if one is present and has those fields.
+        If either is not found, the method will look for ``energy``/``energies`` and ``force``/``forces`` in ``atoms.arrays``.
 
+        `get_atomic_numbers()` will be stored as the atomic_numbers attribute.
 
         Args:
             atoms (ase.Atoms): the input.
@@ -233,10 +235,19 @@ class AtomicData(Data):
                         "energy"
                     )
 
-        elif "forces" in atoms.arrays:
-            add_fields[AtomicDataDict.FORCE_KEY] = atoms.arrays["forces"]
-        elif "force" in atoms.arrays:
-            add_fields[AtomicDataDict.FORCE_KEY] = atoms.arrays["force"]
+        if AtomicDataDict.FORCE_KEY not in add_fields:
+            # Get it from arrays
+            for k in ("force", "forces"):
+                if k in atoms.arrays:
+                    add_fields[AtomicDataDict.FORCE_KEY] = atoms.arrays[k]
+                    break
+
+        if AtomicDataDict.TOTAL_ENERGY_KEY not in add_fields:
+            # Get it from arrays
+            for k in ("energy", "energies"):
+                if k in atoms.arrays:
+                    add_fields[AtomicDataDict.TOTAL_ENERGY_KEY] = atoms.arrays[k]
+                    break
 
         add_fields[AtomicDataDict.ATOMIC_NUMBERS_KEY] = atoms.get_atomic_numbers()
 
@@ -248,6 +259,72 @@ class AtomicData(Data):
             **kwargs,
             **add_fields,
         )
+
+    def to_ase(self) -> Union[List[ase.Atoms], ase.Atoms]:
+        """Build a (list of) ``ase.Atoms`` object(s) from an ``AtomicData`` object.
+
+        For each unique batch number provided in ``AtomicDataDict.BATCH_KEY``,
+        an ``ase.Atoms`` object is created. If ``AtomicDataDict.BATCH_KEY`` does not
+        exist in self, a single ``ase.Atoms`` object is created.
+
+        Returns:
+            A list of ``ase.Atoms`` objects if ``AtomicDataDict.BATCH_KEY`` is in self
+            and is not None. Otherwise, a single ``ase.Atoms`` object is returned.
+        """
+        positions = self.pos
+        if positions.device != torch.device("cpu"):
+            raise TypeError(
+                "Explicitly move this `AtomicData` to CPU using `.to()` before calling `to_ase()`."
+            )
+        atomic_nums = self.atomic_numbers
+        pbc = getattr(self, AtomicDataDict.PBC_KEY, None)
+        cell = getattr(self, AtomicDataDict.CELL_KEY, None)
+        batch = getattr(self, AtomicDataDict.BATCH_KEY, None)
+        energy = getattr(self, AtomicDataDict.TOTAL_ENERGY_KEY, None)
+        force = getattr(self, AtomicDataDict.FORCE_KEY, None)
+        do_calc = energy is not None or force is not None
+
+        if cell is not None:
+            cell = cell.view(-1, 3, 3)
+        if pbc is not None:
+            pbc = pbc.view(-1, 3)
+
+        if batch is not None:
+            n_batches = batch.max() + 1
+            cell = cell.expand(n_batches, 3, 3) if cell is not None else None
+            pbc = pbc.expand(n_batches, 3) if pbc is not None else None
+        else:
+            n_batches = 1
+
+        batch_atoms = []
+        for batch_idx in range(n_batches):
+            if batch is not None:
+                mask = batch == batch_idx
+            else:
+                mask = slice(None)
+
+            mol = ase.Atoms(
+                numbers=atomic_nums[mask],
+                positions=positions[mask],
+                cell=cell[batch_idx] if cell is not None else None,
+                pbc=pbc[batch_idx] if pbc is not None else None,
+            )
+
+            if do_calc:
+                fields = {}
+                if energy is not None:
+                    fields["energy"] = energy[batch_idx].cpu().numpy()
+                if force is not None:
+                    fields["forces"] = force[mask].cpu().numpy()
+                mol.calc = SinglePointCalculator(mol, **fields)
+
+            batch_atoms.append(mol)
+
+        if batch is not None:
+            return batch_atoms
+        else:
+            assert len(batch_atoms) == 1
+            return batch_atoms[0]
 
     def get_edge_vectors(data: Data) -> torch.Tensor:
         data = AtomicDataDict.with_edge_vectors(AtomicData.to_AtomicDataDict(data))
@@ -263,8 +340,15 @@ class AtomicData(Data):
             keys = data.keys()
         else:
             raise ValueError(f"Invalid data `{repr(data)}`")
+
         return {
-            k: data[k] for k in keys if (k not in exclude_keys and data[k] is not None)
+            k: data[k]
+            for k in keys
+            if (
+                k not in exclude_keys
+                and data[k] is not None
+                and isinstance(data[k], torch.Tensor)
+            )
         }
 
     @classmethod
@@ -322,7 +406,7 @@ class AtomicData(Data):
             elif k == AtomicDataDict.CELL_KEY:
                 new_dict[k] = self[k]
             else:
-                if len(self[k]) == self.num_nodes:
+                if isinstance(self[k], torch.Tensor) and len(self[k]) == self.num_nodes:
                     new_dict[k] = self[k][mask]
                 else:
                     new_dict[k] = self[k]

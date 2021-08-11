@@ -1,7 +1,9 @@
 import pytest
+import copy
 
 import numpy as np
 import torch
+from torch_geometric.data import Batch
 
 import ase.build
 import ase.geometry
@@ -17,6 +19,40 @@ def test_from_ase(CuFcc):
     atoms, data = CuFcc
     for key in [AtomicDataDict.FORCE_KEY, AtomicDataDict.POSITIONS_KEY]:
         assert data[key].shape == (len(atoms), 3)  # 4 species in this atoms
+
+
+def test_to_ase(CH3CHO):
+    atoms, data = CH3CHO
+    to_ase_atoms = data.to_ase()
+    assert np.allclose(atoms.get_positions(), to_ase_atoms.get_positions())
+    assert np.array_equal(atoms.get_atomic_numbers(), to_ase_atoms.get_atomic_numbers())
+    assert np.array_equal(atoms.get_pbc(), to_ase_atoms.get_pbc())
+    assert np.array_equal(atoms.get_cell(), to_ase_atoms.get_cell())
+
+
+def test_to_ase_batches(atomic_batch):
+    atomic_data = AtomicData.from_dict(atomic_batch.to_dict())
+    to_ase_atoms_batch = atomic_data.to_ase()
+    for batch_idx, atoms in enumerate(to_ase_atoms_batch):
+        mask = atomic_data.batch == batch_idx
+        assert atoms.get_positions().shape == (len(atoms), 3)
+        assert np.allclose(atoms.get_positions(), atomic_data.pos[mask])
+        assert atoms.get_atomic_numbers().shape == (len(atoms),)
+        assert np.array_equal(
+            atoms.get_atomic_numbers(), atomic_data.atomic_numbers[mask]
+        )
+        assert np.array_equal(atoms.get_cell(), atomic_data.cell[batch_idx])
+        assert np.array_equal(atoms.get_pbc(), atomic_data.pbc[batch_idx])
+
+
+def test_ase_roundtrip(CuFcc):
+    atoms, data = CuFcc
+    atoms2 = data.to_ase()
+    assert np.allclose(atoms.get_positions(), atoms2.get_positions())
+    assert np.array_equal(atoms.get_atomic_numbers(), atoms2.get_atomic_numbers())
+    assert np.array_equal(atoms.get_pbc(), atoms2.get_pbc())
+    assert np.allclose(atoms.get_cell(), atoms2.get_cell())
+    assert np.allclose(atoms.calc.results["forces"], atoms2.calc.results["forces"])
 
 
 def test_non_periodic_edge(CH3CHO):
@@ -62,7 +98,7 @@ def test_without_nodes(CH3CHO):
     assert new_data.edge_index.min() >= 0
     assert new_data.edge_index.max() == new_data.num_nodes - 1
 
-    which_nodes_mask = np.zeros(len(atoms), dtype=np.bool)
+    which_nodes_mask = np.zeros(len(atoms), dtype=bool)
     which_nodes_mask[[0, 1, 2, 4]] = True
     new_data = data.without_nodes(which_nodes=which_nodes_mask)
     assert new_data.num_nodes == len(atoms) - np.sum(which_nodes_mask)
@@ -155,6 +191,21 @@ def test_silicon_neighbors(Si):
     )
     assert edge_index_set_equiv(edge_index, edge_index_true)
     assert edge_index_set_equiv(data.edge_index, edge_index_true)
+
+
+def test_batching(Si):
+    _, orig = Si
+    N = 4
+    datas = []
+    for _ in range(N):
+        new = copy.deepcopy(orig)
+        new.pos += torch.randn_like(new.pos)
+        datas.append(new)
+    batch = Batch.from_data_list(datas)
+    for i, orig in enumerate(datas):
+        new = batch.get_example(i)
+        for k, v in orig:
+            assert torch.equal(v, new[k])
 
 
 def edge_index_set_equiv(a, b):

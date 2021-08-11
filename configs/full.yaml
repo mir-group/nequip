@@ -12,6 +12,7 @@ seed: 0                                                                         
 restart: false                                                                    # set True for a restarted run
 append: false                                                                     # set True if a restarted run should append to the previous log file
 default_dtype: float32                                                            # type of float to use, e.g. float32 and float64
+allow_tf32: True                                                                  # whether to use TensorFloat32 if it is available
 
 # network
 r_max: 4.0                                                                        # cutoff radius in length units
@@ -170,11 +171,15 @@ optimizer_weight_decay: 0
 
 # weight initialization
 # this can be the importable name of any function that can be `model.apply`ed to initialize some weights in the model. NequIP provides a number of useful initializers:
+# For more details please see the docstrings of the individual initializers
 #model_initializers:
 #  - nequip.utils.initialization.uniform_initialize_fcs
-#  - nequip.utils.initialization.uniform_initialize_tps
-#  - nequip.utils.initialization.orthogonal_initialize_linears
-#  - nequip.utils.initialization.uniform_initialize_linears
+#  - nequip.utils.initialization.uniform_initialize_equivariant_linears
+#  - nequip.utils.initialization.uniform_initialize_tp_internal_weights
+#  - nequip.utils.initialization.xavier_initialize_fcs
+#  - nequip.utils.initialization.(unit_)orthogonal_initialize_equivariant_linears
+#  - nequip.utils.initialization.(unit_)orthogonal_initialize_fcs
+#  - nequip.utils.initialization.(unit_)orthogonal_initialize_e3nn_fcs
 
 # lr scheduler, currently only supports the two options listed below, if you need more please file an issue
 # first: on-plateau, reduce lr by factory of lr_scheduler_factor if metrics_key hasn't improved for lr_scheduler_patience epoch
