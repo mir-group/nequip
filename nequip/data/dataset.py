@@ -312,6 +312,12 @@ class AtomicInMemoryDataset(AtomicDataset):
                 arr = field(obj)
             else:
                 arr = obj[field]
+
+            if arr is None:
+                raise ValueError(
+                    f"Cannot compute statistics over field `{field}` whose value is None!"
+                )
+
             # Apply selector
             # TODO: this might be quite expensive if the dataset is large.
             # Better to impliment the general running average case in AtomicDataset,
