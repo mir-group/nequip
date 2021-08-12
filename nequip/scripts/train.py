@@ -102,6 +102,10 @@ def fresh_start(config):
     # Make some things easier for people who run nequip-train
     if "chemical_symbol_to_type" in config and "num_species" not in config:
         config["num_species"] = max(config["chemical_symbol_to_type"].values()) + 1
+    elif "num_species" not in config:
+        raise KeyError(
+            "Either num_species or chemical_symbol_to_type must be provided in the configuration file to set the number of species for the model."
+        )
 
     # = Make the trainer =
     if config.wandb:
