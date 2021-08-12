@@ -14,7 +14,7 @@ import yaml
 from copy import deepcopy
 from os.path import isfile
 from time import perf_counter, gmtime, strftime
-from typing import Optional, Union, Callable
+from typing import Optional, Union
 
 
 if sys.version_info[1] >= 7:

@@ -98,6 +98,11 @@ def fresh_start(config):
 
     e3nn.set_optimization_defaults(**config.get("e3nn_optimization_defaults", {}))
 
+    # = Preprocess config =
+    # Make some things easier for people who run nequip-train
+    if "chemical_symbol_to_type" in config and "num_species" not in config:
+        config["num_species"] = max(config["chemical_symbol_to_type"].values()) + 1
+
     # = Make the trainer =
     if config.wandb:
         import wandb  # noqa: F401
@@ -139,26 +144,20 @@ def fresh_start(config):
     # = Get statistics of training dataset =
     stats_fields = [
         AtomicDataDict.TOTAL_ENERGY_KEY,
-        AtomicDataDict.ATOMIC_NUMBERS_KEY,
     ]
-    stats_modes = ["mean_std", "count"]
+    stats_modes = ["mean_std"]
     if force_training:
         stats_fields.append(AtomicDataDict.FORCE_KEY)
         stats_modes.append("rms")
     stats = trainer.dataset_train.statistics(
         fields=stats_fields, modes=stats_modes, stride=config.dataset_statistics_stride
     )
-    (
-        (energies_mean, energies_std),
-        (allowed_species, Z_count),
-    ) = stats[:2]
+    ((energies_mean, energies_std),) = stats[:1]
     if force_training:
         # Scale by the force std instead
-        force_rms = stats[2][0]
+        force_rms = stats[1][0]
     del stats_modes
     del stats_fields
-
-    config.update(dict(allowed_species=allowed_species))
 
     # = Build a model =
     model_builder = _load_callable(config.model_builder)

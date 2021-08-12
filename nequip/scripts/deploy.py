@@ -150,7 +150,7 @@ def main(args=None):
         # Deploy
         metadata: dict = {NEQUIP_VERSION_KEY: nequip.__version__}
         metadata[R_MAX_KEY] = str(float(config["r_max"]))
-        metadata[N_SPECIES_KEY] = str(len(config["allowed_species"]))
+        metadata[N_SPECIES_KEY] = str(config["num_species"])
         metadata[CONFIG_KEY] = config_str
         metadata = {k: v.encode("ascii") for k, v in metadata.items()}
         torch.jit.save(model, args.out_file, _extra_files=metadata)

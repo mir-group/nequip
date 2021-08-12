@@ -14,6 +14,10 @@ model_uniform_init: false
 # data
 dataset: aspirin
 dataset_file_name: benchmark_data/aspirin_ccsd-train.npz
+chemical_symbol_to_type:
+  H: 0
+  C: 1
+  O: 2
 
 # logging
 wandb: false
