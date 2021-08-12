@@ -14,10 +14,13 @@ model_uniform_init: false
 # data
 dataset: aspirin
 dataset_file_name: benchmark_data/aspirin_ccsd-train.npz
+# A mapping of chemical species to type indexes is necessary if the dataset is provided with atomic numbers instead of type indexes.
 chemical_symbol_to_type:
   H: 0
   C: 1
   O: 2
+# Alternatively, if the dataset has type indexes, the total number of types is all that is required:
+# num_species: 3
 
 # logging
 wandb: false
