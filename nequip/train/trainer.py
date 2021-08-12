@@ -14,7 +14,7 @@ import yaml
 from copy import deepcopy
 from os.path import isfile
 from time import perf_counter, gmtime, strftime
-from typing import Optional, Union
+from typing import Optional, Union, Callable
 
 
 if sys.version_info[1] >= 7:
@@ -31,6 +31,7 @@ from torch_ema import ExponentialMovingAverage
 
 import nequip
 from nequip.data import DataLoader, AtomicData, AtomicDataDict
+import nequip.data.transforms
 from nequip.utils import (
     Output,
     instantiate_from_cls_name,
@@ -244,6 +245,8 @@ class Trainer:
         exclude_keys: list = [],
         batch_size: int = 5,
         shuffle: bool = True,
+        dataset_transform_name: str = "TypeMapper",
+        dataset_transform_kwargs: dict = {},
         n_train: Optional[int] = None,
         n_val: Optional[int] = None,
         dataloader_num_workers: int = 0,
@@ -312,6 +315,7 @@ class Trainer:
         self.optimizer_kwargs = deepcopy(optimizer_kwargs)
         self.lr_scheduler_kwargs = deepcopy(lr_scheduler_kwargs)
         self.early_stopping_kwargs = deepcopy(early_stopping_kwargs)
+        self.dataset_transform_kwargs = deepcopy(dataset_transform_kwargs)
 
         # initialize the optimizer and scheduler, the params will be updated in the function
         self.init()
@@ -554,7 +558,7 @@ class Trainer:
         return trainer
 
     def init(self):
-        """ initialize optimizer """
+        """initialize optimizer"""
         if self.model is None:
             return
 
@@ -770,7 +774,7 @@ class Trainer:
 
     @property
     def stop_cond(self):
-        """ kill the training early """
+        """kill the training early"""
 
         if self.early_stopping is not None and hasattr(self, "mae_dict"):
             early_stop, early_stop_args, debug_args = self.early_stopping(self.mae_dict)
@@ -1038,6 +1042,19 @@ class Trainer:
 
     def set_dataset(self, dataset):
 
+        # Determine transform
+        if getattr(self, "dataset_transform", None) is None:
+            (
+                self.dataset_transform,
+                self.dataset_transform_kwargs,
+            ) = instantiate_from_cls_name(
+                module=nequip.data.transforms,
+                class_name=self.dataset_transform_name,
+                prefix="dataset_transform",
+                all_args=self.kwargs,
+                optional_args=self.dataset_transform_kwargs,
+            )
+
         if self.train_idcs is None or self.val_idcs is None:
 
             total_n = len(dataset)
@@ -1076,6 +1093,7 @@ class Trainer:
             # persistent_workers=(self.max_epochs > 1),
             pin_memory=(self.device != torch.device("cpu")),
             # timeout=10,  # just so you don't get stuck
+            transforms=[self.dataset_transform],
         )
         self.dl_train = DataLoader(dataset=self.dataset_train, **dl_kwargs)
         self.dl_val = DataLoader(dataset=self.dataset_val, **dl_kwargs)
