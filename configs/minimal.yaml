@@ -20,7 +20,10 @@ chemical_symbol_to_type:
   C: 1
   O: 2
 # Alternatively, if the dataset has type indexes, the total number of types is all that is required:
-# num_species: 3
+# species_names:
+#   0: my_type
+#   1: atom
+#   2: thing
 
 # logging
 wandb: false
