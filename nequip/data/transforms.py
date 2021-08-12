@@ -37,6 +37,7 @@ class TypeMapper:
             for sym, type in self.chemical_symbol_to_type.items():
                 Z_to_index[ase.data.atomic_numbers[sym] - self._min_Z] = type
             self._Z_to_index = Z_to_index
+            self._valid_set = set(valid_atomic_numbers)
 
     def __call__(
         self, data: Union[AtomicDataDict.Type, AtomicData]
@@ -54,15 +55,21 @@ class TypeMapper:
             # TODO: torch_geometric data doesn't support `del` yet
             delattr(data, AtomicDataDict.ATOMIC_NUMBERS_KEY)
             if atomic_numbers.min() < self._min_Z or atomic_numbers.max() > self._max_Z:
+                bad_set = (
+                    set(torch.unique(atomic_numbers).cpu().tolist()) - self._valid_set
+                )
                 raise ValueError(
-                    "Some provided atomic numbers are not part of the atomic number -> type mapping!"
+                    f"Data included atomic numbers {bad_set} that are not part of the atomic number -> type mapping!"
                 )
             data[AtomicDataDict.SPECIES_INDEX_KEY] = self._Z_to_index[
                 atomic_numbers - self._min_Z
             ]
             if data[AtomicDataDict.SPECIES_INDEX_KEY].min() < 0:
+                bad_set = (
+                    set(torch.unique(atomic_numbers).cpu().tolist()) - self._valid_set
+                )
                 raise ValueError(
-                    "Some provided atomic numbers are not part of the atomic number -> type mapping!"
+                    f"Data included atomic numbers {bad_set} that are not part of the atomic number -> type mapping!"
                 )
         else:
             raise KeyError(
