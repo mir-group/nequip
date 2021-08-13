@@ -42,7 +42,7 @@ class SimpleLoss:
 
         # zero the nan entries
         not_nan = ~torch.isnan(ref[key])
-        loss = torch.nan_to_num(self.func(pred[key], ref[key], nan=0.0)
+        loss = torch.nan_to_num(self.func(pred[key], ref[key]), nan=0.0)
         if mean:
             return loss.sum() / not_nan.sum()
         else:
@@ -64,7 +64,7 @@ class PerSpeciesLoss(SimpleLoss):
         mean: bool = True,
     ):
         # average over xyz
-        per_atom_loss = self.func(pred[key], ref[key]
+        per_atom_loss = self.func(pred[key], ref[key])
         per_atom_loss = per_atom_loss.mean(dim=-1, keepdim=True)
 
         # zero the nan entries
@@ -72,25 +72,29 @@ class PerSpeciesLoss(SimpleLoss):
         per_atom_loss = torch.nan_to_num(per_atom_loss, nan=0.0)
 
         species_index = pred[AtomicDataDict.SPECIES_INDEX_KEY]
-        unique_indices, inverse_species_index = torch.unique(species_index, return_inverse=True)
+        unique_indices, inverse_species_index = torch.unique(
+            species_index, return_inverse=True
+        )
 
-        per_species_loss = scatter(per_atom_loss, inverse_species_index, reduce="sum", dim=0)
+        per_species_loss = scatter(
+            per_atom_loss, inverse_species_index, reduce="sum", dim=0
+        )
 
         # count the number of species, excluding the nan entry
-        ones = torch.ones_like(per_atom_loss)*not_nan
-        weight_species = 1.0/scatter(ones, inverse_species_index, reduce="sum", dim=0)
+        ones = torch.ones_like(per_atom_loss) * not_nan
+        weight_species = 1.0 / scatter(ones, inverse_species_index, reduce="sum", dim=0)
 
         # the species that have all entry with nan value will be nan
         # set it to zero
         not_inf = ~torch.isinf(weight_species)
-        weight_species = torch.nan_to_num(weight_species*not_inf, nan=0.0)
+        weight_species = torch.nan_to_num(weight_species * not_inf, nan=0.0)
 
-        sum = (per_species_loss*weight_species).sum()
+        sum = (per_species_loss * weight_species).sum()
 
         if mean:
-            return sum/torch.sum(not_inf)
+            return sum / torch.sum(not_inf)
         else:
-            return sum/torch.sum(not_inf)*per_atom_loss.size[0]
+            return sum / torch.sum(not_inf) * per_atom_loss.size[0]
 
 
 def find_loss_function(name: str, params):
