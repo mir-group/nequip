@@ -81,7 +81,7 @@ class PerSpeciesLoss(SimpleLoss):
         )
 
         # count the number of species, excluding the nan entry
-        ones = torch.ones_like(per_atom_loss) * not_nan
+        ones = torch.ones_like(per_atom_loss, dtype=torch.int8) * not_nan
         weight_species = 1.0 / scatter(ones, inverse_species_index, reduce="sum", dim=0)
 
         # the species that have all entry with nan value will be nan
