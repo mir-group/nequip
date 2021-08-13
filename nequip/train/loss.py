@@ -29,7 +29,6 @@ class Loss:
      'force': (1.0, 'Weighted_L1Loss', param_dict)}
     ```
 
-    If atomic_weight_on is True, all the loss function will be weighed by ref[AtomicDataDict.WEIGHTS_KEY+key] (if it exists)
     The loss function can be a loss class name that is exactly the same (case sensitive) to the ones defined in torch.nn.
     It can also be a user define class type that
         - takes "reduction=none" as init argument
@@ -41,11 +40,9 @@ class Loss:
     def __init__(
         self,
         coeffs: Union[dict, str, List[str]],
-        atomic_weight_on: bool = False,
         coeff_schedule: str = "constant",
     ):
 
-        self.atomic_weight_on = atomic_weight_on
         self.coeff_schedule = coeff_schedule
         self.coeffs = {}
         self.funcs = {}
@@ -107,7 +104,6 @@ class Loss:
                 pred=pred,
                 ref=ref,
                 key=key,
-                atomic_weight_on=self.atomic_weight_on,
                 mean=True,
             )
             contrib[key] = _loss
