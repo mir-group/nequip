@@ -123,7 +123,6 @@ class Metrics:
                 pred=pred,
                 ref=ref,
                 key=key,
-                atomic_weight_on=False,
                 mean=False,
             )
 

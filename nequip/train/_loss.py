@@ -67,34 +67,30 @@ class PerSpeciesLoss(SimpleLoss):
         per_atom_loss = self.func(pred[key], ref[key])
         per_atom_loss = per_atom_loss.mean(dim=-1, keepdim=True)
 
-        # zero the nan entries
-        not_nan = ~torch.isnan(per_atom_loss)
-        per_atom_loss = torch.nan_to_num(per_atom_loss, nan=0.0)
+        # find out what is nan
+        not_nan = torch.reshape(~torch.isnan(per_atom_loss), (-1, ))
 
-        species_index = pred[AtomicDataDict.SPECIES_INDEX_KEY]
-        unique_indices, inverse_species_index = torch.unique(
-            species_index, return_inverse=True
+        # off set species index for 1 and save the 0 entry for nan
+        species_index = pred[AtomicDataDict.SPECIES_INDEX_KEY]+1
+        unique_indices, inverse_species_index, species_count = torch.unique(
+            species_index*not_nan, return_inverse=True, return_counts=True,
         )
+        weight_species = 1.0 / species_count
 
-        per_species_loss = scatter(
+        per_species_loss = torch.reshape(scatter(
             per_atom_loss, inverse_species_index, reduce="sum", dim=0
-        )
+        ), (-1,))
 
-        # count the number of species, excluding the nan entry
-        ones = torch.ones_like(per_atom_loss, dtype=torch.int8) * not_nan
-        weight_species = 1.0 / scatter(ones, inverse_species_index, reduce="sum", dim=0)
-
-        # the species that have all entry with nan value will be nan
-        # set it to zero
-        not_inf = ~torch.isinf(weight_species)
-        weight_species = torch.nan_to_num(weight_species * not_inf, nan=0.0)
+        # zero the nan entries
+        not_nan_count = torch.sum(~torch.isnan(per_species_loss))
+        per_species_loss = torch.nan_to_num(per_species_loss, nan=0.0)
 
         sum = (per_species_loss * weight_species).sum()
 
         if mean:
-            return sum / torch.sum(not_inf)
+            return sum / not_nan_count
         else:
-            return sum / torch.sum(not_inf) * per_atom_loss.size[0]
+            return sum / not_nan_count * per_atom_loss.size[0]
 
 
 def find_loss_function(name: str, params):
