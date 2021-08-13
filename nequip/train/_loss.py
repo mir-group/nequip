@@ -19,6 +19,10 @@ class SimpleLoss:
         and reference tensor for its call functions, and outputs a vector
         with the same shape as pred/ref
     params (str): arguments needed to initialize the function above
+
+    Return:
+
+    if mean is True, return a scalar; else return the error matrix of each entry
     """
 
     def __init__(self, func_name: str, params: dict = {}):
@@ -46,7 +50,7 @@ class SimpleLoss:
         if mean:
             return loss.sum() / not_nan.sum()
         else:
-            return loss.sum()
+            return loss
 
 
 class PerSpeciesLoss(SimpleLoss):
@@ -63,6 +67,9 @@ class PerSpeciesLoss(SimpleLoss):
         key: str,
         mean: bool = True,
     ):
+        if not mean:
+            raise NotImplementedError("Cannot handle this yet")
+
         # average over xyz
         per_atom_loss = self.func(pred[key], ref[key])
         per_atom_loss = per_atom_loss.mean(dim=-1, keepdim=True)
@@ -70,7 +77,7 @@ class PerSpeciesLoss(SimpleLoss):
         # find out what is nan
         not_nan = torch.reshape(~torch.isnan(per_atom_loss), (-1, ))
 
-        # off set species index for 1 and save the 0 entry for nan
+        # offset species index by 1 to use 0 for nan
         species_index = pred[AtomicDataDict.SPECIES_INDEX_KEY]+1
         unique_indices, inverse_species_index, species_count = torch.unique(
             species_index*not_nan, return_inverse=True, return_counts=True,
@@ -87,13 +94,15 @@ class PerSpeciesLoss(SimpleLoss):
 
         sum = (per_species_loss * weight_species).sum()
 
-        if mean:
-            return sum / not_nan_count
-        else:
-            return sum / not_nan_count * per_atom_loss.size[0]
+        return sum / not_nan_count
 
 
 def find_loss_function(name: str, params):
+    """
+    Search for loss functions in this module
+
+    If the name starts with PerSpecies, return the PerSpeciesLoss instance
+    """
 
     wrapper_list = dict(
         PerSpecies=PerSpeciesLoss,

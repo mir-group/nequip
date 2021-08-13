@@ -113,23 +113,49 @@ class Loss:
 
 
 class LossStat:
+    """
+    The class that accumulate the loss function values over all batches
+    for each loss component.
+
+    Args:
+
+    keys (null): redundant argument
+
+    """
     def __init__(self, keys):
         self.loss_stat = {"total": RunningStats(dim=tuple(), reduction=Reduction.MEAN)}
 
     def __call__(self, loss, loss_contrib):
+        """
+        Args:
+
+        loss (torch.Tensor): the value of the total loss function for the current batch
+        loss (Dict(torch.Tensor)): the dictionary which contain the loss components
+        """
+
         results = {}
+
         results["loss"] = self.loss_stat["total"].accumulate_batch(loss).item()
+
+        # go through each component
         for k, v in loss_contrib.items():
+
+            # initialize for the 1st batch
             if k not in self.loss_stat:
                 self.loss_stat[k] = RunningStats(dim=tuple(), reduction=Reduction.MEAN)
                 device = v.get_device()
                 self.loss_stat[k].to(device="cpu" if device == -1 else device)
+
             results["loss_" + ABBREV.get(k, k)] = (
                 self.loss_stat[k].accumulate_batch(v).item()
             )
         return results
 
     def reset(self):
+        """
+        Reset all the counters to zero
+        """
+
         for v in self.loss_stat.values():
             v.reset()
 
