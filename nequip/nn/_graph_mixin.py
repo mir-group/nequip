@@ -89,7 +89,11 @@ class GraphModuleMixin:
             out.append(
                 {
                     "forward": (
-                        {k: i.randn(batch, -1) for k, i in self.irreps_in.items()},
+                        {
+                            k: i.randn(batch, -1)
+                            for k, i in self.irreps_in.items()
+                            if i is not None
+                        },
                     )
                 }
             )
