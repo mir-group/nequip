@@ -43,14 +43,23 @@ class SimpleLoss:
         key: str,
         mean: bool = True,
     ):
+        loss = self.func(pred[key], ref[key])
 
         # zero the nan entries
-        not_nan = ~torch.isnan(ref[key])
-        loss = torch.nan_to_num(self.func(pred[key], ref[key]), nan=0.0)
-        if mean:
-            return loss.sum() / not_nan.sum()
+        not_nan = torch.isnan(ref[key])
+        has_nan = torch.any(not_nan)
+        if has_nan:
+            not_nan = ~not_nan
+            loss = torch.nan_to_num(loss, nan=0.0)
+            if mean:
+                return loss.sum() / not_nan.sum()
+            else:
+                return loss
         else:
-            return loss
+            if mean:
+                return loss.mean()
+            else:
+                return loss
 
 
 class PerSpeciesLoss(SimpleLoss):
@@ -70,31 +79,57 @@ class PerSpeciesLoss(SimpleLoss):
         if not mean:
             raise NotImplementedError("Cannot handle this yet")
 
-        # average over xyz
-        per_atom_loss = self.func(pred[key], ref[key])
-        per_atom_loss = per_atom_loss.mean(dim=-1, keepdim=True)
-
-        # find out what is nan
-        not_nan = torch.reshape(~torch.isnan(per_atom_loss), (-1, ))
-
-        # offset species index by 1 to use 0 for nan
-        species_index = pred[AtomicDataDict.SPECIES_INDEX_KEY]+1
-        unique_indices, inverse_species_index, species_count = torch.unique(
-            species_index*not_nan, return_inverse=True, return_counts=True,
-        )
-        weight_species = 1.0 / species_count
-
-        per_species_loss = torch.reshape(scatter(
-            per_atom_loss, inverse_species_index, reduce="sum", dim=0
-        ), (-1,))
-
         # zero the nan entries
-        not_nan_count = torch.sum(~torch.isnan(per_species_loss))
-        per_species_loss = torch.nan_to_num(per_species_loss, nan=0.0)
+        not_nan = torch.isnan(ref[key])
+        has_nan = torch.any(not_nan)
 
-        sum = (per_species_loss * weight_species).sum()
+        # average over xyz
+        per_atom_loss = torch.nan_to_num(self.func(pred[key], ref[key]),
+                                         nan=0.0)
+        if has_nan:
 
-        return sum / not_nan_count
+            per_atom_loss = per_atom_loss.sum(dim=-1, keepdim=True)
+
+            not_nan = ~not_nan
+            # offset species index by 1 to use 0 for nan
+            spe_idx = pred[AtomicDataDict.SPECIES_INDEX_KEY]
+
+            accumulate_index = (spe_idx+1).reshape((-1,)+(1,)*(len(not_nan.shape)-1))*not_nan
+
+            unique_species, species_weight = torch.unique(
+                accumulate_index, return_counts=True,
+            )
+            unique_species = unique_species[1:]-1
+            species_weight = 1./species_weight[1:]
+            N_species = len(species_weight)
+
+            per_species_loss = torch.reshape(scatter(
+                per_atom_loss, spe_idx, reduce="sum", dim=0
+            ), (-1,))
+
+            if len(species_weight)<len(per_species_loss):
+                new_weight = torch.zeros(per_species_loss.shape)
+                for i, spe in enumerate(unique_species):
+                    new_weight[spe] = species_weight[i]
+                species_weight = new_weight
+
+            return (per_species_loss * species_weight).sum()/N_species
+
+        else:
+
+            per_atom_loss = per_atom_loss.mean(dim=-1, keepdim=True)
+
+            # offset species index by 1 to use 0 for nan
+            spe_idx = pred[AtomicDataDict.SPECIES_INDEX_KEY]
+            _, inverse_species_index = torch.unique(
+                spe_idx, return_inverse=True
+            )
+
+            per_species_loss = torch.reshape(scatter(
+                per_atom_loss, inverse_species_index, reduce="mean", dim=0
+            ), (-1,))
+
+            return per_species_loss.mean()
 
 
 def find_loss_function(name: str, params):
