@@ -1,8 +1,46 @@
+from typing import Optional
 import math
 
 import torch
 
 from torch import nn
+
+from e3nn.math import soft_one_hot_linspace
+from e3nn.util.jit import compile_mode
+
+
+@compile_mode("trace")
+class e3nn_basis(nn.Module):
+    r_max: float
+    r_min: float
+    e3nn_basis_name: str
+    num_basis: int
+
+    def __init__(
+        self,
+        r_max: float,
+        r_min: Optional[float] = None,
+        e3nn_basis_name: str = "gaussian",
+        num_basis: int = 8,
+    ):
+        super().__init__()
+        self.r_max = r_max
+        self.r_min = r_min if r_min is not None else 0.0
+        self.e3nn_basis_name = e3nn_basis_name
+        self.num_basis = num_basis
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return soft_one_hot_linspace(
+            x,
+            start=self.r_min,
+            end=self.r_max,
+            number=self.num_basis,
+            basis=self.e3nn_basis_name,
+            cutoff=True,
+        )
+
+    def _make_tracing_inputs(self, n: int):
+        return [{"forward": (torch.randn(5, 1),)} for _ in range(n)]
 
 
 class BesselBasis(nn.Module):
@@ -40,7 +78,7 @@ class BesselBasis(nn.Module):
         else:
             self.register_buffer("bessel_weights", bessel_weights)
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Evaluate Bessel Basis for input x.
 
