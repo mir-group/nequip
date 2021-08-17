@@ -8,7 +8,8 @@ Most recent change on the bottom.
 
 ## [Unreleased]
 ### Added
-- Support for `e3nn`'s `soft_one_hot_linspace` as radial bases 
+- Support for `e3nn`'s `soft_one_hot_linspace` as radial bases
+- Support for parallel dataloader workers with `dataloader_num_workers`
 
 ## [0.3.3] - 2021-08-11
 ### Added
