@@ -605,7 +605,7 @@ class Trainer:
             positional_args=dict(coeffs=self.loss_coeffs),
             all_args=self.kwargs,
         )
-        self.loss_stat = LossStat(keys=list(self.loss.funcs.keys()))
+        self.loss_stat = LossStat(self.loss)
         self._initialized = True
 
         if self.early_stopping is None:

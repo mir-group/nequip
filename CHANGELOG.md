@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Most recent change on the bottom.
 
 ## [Unreleased]
+### Added
+- Support for `e3nn`'s `soft_one_hot_linspace` as radial bases 
 
 ## [0.3.3] - 2021-08-11
 ### Added

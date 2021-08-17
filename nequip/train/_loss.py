@@ -19,9 +19,14 @@ class SimpleLoss:
         and reference tensor for its call functions, and outputs a vector
         with the same shape as pred/ref
     params (str): arguments needed to initialize the function above
+
+    Return:
+
+    if mean is True, return a scalar; else return the error matrix of each entry
     """
 
     def __init__(self, func_name: str, params: dict = {}):
+        self.has_nan = params.get("has_nan", False)
         func, _ = instantiate_from_cls_name(
             torch.nn,
             class_name=func_name,
@@ -37,28 +42,25 @@ class SimpleLoss:
         pred: dict,
         ref: dict,
         key: str,
-        atomic_weight_on: bool = False,
         mean: bool = True,
     ):
-        loss = self.func(pred[key], ref[key])
-        weights_key = AtomicDataDict.WEIGHTS_KEY + key
-        if weights_key in ref and atomic_weight_on:
-            weights = ref[weights_key]
-            # TO DO
+
+
+        # zero the nan entries
+        has_nan = self.has_nan and torch.isnan(ref[key].mean())
+        if has_nan:
+            not_nan = (ref[key]==ref[key]).int()
+            loss = self.func(pred[key], torch.nan_to_num(ref[key], nan=0.0))*not_nan
             if mean:
-                return (loss * weights).mean() / weights.mean()
+                return loss.sum() / not_nan.sum()
             else:
-                raise NotImplementedError(
-                    "metrics and running stat needs to be compatible with this"
-                )
-                return loss * weights, weights
+                return loss
         else:
+            loss = self.func(pred[key], ref[key])
             if mean:
                 return loss.mean()
             else:
                 return loss
-
-        return loss
 
 
 class PerSpeciesLoss(SimpleLoss):
@@ -73,38 +75,57 @@ class PerSpeciesLoss(SimpleLoss):
         pred: dict,
         ref: dict,
         key: str,
-        atomic_weight_on: bool = False,
         mean: bool = True,
     ):
         if not mean:
-            raise NotImplementedError("cannot handle this yet")
+            raise NotImplementedError("Cannot handle this yet")
 
-        per_atom_loss = self.func(pred[key], ref[key])
-        per_atom_loss = per_atom_loss.mean(dim=-1, keepdim=True)
+        has_nan = self.has_nan and torch.isnan(ref[key].mean())
 
-        # if there is atomic weights
-        weights_key = AtomicDataDict.WEIGHTS_KEY + key
-        if weights_key in ref and atomic_weight_on:
-            weights = ref[weights_key]
-            per_atom_loss = per_atom_loss * weights
+        if has_nan:
+            not_nan = (ref[key] == ref[key]).int()
+            per_atom_loss = self.func(pred[key], torch.nan_to_num(ref[key], nan=0.0))*not_nan
         else:
-            atomic_weight_on = False
+            per_atom_loss = self.func(pred[key], ref[key])
 
-        species_index = pred[AtomicDataDict.SPECIES_INDEX_KEY]
-        _, inverse_species_index = torch.unique(species_index, return_inverse=True)
+        reduce_dims = tuple(i + 1 for i in range(len(per_atom_loss.shape) - 1))
 
-        if atomic_weight_on:
-            # TO DO
-            per_species_weight = scatter(weights, inverse_species_index, dim=0)
-            per_species_loss = scatter(per_atom_loss, inverse_species_index, dim=0)
-            return (per_species_loss / per_species_weight).mean()
+        if has_nan:
+            if len(reduce_dims) > 0:
+                per_atom_loss = per_atom_loss.sum(dim=reduce_dims)
+
+            spe_idx = pred[AtomicDataDict.SPECIES_INDEX_KEY]
+            per_species_loss = scatter(per_atom_loss, spe_idx, reduce="sum", dim=0)
+
+            N = scatter(not_nan, spe_idx, reduce="sum", dim=0)
+            N = N.sum(reduce_dims)
+            N = 1.0 / N
+            N_species = ((N == N).int()).sum()
+
+            return (per_species_loss * N).sum() / N_species
+
         else:
-            return scatter(
+
+            if len(reduce_dims) > 0:
+                per_atom_loss = per_atom_loss.mean(dim=reduce_dims)
+
+            # offset species index by 1 to use 0 for nan
+            spe_idx = pred[AtomicDataDict.SPECIES_INDEX_KEY]
+            _, inverse_species_index = torch.unique(spe_idx, return_inverse=True)
+
+            per_species_loss = scatter(
                 per_atom_loss, inverse_species_index, reduce="mean", dim=0
-            ).mean()
+            )
+
+            return per_species_loss.mean()
 
 
 def find_loss_function(name: str, params):
+    """
+    Search for loss functions in this module
+
+    If the name starts with PerSpecies, return the PerSpeciesLoss instance
+    """
 
     wrapper_list = dict(
         PerSpecies=PerSpeciesLoss,
