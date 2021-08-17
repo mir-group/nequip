@@ -250,6 +250,7 @@ class SequentialGraphNetwork(GraphModuleMixin, torch.nn.Sequential):
         names.insert(idx + 1, name)
         modules.insert(idx + 1, module)
         self._modules = OrderedDict(zip(names, modules))
+        # TODO: handle irreps
         return
 
     def insert_from_parameters(
