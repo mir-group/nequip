@@ -26,6 +26,7 @@ class SimpleLoss:
     """
 
     def __init__(self, func_name: str, params: dict = {}):
+        self.has_nan = params.get("has_nan", False)
         func, _ = instantiate_from_cls_name(
             torch.nn,
             class_name=func_name,
@@ -79,55 +80,39 @@ class PerSpeciesLoss(SimpleLoss):
         if not mean:
             raise NotImplementedError("Cannot handle this yet")
 
-        # zero the nan entries
-        not_nan = torch.isnan(ref[key])
-        has_nan = torch.any(not_nan)
+        per_atom_loss = self.func(pred[key], ref[key])
+        has_nan = self.has_nan and torch.isnan(per_atom_loss.mean())
 
-        # average over xyz
-        per_atom_loss = torch.nan_to_num(self.func(pred[key], ref[key]),
-                                         nan=0.0)
         if has_nan:
+            not_nan = (per_atom_loss == per_atom_loss).int()
+            per_atom_loss = torch.nan_to_num(per_atom_loss, nan=0.0)
 
-            per_atom_loss = per_atom_loss.sum(dim=-1, keepdim=True)
+        reduce_dims = tuple(i + 1 for i in range(len(per_atom_loss.shape) - 1))
 
-            not_nan = ~not_nan
-            # offset species index by 1 to use 0 for nan
+        if has_nan:
+            if len(reduce_dims)>0:
+                per_atom_loss = per_atom_loss.sum(dim=reduce_dims)
+
             spe_idx = pred[AtomicDataDict.SPECIES_INDEX_KEY]
+            per_species_loss = scatter(per_atom_loss, spe_idx, reduce="sum", dim=0)
 
-            accumulate_index = (spe_idx+1).reshape((-1,)+(1,)*(len(not_nan.shape)-1))*not_nan
+            N = scatter(not_nan, spe_idx, reduce="sum", dim=0)
+            N = N.sum(reduce_dims)
+            N = 1.0 / N
+            N_species = ((N == N).int()).sum()
 
-            unique_species, species_weight = torch.unique(
-                accumulate_index, return_counts=True,
-            )
-            unique_species = unique_species[1:]-1
-            species_weight = 1./species_weight[1:]
-            N_species = len(species_weight)
-
-            per_species_loss = torch.reshape(scatter(
-                per_atom_loss, spe_idx, reduce="sum", dim=0
-            ), (-1,))
-
-            if len(species_weight)<len(per_species_loss):
-                new_weight = torch.zeros(per_species_loss.shape)
-                for i, spe in enumerate(unique_species):
-                    new_weight[spe] = species_weight[i]
-                species_weight = new_weight
-
-            return (per_species_loss * species_weight).sum()/N_species
+            return (per_species_loss * N).sum() / N_species
 
         else:
 
-            per_atom_loss = per_atom_loss.mean(dim=-1, keepdim=True)
+            if len(reduce_dims)>0:
+                per_atom_loss = per_atom_loss.mean(dim=reduce_dims)
 
             # offset species index by 1 to use 0 for nan
             spe_idx = pred[AtomicDataDict.SPECIES_INDEX_KEY]
-            _, inverse_species_index = torch.unique(
-                spe_idx, return_inverse=True
-            )
+            _, inverse_species_index = torch.unique(spe_idx, return_inverse=True)
 
-            per_species_loss = torch.reshape(scatter(
-                per_atom_loss, inverse_species_index, reduce="mean", dim=0
-            ), (-1,))
+            per_species_loss = scatter(per_atom_loss, inverse_species_index, reduce="mean", dim=0)
 
             return per_species_loss.mean()
 

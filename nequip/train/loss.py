@@ -122,8 +122,10 @@ class LossStat:
     keys (null): redundant argument
 
     """
-    def __init__(self, keys):
-        self.loss_stat = {"total": RunningStats(dim=tuple(), reduction=Reduction.MEAN)}
+
+    def __init__(self, has_nan=False):
+        self.has_nan = has_nan
+        self.loss_stat = {"total": RunningStats(dim=tuple(), reduction=Reduction.MEAN, has_nan=has_nan)}
 
     def __call__(self, loss, loss_contrib):
         """
