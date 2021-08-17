@@ -30,7 +30,7 @@ import torch
 from torch_ema import ExponentialMovingAverage
 
 import nequip
-from nequip.data import DataLoader, AtomicData, AtomicDataDict
+from nequip.data import DataLoader, AtomicData, AtomicDataDict, AtomicDataset
 from nequip.utils import (
     Output,
     instantiate_from_cls_name,
@@ -1036,32 +1036,65 @@ class Trainer:
             for i in range(len(logger.handlers)):
                 logger.handlers.pop()
 
-    def set_dataset(self, dataset):
+    def set_dataset(
+        self,
+        dataset: AtomicDataset,
+        validation_dataset: Optional[AtomicDataset] = None,
+    ) -> None:
+        """Set the dataset(s) used by this trainer.
+
+        Training and validation datasets will be sampled from
+        them in accordance with the trainer's parameters.
+
+        If only one dataset is provided, the train and validation
+        datasets will both be sampled from it. Otherwise, if
+        `validation_dataset` is provided, it will be used.
+        """
 
         if self.train_idcs is None or self.val_idcs is None:
+            if validation_dataset is None:
+                # Sample both from `dataset`:
+                total_n = len(dataset)
+                if (self.n_train + self.n_val) > total_n:
+                    raise ValueError(
+                        "too little data for training and validation. please reduce n_train and n_val"
+                    )
 
-            total_n = len(dataset)
+                if self.train_val_split == "random":
+                    idcs = torch.randperm(total_n)
+                elif self.train_val_split == "sequential":
+                    idcs = torch.arange(total_n)
+                else:
+                    raise NotImplementedError(
+                        f"splitting mode {self.train_val_split} not implemented"
+                    )
 
-            if (self.n_train + self.n_val) > total_n:
-                raise ValueError(
-                    "too little data for training and validation. please reduce n_train and n_val"
-                )
-
-            if self.train_val_split == "random":
-                idcs = torch.randperm(total_n)
-            elif self.train_val_split == "sequential":
-                idcs = torch.arange(total_n)
+                self.train_idcs = idcs[: self.n_train]
+                self.val_idcs = idcs[self.n_train : self.n_train + self.n_val]
             else:
-                raise NotImplementedError(
-                    f"splitting mode {self.train_val_split} not implemented"
-                )
+                if self.n_train > len(dataset):
+                    raise ValueError("Not enough data in dataset for requested n_train")
+                if self.n_val > len(validation_dataset):
+                    raise ValueError("Not enough data in dataset for requested n_train")
+                if self.train_val_split == "random":
+                    self.train_idcs = torch.randperm(len(dataset))[: self.n_train]
+                    self.val_idcs = torch.randperm(len(validation_dataset))[
+                        : self.n_val
+                    ]
+                elif self.train_val_split == "sequential":
+                    self.train_idcs = torch.arange(self.n_train)
+                    self.val_idcs = torch.arange(self.n_val)
+                else:
+                    raise NotImplementedError(
+                        f"splitting mode {self.train_val_split} not implemented"
+                    )
 
-            self.train_idcs = idcs[: self.n_train]
-            self.val_idcs = idcs[self.n_train : self.n_train + self.n_val]
+        if validation_dataset is None:
+            validation_dataset = dataset
 
         # torch_geometric datasets inherantly support subsets using `index_select`
         self.dataset_train = dataset.index_select(self.train_idcs)
-        self.dataset_val = dataset.index_select(self.val_idcs)
+        self.dataset_val = validation_dataset.index_select(self.val_idcs)
 
         # based on recommendations from
         # https://pytorch.org/tutorials/recipes/recipes/tuning_guide.html#enable-async-data-loading-and-augmentation

@@ -118,11 +118,19 @@ def fresh_start(config):
     config.update(output.updated_dict())
 
     # = Load the dataset =
-    dataset = dataset_from_config(config)
+    dataset = dataset_from_config(config, prefix="dataset")
     logging.info(f"Successfully loaded the data set of type {dataset}...")
+    try:
+        validation_dataset = dataset_from_config(config, prefix="validation_dataset")
+        logging.info(
+            f"Successfully loaded the validation data set of type {validation_dataset}..."
+        )
+    except KeyError:
+        # It couldn't be found
+        validation_dataset = None
 
     # = Train/test split =
-    trainer.set_dataset(dataset)
+    trainer.set_dataset(dataset, validation_dataset)
 
     # = Determine training type =
     train_on = config.loss_coeffs

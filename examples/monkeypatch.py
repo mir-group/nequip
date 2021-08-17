@@ -59,6 +59,7 @@ sgn.insert_from_parameters(
 # Load the original config file --- this could be a new one too:
 config = Config.from_file(path + "/config_final.yaml")
 # Load the dataset:
+# (Note that this loads the training dataset if there are separate training and validation datasets defined.)
 dataset = dataset_from_config(config)
 
 # Evaluate the model on a configuration:
