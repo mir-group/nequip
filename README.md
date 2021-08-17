@@ -40,14 +40,24 @@ pip install .
 
 ### Installation Issues
 
-We recommend running the tests using ```pytest```: 
+The easiest way to check if your installation is working is to train a toy model:
+```bash
+$ nequip-train configs/minimal.yaml
+```
+
+If you suspect something is wrong, encounter errors, or just want to confirm that everything is in working order, you can also run the unit tests:
 
 ```
 pip install pytest
-pytest ./tests/
+pytest tests/unit/
 ```
 
-While the tests are somewhat compute intensive, we've known them to hang on certain systems that have GPUs. If this happens to you, please report it along with information on your software environment in the [Issues](https://github.com/mir-group/nequip/issues)!
+To run the full tests, including a set of longer/more intensive integration tests, run:
+```
+pytest tests/
+```
+
+Note: the integration tests have hung in the past on certain systems that have GPUs. If this happens to you, please report it along with information on your software environment in the [Issues](https://github.com/mir-group/nequip/issues)!
 
 ## Usage
 
