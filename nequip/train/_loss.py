@@ -84,7 +84,7 @@ class PerSpeciesLoss(SimpleLoss):
 
         if has_nan:
             not_nan = (ref[key] == ref[key]).int()
-            per_atom_loss = self.func(pred[key], torhc.nan_to_num(ref[key], nan=0.0))*not_nan
+            per_atom_loss = self.func(pred[key], torch.nan_to_num(ref[key], nan=0.0))*not_nan
         else:
             per_atom_loss = self.func(pred[key], ref[key])
 
