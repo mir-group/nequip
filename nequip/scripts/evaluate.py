@@ -148,16 +148,27 @@ def main(args=None):
 
     # Load a config file
     print(
-        f"Loading {'original training ' if dataset_is_from_training else ''}dataset...",
+        f"Loading {'original ' if dataset_is_from_training else ''}dataset...",
         file=sys.stderr,
     )
     config = Config.from_file(str(args.dataset_config))
 
+    dataset_is_validation: bool = False
     # Currently, pytorch_geometric prints some status messages to stdout while loading the dataset
     # TODO: fix may come soon: https://github.com/rusty1s/pytorch_geometric/pull/2950
     # Until it does, just redirect them.
     with contextlib.redirect_stdout(sys.stderr):
-        dataset = dataset_from_config(config)
+        try:
+            # Try to get validation dataset
+            dataset = dataset_from_config(config, prefix="validation_dataset")
+            dataset_is_validation = True
+        except KeyError:
+            # Get shared train + validation dataset
+            dataset = dataset_from_config(config)
+    print(
+        f"Loaded {'validation_' if dataset_is_validation else ''}dataset specified in {args.dataset_config.name}.",
+        file=sys.stderr,
+    )
 
     c = Collater.for_dataset(dataset, exclude_keys=[])
 
@@ -167,13 +178,22 @@ def main(args=None):
         # we know the train and val, get the rest
         all_idcs = set(range(len(dataset)))
         # set operations
-        test_idcs = list(all_idcs - train_idcs - val_idcs)
-        assert set(test_idcs).isdisjoint(train_idcs)
+        if dataset_is_validation:
+            test_idcs = list(all_idcs - val_idcs)
+            print(
+                f"Using origial validation dataset minus validation set frames, yielding a test set size of {len(test_idcs)} frames.",
+                file=sys.stderr,
+            )
+        else:
+            test_idcs = list(all_idcs - train_idcs - val_idcs)
+            assert set(test_idcs).isdisjoint(train_idcs)
+            print(
+                f"Using origial training dataset minus training and validation frames, yielding a test set size of {len(test_idcs)} frames.",
+                file=sys.stderr,
+            )
+        # No matter what it should be disjoint from validation:
         assert set(test_idcs).isdisjoint(val_idcs)
-        print(
-            f"Using training dataset minus training and validation frames, yielding a test set size of {len(test_idcs)} frames.",
-            file=sys.stderr,
-        )
+
         if not do_metrics:
             print(
                 "WARNING: using the automatic test set ^^^ but not computing metrics, is this really what you wanted to do?",
