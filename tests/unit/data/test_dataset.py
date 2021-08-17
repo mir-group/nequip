@@ -167,17 +167,18 @@ class TestFromConfig:
         assert isdir(g.root)
         assert isdir(f"{g.root}/processed")
 
-    def test_ase(self, ase_file, root):
+    @pytest.mark.parametrize("prefix", ["dataset", "thingy"])
+    def test_ase(self, ase_file, root, prefix):
         config = Config(
             dict(
-                dataset="ASEDataset",
                 file_name=ase_file,
                 root=root,
                 extra_fixed_fields={"r_max": 3.0},
                 ase_args=dict(format="extxyz"),
             )
         )
-        a = dataset_from_config(config)
+        config[prefix] = "ASEDataset"
+        a = dataset_from_config(config, prefix=prefix)
         assert isdir(a.root)
         assert isdir(f"{a.root}/processed")
 
