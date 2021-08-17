@@ -44,19 +44,19 @@ class SimpleLoss:
         key: str,
         mean: bool = True,
     ):
-        loss = self.func(pred[key], ref[key])
+
 
         # zero the nan entries
-        not_nan = torch.isnan(ref[key])
-        has_nan = torch.any(not_nan)
+        has_nan = self.has_nan and torch.isnan(ref[key].mean())
         if has_nan:
-            not_nan = ~not_nan
-            loss = torch.nan_to_num(loss, nan=0.0)
+            not_nan = (ref[key]==ref[key]).int()
+            loss = self.func(pred[key], torch.nan_to_num(ref[key], nan=0.0))*not_nan
             if mean:
                 return loss.sum() / not_nan.sum()
             else:
                 return loss
         else:
+            loss = self.func(pred[key], ref[key])
             if mean:
                 return loss.mean()
             else:
@@ -80,12 +80,13 @@ class PerSpeciesLoss(SimpleLoss):
         if not mean:
             raise NotImplementedError("Cannot handle this yet")
 
-        per_atom_loss = self.func(pred[key], ref[key])
-        has_nan = self.has_nan and torch.isnan(per_atom_loss.mean())
+        has_nan = self.has_nan and torch.isnan(ref[key].mean())
 
         if has_nan:
             not_nan = (per_atom_loss == per_atom_loss).int()
-            per_atom_loss = torch.nan_to_num(per_atom_loss, nan=0.0)
+            per_atom_loss = self.func(pred[key], torhc.nan_to_num(ref[key], nan=0.0))*not_nan
+        else:
+            per_atom_loss = self.func(pred[key], ref[key])
 
         reduce_dims = tuple(i + 1 for i in range(len(per_atom_loss.shape) - 1))
 
