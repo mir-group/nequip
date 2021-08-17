@@ -123,9 +123,16 @@ class LossStat:
 
     """
 
-    def __init__(self, has_nan=False):
-        self.has_nan = has_nan
-        self.loss_stat = {"total": RunningStats(dim=tuple(), reduction=Reduction.MEAN, has_nan=has_nan)}
+    def __init__(self, loss_instance=None):
+        self.loss_stat = {
+            "total": RunningStats(
+                dim=tuple(), reduction=Reduction.MEAN, has_nan=False
+            )
+        }
+        self.has_nan = {}
+        if loss_instance is not None:
+            for key, func in loss_instance.funcs.items():
+                self.has_nan[key] = func.has_nan if hasattr(func, "has_nan") else False
 
     def __call__(self, loss, loss_contrib):
         """
@@ -144,7 +151,11 @@ class LossStat:
 
             # initialize for the 1st batch
             if k not in self.loss_stat:
-                self.loss_stat[k] = RunningStats(dim=tuple(), reduction=Reduction.MEAN)
+                self.loss_stat[k] = RunningStats(
+                    dim=tuple(),
+                    reduction=Reduction.MEAN,
+                    has_nan=self.has_nan.get(k, False),
+                )
                 device = v.get_device()
                 self.loss_stat[k].to(device="cpu" if device == -1 else device)
 

@@ -19,10 +19,10 @@ dicts = (
     },
 )
 nan_dict = {
-        AtomicDataDict.TOTAL_ENERGY_KEY: (3.0, "L1Loss", {"has_nan":True}),
-        AtomicDataDict.FORCE_KEY: (1.0, "MSELoss", {"has_nan":True}),
-        "k": 1.0,
-    }
+    AtomicDataDict.TOTAL_ENERGY_KEY: (3.0, "L1Loss", {"has_nan": True}),
+    AtomicDataDict.FORCE_KEY: (1.0, "MSELoss", {"has_nan": True}),
+    "k": 1.0,
+}
 
 
 class TestInit:
@@ -89,7 +89,9 @@ class TestNaN:
 
         pred, ref, wo_nan_pred, wo_nan_ref = data_w_NaN
 
-        config = {AtomicDataDict.FORCE_KEY: (1.0, "PerSpeciesMSELoss", {"has_nan":True})}
+        config = {
+            AtomicDataDict.FORCE_KEY: (1.0, "PerSpeciesMSELoss", {"has_nan": True})
+        }
         loss = Loss(coeffs=config)
 
         l, contb = loss(pred, ref)

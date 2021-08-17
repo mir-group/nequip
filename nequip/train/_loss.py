@@ -90,7 +90,7 @@ class PerSpeciesLoss(SimpleLoss):
         reduce_dims = tuple(i + 1 for i in range(len(per_atom_loss.shape) - 1))
 
         if has_nan:
-            if len(reduce_dims)>0:
+            if len(reduce_dims) > 0:
                 per_atom_loss = per_atom_loss.sum(dim=reduce_dims)
 
             spe_idx = pred[AtomicDataDict.SPECIES_INDEX_KEY]
@@ -105,14 +105,16 @@ class PerSpeciesLoss(SimpleLoss):
 
         else:
 
-            if len(reduce_dims)>0:
+            if len(reduce_dims) > 0:
                 per_atom_loss = per_atom_loss.mean(dim=reduce_dims)
 
             # offset species index by 1 to use 0 for nan
             spe_idx = pred[AtomicDataDict.SPECIES_INDEX_KEY]
             _, inverse_species_index = torch.unique(spe_idx, return_inverse=True)
 
-            per_species_loss = scatter(per_atom_loss, inverse_species_index, reduce="mean", dim=0)
+            per_species_loss = scatter(
+                per_atom_loss, inverse_species_index, reduce="mean", dim=0
+            )
 
             return per_species_loss.mean()
 
