@@ -1082,18 +1082,20 @@ class Trainer:
 
         # based on recommendations from
         # https://pytorch.org/tutorials/recipes/recipes/tuning_guide.html#enable-async-data-loading-and-augmentation
-        if self.dataloader_num_workers != 0:
-            # some issues with timeouts need to be investigated
-            raise NotImplementedError
         dl_kwargs = dict(
             batch_size=self.batch_size,
             shuffle=self.shuffle,
             exclude_keys=self.exclude_keys,
-            # num_workers=self.dataloader_num_workers,
-            # persistent_workers=(self.max_epochs > 1),
-            pin_memory=(self.device != torch.device("cpu")),
-            # timeout=10,  # just so you don't get stuck
             transforms=[self.dataset_transform],
+            num_workers=self.dataloader_num_workers,
+            # keep stuff around in memory
+            persistent_workers=(
+                self.dataloader_num_workers > 0 and self.max_epochs > 1
+            ),
+            # PyTorch recommends this for GPU since it makes copies much faster
+            pin_memory=(self.device != torch.device("cpu")),
+            # avoid getting stuck
+            timeout=(10 if self.dataloader_num_workers > 0 else 0),
         )
         self.dl_train = DataLoader(dataset=self.dataset_train, **dl_kwargs)
         self.dl_val = DataLoader(dataset=self.dataset_val, **dl_kwargs)

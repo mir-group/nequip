@@ -89,7 +89,11 @@ class GraphModuleMixin:
             out.append(
                 {
                     "forward": (
-                        {k: i.randn(batch, -1) for k, i in self.irreps_in.items()},
+                        {
+                            k: i.randn(batch, -1)
+                            for k, i in self.irreps_in.items()
+                            if i is not None
+                        },
                     )
                 }
             )
@@ -246,6 +250,7 @@ class SequentialGraphNetwork(GraphModuleMixin, torch.nn.Sequential):
         names.insert(idx + 1, name)
         modules.insert(idx + 1, module)
         self._modules = OrderedDict(zip(names, modules))
+        # TODO: handle irreps
         return
 
     def insert_from_parameters(
