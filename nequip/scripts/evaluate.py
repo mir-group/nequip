@@ -1,6 +1,6 @@
 import sys
 import argparse
-from logging import getLogger, DEBUG, INFO, debug, info, StreamHandler, FileHandler
+from logging import getLogger, CRITICAL, INFO, critical, info, StreamHandler, FileHandler
 import textwrap
 from pathlib import Path
 import contextlib
@@ -138,32 +138,32 @@ def main(args=None):
         device = torch.device(args.device)
 
     logger = getLogger("")
-    logger.setLevel(DEBUG)
+    logger.setLevel(CRITICAL)
     logger.handlers = [StreamHandler(sys.stderr), StreamHandler(sys.stdout)]
-    logger.handlers[0].setLevel(DEBUG)
-    logger.handlers[1].setLevel(INFO)
+    logger.handlers[0].setLevel(INFO)
+    logger.handlers[1].setLevel(CRITICAL)
     if args.log is not None:
         logger.addHandler(FileHandler(args.log, mode="w"))
-        logger.handlers[-1].setLevel(DEBUG)
+        logger.handlers[-1].setLevel(INFO)
 
-    debug(f"Using device: {device}")
+    info(f"Using device: {device}")
     if device.type == "cuda":
-        debug(
+        info(
             "WARNING: please note that models running on CUDA are usually nondeterministc and that this manifests in the final test errors; for a _more_ deterministic result, please use `--device cpu`",
         )
 
     # Load model:
-    debug("Loading model... ")
+    info("Loading model... ")
     try:
         model, _ = load_deployed_model(args.model, device=device)
-        debug("loaded deployed model.")
+        info("loaded deployed model.")
     except ValueError:  # its not a deployed model
         model = torch.load(args.model, map_location=device)
         model = model.to(device)
-        debug("loaded pickled Python model.")
+        info("loaded pickled Python model.")
 
     # Load a config file
-    debug(
+    info(
         f"Loading {'original training ' if dataset_is_from_training else ''}dataset...",
     )
     config = Config.from_file(str(args.dataset_config))
@@ -185,11 +185,11 @@ def main(args=None):
         test_idcs = list(all_idcs - train_idcs - val_idcs)
         assert set(test_idcs).isdisjoint(train_idcs)
         assert set(test_idcs).isdisjoint(val_idcs)
-        debug(
+        info(
             f"Using training dataset minus training and validation frames, yielding a test set size of {len(test_idcs)} frames.",
         )
         if not do_metrics:
-            debug(
+            info(
                 "WARNING: using the automatic test set ^^^ but not computing metrics, is this really what you wanted to do?",
             )
     else:
@@ -200,7 +200,7 @@ def main(args=None):
             ),
             filename=str(args.test_indexes),
         )
-        debug(
+        info(
             f"Using provided test set indexes, yielding a test set size of {len(test_idcs)} frames.",
         )
 
@@ -236,7 +236,7 @@ def main(args=None):
     batch_i: int = 0
     batch_size: int = args.batch_size
 
-    debug("Starting...")
+    info("Starting...")
     context_stack = contextlib.ExitStack()
     with contextlib.ExitStack() as context_stack:
         # "None" checks if in a TTY and disables if not
@@ -296,8 +296,8 @@ def main(args=None):
             display_bar.close()
 
     if do_metrics:
-        debug("\n--- Final result: ---")
-        info(
+        info("\n--- Final result: ---")
+        critical(
             "\n".join(
                 f"{k:>20s} = {v:< 20f}"
                 for k, v in metrics.flatten_metrics(metrics.current_result())[0].items()
