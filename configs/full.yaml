@@ -77,6 +77,11 @@ npz_fixed_field_keys:                                                           
 # ase_args:                                                                        # any arguments needed by ase.io.read
 #   format: extxyz
 
+# If you want to use a different dataset for validation, you can specify
+# the same types of options using a `validation_` prefix:
+# validation_dataset: ase
+# validation_dataset_file_name: xxx.xyz                                                       # need to be a format accepted by ase.io.read
+
 # logging
 wandb: false                                                                        # we recommend using wandb for logging, we'll turn it off here as it's optional
 wandb_project: aspirin                                                             # project name used in wandb

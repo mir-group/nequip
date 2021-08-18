@@ -8,7 +8,7 @@ from nequip import data, datasets
 from .config import Config
 
 
-def dataset_from_config(config):
+def dataset_from_config(config, prefix: str = "dataset"):
     """initialize database based on a config instance
 
     It needs dataset type name (case insensitive),
@@ -17,19 +17,22 @@ def dataset_from_config(config):
     Examples see tests/data/test_dataset.py TestFromConfig
     and tests/datasets/test_simplest.py
     """
+    config_dataset = config.get(prefix, None)
+    if config_dataset is None:
+        raise KeyError(f"Dataset with prefix `{prefix}` isn't present in this config!")
 
-    if inspect.isclass(config.dataset):
+    if inspect.isclass(config_dataset):
         # user define class
-        class_name = config.dataset
+        class_name = config_dataset
     else:
         try:
-            module_name = ".".join(config.dataset.split(".")[:-1])
-            class_name = ".".join(config.dataset.split(".")[-1:])
+            module_name = ".".join(config_dataset.split(".")[:-1])
+            class_name = ".".join(config_dataset.split(".")[-1:])
             class_name = getattr(import_module(module_name), class_name)
         except Exception as e:
             # ^ TODO: don't catch all Exception
             # default class defined in nequip.data or nequip.dataset
-            dataset_name = config.dataset.lower()
+            dataset_name = config_dataset.lower()
 
             class_name = None
             for k, v in inspect.getmembers(data, inspect.isclass) + inspect.getmembers(
@@ -44,18 +47,19 @@ def dataset_from_config(config):
                     class_name = v
 
     if class_name is None:
-        raise NameError(f"dataset {dataset_name} does not exists")
+        raise NameError(f"dataset type {dataset_name} does not exists")
 
     # if dataset r_max is not found, use the universal r_max
-    if "dataset_extra_fixed_fields" not in config:
-        config.dataset_extra_fixed_fields = {}
+    extra_fixed_fields_key = prefix + "_extra_fixed_fields"
+    if extra_fixed_fields_key not in config:
+        config[extra_fixed_fields_key] = {}
         if "extra_fixed_fields" in config:
-            config.dataset_extra_fixed_fields.update(config.extra_fixed_fields)
+            config[extra_fixed_fields_key].update(config.extra_fixed_fields)
 
-    if "r_max" in config and "r_max" not in config.dataset_extra_fixed_fields:
-        config.dataset_extra_fixed_fields["r_max"] = config.r_max
+    if "r_max" in config and "r_max" not in config[extra_fixed_fields_key]:
+        config[extra_fixed_fields_key]["r_max"] = config.r_max
 
-    instance, _ = instantiate(class_name, prefix="dataset", optional_args=config)
+    instance, _ = instantiate(class_name, prefix=prefix, optional_args=config)
 
     return instance
 

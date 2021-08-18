@@ -171,15 +171,25 @@ def main(args=None, running_as_script: bool = True):
 
     # Load a config file
     logger.info(
-        f"Loading {'original training ' if dataset_is_from_training else ''}dataset...",
+        f"Loading {'original ' if dataset_is_from_training else ''}dataset...",
     )
     config = Config.from_file(str(args.dataset_config))
 
-    # Currently, pytorch_geometric debugs some status messages to stdout while loading the dataset
+    dataset_is_validation: bool = False
+    # Currently, pytorch_geometric prints some status messages to stdout while loading the dataset
     # TODO: fix may come soon: https://github.com/rusty1s/pytorch_geometric/pull/2950
     # Until it does, just redirect them.
     with contextlib.redirect_stdout(sys.stderr):
-        dataset = dataset_from_config(config)
+        try:
+            # Try to get validation dataset
+            dataset = dataset_from_config(config, prefix="validation_dataset")
+            dataset_is_validation = True
+        except KeyError:
+            # Get shared train + validation dataset
+            dataset = dataset_from_config(config)
+    logger.info(
+        f"Loaded {'validation_' if dataset_is_validation else ''}dataset specified in {args.dataset_config.name}.",
+    )
 
     c = Collater.for_dataset(dataset, exclude_keys=[])
 
@@ -189,12 +199,19 @@ def main(args=None, running_as_script: bool = True):
         # we know the train and val, get the rest
         all_idcs = set(range(len(dataset)))
         # set operations
-        test_idcs = list(all_idcs - train_idcs - val_idcs)
-        assert set(test_idcs).isdisjoint(train_idcs)
+        if dataset_is_validation:
+            test_idcs = list(all_idcs - val_idcs)
+            logger.info(
+                f"Using origial validation dataset minus validation set frames, yielding a test set size of {len(test_idcs)} frames.",
+            )
+        else:
+            test_idcs = list(all_idcs - train_idcs - val_idcs)
+            assert set(test_idcs).isdisjoint(train_idcs)
+            logger.info(
+                f"Using origial training dataset minus training and validation frames, yielding a test set size of {len(test_idcs)} frames.",
+            )
+        # No matter what it should be disjoint from validation:
         assert set(test_idcs).isdisjoint(val_idcs)
-        logger.info(
-            f"Using training dataset minus training and validation frames, yielding a test set size of {len(test_idcs)} frames.",
-        )
         if not do_metrics:
             logger.info(
                 "WARNING: using the automatic test set ^^^ but not computing metrics, is this really what you wanted to do?",
