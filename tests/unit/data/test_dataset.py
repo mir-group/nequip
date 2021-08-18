@@ -3,7 +3,7 @@ import pytest
 import tempfile
 import torch
 
-from os.path import isdir
+from os.path import isdir, isfile
 
 from ase.io import write
 
@@ -68,7 +68,8 @@ class TestInit:
     def test_npz(self, npz_data, root):
         g = NpzDataset(file_name=npz_data, root=root, extra_fixed_fields={"r_max": 3.0})
         assert isdir(g.root)
-        assert isdir(f"{g.root}/processed")
+        assert isdir(g.processed_dir)
+        assert isfile(g.processed_dir + "/data.pth")
 
     def test_ase(self, ase_file, root):
         a = ASEDataset(
@@ -78,7 +79,8 @@ class TestInit:
             ase_args=dict(format="extxyz"),
         )
         assert isdir(a.root)
-        assert isdir(f"{a.root}/processed")
+        assert isdir(a.processed_dir)
+        assert isfile(a.processed_dir + "/data.pth")
 
 
 class TestStatistics:
@@ -145,9 +147,7 @@ class TestReload:
         )
         print(a.processed_file_names[0])
         print(npz_dataset.processed_file_names[0])
-        assert (a.processed_file_names[0] == npz_dataset.processed_file_names[0]) == (
-            change_rmax == 0
-        )
+        assert (a.processed_dir == npz_dataset.processed_dir) == (change_rmax == 0)
 
 
 class TestFromConfig:
@@ -165,7 +165,8 @@ class TestFromConfig:
         g = dataset_from_config(config)
         assert g.fixed_fields["r_max"] == 3
         assert isdir(g.root)
-        assert isdir(f"{g.root}/processed")
+        assert isdir(g.processed_dir)
+        assert isfile(g.processed_dir + "/data.pth")
 
     @pytest.mark.parametrize("prefix", ["dataset", "thingy"])
     def test_ase(self, ase_file, root, prefix):
@@ -180,7 +181,8 @@ class TestFromConfig:
         config[prefix] = "ASEDataset"
         a = dataset_from_config(config, prefix=prefix)
         assert isdir(a.root)
-        assert isdir(f"{a.root}/processed")
+        assert isdir(a.processed_dir)
+        assert isfile(a.processed_dir + "/data.pth")
 
 
 class TestFromList:
