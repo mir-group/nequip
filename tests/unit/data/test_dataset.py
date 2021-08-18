@@ -193,6 +193,15 @@ class TestFromConfig:
         assert isdir(a.processed_dir)
         assert isfile(a.processed_dir + "/data.pth")
 
+        # Test reload
+        # Change some random ASE specific parameter
+        # See https://wiki.fysik.dtu.dk/ase/ase/io/io.html
+        config["ase_args"]["do_not_split_by_at_sign"] = True
+        b = dataset_from_config(config, prefix=prefix)
+        assert isdir(b.processed_dir)
+        assert isfile(b.processed_dir + "/data.pth")
+        assert a.processed_dir != b.processed_dir
+
 
 class TestFromList:
     def test_from_atoms(self, molecules):
