@@ -12,6 +12,9 @@ Most recent change on the bottom.
 - Support for parallel dataloader workers with `dataloader_num_workers`
 - Optionally independently configure validation and training datasets
 
+### Changed
+- Name processed datasets based on a hash of their parameters to ensure only valid cached data is used
+
 ## [0.3.3] - 2021-08-11
 ### Added
 - `to_ase` method in `AtomicData.py` to convert `AtomicData` object to (list of) `ase.Atoms` object(s)
