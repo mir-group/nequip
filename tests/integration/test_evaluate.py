@@ -79,7 +79,11 @@ def test_metrics(training_session, do_test_idcs, do_metrics):
     # == Run test error ==
     outdir = f"{true_config['root']}/{true_config['run_name']}/"
 
-    default_params = {"train-dir": outdir, "output": tmpdir + "/out.xyz"}
+    default_params = {
+        "train-dir": outdir,
+        "output": tmpdir + "/out.xyz",
+        "log": tmpdir + "/out.log",
+    }
 
     def runit(params: dict):
         tmp = default_params.copy()
@@ -161,7 +165,13 @@ def test_metrics(training_session, do_test_idcs, do_metrics):
     # Check insensitive to batch size
     for batch_size in (13, 1000):
         metrics2 = runit(
-            {"train-dir": outdir, "batch-size": batch_size, "device": "cpu"}
+            {
+                "train-dir": outdir,
+                "batch-size": batch_size,
+                "device": "cpu",
+                "output": tmpdir + f"/{batch_size}.xyz",
+                "log": tmpdir + f"/{batch_size}.log",
+            }
         )
         for k, v in metrics.items():
             assert np.all(np.abs(v - metrics2[k]) < 1e-5)
@@ -169,7 +179,7 @@ def test_metrics(training_session, do_test_idcs, do_metrics):
         # Use `cmp`, which is UNIX standard, to make efficient
         # See https://stackoverflow.com/questions/12900538/fastest-way-to-tell-if-two-files-have-the-same-contents-in-unix-linux
         cmp_retval = subprocess.run(
-            ["cmp", "--silent", tmpdir + "/out-orig.xyz", tmpdir + "/out.xyz"]
+            ["cmp", "--silent", tmpdir + "/out-orig.xyz", tmpdir + f"/{batch_size}.xyz"]
         )
         if cmp_retval.returncode == 0:
             # same
