@@ -90,3 +90,29 @@ class BesselBasis(nn.Module):
         numerator = torch.sin(self.bessel_weights * x.unsqueeze(-1) / self.r_max)
 
         return self.prefactor * (numerator / x.unsqueeze(-1))
+
+
+# class GaussianBasis(nn.Module):
+#     r_max: float
+
+#     def __init__(self, r_max, r_min=0.0, num_basis=8, trainable=True):
+#         super().__init__()
+
+#         self.trainable = trainable
+#         self.num_basis = num_basis
+
+#         self.r_max = float(r_max)
+#         self.r_min = float(r_min)
+
+#         means = torch.linspace(self.r_min, self.r_max, self.num_basis)
+#         stds = torch.full(size=means.size, fill_value=means[1] - means[0])
+#         if self.trainable:
+#             self.means = nn.Parameter(means)
+#             self.stds = nn.Parameter(stds)
+#         else:
+#             self.register_buffer("means", means)
+#             self.register_buffer("stds", stds)
+
+#     def forward(self, x: torch.Tensor) -> torch.Tensor:
+#         x = (x[..., None] - self.means) / self.stds
+#         x = x.square().mul(-0.5).exp() / self.stds  # sqrt(2 * pi)
