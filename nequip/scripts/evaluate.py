@@ -1,6 +1,6 @@
 import sys
 import argparse
-from logging import getLogger, DEBUG, INFO, debug, info, StreamHandler, FileHandler
+import logging
 import textwrap
 from pathlib import Path
 import contextlib
@@ -10,7 +10,7 @@ import ase.io
 
 import torch
 
-from nequip.utils import Config, dataset_from_config, Output
+from nequip.utils import Config, dataset_from_config
 from nequip.data import AtomicData, Collater
 from nequip.scripts.deploy import load_deployed_model
 from nequip.utils import load_file, instantiate
@@ -18,7 +18,7 @@ from nequip.train.loss import Loss
 from nequip.train.metrics import Metrics
 
 
-def main(args=None):
+def main(args=None, running_as_script: bool = True):
     # in results dir, do: nequip-deploy build . deployed.pth
     parser = argparse.ArgumentParser(
         description=textwrap.dedent(
@@ -89,7 +89,7 @@ def main(args=None):
     # Something has to be provided
     # See https://stackoverflow.com/questions/22368458/how-to-make-argparse-logging.debug-usage-when-no-option-is-given-to-the-code
     if len(sys.argv) == 1:
-        parser.logging.debug_help()
+        parser.print_help()
         parser.exit()
     # Parse the args
     args = parser.parse_args(args=args)
@@ -137,33 +137,40 @@ def main(args=None):
     else:
         device = torch.device(args.device)
 
-    logger = getLogger("")
-    logger.setLevel(DEBUG)
-    logger.handlers = [StreamHandler(sys.stderr), StreamHandler(sys.stdout)]
-    logger.handlers[0].setLevel(DEBUG)
-    logger.handlers[1].setLevel(INFO)
-    if args.log is not None:
-        logger.addHandler(FileHandler(args.log, mode="w"))
-        logger.handlers[-1].setLevel(DEBUG)
+    if running_as_script:
+        # Configure the root logger so stuff gets printed
+        root_logger = logging.getLogger()
+        root_logger.setLevel(logging.CRITICAL)
+        root_logger.handlers = [
+            logging.StreamHandler(sys.stderr),
+            logging.StreamHandler(sys.stdout),
+        ]
+        root_logger.handlers[0].setLevel(logging.INFO)
+        root_logger.handlers[1].setLevel(logging.CRITICAL)
+        if args.log is not None:
+            root_logger.addHandler(logging.FileHandler(args.log, mode="w"))
+            root_logger.handlers[-1].setLevel(logging.INFO)
+    logger = logging.getLogger("nequip-evaluate")
+    logger.setLevel(logging.INFO)
 
-    debug(f"Using device: {device}")
+    logger.info(f"Using device: {device}")
     if device.type == "cuda":
-        debug(
+        logger.info(
             "WARNING: please note that models running on CUDA are usually nondeterministc and that this manifests in the final test errors; for a _more_ deterministic result, please use `--device cpu`",
         )
 
     # Load model:
-    debug("Loading model... ")
+    logger.info("Loading model... ")
     try:
         model, _ = load_deployed_model(args.model, device=device)
-        debug("loaded deployed model.")
+        logger.info("loaded deployed model.")
     except ValueError:  # its not a deployed model
         model = torch.load(args.model, map_location=device)
         model = model.to(device)
-        debug("loaded pickled Python model.")
+        logger.info("loaded pickled Python model.")
 
     # Load a config file
-    debug(
+    logger.info(
         f"Loading {'original training ' if dataset_is_from_training else ''}dataset...",
     )
     config = Config.from_file(str(args.dataset_config))
@@ -185,11 +192,11 @@ def main(args=None):
         test_idcs = list(all_idcs - train_idcs - val_idcs)
         assert set(test_idcs).isdisjoint(train_idcs)
         assert set(test_idcs).isdisjoint(val_idcs)
-        debug(
+        logger.info(
             f"Using training dataset minus training and validation frames, yielding a test set size of {len(test_idcs)} frames.",
         )
         if not do_metrics:
-            debug(
+            logger.info(
                 "WARNING: using the automatic test set ^^^ but not computing metrics, is this really what you wanted to do?",
             )
     else:
@@ -200,7 +207,7 @@ def main(args=None):
             ),
             filename=str(args.test_indexes),
         )
-        debug(
+        logger.info(
             f"Using provided test set indexes, yielding a test set size of {len(test_idcs)} frames.",
         )
 
@@ -236,7 +243,7 @@ def main(args=None):
     batch_i: int = 0
     batch_size: int = args.batch_size
 
-    debug("Starting...")
+    logger.info("Starting...")
     context_stack = contextlib.ExitStack()
     with contextlib.ExitStack() as context_stack:
         # "None" checks if in a TTY and disables if not
@@ -296,8 +303,8 @@ def main(args=None):
             display_bar.close()
 
     if do_metrics:
-        debug("\n--- Final result: ---")
-        info(
+        logger.info("\n--- Final result: ---")
+        logger.critical(
             "\n".join(
                 f"{k:>20s} = {v:< 20f}"
                 for k, v in metrics.flatten_metrics(metrics.current_result())[0].items()
@@ -306,4 +313,4 @@ def main(args=None):
 
 
 if __name__ == "__main__":
-    main()
+    main(running_as_script=True)
