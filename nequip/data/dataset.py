@@ -149,7 +149,7 @@ class AtomicInMemoryDataset(AtomicDataset):
         return params
 
     @property
-    def processed_file_names(self):
+    def processed_dir(self) -> str:
         # We want the file name to change when the parameters change
         # So, first we get all parameters:
         params = self._get_parameters()
@@ -160,7 +160,11 @@ class AtomicInMemoryDataset(AtomicDataset):
         buffer = yaml.dump(params).encode("ascii")
         # And hash it:
         param_hash = hashlib.sha1(buffer).hexdigest()
-        return [f"dataset_{param_hash}.pth"]
+        return f"{self.root}/processed_dataset_{param_hash}"
+
+    @property
+    def processed_file_names(self) -> List[str]:
+        return ["data.pth"]
 
     def get_data(
         self,
