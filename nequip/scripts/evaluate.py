@@ -1,6 +1,14 @@
 import sys
 import argparse
-from logging import getLogger, CRITICAL, INFO, critical, info, StreamHandler, FileHandler
+from logging import (
+    getLogger,
+    CRITICAL,
+    INFO,
+    critical,
+    info,
+    StreamHandler,
+    FileHandler,
+)
 import textwrap
 from pathlib import Path
 import contextlib
@@ -10,7 +18,7 @@ import ase.io
 
 import torch
 
-from nequip.utils import Config, dataset_from_config, Output
+from nequip.utils import Config, dataset_from_config
 from nequip.data import AtomicData, Collater
 from nequip.scripts.deploy import load_deployed_model
 from nequip.utils import load_file, instantiate
