@@ -138,16 +138,20 @@ class TestStatistics:
 
 class TestReload:
     @pytest.mark.parametrize("change_rmax", [0, 1])
-    def test_reload(self, npz_dataset, npz_data, change_rmax):
+    @pytest.mark.parametrize("give_url", [True, False])
+    def test_reload(self, npz_dataset, npz_data, change_rmax, give_url):
         r_max = npz_dataset.extra_fixed_fields["r_max"] + change_rmax
         a = NpzDataset(
             file_name=npz_data,
             root=npz_dataset.root,
             extra_fixed_fields={"r_max": r_max},
+            **({"url": "example.com/data.dat"} if give_url else {})
         )
         print(a.processed_file_names[0])
         print(npz_dataset.processed_file_names[0])
-        assert (a.processed_dir == npz_dataset.processed_dir) == (change_rmax == 0)
+        assert (a.processed_dir == npz_dataset.processed_dir) == (
+            change_rmax == 0 and not give_url
+        )
 
 
 class TestFromConfig:
