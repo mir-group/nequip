@@ -89,7 +89,7 @@ def main(args=None):
     # Something has to be provided
     # See https://stackoverflow.com/questions/22368458/how-to-make-argparse-logging.debug-usage-when-no-option-is-given-to-the-code
     if len(sys.argv) == 1:
-        parser.logging.debug_help()
+        parser.print_help()
         parser.exit()
     # Parse the args
     args = parser.parse_args(args=args)
