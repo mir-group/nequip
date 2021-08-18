@@ -164,7 +164,7 @@ class AtomicInMemoryDataset(AtomicDataset):
 
     @property
     def processed_file_names(self) -> List[str]:
-        return ["data.pth", "params.pth"]
+        return ["data.pth", "params.yaml"]
 
     def get_data(
         self,
@@ -288,7 +288,8 @@ class AtomicInMemoryDataset(AtomicDataset):
         logging.info(f"Loaded data: {data}")
 
         torch.save((data, fixed_fields, self.include_frames), self.processed_paths[0])
-        torch.save(self._get_parameters(), self.processed_paths[1])
+        with open(self.processed_paths[1], "w") as f:
+            yaml.dump(self._get_parameters(), f)
 
         self.data = data
         self.fixed_fields = fixed_fields
