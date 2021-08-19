@@ -15,6 +15,7 @@ Most recent change on the bottom.
 
 ### Changed
 - Name processed datasets based on a hash of their parameters to ensure only valid cached data is used
+- Do not use TensorFloat32 by default on Ampere GPUs until we understand it better
 
 ## [0.3.3] - 2021-08-11
 ### Added
