@@ -7,7 +7,6 @@ from torch_scatter import scatter
 from e3nn.o3 import Linear
 
 from nequip.data import AtomicDataDict
-from nequip.utils.batch_ops import bincount
 from ._graph_mixin import GraphModuleMixin
 
 
