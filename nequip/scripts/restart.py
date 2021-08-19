@@ -80,10 +80,19 @@ def restart(file_name, config, mode="update"):
 
     config.update(trainer.output.updated_dict())
 
-    dataset = dataset_from_config(config)
-    logging.info(f"Successfully reload the data set of type {dataset}...")
+    # = Load the dataset =
+    dataset = dataset_from_config(config, prefix="dataset")
+    logging.info(f"Successfully re-loaded the data set of type {dataset}...")
+    try:
+        validation_dataset = dataset_from_config(config, prefix="validation_dataset")
+        logging.info(
+            f"Successfully re-loaded the validation data set of type {validation_dataset}..."
+        )
+    except KeyError:
+        # It couldn't be found
+        validation_dataset = None
+    trainer.set_dataset(dataset, validation_dataset)
 
-    trainer.set_dataset(dataset)
     trainer.train()
 
     return

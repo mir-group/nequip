@@ -7,6 +7,9 @@ This module requre the torch_geometric to catch up with the github main branch f
 import numpy as np
 import logging
 import tempfile
+import inspect
+import yaml
+import hashlib
 from os.path import dirname, basename, abspath
 from typing import Tuple, Dict, Any, List, Callable, Union, Optional, Sequence
 
@@ -15,6 +18,7 @@ import ase
 import torch
 from torch_geometric.data import Batch, Dataset, download_url, extract_zip
 
+import nequip
 from nequip.data import AtomicData, AtomicDataDict
 from ._util import _TORCH_INTEGER_DTYPES
 
@@ -85,7 +89,7 @@ class AtomicInMemoryDataset(AtomicDataset):
         extra_fixed_fields: Dict[str, Any] = {},
         include_frames: Optional[List[int]] = None,
     ):
-        # TO DO, this may be symplified
+        # TO DO, this may be simplified
         # See if a subclass defines some inputs
         self.file_name = (
             getattr(type(self), "FILE_NAME", None) if file_name is None else file_name
@@ -135,14 +139,32 @@ class AtomicInMemoryDataset(AtomicDataset):
     def raw_file_names(self):
         raise NotImplementedError()
 
+    def _get_parameters(self) -> Dict[str, Any]:
+        """Get a dict of the parameters used to build this dataset."""
+        pnames = list(inspect.signature(self.__init__).parameters)
+        params = {k: getattr(self, k) for k in pnames if hasattr(self, k)}
+        # Add other relevant metadata:
+        params["dtype"] = str(torch.get_default_dtype())
+        params["nequip_version"] = nequip.__version__
+        return params
+
     @property
-    def processed_file_names(self):
-        # TO DO, can be updated to hash all simple terms in extra_fixed_fields
-        r_max = self.extra_fixed_fields["r_max"]
-        dtype = str(torch.get_default_dtype())
-        if dtype.startswith("torch."):
-            dtype = dtype[len("torch.") :]
-        return [f"{r_max}_{dtype}_data.pt"]
+    def processed_dir(self) -> str:
+        # We want the file name to change when the parameters change
+        # So, first we get all parameters:
+        params = self._get_parameters()
+        # Make some kind of string of them:
+        # we don't care about this possibly changing between python versions,
+        # since a change in python version almost certainly means a change in
+        # versions of other things too, and is a good reason to recompute
+        buffer = yaml.dump(params).encode("ascii")
+        # And hash it:
+        param_hash = hashlib.sha1(buffer).hexdigest()
+        return f"{self.root}/processed_dataset_{param_hash}"
+
+    @property
+    def processed_file_names(self) -> List[str]:
+        return ["data.pth", "params.yaml"]
 
     def get_data(
         self,
@@ -266,6 +288,8 @@ class AtomicInMemoryDataset(AtomicDataset):
         logging.info(f"Loaded data: {data}")
 
         torch.save((data, fixed_fields, self.include_frames), self.processed_paths[0])
+        with open(self.processed_paths[1], "w") as f:
+            yaml.dump(self._get_parameters(), f)
 
         self.data = data
         self.fixed_fields = fixed_fields
