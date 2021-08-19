@@ -11,6 +11,7 @@ import argparse
 import torch
 
 from nequip.utils import Config, dataset_from_config, Output, load_file
+from nequip.scripts.train import _set_global_options
 
 
 def main(args=None):
@@ -55,9 +56,8 @@ def restart(file_name, config, mode="update"):
 
     config = Config(dictionary, exclude_keys=["state_dict", "progress"])
 
-    torch.set_default_dtype(
-        {"float32": torch.float32, "float64": torch.float64}[config.default_dtype]
-    )
+    # dtype, etc.
+    _set_global_options(config)
 
     if config.wandb:
         from nequip.train.trainer_wandb import TrainerWandB

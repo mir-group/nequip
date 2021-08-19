@@ -78,8 +78,8 @@ def _load_callable(obj: Union[str, Callable]) -> Callable:
     return obj
 
 
-def fresh_start(config):
-    # = Set global state =
+def _set_global_options(config):
+    """Configure global options of libraries like `torch` and `e3nn` based on `config`."""
     # Set TF32 support
     # See https://pytorch.org/docs/stable/notes/cuda.html#tensorfloat-32-tf32-on-ampere-devices
     if torch.cuda.is_available():
@@ -98,6 +98,9 @@ def fresh_start(config):
 
     e3nn.set_optimization_defaults(**config.get("e3nn_optimization_defaults", {}))
 
+
+def fresh_start(config):
+    _set_global_options(config)
     # = Make the trainer =
     if config.wandb:
         import wandb  # noqa: F401
