@@ -777,7 +777,7 @@ class Trainer:
             if debug_args is not None:
                 self.logger.debug(debug_args)
             if early_stop:
-                self.stop_args = early_stop_args
+                self.stop_arg = early_stop_args
                 return True
 
         if self.iepoch >= self.max_epochs:
