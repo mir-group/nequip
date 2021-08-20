@@ -6,10 +6,11 @@ from typing import Optional, Union, List
 
 from nequip import data, datasets
 from nequip.data.transforms import TypeMapper
+from nequip.data import AtomicDataset
 from .config import Config
 
 
-def dataset_from_config(config, prefix: str = "dataset"):
+def dataset_from_config(config, prefix: str = "dataset") -> AtomicDataset:
     """initialize database based on a config instance
 
     It needs dataset type name (case insensitive),

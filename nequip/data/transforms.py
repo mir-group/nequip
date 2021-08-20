@@ -1,4 +1,4 @@
-from typing import Dict, Optional, Union
+from typing import Dict, Optional, Union, List
 import warnings
 
 import torch
@@ -11,20 +11,34 @@ from nequip.data import AtomicData, AtomicDataDict
 class TypeMapper:
     """Based on a configuration, map atomic numbers to types."""
 
+    num_species: int
     chemical_symbol_to_type: Optional[Dict[str, int]]
+    species_names: List[str]
     _min_Z: int
 
     def __init__(
         self,
-        num_species: int,
+        species_names: Optional[Union[Dict[int, str], List[str]]] = None,
         chemical_symbol_to_type: Optional[Dict[str, int]] = None,
     ):
+        # Build from chem->type mapping, if provided
         self.chemical_symbol_to_type = chemical_symbol_to_type
         if self.chemical_symbol_to_type is not None:
+            if species_names is not None:
+                raise ValueError(
+                    "chemical_symbol_to_type and species_names cannot both be provided!"
+                )
             # Validate
             for sym, type in self.chemical_symbol_to_type.items():
                 assert sym in ase.data.atomic_numbers, f"Invalid chemical symbol {sym}"
-                assert 0 <= type < num_species, f"Invalid type number {type}"
+                assert 0 <= type, f"Invalid type number {type}"
+            assert set(self.chemical_symbol_to_type.values()) == set(
+                range(len(self.chemical_symbol_to_type))
+            )
+            # Make species_names
+            species_names = [None] * len(self.chemical_symbol_to_type)
+            for sym, type in self.chemical_symbol_to_type.items():
+                species_names[type] = sym
             # Make mapper array
             valid_atomic_numbers = [
                 ase.data.atomic_numbers[sym] for sym in self.chemical_symbol_to_type
@@ -38,6 +52,17 @@ class TypeMapper:
                 Z_to_index[ase.data.atomic_numbers[sym] - self._min_Z] = type
             self._Z_to_index = Z_to_index
             self._valid_set = set(valid_atomic_numbers)
+        # check
+        if species_names is None:
+            raise ValueError(
+                "Neither chemical_symbol_to_type nor species_names was provided; one or the other is required"
+            )
+        # Set to however many maps specified -- we already checked contiguous
+        self.num_species = len(species_names)
+        # Check species_names
+        if isinstance(species_names, dict):
+            species_names = [species_names[type] for type in range(self.num_species)]
+        self.species_names = species_names
 
     def __call__(
         self, data: Union[AtomicDataDict.Type, AtomicData]

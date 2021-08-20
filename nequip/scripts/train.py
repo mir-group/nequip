@@ -101,26 +101,6 @@ def _set_global_options(config):
 
 def fresh_start(config):
     _set_global_options(config)
-    # = Preprocess config =
-    # Make some things easier for people who run nequip-train
-    if "chemical_symbol_to_type" in config and "species_names" in config:
-        raise ValueError(
-            "chemical_symbol_to_type and species_names cannot both be provided"
-        )
-    if "chemical_symbol_to_type" in config:
-        config["species_names"] = {
-            type: sym for sym, type in config["chemical_symbol_to_type"].items()
-        }
-        if len(config["chemical_symbol_to_type"]) != len(config["species_names"]):
-            raise ValueError(
-                "chemical_symbol_to_type mapped two symbols to the same type index"
-            )
-
-    if "species_names" not in config:
-        raise KeyError(
-            "Either num_species or chemical_symbol_to_type must be provided in the configuration file to set the number of species for the model."
-        )
-    config["num_species"] = max(config["species_names"].keys()) + 1
 
     # = Make the trainer =
     if config.wandb:
@@ -152,6 +132,9 @@ def fresh_start(config):
     except KeyError:
         # It couldn't be found
         validation_dataset = None
+
+    # For the model building:
+    config["num_species"] = dataset.type_mapper.num_species
 
     # = Train/test split =
     trainer.set_dataset(dataset, validation_dataset)
