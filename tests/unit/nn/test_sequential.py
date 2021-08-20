@@ -14,7 +14,7 @@ def test_basic():
         {
             AtomicDataDict.POSITIONS_KEY: torch.randn(5, 3),
             AtomicDataDict.EDGE_INDEX_KEY: torch.LongTensor([[0, 1], [1, 0]]),
-            AtomicDataDict.SPECIES_INDEX_KEY: torch.LongTensor([0, 0, 1, 2, 0]),
+            AtomicDataDict.ATOM_TYPE_KEY: torch.LongTensor([0, 0, 1, 2, 0]),
         }
     )
 
@@ -34,7 +34,7 @@ def test_append():
         {
             AtomicDataDict.POSITIONS_KEY: torch.randn(5, 3),
             AtomicDataDict.EDGE_INDEX_KEY: torch.LongTensor([[0, 1], [1, 0]]),
-            AtomicDataDict.SPECIES_INDEX_KEY: torch.LongTensor([0, 0, 1, 2, 0]),
+            AtomicDataDict.ATOM_TYPE_KEY: torch.LongTensor([0, 0, 1, 2, 0]),
         }
     )
     assert out["thing"].shape == out[AtomicDataDict.NODE_FEATURES_KEY].shape
@@ -61,7 +61,7 @@ def test_insert():
         {
             AtomicDataDict.POSITIONS_KEY: torch.randn(5, 3),
             AtomicDataDict.EDGE_INDEX_KEY: torch.LongTensor([[0, 1], [1, 0]]),
-            AtomicDataDict.SPECIES_INDEX_KEY: torch.LongTensor([0, 0, 1, 2, 0]),
+            AtomicDataDict.ATOM_TYPE_KEY: torch.LongTensor([0, 0, 1, 2, 0]),
         }
     )
     assert AtomicDataDict.NODE_FEATURES_KEY in out

@@ -438,6 +438,7 @@ class NpzDataset(AtomicInMemoryDataset):
         force_fixed_keys: List[str] = [],
         extra_fixed_fields: Dict[str, Any] = {},
         include_frames: Optional[List[int]] = None,
+        type_mapper: TypeMapper = None,
     ):
         self.key_mapping = key_mapping
         self.npz_fixed_field_keys = npz_fixed_field_keys
@@ -450,6 +451,7 @@ class NpzDataset(AtomicInMemoryDataset):
             force_fixed_keys=force_fixed_keys,
             extra_fixed_fields=extra_fixed_fields,
             include_frames=include_frames,
+            type_mapper=type_mapper,
         )
 
     @property
@@ -472,7 +474,7 @@ class NpzDataset(AtomicInMemoryDataset):
         # TODO: generalize this?
         for intkey in (
             AtomicDataDict.ATOMIC_NUMBERS_KEY,
-            AtomicDataDict.SPECIES_INDEX_KEY,
+            AtomicDataDict.ATOM_TYPE_KEY,
             AtomicDataDict.EDGE_INDEX_KEY,
         ):
             if intkey in mapped:
@@ -500,6 +502,7 @@ class ASEDataset(AtomicInMemoryDataset):
         force_fixed_keys: List[str] = [],
         extra_fixed_fields: Dict[str, Any] = {},
         include_frames: Optional[List[int]] = None,
+        type_mapper: TypeMapper = None,
     ):
 
         self.ase_args = dict(index=":")
@@ -513,6 +516,7 @@ class ASEDataset(AtomicInMemoryDataset):
             force_fixed_keys=force_fixed_keys,
             extra_fixed_fields=extra_fixed_fields,
             include_frames=include_frames,
+            type_mapper=type_mapper,
         )
 
     @classmethod

@@ -90,17 +90,17 @@ class PerSpeciesLoss(SimpleLoss):
         else:
             atomic_weight_on = False
 
-        species_index = pred[AtomicDataDict.SPECIES_INDEX_KEY]
-        _, inverse_species_index = torch.unique(species_index, return_inverse=True)
+        atom_type = pred[AtomicDataDict.ATOM_TYPE_KEY]
+        _, inverse_atom_type = torch.unique(atom_type, return_inverse=True)
 
         if atomic_weight_on:
             # TO DO
-            per_species_weight = scatter(weights, inverse_species_index, dim=0)
-            per_species_loss = scatter(per_atom_loss, inverse_species_index, dim=0)
+            per_species_weight = scatter(weights, inverse_atom_type, dim=0)
+            per_species_loss = scatter(per_atom_loss, inverse_atom_type, dim=0)
             return (per_species_loss / per_species_weight).mean()
         else:
             return scatter(
-                per_atom_loss, inverse_species_index, reduce="mean", dim=0
+                per_atom_loss, inverse_atom_type, reduce="mean", dim=0
             ).mean()
 
 

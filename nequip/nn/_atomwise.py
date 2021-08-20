@@ -125,7 +125,7 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
             self.register_buffer("scales", scales)
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
-        species_idx = data[AtomicDataDict.SPECIES_INDEX_KEY]
+        species_idx = data[AtomicDataDict.ATOM_TYPE_KEY]
         in_field = data[self.field]
         assert len(in_field) == len(
             species_idx

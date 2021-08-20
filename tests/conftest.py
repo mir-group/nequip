@@ -14,6 +14,7 @@ from torch_geometric.data import Batch
 
 from nequip.utils.test import set_irreps_debug
 from nequip.data import AtomicData, ASEDataset
+from nequip.data.transforms import TypeMapper
 
 # For good practice, we *should* do this:
 # See https://docs.pytest.org/en/stable/fixture.html#using-fixtures-from-other-projects
@@ -87,6 +88,7 @@ def nequip_dataset(molecules, temp_data, float_tolerance):
             root=temp_data,
             extra_fixed_fields={"r_max": 3.0},
             ase_args=dict(format="extxyz"),
+            type_mapper=TypeMapper(chemical_symbol_to_type={"H": 0, "C": 1, "O": 2}),
         )
         yield a
 

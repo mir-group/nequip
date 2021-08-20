@@ -21,7 +21,7 @@ def test_basic():
         {
             AtomicDataDict.POSITIONS_KEY: torch.randn(5, 3),
             AtomicDataDict.EDGE_INDEX_KEY: torch.LongTensor([[0, 1], [1, 0]]),
-            AtomicDataDict.SPECIES_INDEX_KEY: torch.LongTensor([0, 0, 1, 2, 0]),
+            AtomicDataDict.ATOM_TYPE_KEY: torch.LongTensor([0, 0, 1, 2, 0]),
         }
     )
     saved = out["saved"]

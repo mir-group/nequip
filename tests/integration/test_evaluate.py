@@ -125,7 +125,7 @@ def test_metrics(training_session, do_test_idcs, do_metrics):
         metrics_yaml = tmpdir + "/my-metrics.yaml"
         with open(metrics_yaml, "w") as f:
             # Write out a fancier metrics file
-            # We don't use PerSpecies here since the simple models don't fill SPECIES_INDEX right now
+            # We don't use PerSpecies here since the simple models don't fill ATOM_TYPE_KEY right now
             # ^ TODO!
             f.write(
                 textwrap.dedent(

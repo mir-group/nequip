@@ -1,8 +1,3 @@
-import numpy as np
-
-from ase import units
-from ase.io import read
-
 from nequip.data import ASEDataset, AtomicDataDict
 
 

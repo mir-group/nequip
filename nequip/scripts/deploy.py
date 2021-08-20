@@ -28,14 +28,14 @@ CONFIG_KEY: Final[str] = "config"
 NEQUIP_VERSION_KEY: Final[str] = "nequip_version"
 R_MAX_KEY: Final[str] = "r_max"
 N_SPECIES_KEY: Final[str] = "n_species"
-SPECIES_NAMES_KEY: Final[str] = "species_names"
+TYPE_NAMES_KEY: Final[str] = "type_names"
 
 _ALL_METADATA_KEYS = [
     CONFIG_KEY,
     NEQUIP_VERSION_KEY,
     R_MAX_KEY,
     N_SPECIES_KEY,
-    SPECIES_NAMES_KEY,
+    TYPE_NAMES_KEY,
 ]
 
 
@@ -163,16 +163,16 @@ def main(args=None):
         if "allowed_species" in config:
             # This is from before the atomic number updates
             n_species = len(config["allowed_species"])
-            species_names = {
+            type_names = {
                 type: ase.data.chemical_symbols[atomic_num]
                 for type, atomic_num in enumerate(config["allowed_species"])
             }
         else:
             # The new atomic number setup
             n_species = str(config["num_species"])
-            species_names = config["species_names"]
+            type_names = config["type_names"]
         metadata[N_SPECIES_KEY] = str(n_species)
-        metadata[SPECIES_NAMES_KEY] = " ".join(species_names)
+        metadata[TYPE_NAMES_KEY] = " ".join(type_names)
 
         metadata[CONFIG_KEY] = config_str
         metadata = {k: v.encode("ascii") for k, v in metadata.items()}

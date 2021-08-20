@@ -13,12 +13,12 @@ class TypeMapper:
 
     num_species: int
     chemical_symbol_to_type: Optional[Dict[str, int]]
-    species_names: List[str]
+    type_names: List[str]
     _min_Z: int
 
     def __init__(
         self,
-        species_names: Optional[List[str]] = None,
+        type_names: Optional[List[str]] = None,
         chemical_symbol_to_type: Optional[Dict[str, int]] = None,
     ):
         # Build from chem->type mapping, if provided
@@ -31,16 +31,16 @@ class TypeMapper:
             assert set(self.chemical_symbol_to_type.values()) == set(
                 range(len(self.chemical_symbol_to_type))
             )
-            if species_names is None:
-                # Make species_names
-                species_names = [None] * len(self.chemical_symbol_to_type)
+            if type_names is None:
+                # Make type_names
+                type_names = [None] * len(self.chemical_symbol_to_type)
                 for sym, type in self.chemical_symbol_to_type.items():
-                    species_names[type] = sym
+                    type_names[type] = sym
             else:
                 # Make sure they agree on types
                 # We already checked that chem->type is contiguous,
-                # so enough to check length since species_names is a list
-                assert len(species_names) == len(self.chemical_symbol_to_type)
+                # so enough to check length since type_names is a list
+                assert len(type_names) == len(self.chemical_symbol_to_type)
             # Make mapper array
             valid_atomic_numbers = [
                 ase.data.atomic_numbers[sym] for sym in self.chemical_symbol_to_type
@@ -55,22 +55,22 @@ class TypeMapper:
             self._Z_to_index = Z_to_index
             self._valid_set = set(valid_atomic_numbers)
         # check
-        if species_names is None:
+        if type_names is None:
             raise ValueError(
-                "Neither chemical_symbol_to_type nor species_names was provided; one or the other is required"
+                "Neither chemical_symbol_to_type nor type_names was provided; one or the other is required"
             )
         # Set to however many maps specified -- we already checked contiguous
-        self.num_species = len(species_names)
-        # Check species_names
-        self.species_names = species_names
+        self.num_species = len(type_names)
+        # Check type_names
+        self.type_names = type_names
 
     def __call__(
         self, data: Union[AtomicDataDict.Type, AtomicData]
     ) -> Union[AtomicDataDict.Type, AtomicData]:
-        if AtomicDataDict.SPECIES_INDEX_KEY in data:
+        if AtomicDataDict.ATOM_TYPE_KEY in data:
             if AtomicDataDict.ATOMIC_NUMBERS_KEY in data:
                 warnings.warn(
-                    "Data contained both SPECIES_INDEX_KEY and ATOMIC_NUMBERS_KEY; ignoring ATOMIC_NUMBERS_KEY"
+                    "Data contained both ATOM_TYPE_KEY and ATOMIC_NUMBERS_KEY; ignoring ATOMIC_NUMBERS_KEY"
                 )
         elif AtomicDataDict.ATOMIC_NUMBERS_KEY in data:
             assert (
@@ -86,10 +86,10 @@ class TypeMapper:
                 raise ValueError(
                     f"Data included atomic numbers {bad_set} that are not part of the atomic number -> type mapping!"
                 )
-            data[AtomicDataDict.SPECIES_INDEX_KEY] = self._Z_to_index[
+            data[AtomicDataDict.ATOM_TYPE_KEY] = self._Z_to_index[
                 atomic_numbers - self._min_Z
             ]
-            if data[AtomicDataDict.SPECIES_INDEX_KEY].min() < 0:
+            if data[AtomicDataDict.ATOM_TYPE_KEY].min() < 0:
                 bad_set = (
                     set(torch.unique(atomic_numbers).cpu().tolist()) - self._valid_set
                 )
@@ -98,6 +98,6 @@ class TypeMapper:
                 )
         else:
             raise KeyError(
-                "Data doesn't contain any atom type information (SPECIES_INDEX_KEY or ATOMIC_NUMBERS_KEY)"
+                "Data doesn't contain any atom type information (ATOM_TYPE_KEY or ATOMIC_NUMBERS_KEY)"
             )
         return data
