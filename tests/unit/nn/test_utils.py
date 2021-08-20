@@ -7,7 +7,7 @@ from nequip.nn import SequentialGraphNetwork, SaveForOutput, AtomwiseLinear
 
 def test_basic():
     sgn = SequentialGraphNetwork.from_parameters(
-        shared_params={"num_species": 4},
+        shared_params={"num_types": 4},
         layers={
             "one_hot": OneHotAtomEncoding,
             "save": (

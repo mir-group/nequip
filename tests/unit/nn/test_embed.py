@@ -16,7 +16,7 @@ from nequip.nn.embedding import (
 def test_onehot(CH3CHO):
     _, data = CH3CHO
     oh = OneHotAtomEncoding(
-        num_species=3,
+        num_types=3,
         irreps_in=data.irreps,
     )
     assert_auto_jitable(oh)

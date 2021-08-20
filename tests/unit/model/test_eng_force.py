@@ -21,10 +21,12 @@ from nequip.utils.test import assert_AtomicData_equivariant
 
 logging.basicConfig(level=logging.DEBUG)
 
-chemmap = {"H": 0, "C": 1, "O": 2}
+COMMON_CONFIG = {
+    "num_types": 3,
+    "types_names": ["H", "C", "O"],
+}
 r_max = 3
 minimal_config1 = dict(
-    chemical_symbol_to_type=chemmap,
     irreps_edge_sh="0e + 1o",
     r_max=4,
     feature_irreps_hidden="4x0e + 4x1o",
@@ -33,17 +35,17 @@ minimal_config1 = dict(
     num_basis=8,
     PolynomialCutoff_p=6,
     nonlinearity_type="norm",
+    **COMMON_CONFIG
 )
 minimal_config2 = dict(
-    chemical_symbol_to_type=chemmap,
     irreps_edge_sh="0e + 1o",
     r_max=4,
     chemical_embedding_irreps_out="8x0e + 8x0o + 8x1e + 8x1o",
     irreps_mid_output_block="2x0e",
     feature_irreps_hidden="4x0e + 4x1o",
+    **COMMON_CONFIG
 )
 minimal_config3 = dict(
-    chemical_symbol_to_type=chemmap,
     irreps_edge_sh="0e + 1o",
     r_max=4,
     feature_irreps_hidden="4x0e + 4x1o",
@@ -52,9 +54,9 @@ minimal_config3 = dict(
     num_basis=8,
     PolynomialCutoff_p=6,
     nonlinearity_type="gate",
+    **COMMON_CONFIG
 )
 minimal_config4 = dict(
-    chemical_symbol_to_type=chemmap,
     irreps_edge_sh="0e + 1o + 2e",
     r_max=4,
     feature_irreps_hidden="2x0e + 2x1o + 2x2e",
@@ -66,6 +68,7 @@ minimal_config4 = dict(
     # test custom nonlinearities
     nonlinearity_scalars={"e": "silu", "o": "tanh"},
     nonlinearity_gates={"e": "silu", "o": "abs"},
+    **COMMON_CONFIG
 )
 
 
@@ -305,9 +308,7 @@ class TestCutoff:
 
         # make a synthetic three atom example
         data = AtomicData(
-            atomic_numbers=np.random.choice(
-                [ase.data.atomic_numbers[sym] for sym in chemmap], size=3
-            ),
+            atomic_numbers=np.random.choice([1, 6, 8], size=3),
             pos=np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]),
             edge_index=np.array([[0, 1, 0, 2], [1, 0, 2, 0]]),
         )

@@ -7,7 +7,7 @@ from nequip.nn import SequentialGraphNetwork, AtomwiseLinear
 
 def test_basic():
     sgn = SequentialGraphNetwork.from_parameters(
-        shared_params={"num_species": 3},
+        shared_params={"num_types": 3},
         layers={"one_hot": OneHotAtomEncoding, "linear": AtomwiseLinear},
     )
     sgn(
@@ -21,7 +21,7 @@ def test_basic():
 
 def test_append():
     sgn = SequentialGraphNetwork.from_parameters(
-        shared_params={"num_species": 3}, layers={"one_hot": OneHotAtomEncoding}
+        shared_params={"num_types": 3}, layers={"one_hot": OneHotAtomEncoding}
     )
     sgn.append_from_parameters(
         shared_params={"out_field": AtomicDataDict.NODE_FEATURES_KEY},
@@ -42,7 +42,7 @@ def test_append():
 
 def test_insert():
     sgn = SequentialGraphNetwork.from_parameters(
-        shared_params={"num_species": 3},
+        shared_params={"num_types": 3},
         layers={"one_hot": OneHotAtomEncoding, "lin2": AtomwiseLinear},
     )
     sgn.insert_from_parameters(

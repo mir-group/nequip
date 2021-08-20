@@ -25,7 +25,7 @@ def test_rescale(
 ):
     _, data = CH3CHO
     oh = OneHotAtomEncoding(
-        num_species=3,
+        num_types=3,
         irreps_in=data.irreps,
     )
 

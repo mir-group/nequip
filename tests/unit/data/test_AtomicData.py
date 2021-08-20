@@ -21,8 +21,8 @@ def test_from_ase(CuFcc):
         assert data[key].shape == (len(atoms), 3)  # 4 species in this atoms
 
 
-def test_to_ase(CH3CHO):
-    atoms, data = CH3CHO
+def test_to_ase(CH3CHO_no_typemap):
+    atoms, data = CH3CHO_no_typemap
     to_ase_atoms = data.to_ase()
     assert np.allclose(atoms.get_positions(), to_ase_atoms.get_positions())
     assert np.array_equal(atoms.get_atomic_numbers(), to_ase_atoms.get_atomic_numbers())
@@ -39,7 +39,7 @@ def test_to_ase_batches(atomic_batch):
         assert np.allclose(atoms.get_positions(), atomic_data.pos[mask])
         assert atoms.get_atomic_numbers().shape == (len(atoms),)
         assert np.array_equal(
-            atoms.get_atomic_numbers(), atomic_data.atomic_numbers[mask]
+            atoms.get_atomic_numbers(), atomic_data[AtomicDataDict.ATOM_TYPE_KEY][mask]
         )
         assert np.array_equal(atoms.get_cell(), atomic_data.cell[batch_idx])
         assert np.array_equal(atoms.get_pbc(), atomic_data.pbc[batch_idx])

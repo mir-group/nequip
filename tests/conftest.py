@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Tuple
 import numpy as np
 import pathlib
 import pytest
@@ -55,11 +55,17 @@ def temp_data(float_tolerance):
 
 
 @pytest.fixture(scope="session")
-def CH3CHO(float_tolerance) -> AtomicData:
-    atoms = molecule("CH3CHO")
-    data = AtomicData.from_ase(atoms, r_max=2.0)
+def CH3CHO(CH3CHO_no_typemap) -> Tuple[Atoms, AtomicData]:
+    atoms, data = CH3CHO_no_typemap
     tm = TypeMapper(chemical_symbol_to_type={"C": 0, "O": 1, "H": 2})
     data = tm(data)
+    return atoms, data
+
+
+@pytest.fixture(scope="session")
+def CH3CHO_no_typemap(float_tolerance) -> Tuple[Atoms, AtomicData]:
+    atoms = molecule("CH3CHO")
+    data = AtomicData.from_ase(atoms, r_max=2.0)
     return atoms, data
 
 

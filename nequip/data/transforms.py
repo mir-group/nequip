@@ -11,7 +11,7 @@ from nequip.data import AtomicData, AtomicDataDict
 class TypeMapper:
     """Based on a configuration, map atomic numbers to types."""
 
-    num_species: int
+    num_types: int
     chemical_symbol_to_type: Optional[Dict[str, int]]
     type_names: List[str]
     _min_Z: int
@@ -60,7 +60,7 @@ class TypeMapper:
                 "Neither chemical_symbol_to_type nor type_names was provided; one or the other is required"
             )
         # Set to however many maps specified -- we already checked contiguous
-        self.num_species = len(type_names)
+        self.num_types = len(type_names)
         # Check type_names
         self.type_names = type_names
 

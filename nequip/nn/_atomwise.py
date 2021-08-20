@@ -87,7 +87,7 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
     def __init__(
         self,
         field: str,
-        num_species: int,
+        num_types: int,
         out_field: Optional[str] = None,
         shifts: Optional[list] = None,
         scales: Optional[list] = None,
@@ -104,17 +104,17 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
         )
 
         shifts = (
-            torch.zeros(num_species)
+            torch.zeros(num_types)
             if shifts is None
             else torch.as_tensor(shifts, dtype=torch.get_default_dtype())
         )
-        assert shifts.shape == (num_species,), f"Invalid shape of shifts {shifts}"
+        assert shifts.shape == (num_types,), f"Invalid shape of shifts {shifts}"
         scales = (
-            torch.ones(num_species)
+            torch.ones(num_types)
             if scales is None
             else torch.as_tensor(scales, dtype=torch.get_default_dtype())
         )
-        assert scales.shape == (num_species,), f"Invalid shape of scales {scales}"
+        assert scales.shape == (num_types,), f"Invalid shape of scales {scales}"
 
         self.trainable = trainable
         if trainable:

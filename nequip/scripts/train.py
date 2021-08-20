@@ -134,7 +134,7 @@ def fresh_start(config):
         validation_dataset = None
 
     # For the model building:
-    config["num_species"] = dataset.type_mapper.num_species
+    config["num_types"] = dataset.type_mapper.num_types
     config["type_names"] = dataset.type_mapper.type_names
 
     # = Train/test split =

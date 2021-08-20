@@ -169,7 +169,7 @@ def main(args=None):
             }
         else:
             # The new atomic number setup
-            n_species = str(config["num_species"])
+            n_species = str(config["num_types"])
             type_names = config["type_names"]
         metadata[N_SPECIES_KEY] = str(n_species)
         metadata[TYPE_NAMES_KEY] = " ".join(type_names)
