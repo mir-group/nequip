@@ -149,9 +149,15 @@ class AtomicInMemoryDataset(AtomicDataset):
     def _get_parameters(self) -> Dict[str, Any]:
         """Get a dict of the parameters used to build this dataset."""
         pnames = list(inspect.signature(self.__init__).parameters)
-        # the type mapper is applied after saving, not before, so doesn't matter to cache validity
-        pnames.remove("type_mapper")
-        params = {k: getattr(self, k) for k in pnames if hasattr(self, k)}
+        IGNORE_KEYS = {
+            # the type mapper is applied after saving, not before, so doesn't matter to cache validity
+            "type_mapper"
+        }
+        params = {
+            k: getattr(self, k)
+            for k in pnames
+            if k not in IGNORE_KEYS and hasattr(self, k)
+        }
         # Add other relevant metadata:
         params["dtype"] = str(torch.get_default_dtype())
         params["nequip_version"] = nequip.__version__

@@ -18,16 +18,12 @@ class TypeMapper:
 
     def __init__(
         self,
-        species_names: Optional[Union[Dict[int, str], List[str]]] = None,
+        species_names: Optional[List[str]] = None,
         chemical_symbol_to_type: Optional[Dict[str, int]] = None,
     ):
         # Build from chem->type mapping, if provided
         self.chemical_symbol_to_type = chemical_symbol_to_type
         if self.chemical_symbol_to_type is not None:
-            if species_names is not None:
-                raise ValueError(
-                    "chemical_symbol_to_type and species_names cannot both be provided!"
-                )
             # Validate
             for sym, type in self.chemical_symbol_to_type.items():
                 assert sym in ase.data.atomic_numbers, f"Invalid chemical symbol {sym}"
@@ -35,10 +31,16 @@ class TypeMapper:
             assert set(self.chemical_symbol_to_type.values()) == set(
                 range(len(self.chemical_symbol_to_type))
             )
-            # Make species_names
-            species_names = [None] * len(self.chemical_symbol_to_type)
-            for sym, type in self.chemical_symbol_to_type.items():
-                species_names[type] = sym
+            if species_names is None:
+                # Make species_names
+                species_names = [None] * len(self.chemical_symbol_to_type)
+                for sym, type in self.chemical_symbol_to_type.items():
+                    species_names[type] = sym
+            else:
+                # Make sure they agree on types
+                # We already checked that chem->type is contiguous,
+                # so enough to check length since species_names is a list
+                assert len(species_names) == len(self.chemical_symbol_to_type)
             # Make mapper array
             valid_atomic_numbers = [
                 ase.data.atomic_numbers[sym] for sym in self.chemical_symbol_to_type
@@ -60,8 +62,6 @@ class TypeMapper:
         # Set to however many maps specified -- we already checked contiguous
         self.num_species = len(species_names)
         # Check species_names
-        if isinstance(species_names, dict):
-            species_names = [species_names[type] for type in range(self.num_species)]
         self.species_names = species_names
 
     def __call__(

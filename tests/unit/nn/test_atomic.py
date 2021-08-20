@@ -19,7 +19,9 @@ def model(float_tolerance, request):
     zero_species = request.param
     shifts = [3, 5, 7]
     shifts[zero_species] = 0
-    params = dict(allowed_species=[1, 6, 8], total_shift=1.0, shifts=shifts)
+    params = dict(
+        chemical_symbol_to_type={"H": 0, "C": 1, "O": 2}, total_shift=1.0, shifts=shifts
+    )
     return SequentialGraphNetwork.from_parameters(
         shared_params=params,
         layers={

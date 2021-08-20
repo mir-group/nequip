@@ -863,7 +863,7 @@ class Trainer:
         # append details from metrics
         metrics, skip_keys = self.metrics.flatten_metrics(
             metrics=self.batch_metrics,
-            allowed_species=self.model.config.get("allowed_species", None)
+            species_names=self.model.config.get("species_names")
             if hasattr(self.model, "config")
             else None,
         )
@@ -991,7 +991,7 @@ class Trainer:
 
             met, skip_keys = self.metrics.flatten_metrics(
                 metrics=self.metrics_dict[category],
-                allowed_species=self.model.config.get("allowed_species", None)
+                species_names=self.model.config.get("species_names")
                 if hasattr(self.model, "config")
                 else None,
             )

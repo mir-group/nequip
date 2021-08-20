@@ -7,6 +7,8 @@ from os.path import isfile
 
 import numpy as np
 
+import ase.data
+
 from e3nn import o3
 from e3nn.util.jit import script
 
@@ -19,10 +21,10 @@ from nequip.utils.test import assert_AtomicData_equivariant
 
 logging.basicConfig(level=logging.DEBUG)
 
-ALLOWED_SPECIES = [1, 6, 8]
+chemmap = {"H": 0, "C": 1, "O": 2}
 r_max = 3
 minimal_config1 = dict(
-    allowed_species=ALLOWED_SPECIES,
+    chemical_symbol_to_type=chemmap,
     irreps_edge_sh="0e + 1o",
     r_max=4,
     feature_irreps_hidden="4x0e + 4x1o",
@@ -33,7 +35,7 @@ minimal_config1 = dict(
     nonlinearity_type="norm",
 )
 minimal_config2 = dict(
-    allowed_species=ALLOWED_SPECIES,
+    chemical_symbol_to_type=chemmap,
     irreps_edge_sh="0e + 1o",
     r_max=4,
     chemical_embedding_irreps_out="8x0e + 8x0o + 8x1e + 8x1o",
@@ -41,7 +43,7 @@ minimal_config2 = dict(
     feature_irreps_hidden="4x0e + 4x1o",
 )
 minimal_config3 = dict(
-    allowed_species=ALLOWED_SPECIES,
+    chemical_symbol_to_type=chemmap,
     irreps_edge_sh="0e + 1o",
     r_max=4,
     feature_irreps_hidden="4x0e + 4x1o",
@@ -52,7 +54,7 @@ minimal_config3 = dict(
     nonlinearity_type="gate",
 )
 minimal_config4 = dict(
-    allowed_species=ALLOWED_SPECIES,
+    chemical_symbol_to_type=chemmap,
     irreps_edge_sh="0e + 1o + 2e",
     r_max=4,
     feature_irreps_hidden="2x0e + 2x1o + 2x2e",
@@ -303,7 +305,9 @@ class TestCutoff:
 
         # make a synthetic three atom example
         data = AtomicData(
-            atomic_numbers=np.random.choice(ALLOWED_SPECIES, size=3),
+            atomic_numbers=np.random.choice(
+                [ase.data.atomic_numbers[sym] for sym in chemmap], size=3
+            ),
             pos=np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]),
             edge_index=np.array([[0, 1, 0, 2], [1, 0, 2, 0]]),
         )

@@ -52,7 +52,7 @@ def test_deploy(nequip_dataset, BENCHMARK_ROOT):
         # now test predictions the same
         best_mod = torch.load(f"{tmpdir}/{run_name}/best_model.pth")
         device = next(best_mod.parameters()).device
-        data = AtomicData.to_AtomicDataDict(nequip_dataset[0]).to(device)
+        data = AtomicData.to_AtomicDataDict(nequip_dataset[0].to(device))
         # Needed because of debug mode:
         data[AtomicDataDict.TOTAL_ENERGY_KEY] = data[
             AtomicDataDict.TOTAL_ENERGY_KEY
