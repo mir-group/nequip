@@ -28,7 +28,7 @@ default_config = dict(
     model_initializers=[],
     dataset_statistics_stride=1,
     default_dtype="float32",
-    allow_tf32=False,  # TODO: experiments about this!
+    allow_tf32=False,  # TODO: until we understand equivar issues
     verbose="INFO",
     model_debug_mode=False,
     equivariance_test=False,
@@ -78,8 +78,8 @@ def _load_callable(obj: Union[str, Callable]) -> Callable:
     return obj
 
 
-def fresh_start(config):
-    # = Set global state =
+def _set_global_options(config):
+    """Configure global options of libraries like `torch` and `e3nn` based on `config`."""
     # Set TF32 support
     # See https://pytorch.org/docs/stable/notes/cuda.html#tensorfloat-32-tf32-on-ampere-devices
     if torch.cuda.is_available():
@@ -98,6 +98,9 @@ def fresh_start(config):
 
     e3nn.set_optimization_defaults(**config.get("e3nn_optimization_defaults", {}))
 
+
+def fresh_start(config):
+    _set_global_options(config)
     # = Preprocess config =
     # Make some things easier for people who run nequip-train
     if "chemical_symbol_to_type" in config and "species_names" in config:
@@ -139,11 +142,19 @@ def fresh_start(config):
     config.update(output.updated_dict())
 
     # = Load the dataset =
-    dataset = dataset_from_config(config)
+    dataset = dataset_from_config(config, prefix="dataset")
     logging.info(f"Successfully loaded the data set of type {dataset}...")
+    try:
+        validation_dataset = dataset_from_config(config, prefix="validation_dataset")
+        logging.info(
+            f"Successfully loaded the validation data set of type {validation_dataset}..."
+        )
+    except KeyError:
+        # It couldn't be found
+        validation_dataset = None
 
     # = Train/test split =
-    trainer.set_dataset(dataset)
+    trainer.set_dataset(dataset, validation_dataset)
 
     # = Determine training type =
     train_on = config.loss_coeffs

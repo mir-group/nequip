@@ -3,7 +3,7 @@ import pytest
 import tempfile
 import torch
 
-from os.path import isdir
+from os.path import isdir, isfile
 
 from ase.io import write
 
@@ -68,7 +68,8 @@ class TestInit:
     def test_npz(self, npz_data, root):
         g = NpzDataset(file_name=npz_data, root=root, extra_fixed_fields={"r_max": 3.0})
         assert isdir(g.root)
-        assert isdir(f"{g.root}/processed")
+        assert isdir(g.processed_dir)
+        assert isfile(g.processed_dir + "/data.pth")
 
     def test_ase(self, ase_file, root):
         a = ASEDataset(
@@ -78,7 +79,8 @@ class TestInit:
             ase_args=dict(format="extxyz"),
         )
         assert isdir(a.root)
-        assert isdir(f"{a.root}/processed")
+        assert isdir(a.processed_dir)
+        assert isfile(a.processed_dir + "/data.pth")
 
 
 class TestStatistics:
@@ -136,17 +138,24 @@ class TestStatistics:
 
 class TestReload:
     @pytest.mark.parametrize("change_rmax", [0, 1])
-    def test_reload(self, npz_dataset, npz_data, change_rmax):
+    @pytest.mark.parametrize("give_url", [True, False])
+    @pytest.mark.parametrize("change_key_map", [True, False])
+    def test_reload(self, npz_dataset, npz_data, change_rmax, give_url, change_key_map):
         r_max = npz_dataset.extra_fixed_fields["r_max"] + change_rmax
+        keymap = npz_dataset.key_mapping.copy()  # the default one
+        if change_key_map:
+            keymap["x1"] = "x2"
         a = NpzDataset(
             file_name=npz_data,
             root=npz_dataset.root,
             extra_fixed_fields={"r_max": r_max},
+            key_mapping=keymap,
+            **({"url": "example.com/data.dat"} if give_url else {})
         )
         print(a.processed_file_names[0])
         print(npz_dataset.processed_file_names[0])
-        assert (a.processed_file_names[0] == npz_dataset.processed_file_names[0]) == (
-            change_rmax == 0
+        assert (a.processed_dir == npz_dataset.processed_dir) == (
+            (change_rmax == 0) and (not give_url) and (not change_key_map)
         )
 
 
@@ -165,21 +174,33 @@ class TestFromConfig:
         g = dataset_from_config(config)
         assert g.fixed_fields["r_max"] == 3
         assert isdir(g.root)
-        assert isdir(f"{g.root}/processed")
+        assert isdir(g.processed_dir)
+        assert isfile(g.processed_dir + "/data.pth")
 
-    def test_ase(self, ase_file, root):
+    @pytest.mark.parametrize("prefix", ["dataset", "thingy"])
+    def test_ase(self, ase_file, root, prefix):
         config = Config(
             dict(
-                dataset="ASEDataset",
                 file_name=ase_file,
                 root=root,
                 extra_fixed_fields={"r_max": 3.0},
                 ase_args=dict(format="extxyz"),
             )
         )
-        a = dataset_from_config(config)
+        config[prefix] = "ASEDataset"
+        a = dataset_from_config(config, prefix=prefix)
         assert isdir(a.root)
-        assert isdir(f"{a.root}/processed")
+        assert isdir(a.processed_dir)
+        assert isfile(a.processed_dir + "/data.pth")
+
+        # Test reload
+        # Change some random ASE specific parameter
+        # See https://wiki.fysik.dtu.dk/ase/ase/io/io.html
+        config["ase_args"]["do_not_split_by_at_sign"] = True
+        b = dataset_from_config(config, prefix=prefix)
+        assert isdir(b.processed_dir)
+        assert isfile(b.processed_dir + "/data.pth")
+        assert a.processed_dir != b.processed_dir
 
 
 class TestFromList:

@@ -29,6 +29,6 @@ def test_simple(name, temp_data, BENCHMARK_ROOT):
     print(a.data)
     print(a.fixed_fields)
     assert isdir(config.root)
-    assert isdir(f"{config.root}/processed")
+    assert isdir(a.processed_dir)
     assert len(a.data.edge_index) == len(include_frames)
-    rmtree(f"{config.root}/processed")
+    rmtree(a.processed_dir)

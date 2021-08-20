@@ -11,6 +11,7 @@ import argparse
 import torch
 
 from nequip.utils import Config, dataset_from_config, Output, load_file
+from nequip.scripts.train import _set_global_options
 
 
 def main(args=None):
@@ -55,9 +56,8 @@ def restart(file_name, config, mode="update"):
 
     config = Config(dictionary, exclude_keys=["state_dict", "progress"])
 
-    torch.set_default_dtype(
-        {"float32": torch.float32, "float64": torch.float64}[config.default_dtype]
-    )
+    # dtype, etc.
+    _set_global_options(config)
 
     if config.wandb:
         from nequip.train.trainer_wandb import TrainerWandB
@@ -80,10 +80,19 @@ def restart(file_name, config, mode="update"):
 
     config.update(trainer.output.updated_dict())
 
-    dataset = dataset_from_config(config)
-    logging.info(f"Successfully reload the data set of type {dataset}...")
+    # = Load the dataset =
+    dataset = dataset_from_config(config, prefix="dataset")
+    logging.info(f"Successfully re-loaded the data set of type {dataset}...")
+    try:
+        validation_dataset = dataset_from_config(config, prefix="validation_dataset")
+        logging.info(
+            f"Successfully re-loaded the validation data set of type {validation_dataset}..."
+        )
+    except KeyError:
+        # It couldn't be found
+        validation_dataset = None
+    trainer.set_dataset(dataset, validation_dataset)
 
-    trainer.set_dataset(dataset)
     trainer.train()
 
     return
