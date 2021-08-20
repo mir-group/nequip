@@ -211,5 +211,5 @@ class TestFromList:
         assert len(dataset) == len(molecules)
         for i, mol in enumerate(molecules):
             assert np.array_equal(
-                mol.get_atomic_numbers(), dataset.get(i).to_ase().get_atomic_numbers()
+                mol.get_atomic_numbers(), dataset[i].to_ase().get_atomic_numbers()
             )

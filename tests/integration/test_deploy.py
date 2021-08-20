@@ -52,7 +52,7 @@ def test_deploy(nequip_dataset, BENCHMARK_ROOT):
         # now test predictions the same
         best_mod = torch.load(f"{tmpdir}/{run_name}/best_model.pth")
         device = next(best_mod.parameters()).device
-        data = AtomicData.to_AtomicDataDict(nequip_dataset.get(0).to(device))
+        data = AtomicData.to_AtomicDataDict(nequip_dataset[0]).to(device)
         # Needed because of debug mode:
         data[AtomicDataDict.TOTAL_ENERGY_KEY] = data[
             AtomicDataDict.TOTAL_ENERGY_KEY
@@ -72,7 +72,7 @@ def test_deploy(nequip_dataset, BENCHMARK_ROOT):
         assert metadata[deploy.NEQUIP_VERSION_KEY] == nequip.__version__
         assert np.allclose(float(metadata[deploy.R_MAX_KEY]), true_config["r_max"])
 
-        data = AtomicData.to_AtomicDataDict(nequip_dataset.get(0).to("cpu"))
+        data = AtomicData.to_AtomicDataDict(nequip_dataset[0].to("cpu"))
         deploy_pred = deploy_mod(data)[AtomicDataDict.TOTAL_ENERGY_KEY]
         assert torch.allclose(train_pred.to("cpu"), deploy_pred, atol=1e-7)
 

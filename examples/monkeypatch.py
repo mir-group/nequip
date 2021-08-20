@@ -63,7 +63,7 @@ config = Config.from_file(path + "/config_final.yaml")
 dataset = dataset_from_config(config)
 
 # Evaluate the model on a configuration:
-data = dataset.get(0)
+data = dataset[0]
 out = sgn(AtomicData.to_AtomicDataDict(data))
 
 # Check that our extracted data is there:
