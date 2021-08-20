@@ -1,4 +1,4 @@
-from typing import List, Callable, Union
+from typing import List
 
 import torch
 
@@ -11,27 +11,21 @@ class Collater(object):
     Args:
         fixed_fields: which fields are fixed fields
         exclude_keys: keys to ignore in the input, not copying to the output
-        transforms: a list of transformations taking and returning ``Batch``, called in the given order on the batched data.
     """
 
     def __init__(
         self,
         fixed_fields: List[str] = [],
         exclude_keys: List[str] = [],
-        transforms: Union[List[Callable], Callable] = [],
     ):
         self.fixed_fields = fixed_fields
         self._exclude_keys = set(exclude_keys)
-        if callable(transforms):
-            transforms = [transforms]
-        self.transforms = transforms
 
     @classmethod
     def for_dataset(
         cls,
         dataset,
         exclude_keys: List[str] = [],
-        transforms: Union[List[Callable], Callable] = [],
     ):
         """Construct a collater appropriate to ``dataset``.
 
@@ -40,11 +34,10 @@ class Collater(object):
         return cls(
             fixed_fields=list(getattr(dataset, "fixed_fields", {}).keys()),
             exclude_keys=exclude_keys,
-            transforms=transforms,
         )
 
     def collate(self, batch: List[Data]) -> Batch:
-        """Collate a list of data without applying ``transforms``"""
+        """Collate a list of data"""
         # For fixed fields, we need to batch those that are per-node or
         # per-edge, since they need to be repeated in order to have the same
         # number of nodes/edges as the full batch graph.
@@ -66,11 +59,8 @@ class Collater(object):
         return out
 
     def __call__(self, batch: List[Data]) -> Batch:
-        """Collate a list of data and apply ``transforms``"""
-        batch = self.collate(batch)
-        for transform in self.transforms:
-            batch = transform(batch)
-        return batch
+        """Collate a list of data"""
+        return self.collate(batch)
 
     @property
     def exclude_keys(self):
@@ -84,7 +74,6 @@ class DataLoader(torch.utils.data.DataLoader):
         batch_size: int = 1,
         shuffle: bool = False,
         exclude_keys: List[str] = [],
-        transforms: Union[List[Callable], Callable] = [],
         **kwargs,
     ):
         if "collate_fn" in kwargs:
@@ -94,8 +83,6 @@ class DataLoader(torch.utils.data.DataLoader):
             dataset,
             batch_size,
             shuffle,
-            collate_fn=Collater.for_dataset(
-                dataset, exclude_keys=exclude_keys, transforms=transforms
-            ),
+            collate_fn=Collater.for_dataset(dataset, exclude_keys=exclude_keys),
             **kwargs,
         )

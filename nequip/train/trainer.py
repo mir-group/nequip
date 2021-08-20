@@ -31,7 +31,6 @@ from torch_ema import ExponentialMovingAverage
 
 import nequip
 from nequip.data import DataLoader, AtomicData, AtomicDataDict, AtomicDataset
-import nequip.data.transforms
 from nequip.utils import (
     Output,
     instantiate_from_cls_name,
@@ -245,8 +244,6 @@ class Trainer:
         exclude_keys: list = [],
         batch_size: int = 5,
         shuffle: bool = True,
-        dataset_transform_name: str = "TypeMapper",
-        dataset_transform_kwargs: dict = {},
         n_train: Optional[int] = None,
         n_val: Optional[int] = None,
         dataloader_num_workers: int = 0,
@@ -315,7 +312,6 @@ class Trainer:
         self.optimizer_kwargs = deepcopy(optimizer_kwargs)
         self.lr_scheduler_kwargs = deepcopy(lr_scheduler_kwargs)
         self.early_stopping_kwargs = deepcopy(early_stopping_kwargs)
-        self.dataset_transform_kwargs = deepcopy(dataset_transform_kwargs)
 
         # initialize the optimizer and scheduler, the params will be updated in the function
         self.init()
@@ -1047,29 +1043,12 @@ class Trainer:
     ) -> None:
         """Set the dataset(s) used by this trainer.
 
-        <<<<<<< HEAD
-                # Determine transform
-                if getattr(self, "dataset_transform", None) is None:
-                    (
-                        self.dataset_transform,
-                        self.dataset_transform_kwargs,
-                    ) = instantiate_from_cls_name(
-                        module=nequip.data.transforms,
-                        class_name=self.dataset_transform_name,
-                        prefix="dataset_transform",
-                        all_args=self.kwargs,
-                        optional_args=self.dataset_transform_kwargs,
-                    )
+        Training and validation datasets will be sampled from
+        them in accordance with the trainer's parameters.
 
-                if self.train_idcs is None or self.val_idcs is None:
-        =======
-                Training and validation datasets will be sampled from
-                them in accordance with the trainer's parameters.
-        >>>>>>> develop
-
-                If only one dataset is provided, the train and validation
-                datasets will both be sampled from it. Otherwise, if
-                `validation_dataset` is provided, it will be used.
+        If only one dataset is provided, the train and validation
+        datasets will both be sampled from it. Otherwise, if
+        `validation_dataset` is provided, it will be used.
         """
 
         if self.train_idcs is None or self.val_idcs is None:
@@ -1123,7 +1102,6 @@ class Trainer:
             batch_size=self.batch_size,
             shuffle=self.shuffle,
             exclude_keys=self.exclude_keys,
-            transforms=[self.dataset_transform],
             num_workers=self.dataloader_num_workers,
             # keep stuff around in memory
             persistent_workers=(
