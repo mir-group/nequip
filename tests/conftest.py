@@ -58,6 +58,8 @@ def temp_data(float_tolerance):
 def CH3CHO(float_tolerance) -> AtomicData:
     atoms = molecule("CH3CHO")
     data = AtomicData.from_ase(atoms, r_max=2.0)
+    tm = TypeMapper(chemical_symbol_to_type={"C": 0, "O": 1, "H": 2})
+    data = tm(data)
     return atoms, data
 
 
@@ -95,7 +97,7 @@ def nequip_dataset(molecules, temp_data, float_tolerance):
 
 @pytest.fixture(scope="session")
 def atomic_batch(nequip_dataset):
-    return Batch.from_data_list([nequip_dataset.data[0], nequip_dataset.data[1]])
+    return Batch.from_data_list([nequip_dataset[0], nequip_dataset[1]])
 
 
 # Use debug mode
