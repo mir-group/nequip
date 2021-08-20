@@ -30,7 +30,13 @@ R_MAX_KEY: Final[str] = "r_max"
 N_SPECIES_KEY: Final[str] = "n_species"
 SPECIES_NAMES_KEY: Final[str] = "species_names"
 
-_ALL_METADATA_KEYS = [CONFIG_KEY, NEQUIP_VERSION_KEY, R_MAX_KEY, N_SPECIES_KEY]
+_ALL_METADATA_KEYS = [
+    CONFIG_KEY,
+    NEQUIP_VERSION_KEY,
+    R_MAX_KEY,
+    N_SPECIES_KEY,
+    SPECIES_NAMES_KEY,
+]
 
 
 def load_deployed_model(
@@ -107,7 +113,8 @@ def main(args=None):
         model, metadata = load_deployed_model(args.model_path)
         del model
         config = metadata.pop(CONFIG_KEY)
-        logging.info(f"Loaded TorchScript model with metadata {metadata}")
+        metadata_str = "\n".join("  %s: %s" % e for e in metadata.items())
+        logging.info(f"Loaded TorchScript model with metadata:\n{metadata_str}\n")
         logging.info("Model was built with config:")
         print(config)
 
@@ -165,9 +172,7 @@ def main(args=None):
             n_species = str(config["num_species"])
             species_names = config["species_names"]
         metadata[N_SPECIES_KEY] = str(n_species)
-        metadata[SPECIES_NAMES_KEY] = " ".join(
-            species_names[type] for type in range(n_species)
-        )
+        metadata[SPECIES_NAMES_KEY] = " ".join(species_names)
 
         metadata[CONFIG_KEY] = config_str
         metadata = {k: v.encode("ascii") for k, v in metadata.items()}
