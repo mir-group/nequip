@@ -5,6 +5,7 @@ from importlib import import_module
 from typing import Optional, Union, List
 
 from nequip import data, datasets
+from nequip.data.transforms import TypeMapper
 from .config import Config
 
 
@@ -59,7 +60,15 @@ def dataset_from_config(config, prefix: str = "dataset"):
     if "r_max" in config and "r_max" not in config[extra_fixed_fields_key]:
         config[extra_fixed_fields_key]["r_max"] = config.r_max
 
-    instance, _ = instantiate(class_name, prefix=prefix, optional_args=config)
+    # Build a TypeMapper from the config
+    type_mapper, _ = instantiate(TypeMapper, prefix=prefix, optional_args=config)
+
+    instance, _ = instantiate(
+        class_name,
+        prefix=prefix,
+        positional_args={"type_mapper": type_mapper},
+        optional_args=config,
+    )
 
     return instance
 
