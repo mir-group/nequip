@@ -21,6 +21,7 @@ from torch_geometric.data import Batch, Dataset, download_url, extract_zip
 import nequip
 from nequip.data import AtomicData, AtomicDataDict
 from ._util import _TORCH_INTEGER_DTYPES
+from .transforms import TypeMapper
 
 
 class AtomicDataset(Dataset):
@@ -56,6 +57,11 @@ class AtomicDataset(Dataset):
         # TODO: When lazy-loading datasets are implimented, how to deal with statistics, sampling, and subsets?
         raise NotImplementedError("not implimented for general AtomicDataset yet")
 
+    @property
+    def type_mapper(self) -> Optional[TypeMapper]:
+        # self.transform is always a TypeMapper
+        return self.transform
+
 
 class AtomicInMemoryDataset(AtomicDataset):
     r"""Base class for all datasets that fit in memory.
@@ -88,6 +94,7 @@ class AtomicInMemoryDataset(AtomicDataset):
         force_fixed_keys: List[str] = [],
         extra_fixed_fields: Dict[str, Any] = {},
         include_frames: Optional[List[int]] = None,
+        type_mapper: TypeMapper = None,
     ):
         # TO DO, this may be simplified
         # See if a subclass defines some inputs
@@ -119,7 +126,7 @@ class AtomicInMemoryDataset(AtomicDataset):
         # Initialize the InMemoryDataset, which runs download and process
         # See https://pytorch-geometric.readthedocs.io/en/latest/notes/create_dataset.html#creating-in-memory-datasets
         # Then pre-process the data if disk files are not found
-        super().__init__(root=root)
+        super().__init__(root=root, transform=type_mapper)
         if self.data is None:
             self.data, self.fixed_fields, include_frames = torch.load(
                 self.processed_paths[0]
@@ -142,7 +149,15 @@ class AtomicInMemoryDataset(AtomicDataset):
     def _get_parameters(self) -> Dict[str, Any]:
         """Get a dict of the parameters used to build this dataset."""
         pnames = list(inspect.signature(self.__init__).parameters)
-        params = {k: getattr(self, k) for k in pnames if hasattr(self, k)}
+        IGNORE_KEYS = {
+            # the type mapper is applied after saving, not before, so doesn't matter to cache validity
+            "type_mapper"
+        }
+        params = {
+            k: getattr(self, k)
+            for k in pnames
+            if k not in IGNORE_KEYS and hasattr(self, k)
+        }
         # Add other relevant metadata:
         params["dtype"] = str(torch.get_default_dtype())
         params["nequip_version"] = nequip.__version__
@@ -423,6 +438,7 @@ class NpzDataset(AtomicInMemoryDataset):
         force_fixed_keys: List[str] = [],
         extra_fixed_fields: Dict[str, Any] = {},
         include_frames: Optional[List[int]] = None,
+        type_mapper: TypeMapper = None,
     ):
         self.key_mapping = key_mapping
         self.npz_fixed_field_keys = npz_fixed_field_keys
@@ -435,6 +451,7 @@ class NpzDataset(AtomicInMemoryDataset):
             force_fixed_keys=force_fixed_keys,
             extra_fixed_fields=extra_fixed_fields,
             include_frames=include_frames,
+            type_mapper=type_mapper,
         )
 
     @property
@@ -457,7 +474,7 @@ class NpzDataset(AtomicInMemoryDataset):
         # TODO: generalize this?
         for intkey in (
             AtomicDataDict.ATOMIC_NUMBERS_KEY,
-            AtomicDataDict.SPECIES_INDEX_KEY,
+            AtomicDataDict.ATOM_TYPE_KEY,
             AtomicDataDict.EDGE_INDEX_KEY,
         ):
             if intkey in mapped:
@@ -485,6 +502,7 @@ class ASEDataset(AtomicInMemoryDataset):
         force_fixed_keys: List[str] = [],
         extra_fixed_fields: Dict[str, Any] = {},
         include_frames: Optional[List[int]] = None,
+        type_mapper: TypeMapper = None,
     ):
 
         self.ase_args = dict(index=":")
@@ -498,6 +516,7 @@ class ASEDataset(AtomicInMemoryDataset):
             force_fixed_keys=force_fixed_keys,
             extra_fixed_fields=extra_fixed_fields,
             include_frames=include_frames,
+            type_mapper=type_mapper,
         )
 
     @classmethod

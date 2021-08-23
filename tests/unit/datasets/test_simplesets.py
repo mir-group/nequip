@@ -19,6 +19,7 @@ def test_simple(name, temp_data, BENCHMARK_ROOT):
             root=f"{temp_data}/{name}",
             extra_fixed_fields={"r_max": 3},
             include_frames=include_frames,
+            chemical_symbol_to_type={"H": 0, "C": 1, "O": 2},
         )
     )
 

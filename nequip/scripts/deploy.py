@@ -17,6 +17,8 @@ import numpy as np  # noqa: F401
 
 import torch
 
+import ase.data
+
 from e3nn.util.jit import script
 
 import nequip
@@ -26,8 +28,15 @@ CONFIG_KEY: Final[str] = "config"
 NEQUIP_VERSION_KEY: Final[str] = "nequip_version"
 R_MAX_KEY: Final[str] = "r_max"
 N_SPECIES_KEY: Final[str] = "n_species"
+TYPE_NAMES_KEY: Final[str] = "type_names"
 
-_ALL_METADATA_KEYS = [CONFIG_KEY, NEQUIP_VERSION_KEY, R_MAX_KEY, N_SPECIES_KEY]
+_ALL_METADATA_KEYS = [
+    CONFIG_KEY,
+    NEQUIP_VERSION_KEY,
+    R_MAX_KEY,
+    N_SPECIES_KEY,
+    TYPE_NAMES_KEY,
+]
 
 
 def load_deployed_model(
@@ -104,7 +113,8 @@ def main(args=None):
         model, metadata = load_deployed_model(args.model_path)
         del model
         config = metadata.pop(CONFIG_KEY)
-        logging.info(f"Loaded TorchScript model with metadata {metadata}")
+        metadata_str = "\n".join("  %s: %s" % e for e in metadata.items())
+        logging.info(f"Loaded TorchScript model with metadata:\n{metadata_str}\n")
         logging.info("Model was built with config:")
         print(config)
 
@@ -150,7 +160,20 @@ def main(args=None):
         # Deploy
         metadata: dict = {NEQUIP_VERSION_KEY: nequip.__version__}
         metadata[R_MAX_KEY] = str(float(config["r_max"]))
-        metadata[N_SPECIES_KEY] = str(len(config["allowed_species"]))
+        if "allowed_species" in config:
+            # This is from before the atomic number updates
+            n_species = len(config["allowed_species"])
+            type_names = {
+                type: ase.data.chemical_symbols[atomic_num]
+                for type, atomic_num in enumerate(config["allowed_species"])
+            }
+        else:
+            # The new atomic number setup
+            n_species = str(config["num_types"])
+            type_names = config["type_names"]
+        metadata[N_SPECIES_KEY] = str(n_species)
+        metadata[TYPE_NAMES_KEY] = " ".join(type_names)
+
         metadata[CONFIG_KEY] = config_str
         metadata = {k: v.encode("ascii") for k, v in metadata.items()}
         torch.jit.save(model, args.out_file, _extra_files=metadata)

@@ -87,7 +87,7 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
     def __init__(
         self,
         field: str,
-        allowed_species: List[int],
+        num_types: int,
         out_field: Optional[str] = None,
         shifts: Optional[list] = None,
         scales: Optional[list] = None,
@@ -104,21 +104,17 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
         )
 
         shifts = (
-            torch.zeros(len(allowed_species))
+            torch.zeros(num_types)
             if shifts is None
             else torch.as_tensor(shifts, dtype=torch.get_default_dtype())
         )
-        assert shifts.shape == (
-            len(allowed_species),
-        ), f"Invalid shape of shifts {shifts}"
+        assert shifts.shape == (num_types,), f"Invalid shape of shifts {shifts}"
         scales = (
-            torch.ones(len(allowed_species))
+            torch.ones(num_types)
             if scales is None
             else torch.as_tensor(scales, dtype=torch.get_default_dtype())
         )
-        assert scales.shape == (
-            len(allowed_species),
-        ), f"Invalid shape of scales {scales}"
+        assert scales.shape == (num_types,), f"Invalid shape of scales {scales}"
 
         self.trainable = trainable
         if trainable:
@@ -129,7 +125,7 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
             self.register_buffer("scales", scales)
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
-        species_idx = data[AtomicDataDict.SPECIES_INDEX_KEY]
+        species_idx = data[AtomicDataDict.ATOM_TYPE_KEY]
         in_field = data[self.field]
         assert len(in_field) == len(
             species_idx

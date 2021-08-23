@@ -5,6 +5,7 @@ import torch
 
 from os.path import isdir, isfile
 
+import ase.data
 from ase.io import write
 
 from nequip.data import (
@@ -24,6 +25,9 @@ def ase_file(molecules):
         yield fp.name
 
 
+MAX_ATOMIC_NUMBER: int = 8
+
+
 @pytest.fixture(scope="session")
 def npz():
     natoms = 3
@@ -32,7 +36,7 @@ def npz():
         positions=np.random.random((nframes, natoms, 3)),
         force=np.random.random((nframes, natoms, 3)),
         energy=np.random.random(nframes),
-        Z=np.random.randint(1, 8, size=(nframes, natoms)),
+        Z=np.random.randint(1, MAX_ATOMIC_NUMBER, size=(nframes, natoms)),
     )
 
 
@@ -150,7 +154,7 @@ class TestReload:
             root=npz_dataset.root,
             extra_fixed_fields={"r_max": r_max},
             key_mapping=keymap,
-            **({"url": "example.com/data.dat"} if give_url else {})
+            **({"url": "example.com/data.dat"} if give_url else {}),
         )
         print(a.processed_file_names[0])
         print(npz_dataset.processed_file_names[0])
@@ -170,7 +174,18 @@ class TestFromConfig:
         ],
     )
     def test_npz(self, npz_data, root, args):
-        config = Config(dict(dataset="npz", file_name=npz_data, root=root, **args))
+        config = Config(
+            dict(
+                dataset="npz",
+                file_name=npz_data,
+                root=root,
+                chemical_symbol_to_type={
+                    ase.data.chemical_symbols[an]: an - 1
+                    for an in range(1, MAX_ATOMIC_NUMBER)
+                },
+                **args,
+            )
+        )
         g = dataset_from_config(config)
         assert g.fixed_fields["r_max"] == 3
         assert isdir(g.root)
@@ -185,6 +200,7 @@ class TestFromConfig:
                 root=root,
                 extra_fixed_fields={"r_max": 3.0},
                 ase_args=dict(format="extxyz"),
+                chemical_symbol_to_type={"H": 0, "C": 1, "O": 2},
             )
         )
         config[prefix] = "ASEDataset"
@@ -211,5 +227,5 @@ class TestFromList:
         assert len(dataset) == len(molecules)
         for i, mol in enumerate(molecules):
             assert np.array_equal(
-                mol.get_atomic_numbers(), dataset.get(i).to_ase().get_atomic_numbers()
+                mol.get_atomic_numbers(), dataset[i].to_ase().get_atomic_numbers()
             )

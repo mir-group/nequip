@@ -28,7 +28,7 @@ default_config = dict(
     model_initializers=[],
     dataset_statistics_stride=1,
     default_dtype="float32",
-    allow_tf32=False,  # until we understand equivar issues
+    allow_tf32=False,  # TODO: until we understand equivar issues
     verbose="INFO",
     model_debug_mode=False,
     equivariance_test=False,
@@ -101,6 +101,7 @@ def _set_global_options(config):
 
 def fresh_start(config):
     _set_global_options(config)
+
     # = Make the trainer =
     if config.wandb:
         import wandb  # noqa: F401
@@ -132,6 +133,10 @@ def fresh_start(config):
         # It couldn't be found
         validation_dataset = None
 
+    # For the model building:
+    config["num_types"] = dataset.type_mapper.num_types
+    config["type_names"] = dataset.type_mapper.type_names
+
     # = Train/test split =
     trainer.set_dataset(dataset, validation_dataset)
 
@@ -150,26 +155,20 @@ def fresh_start(config):
     # = Get statistics of training dataset =
     stats_fields = [
         AtomicDataDict.TOTAL_ENERGY_KEY,
-        AtomicDataDict.ATOMIC_NUMBERS_KEY,
     ]
-    stats_modes = ["mean_std", "count"]
+    stats_modes = ["mean_std"]
     if force_training:
         stats_fields.append(AtomicDataDict.FORCE_KEY)
         stats_modes.append("rms")
     stats = trainer.dataset_train.statistics(
         fields=stats_fields, modes=stats_modes, stride=config.dataset_statistics_stride
     )
-    (
-        (energies_mean, energies_std),
-        (allowed_species, Z_count),
-    ) = stats[:2]
+    ((energies_mean, energies_std),) = stats[:1]
     if force_training:
         # Scale by the force std instead
-        force_rms = stats[2][0]
+        force_rms = stats[1][0]
     del stats_modes
     del stats_fields
-
-    config.update(dict(allowed_species=allowed_species))
 
     # = Build a model =
     model_builder = _load_callable(config.model_builder)

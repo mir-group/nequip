@@ -50,7 +50,7 @@ class AtomicData(Data):
         node_attrs (Tensor [n_atom, ...]): the attributes of the nodes, for instance the atom type, optional
         batch (Tensor [n_atom]): the graph to which the node belongs, optional
         atomic_numbers (Tensor [n_atom]): optional.
-        species_index (Tensor [n_atom]): optional.
+        atom_type (Tensor [n_atom]): optional.
         **kwargs: other data, optional.
     """
 
@@ -68,7 +68,7 @@ class AtomicData(Data):
             if (
                 k == AtomicDataDict.EDGE_INDEX_KEY
                 or k == AtomicDataDict.ATOMIC_NUMBERS_KEY
-                or k == AtomicDataDict.SPECIES_INDEX_KEY
+                or k == AtomicDataDict.ATOM_TYPE_KEY
                 or k == AtomicDataDict.BATCH_KEY
             ):
                 # Any property used as an index must be long (or byte or bool, but those are not relevant for atomic scale systems)
@@ -276,7 +276,13 @@ class AtomicData(Data):
             raise TypeError(
                 "Explicitly move this `AtomicData` to CPU using `.to()` before calling `to_ase()`."
             )
-        atomic_nums = self.atomic_numbers
+        if AtomicDataDict.ATOMIC_NUMBERS_KEY in self:
+            atomic_nums = self.atomic_numbers
+        else:
+            warnings.warn(
+                "AtomicData.to_ase(): self didn't contain atomic numbers... using atom_type as atomic numbers instead, but this means the chemical symbols in ASE (outputs) will be wrong"
+            )
+            atomic_nums = self[AtomicDataDict.ATOM_TYPE_KEY]
         pbc = getattr(self, AtomicDataDict.PBC_KEY, None)
         cell = getattr(self, AtomicDataDict.CELL_KEY, None)
         batch = getattr(self, AtomicDataDict.BATCH_KEY, None)

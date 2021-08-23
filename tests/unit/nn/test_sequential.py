@@ -7,21 +7,21 @@ from nequip.nn import SequentialGraphNetwork, AtomwiseLinear
 
 def test_basic():
     sgn = SequentialGraphNetwork.from_parameters(
-        shared_params={"num_species": 3},
+        shared_params={"num_types": 3},
         layers={"one_hot": OneHotAtomEncoding, "linear": AtomwiseLinear},
     )
     sgn(
         {
             AtomicDataDict.POSITIONS_KEY: torch.randn(5, 3),
             AtomicDataDict.EDGE_INDEX_KEY: torch.LongTensor([[0, 1], [1, 0]]),
-            AtomicDataDict.SPECIES_INDEX_KEY: torch.LongTensor([0, 0, 1, 2, 0]),
+            AtomicDataDict.ATOM_TYPE_KEY: torch.LongTensor([0, 0, 1, 2, 0]),
         }
     )
 
 
 def test_append():
     sgn = SequentialGraphNetwork.from_parameters(
-        shared_params={"num_species": 3}, layers={"one_hot": OneHotAtomEncoding}
+        shared_params={"num_types": 3}, layers={"one_hot": OneHotAtomEncoding}
     )
     sgn.append_from_parameters(
         shared_params={"out_field": AtomicDataDict.NODE_FEATURES_KEY},
@@ -34,7 +34,7 @@ def test_append():
         {
             AtomicDataDict.POSITIONS_KEY: torch.randn(5, 3),
             AtomicDataDict.EDGE_INDEX_KEY: torch.LongTensor([[0, 1], [1, 0]]),
-            AtomicDataDict.SPECIES_INDEX_KEY: torch.LongTensor([0, 0, 1, 2, 0]),
+            AtomicDataDict.ATOM_TYPE_KEY: torch.LongTensor([0, 0, 1, 2, 0]),
         }
     )
     assert out["thing"].shape == out[AtomicDataDict.NODE_FEATURES_KEY].shape
@@ -42,7 +42,7 @@ def test_append():
 
 def test_insert():
     sgn = SequentialGraphNetwork.from_parameters(
-        shared_params={"num_species": 3},
+        shared_params={"num_types": 3},
         layers={"one_hot": OneHotAtomEncoding, "lin2": AtomwiseLinear},
     )
     sgn.insert_from_parameters(
@@ -61,7 +61,7 @@ def test_insert():
         {
             AtomicDataDict.POSITIONS_KEY: torch.randn(5, 3),
             AtomicDataDict.EDGE_INDEX_KEY: torch.LongTensor([[0, 1], [1, 0]]),
-            AtomicDataDict.SPECIES_INDEX_KEY: torch.LongTensor([0, 0, 1, 2, 0]),
+            AtomicDataDict.ATOM_TYPE_KEY: torch.LongTensor([0, 0, 1, 2, 0]),
         }
     )
     assert AtomicDataDict.NODE_FEATURES_KEY in out
