@@ -13,10 +13,15 @@ Most recent change on the bottom.
 - Optionally independently configure validation and training datasets
 - Save dataset parameters along with processed data
 - Gradient clipping
+- Arbitrary atom type support
 
 ### Changed
 - Name processed datasets based on a hash of their parameters to ensure only valid cached data is used
 - Do not use TensorFloat32 by default on Ampere GPUs until we understand it better
+- No atomic numbers in networks
+
+### Removed
+- Removed `allowed_species`
 
 ## [0.3.3] - 2021-08-11
 ### Added
