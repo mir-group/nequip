@@ -184,6 +184,11 @@ optimizer_betas: !!python/tuple
 optimizer_eps: 1.0e-08
 optimizer_weight_decay: 0
 
+# gradient clipping using torch.nn.utils.clip_grad_norm_
+# see https://pytorch.org/docs/stable/generated/torch.nn.utils.clip_grad_norm_.html#torch.nn.utils.clip_grad_norm_
+# setting to inf or null disables it
+max_gradient_norm: null
+
 # weight initialization
 # this can be the importable name of any function that can be `model.apply`ed to initialize some weights in the model. NequIP provides a number of useful initializers:
 # For more details please see the docstrings of the individual initializers
