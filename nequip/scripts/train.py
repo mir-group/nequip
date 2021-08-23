@@ -2,6 +2,7 @@
 from typing import Union, Callable
 import logging
 import argparse
+from torch._C import Value
 import yaml
 
 # This is a weird hack to avoid Intel MKL issues on the cluster when this is called as a subprocess of a process that has itself initialized PyTorch.
@@ -149,41 +150,53 @@ def fresh_start(config):
             f"Training on fields `{train_on}` besides forces and total energy not supported in the out-of-the-box training script yet; please use your own training script based on train.py."
         )
     force_training = "forces" in train_on
+
     logging.debug(f"Force training mode: {force_training}")
     del train_on
 
-    # = Get statistics of training dataset =
-    stats_fields = [
-        AtomicDataDict.TOTAL_ENERGY_KEY,
-    ]
-    stats_modes = ["mean_std"]
-    if force_training:
-        stats_fields.append(AtomicDataDict.FORCE_KEY)
-        stats_modes.append("rms")
-    stats = trainer.dataset_train.statistics(
-        fields=stats_fields, modes=stats_modes, stride=config.dataset_statistics_stride
+    # = Determine energy rescale type =
+    global_shift = config.get("global_rescale_shift", "dataset_energy_mean")
+    global_scale = config.get(
+        "global_rescale_scale",
+        "dataset_force_rms" if force_training else "dataset_energy_std",
     )
-    ((energies_mean, energies_std),) = stats[:1]
+
+    def get_per_species(key, default):
+        return config.get(
+            f"PerSpeciesScaleShift_{key}",
+            config.get(f"per_species_scale_shift_{key}", default),
+        )
+
+    def pop_per_species(key, default):
+        return config.pop(
+            f"PerSpeciesScaleShift_{key}",
+            config.pop(f"per_species_scale_shift_{key}", default),
+        )
+
+    per_species_scale_shift = get_per_species("enable", False)
+    if global_shift is not None and per_species_scale_shift:
+        raise ValueError("One can only enable either global shift or per_species shift")
+    logging.debug(f"Enable per species scale shift: {per_species_scale_shift}")
+    logging.debug(f"Enable global scale shift: {per_species_scale_shift}")
+
+    # = Get statistics of training dataset =
     if force_training:
-        # Scale by the force std instead
-        force_rms = stats[1][0]
-    del stats_modes
-    del stats_fields
-
-    # = Build a model =
-    model_builder = _load_callable(config.model_builder)
-    core_model = model_builder(**dict(config))
-
-    # = Reinit if wanted =
-    with torch.no_grad():
-        for initer in config.model_initializers:
-            initer = _load_callable(initer)
-            core_model.apply(initer)
+        ((force_rms,),) = trainer.dataset_train.statistics(
+            fields=[AtomicDataDict.FORCE_KEY],
+            modes=["rms"],
+            stride=config.dataset_statistics_stride,
+        )
+    if global_scale == "dataset_energy_std" or global_shift == "dataset_energy_mean":
+        ((energies_mean, energies_std),) = trainer.dataset_train.statistics(
+            fields=[AtomicDataDict.TOTAL_ENERGY_KEY],
+            modes=["mean_std"],
+            stride=config.dataset_statistics_stride,
+        )
 
     # = Determine shifts, scales =
     # This is a bit awkward, but necessary for there to be a value
     # in the config that signals "use dataset"
-    global_shift = config.get("global_rescale_shift", "dataset_energy_mean")
+
     if global_shift == "dataset_energy_mean":
         global_shift = energies_mean
     elif (
@@ -196,9 +209,6 @@ def fresh_start(config):
     else:
         raise ValueError(f"Invalid global shift `{global_shift}`")
 
-    global_scale = config.get(
-        "global_rescale_scale", force_rms if force_training else energies_std
-    )
     if global_scale == "dataset_energy_std":
         global_scale = energies_std
     elif global_scale == "dataset_force_rms":
@@ -227,6 +237,67 @@ def fresh_start(config):
     logging.debug(
         f"Initially outputs are scaled by: {global_scale}, eneriges are shifted by {global_shift}."
     )
+
+    if per_species_scale_shift:
+        scales = pop_per_species("scales", None)
+        shifts = pop_per_species("shifts", None)
+        if scales == "dataset_energy_std" or shifts == "dataset_energy_mean":
+            (
+                (per_species_energies_mean, per_species_energies_std),
+            ) = trainer.dataset_train.statistics(
+                fields=[AtomicDataDict.TOTAL_ENERGY_KEY],
+                modes=["atom_type_mean_std"],
+                stride=config.dataset_statistics_stride,
+            )
+
+        if scales == "dataset_energy_std":
+            scales = per_species_energies_std
+            if torch.min(scales) < RESCALE_THRESHOLD:
+                raise ValueError(
+                    f"Atomic energy scaling was very low: {torch.min(scales)}. "
+                    "If dataset values were used, does the dataset contain insufficient variation? Maybe try disabling global scaling with global_scale=None."
+                )
+        elif (
+            scales is None
+            or isinstance(scales, float)
+            or isinstance(scales, torch.Tensor)
+        ):
+            pass
+        else:
+            raise ValueError(f"Scales has to be number or but {scales}")
+
+        if global_scale is not None and scales is not None:
+            scales = scales / global_scale
+        config["PerSpeciesScaleShift_scales"] = scales
+
+        if shifts == "dataset_energy_mean":
+            shifts = per_species_energies_mean
+        elif (
+            shifts is None
+            or isinstance(shifts, float)
+            or isinstance(shifts, torch.Tensor)
+        ):
+            pass
+        else:
+            raise ValueError(f"Shifts has to be number but {shifts}")
+        if global_scale is not None and shifts is not None:
+            shifts = shifts / global_scale
+        config["PerSpeciesScaleShift_shifts"] = shifts
+        logging.debug(
+            f"Initially per atom outputs are scaled by: {scales}, eneriges are shifted by {shifts}."
+        )
+
+    raise RuntimeError
+
+    # = Build a model =
+    model_builder = _load_callable(config.model_builder)
+    core_model = model_builder(**dict(config))
+
+    # = Reinit if wanted =
+    with torch.no_grad():
+        for initer in config.model_initializers:
+            initer = _load_callable(initer)
+            core_model.apply(initer)
 
     # == Build the model ==
     final_model = RescaleOutput(

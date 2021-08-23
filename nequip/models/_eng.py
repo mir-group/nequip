@@ -25,7 +25,10 @@ def EnergyModel(**shared_params) -> SequentialGraphNetwork:
     logging.debug("Start building the network model")
 
     num_layers = shared_params.pop("num_layers", 3)
-    add_per_species_shift = shared_params.pop("PerSpeciesScaleShift_enable", False)
+    add_per_species_shift = shared_params.pop(
+        "PerSpeciesScaleShift_enable",
+        shared_params.pop("per_species_scale_shift_enable", False),
+    )
 
     layers = {
         # -- Encode --
