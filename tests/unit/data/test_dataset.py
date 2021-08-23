@@ -5,7 +5,7 @@ import torch
 
 from os.path import isdir, isfile
 
-from ase.data import atomic_numbers, chemical_symbols
+from ase.data import chemical_symbols
 from ase.io import write
 
 from nequip.data import (
@@ -27,11 +27,12 @@ def ase_file(molecules):
 
 
 MAX_ATOMIC_NUMBER: int = 5
+NATOMS = 3
 
 
 @pytest.fixture(scope="session")
 def npz():
-    natoms = 3
+    natoms = NATOMS
     nframes = 8
     yield dict(
         positions=np.random.random((nframes, natoms, 3)),
@@ -48,7 +49,7 @@ def npz_data(npz):
         yield path.name
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="class")
 def npz_dataset(npz_data, temp_data):
     a = NpzDataset(
         file_name=npz_data,
@@ -67,7 +68,7 @@ def root():
 class TestInit:
     def test_init(self):
         with pytest.raises(NotImplementedError) as excinfo:
-            a = AtomicInMemoryDataset(root=None)
+            AtomicInMemoryDataset(root=None)
         assert str(excinfo.value) == ""
 
     def test_npz(self, npz_data, root):
@@ -140,25 +141,95 @@ class TestStatistics:
             force_rms.numpy(), np.sqrt(np.mean(np.square(npz["force"][0])))
         )
 
-class TestPerAtomStatistics:
 
-    def test_statistics(self, npz_dataset, npz):
+class TestPerAtomStatistics:
+    def test_vary_species(self, npz_dataset):
 
         # set up the transformer
         unique = torch.unique(npz_dataset.data[AtomicDataDict.ATOMIC_NUMBERS_KEY])
-        npz_dataset.transform = TypeMapper(chemical_symbol_to_type={chemical_symbols[n]:i for i, n in enumerate(unique)})
+        npz_dataset.transform = TypeMapper(
+            chemical_symbol_to_type={
+                chemical_symbols[n]: i for i, n in enumerate(unique)
+            }
+        )
 
         # design a ground truth
-        N = npz_dataset.type_count_per_graph
+        N, _ = npz_dataset.type_count_per_graph()
+        N = N.type(torch.get_default_dtype())
         e = torch.rand((N.shape[1], 1))
         E = torch.matmul(N, e)
         npz_dataset.data[AtomicDataDict.TOTAL_ENERGY_KEY] = E
 
-        ((mean, std),) = npz_dataset.statistics([AtomicDataDict.TOTAL_ENERGY_KEY],
+        ((mean, std),) = npz_dataset.statistics(
+            [AtomicDataDict.TOTAL_ENERGY_KEY],
             modes=["atom_type_mean_std"],
         )
+        e = e.reshape([-1])
         assert torch.allclose(mean, e)
         assert torch.allclose(std, torch.zeros_like(e), atol=1e-4)
+
+
+class TestPerAtomStatistics2:
+    def test_same_species(self, npz_dataset):
+
+        # let all atoms to be the same type
+        n = npz_dataset.data[AtomicDataDict.BATCH_KEY]
+        new_n = torch.ones(n.shape, dtype=torch.int64)
+        new_n[::NATOMS] += 2
+        npz_dataset.data[AtomicDataDict.ATOMIC_NUMBERS_KEY] = new_n
+
+        # set up the transformer
+        npz_dataset.transform = TypeMapper(
+            chemical_symbol_to_type={
+                chemical_symbols[n]: i for i, n in enumerate([1, 3])
+            }
+        )
+
+        # compute the ground truth
+        E = npz_dataset.data[AtomicDataDict.TOTAL_ENERGY_KEY]
+        ref_E = E / (n.shape[0] / len(npz_dataset))
+        ref_mean = ref_E.mean() * torch.ones(2)
+        ref_std = ref_E.std() * torch.ones(2)
+
+        ((mean, std),) = npz_dataset.statistics(
+            [AtomicDataDict.TOTAL_ENERGY_KEY],
+            modes=["atom_type_mean_std"],
+        )
+        print("mean", mean, ref_mean)
+        assert torch.allclose(mean, ref_mean)
+        assert torch.allclose(std, ref_std)
+
+
+class TestPerAtomStatistics3:
+    def test_same_species(self, npz_dataset):
+
+        # let all atoms to be the same type
+        npz_dataset.data[AtomicDataDict.ATOMIC_NUMBERS_KEY] = None
+        npz_dataset.fixed_fields[AtomicDataDict.ATOMIC_NUMBERS_KEY] = torch.ones(
+            NATOMS, dtype=torch.int64
+        )
+        print("fixed_fields", npz_dataset.fixed_fields)
+
+        # set up the transformer
+        npz_dataset.transform = TypeMapper(
+            chemical_symbol_to_type={
+                chemical_symbols[n]: i for i, n in enumerate([1, 3])
+            }
+        )
+
+        # compute the ground truth
+        E = npz_dataset.data[AtomicDataDict.TOTAL_ENERGY_KEY]
+        ref_E = E / NATOMS
+        print(ref_E)
+        ref_mean = ref_E.mean().reshape([1])
+        ref_std = ref_E.std().reshape([1])
+
+        ((mean, std),) = npz_dataset.statistics(
+            [AtomicDataDict.TOTAL_ENERGY_KEY],
+            modes=["atom_type_mean_std"],
+        )
+        assert torch.allclose(mean, ref_mean)
+        assert torch.allclose(std, ref_std)
 
 
 class TestReload:
@@ -201,8 +272,7 @@ class TestFromConfig:
                 file_name=npz_data,
                 root=root,
                 chemical_symbol_to_type={
-                    chemical_symbols[an]: an - 1
-                    for an in range(1, MAX_ATOMIC_NUMBER)
+                    chemical_symbols[an]: an - 1 for an in range(1, MAX_ATOMIC_NUMBER)
                 },
                 **args,
             )

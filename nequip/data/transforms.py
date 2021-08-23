@@ -79,6 +79,7 @@ class TypeMapper:
             atomic_numbers = data[AtomicDataDict.ATOMIC_NUMBERS_KEY]
             # TODO: torch_geometric data doesn't support `del` yet
             delattr(data, AtomicDataDict.ATOMIC_NUMBERS_KEY)
+
             if atomic_numbers.min() < self._min_Z or atomic_numbers.max() > self._max_Z:
                 bad_set = (
                     set(torch.unique(atomic_numbers).cpu().tolist()) - self._valid_set
@@ -86,9 +87,9 @@ class TypeMapper:
                 raise ValueError(
                     f"Data included atomic numbers {bad_set} that are not part of the atomic number -> type mapping!"
                 )
-            data[AtomicDataDict.ATOM_TYPE_KEY] = self._Z_to_index[
-                atomic_numbers - self._min_Z
-            ]
+
+            data[AtomicDataDict.ATOM_TYPE_KEY] = self.transform(atomic_numbers)
+
             if data[AtomicDataDict.ATOM_TYPE_KEY].min() < 0:
                 bad_set = (
                     set(torch.unique(atomic_numbers).cpu().tolist()) - self._valid_set
@@ -101,3 +102,12 @@ class TypeMapper:
                 "Data doesn't contain any atom type information (ATOM_TYPE_KEY or ATOMIC_NUMBERS_KEY)"
             )
         return data
+
+    def transform(self, atomic_numbers):
+        if atomic_numbers.min() < self._min_Z or atomic_numbers.max() > self._max_Z:
+            bad_set = set(torch.unique(atomic_numbers).cpu().tolist()) - self._valid_set
+            raise ValueError(
+                f"Data included atomic numbers {bad_set} that are not part of the atomic number -> type mapping!"
+            )
+
+        return self._Z_to_index[atomic_numbers - self._min_Z]
