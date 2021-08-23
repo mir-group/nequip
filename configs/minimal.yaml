@@ -4,6 +4,10 @@ run_name: minimal
 seed: 0
 
 # network
+# Default model is energy + forces, if you want stress:
+# model_builder: nequip.models.StressForceModel
+# For just energy, see `minimal_eng.yaml`
+
 num_basis: 8
 r_max: 4.0
 irreps_edge_sh: 0e + 1o

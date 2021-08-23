@@ -7,6 +7,7 @@ from nequip.nn import (
     AtomwiseLinear,
     AtomwiseReduce,
     ForceOutput,
+    StressOutput,
     PerSpeciesScaleShift,
     ConvNetLayer,
 )
@@ -87,3 +88,12 @@ def ForceModel(**shared_params) -> GraphModuleMixin:
     """
     energy_model = EnergyModel(**shared_params)
     return ForceOutput(energy_model=energy_model)
+
+
+def StressForceModel(**shared_params) -> GraphModuleMixin:
+    """Same as ForceModel, but also with stresses.
+
+    A convinience method, equivalent to constructing ``EnergyModel`` and passing it to ``nequip.nn.StressOutput``.
+    """
+    energy_model = EnergyModel(**shared_params)
+    return StressOutput(energy_model=energy_model)

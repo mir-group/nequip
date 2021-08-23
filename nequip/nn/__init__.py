@@ -6,7 +6,7 @@ from ._atomwise import (  # noqa: F401
     PerSpeciesScaleShift,
 )  # noqa: F401
 from ._interaction_block import InteractionBlock  # noqa: F401
-from ._grad_output import GradientOutput, ForceOutput  # noqa: F401
+from ._grad_output import GradientOutput, ForceOutput, StressOutput  # noqa: F401
 from ._rescale import RescaleOutput  # noqa: F401
 from ._convnetlayer import ConvNetLayer  # noqa: F401
 from ._util import SaveForOutput  # noqa: F401

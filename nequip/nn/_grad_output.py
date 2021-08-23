@@ -21,6 +21,7 @@ class GradientOutput(GraphModuleMixin, torch.nn.Module):
         sign: either 1 or -1; the returned gradient is multiplied by this.
     """
     sign: float
+    _negate: bool
 
     def __init__(
         self,
@@ -34,6 +35,7 @@ class GradientOutput(GraphModuleMixin, torch.nn.Module):
         sign = float(sign)
         assert sign in (1.0, -1.0)
         self.sign = sign
+        self._negate = sign == -1.0
         self.of = of
         # TO DO: maybe better to force using list?
         if isinstance(wrt, str):
@@ -89,8 +91,9 @@ class GradientOutput(GraphModuleMixin, torch.nn.Module):
             if grad is None:
                 # From the docs: "If an output doesn’t require_grad, then the gradient can be None"
                 raise RuntimeError("Something is wrong, gradient couldn't be computed")
-            else:
-                data[out] = self.sign * grad
+            if self._negate:
+                grad = torch.neg(grad)
+            data[out] = grad
 
         # unset requires_grad_
         for req_grad, k in zip(old_requires_grad, self.wrt):
@@ -115,3 +118,94 @@ def ForceOutput(energy_model: GraphModuleMixin) -> GradientOutput:
         out_field=AtomicDataDict.FORCE_KEY,
         sign=-1,  # force is the negative gradient
     )
+
+
+@compile_mode("script")
+class StressOutput(GraphModuleMixin, torch.nn.Module):
+    r"""Compute stress (and forces) using autograd of an energy model.
+
+    Args:
+        func: the model to wrap
+    """
+    do_forces: bool
+
+    def __init__(self, energy_model: GraphModuleMixin, do_forces: bool = True):
+        super().__init__()
+        if not do_forces:
+            raise NotImplementedError
+        self.do_forces = do_forces
+
+        # Displacement is to cell, so has same irreps?
+        # TODO !!
+        energy_model.irreps_in["_displacement"] = None
+
+        self._grad = GradientOutput(
+            func=energy_model,
+            of=AtomicDataDict.TOTAL_ENERGY_KEY,
+            wrt=[
+                AtomicDataDict.POSITIONS_KEY,
+                "_displacement",
+            ],
+            out_field=[
+                AtomicDataDict.FORCE_KEY,
+                AtomicDataDict.STRESS_KEY,
+            ],
+        )
+
+        # check and init irreps
+        irreps_in = self._grad.irreps_in.copy()
+        assert AtomicDataDict.POSITIONS_KEY in irreps_in
+        irreps_in[AtomicDataDict.CELL_KEY] = None  # three vectors
+        del irreps_in["_displacement"]
+        self._init_irreps(
+            irreps_in=irreps_in,
+            irreps_out=self._grad.irreps_out,
+        )
+        del self.irreps_out["_displacement"]
+
+    def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
+        # TODO: does any of this make sense without PBC? check it
+        # Make the cell per-batch
+        data = AtomicDataDict.with_batch(data)
+        batch = data[AtomicDataDict.BATCH_KEY]
+        num_batch = batch.max() + 1
+        data[AtomicDataDict.CELL_KEY] = (
+            data[AtomicDataDict.CELL_KEY].view(-1, 3, 3).expand(num_batch, 3, 3)
+        )
+        # Add the displacements
+        # the GradientOutput will make them require grad
+        # See https://github.com/atomistic-machine-learning/schnetpack/blob/master/src/schnetpack/atomistic/model.py#L45
+        displacement = torch.zeros_like(
+            data[AtomicDataDict.CELL_KEY], requires_grad=True
+        )
+        data["_displacement"] = displacement
+        pos = data[AtomicDataDict.POSITIONS_KEY]
+        # bmm is natom in batch
+        data[AtomicDataDict.POSITIONS_KEY] = pos + torch.bmm(
+            pos.unsqueeze(-2), displacement[batch]
+        ).squeeze(-2)
+        cell = data[AtomicDataDict.CELL_KEY]
+        # bmm is num_batch in batch
+        data[AtomicDataDict.CELL_KEY] = cell + torch.bmm(cell, displacement)
+
+        # Call model and get gradients
+        data = self._grad(data)
+
+        # Put negative sign on forces
+        data[AtomicDataDict.FORCE_KEY] = torch.neg(data[AtomicDataDict.FORCE_KEY])
+
+        # Rescale stress tensor
+        # See https://github.com/atomistic-machine-learning/schnetpack/blob/master/src/schnetpack/atomistic/output_modules.py#L180
+        # First dim is batch, second is vec, third is xyz
+        volume = torch.sum(
+            cell[:, 0, :] * torch.cross(cell[:, 1, :], cell[:, 2, :], dim=1),
+            dim=1,
+            keepdim=True,
+        )[..., None]
+        assert len(volume) == num_batch
+        data[AtomicDataDict.STRESS_KEY] = data[AtomicDataDict.STRESS_KEY] / volume
+
+        # Remove helper
+        del data["_displacement"]
+
+        return data

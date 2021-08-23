@@ -1,1 +1,1 @@
-from ._eng import EnergyModel, ForceModel  # noqa: F401
+from ._eng import EnergyModel, ForceModel, StressForceModel  # noqa: F401

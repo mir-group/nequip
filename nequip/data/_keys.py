@@ -38,6 +38,7 @@ SPECIES_INDEX_KEY: Final[str] = "species_index"
 PER_ATOM_ENERGY_KEY: Final[str] = "atomic_energy"
 TOTAL_ENERGY_KEY: Final[str] = "total_energy"
 FORCE_KEY: Final[str] = "forces"
+STRESS_KEY: Final[str] = "stress"
 
 BATCH_KEY: Final[str] = "batch"
 
