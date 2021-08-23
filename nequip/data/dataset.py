@@ -405,7 +405,50 @@ class AtomicInMemoryDataset(AtomicDataset):
                 std = torch.std(arr, dim=0, unbiased=unbiased)
                 out.append((mean, std))
 
+            elif ana_mode == "atom_type_mean_std":
+
+                mean, std = self.per_atom_type_statistics(selector, arr)
+                out.append((mean, std))
+
         return out
+
+    def per_atom_type_statistics(self, selector, arr):
+
+        N = (self.type_count_per_graph[selector]).type(torch.get_default_dtype())
+        if N.shape[0] <= N.shape[1]:
+            raise RuntimeError("Not sufficient frames to obtain the variance")
+
+        mean = torch.matmul(torch.pinverse(N), arr)
+        res2 = torch.sum(torch.square(torch.matmul(N, mean) - arr))
+        NTN = torch.matmul(torch.transpose(N, 1, 0), N)
+        cov = res2 * torch.inverse(NTN) / (N.shape[0] - N.shape[1])
+        std = torch.sqrt(torch.diagonal(cov))
+
+        return mean, std
+
+    @property
+    def type_count_per_graph(self):
+        state = None
+        for i in range(self.data.num_graphs):
+            frame = self[i]
+            atomic_type = frame[AtomicDataDict.ATOM_TYPE_KEY]
+            bins = torch.bincount(atomic_type)
+            if state is None:
+                state = bins.reshape([1, -1])
+            else:
+                Ndiff = len(bins) - state.shape[1]
+                if Ndiff > 0:
+                    state = torch.cat(
+                        (
+                            state,
+                            torch.zeros((state.shape[0], Ndiff)),
+                        ),
+                        dim=1,
+                    )
+                elif Ndiff < 0:
+                    bins = torch.cat((bins, torch.zeros(-Ndiff)), dim=0)
+                state = torch.cat((state, bins.reshape([1, -1])), dim=0)
+        return state[:, 1:]
 
 
 # TODO: document fixed field mapped key behavior more clearly

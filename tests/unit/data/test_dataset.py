@@ -5,7 +5,7 @@ import torch
 
 from os.path import isdir, isfile
 
-import ase.data
+from ase.data import atomic_numbers, chemical_symbols
 from ase.io import write
 
 from nequip.data import (
@@ -14,6 +14,7 @@ from nequip.data import (
     NpzDataset,
     ASEDataset,
 )
+from nequip.data.transforms import TypeMapper
 from nequip.utils import dataset_from_config, Config
 
 
@@ -25,13 +26,13 @@ def ase_file(molecules):
         yield fp.name
 
 
-MAX_ATOMIC_NUMBER: int = 8
+MAX_ATOMIC_NUMBER: int = 5
 
 
 @pytest.fixture(scope="session")
 def npz():
     natoms = 3
-    nframes = 4
+    nframes = 8
     yield dict(
         positions=np.random.random((nframes, natoms, 3)),
         force=np.random.random((nframes, natoms, 3)),
@@ -139,6 +140,26 @@ class TestStatistics:
             force_rms.numpy(), np.sqrt(np.mean(np.square(npz["force"][0])))
         )
 
+class TestPerAtomStatistics:
+
+    def test_statistics(self, npz_dataset, npz):
+
+        # set up the transformer
+        unique = torch.unique(npz_dataset.data[AtomicDataDict.ATOMIC_NUMBERS_KEY])
+        npz_dataset.transform = TypeMapper(chemical_symbol_to_type={chemical_symbols[n]:i for i, n in enumerate(unique)})
+
+        # design a ground truth
+        N = npz_dataset.type_count_per_graph
+        e = torch.rand((N.shape[1], 1))
+        E = torch.matmul(N, e)
+        npz_dataset.data[AtomicDataDict.TOTAL_ENERGY_KEY] = E
+
+        ((mean, std),) = npz_dataset.statistics([AtomicDataDict.TOTAL_ENERGY_KEY],
+            modes=["atom_type_mean_std"],
+        )
+        assert torch.allclose(mean, e)
+        assert torch.allclose(std, torch.zeros_like(e), atol=1e-4)
+
 
 class TestReload:
     @pytest.mark.parametrize("change_rmax", [0, 1])
@@ -180,7 +201,7 @@ class TestFromConfig:
                 file_name=npz_data,
                 root=root,
                 chemical_symbol_to_type={
-                    ase.data.chemical_symbols[an]: an - 1
+                    chemical_symbols[an]: an - 1
                     for an in range(1, MAX_ATOMIC_NUMBER)
                 },
                 **args,
