@@ -20,7 +20,9 @@ def model(float_tolerance, request):
     shifts = [3, 5, 7]
     shifts[zero_species] = 0
     params = dict(
-        chemical_symbol_to_type={"H": 0, "C": 1, "O": 2}, total_shift=1.0, shifts=shifts
+        num_types=3,
+        total_shift=1.0,
+        shifts=shifts,
     )
     return SequentialGraphNetwork.from_parameters(
         shared_params=params,
@@ -46,9 +48,7 @@ def model(float_tolerance, request):
 def batches(float_tolerance, nequip_dataset):
     b = []
     for idx in [[0], [1], [0, 1]]:
-        b += [
-            AtomicData.to_AtomicDataDict(Batch.from_data_list(nequip_dataset.data[idx]))
-        ]
+        b += [AtomicData.to_AtomicDataDict(Batch.from_data_list(nequip_dataset[idx]))]
     return b
 
 
