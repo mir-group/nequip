@@ -223,9 +223,13 @@ lr_scheduler_factor: 0.5
 PerSpeciesScaleShift_enable: false
 # if the PerSpeciesScaleShift is enabled, whether the shifts and scales are trainable
 PerSpeciesScaleShift_trainable: true
-# optional initial atomic energy shift for each species. in order of type. Defaults to zeros.
+# optional initial atomic energy shift for each species. in order of type. Defaults to zeros. 
+# Another option is to use "dataset_energy_mean", which automatically compute the per atom energy mean
+# but ^ this mode is not compatible with global_shift = "dataset_energy_mean"
 PerSpeciesScaleShift_shifts: [0.0, 0.0, 0.0]
 # optional initial atomic energy scale for each species. in order of type. Defaults to ones.
+# Another option is to use "dataset_energy_std", which automatically compute the per atom energy mean
+# but ^ this mode is not compatible with global_shift = "dataset_energy_mean"
 PerSpeciesScaleShift_scales: [1.0, 1.0, 1.0]
 
 # global energy shift. When "dataset_energy_mean" (the default), the mean energy of the dataset. When None, disables the global shift. When a number, used directly.

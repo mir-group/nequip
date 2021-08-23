@@ -286,8 +286,7 @@ def fresh_start(config):
         logging.debug(
             f"Initially per atom outputs are scaled by: {scales}, eneriges are shifted by {shifts}."
         )
-
-    raise RuntimeError
+    # raise RuntimeError("hello")
 
     # = Build a model =
     model_builder = _load_callable(config.model_builder)
