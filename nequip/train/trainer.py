@@ -238,6 +238,7 @@ class Trainer:
         optim=None,
         optimizer_name: str = "Adam",
         optimizer_kwargs: Optional[dict] = None,
+        max_gradient_norm: float = float("inf"),
         use_ema: bool = False,
         ema_decay: float = 0.999,
         ema_use_num_updates=True,
@@ -572,6 +573,12 @@ class Trainer:
                 optional_args=self.optimizer_kwargs,
             )
 
+            self.max_gradient_norm = (
+                float(self.max_gradient_norm)
+                if self.max_gradient_norm is not None
+                else float("inf")
+            )
+
         if self.use_ema and self.ema is None:
             self.ema = ExponentialMovingAverage(
                 self.model.parameters(),
@@ -734,10 +741,19 @@ class Trainer:
         # Note that either way all normalization was handled internally by RescaleOutput
 
         if not validation:
+            # Actually do an optimization step, since we're training:
             loss, loss_contrib = self.loss(pred=out, ref=data_unscaled)
             # see https://pytorch.org/tutorials/recipes/recipes/tuning_guide.html#use-parameter-grad-none-instead-of-model-zero-grad-or-optimizer-zero-grad
             self.optim.zero_grad(set_to_none=True)
             loss.backward()
+
+            # See https://stackoverflow.com/a/56069467
+            # Has to happen after .backward() so there are grads to clip
+            if self.max_gradient_norm < float("inf"):
+                torch.nn.utils.clip_grad_norm_(
+                    self.model.parameters(), self.max_gradient_norm
+                )
+
             self.optim.step()
 
             if self.use_ema:
