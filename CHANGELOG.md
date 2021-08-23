@@ -12,6 +12,7 @@ Most recent change on the bottom.
 - Support for parallel dataloader workers with `dataloader_num_workers`
 - Optionally independently configure validation and training datasets
 - Save dataset parameters along with processed data
+- Gradient clipping
 
 ### Changed
 - Name processed datasets based on a hash of their parameters to ensure only valid cached data is used
