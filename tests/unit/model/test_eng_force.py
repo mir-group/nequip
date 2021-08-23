@@ -7,12 +7,11 @@ from os.path import isfile
 
 import numpy as np
 
-import ase.data
-
 from e3nn import o3
 from e3nn.util.jit import script
 
-from nequip.data import AtomicDataDict, AtomicData
+from nequip.data import AtomicDataDict, AtomicData, Collater
+from nequip.data.transforms import TypeMapper
 from nequip.models import EnergyModel, ForceModel
 from nequip.nn import GraphModuleMixin, AtomwiseLinear
 from nequip.utils.initialization import uniform_initialize_equivariant_linears
@@ -223,7 +222,8 @@ class TestGradient:
 
 class TestAutoGradient:
     def test_cross_frame_grad(self, config, nequip_dataset):
-        batch = nequip_dataset.data
+        c = Collater.for_dataset(nequip_dataset)
+        batch = c([nequip_dataset[i] for i in range(len(nequip_dataset))])
         device = "cpu"
         energy_model = EnergyModel(**config)
         energy_model.to(device)
@@ -265,9 +265,10 @@ class TestCutoff:
         atoms2.positions += 40.0 + np.random.randn(3)
         atoms_both = atoms1.copy()
         atoms_both.extend(atoms2)
-        data1 = AtomicData.from_ase(atoms1, r_max=r_max)
-        data2 = AtomicData.from_ase(atoms2, r_max=r_max)
-        data_both = AtomicData.from_ase(atoms_both, r_max=r_max)
+        tm = TypeMapper(chemical_symbol_to_type={"H": 0, "C": 1, "O": 2})
+        data1 = tm(AtomicData.from_ase(atoms1, r_max=r_max))
+        data2 = tm(AtomicData.from_ase(atoms2, r_max=r_max))
+        data_both = tm(AtomicData.from_ase(atoms_both, r_max=r_max))
         assert (
             data_both[AtomicDataDict.EDGE_INDEX_KEY].shape[1]
             == data1[AtomicDataDict.EDGE_INDEX_KEY].shape[1]
@@ -289,7 +290,7 @@ class TestCutoff:
         atoms3 = atoms2.copy()
         atoms3.positions += np.random.randn(3)
         atoms_both2.extend(atoms3)
-        data_both2 = AtomicData.from_ase(atoms_both2, r_max=r_max)
+        data_both2 = tm(AtomicData.from_ase(atoms_both2, r_max=r_max))
         out_both2 = instance(AtomicData.to_AtomicDataDict(data_both2))
         assert torch.allclose(
             out_both2[AtomicDataDict.TOTAL_ENERGY_KEY],
@@ -308,7 +309,7 @@ class TestCutoff:
 
         # make a synthetic three atom example
         data = AtomicData(
-            atomic_numbers=np.random.choice([1, 6, 8], size=3),
+            atom_types=np.random.choice([0, 1, 2], size=3),
             pos=np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]),
             edge_index=np.array([[0, 1, 0, 2], [1, 0, 2, 0]]),
         )
