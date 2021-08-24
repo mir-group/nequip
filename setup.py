@@ -36,7 +36,7 @@ setup(
         "pyyaml",
         "contextlib2;python_version<'3.7'",  # backport of nullcontext
         "typing_extensions;python_version<'3.8'",
-        "torch-runstats",
+        "torch-runstats>=0.2.0",
     ],
     zip_safe=True,
 )
