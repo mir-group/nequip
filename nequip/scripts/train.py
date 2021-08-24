@@ -161,23 +161,17 @@ def fresh_start(config):
         "dataset_force_rms" if force_training else "dataset_energy_std",
     )
 
+    # = Get setting for per species shift =
     def get_per_species(key, default):
         return config.get(
             f"PerSpeciesScaleShift_{key}",
             config.get(f"per_species_scale_shift_{key}", default),
         )
 
-    def pop_per_species(key, default):
-        return config.pop(
-            f"PerSpeciesScaleShift_{key}",
-            config.pop(f"per_species_scale_shift_{key}", default),
-        )
-
     per_species_scale_shift = get_per_species("enable", False)
     if global_shift is not None and per_species_scale_shift:
         raise ValueError("One can only enable either global shift or per_species shift")
-    logging.debug(f"Enable per species scale shift: {per_species_scale_shift}")
-    logging.debug(f"Enable global scale shift: {per_species_scale_shift}")
+    logging.info(f"Enable per species scale/shift: {per_species_scale_shift}")
 
     # = Get statistics of training dataset =
     if force_training:
@@ -192,8 +186,28 @@ def fresh_start(config):
             modes=["mean_std"],
             stride=config.dataset_statistics_stride,
         )
+    if per_species_scale_shift:
 
-    # = Determine shifts, scales =
+        def pop_per_species(key, default):
+            return config.pop(
+                f"PerSpeciesScaleShift_{key}",
+                config.pop(f"per_species_scale_shift_{key}", default),
+            )
+
+        scales = pop_per_species("scales", None)
+        shifts = pop_per_species("shifts", None)
+        sigma = pop_per_species("sigma", None)
+        if scales == "dataset_energy_std" or shifts == "dataset_energy_mean":
+            (
+                (per_species_energies_mean, per_species_energies_std),
+            ) = trainer.dataset_train.statistics(
+                fields=[AtomicDataDict.TOTAL_ENERGY_KEY],
+                modes=["atom_type_mean_std"],
+                stride=config.dataset_statistics_stride,
+                sigma=sigma,
+            )
+
+    # = Determine global shifts, scales =
     # This is a bit awkward, but necessary for there to be a value
     # in the config that signals "use dataset"
 
@@ -234,23 +248,8 @@ def fresh_start(config):
         )
         # TODO: offer option to disable rescaling?
 
-    logging.debug(
-        f"Initially outputs are scaled by: {global_scale}, eneriges are shifted by {global_shift}."
-    )
-
+    # = Determine per species scale/shift =
     if per_species_scale_shift:
-        scales = pop_per_species("scales", None)
-        shifts = pop_per_species("shifts", None)
-        sigma = pop_per_species("sigma", None)
-        if scales == "dataset_energy_std" or shifts == "dataset_energy_mean":
-            (
-                (per_species_energies_mean, per_species_energies_std),
-            ) = trainer.dataset_train.statistics(
-                fields=[AtomicDataDict.TOTAL_ENERGY_KEY],
-                modes=["atom_type_mean_std"],
-                stride=config.dataset_statistics_stride,
-                sigma=sigma,
-            )
 
         if scales == "dataset_energy_std":
             scales = per_species_energies_std
@@ -259,8 +258,6 @@ def fresh_start(config):
                     f"Atomic energy scaling was very low: {torch.min(scales)}. "
                     "If dataset values were used, does the dataset contain insufficient variation? Maybe try disabling global scaling with global_scale=None."
                 )
-        elif scales == "dataset_force_rms" and force_training:
-            scales = force_rms * torch.ones(per_species_energies_mean.shape)
         elif (
             scales is None
             or isinstance(scales, float)
@@ -269,11 +266,6 @@ def fresh_start(config):
             pass
         else:
             raise ValueError(f"Scales has to be number or but {scales}")
-
-        if not (global_scale is None or scales is None):
-            raise ValueError(
-                f"Only one intial values of global scale and local scale are allowed to be set"
-            )
 
         config["PerSpeciesScaleShift_scales"] = scales
 
@@ -325,6 +317,9 @@ def fresh_start(config):
         trainable_global_rescale_scale=config.get(
             "trainable_global_rescale_scale", False
         ),
+    )
+    logging.info(
+        f"Initially outputs are scaled by: {global_scale}, eneriges are shifted by {global_shift}."
     )
 
     logging.info("Successfully built the network...")

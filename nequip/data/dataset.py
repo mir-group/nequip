@@ -439,25 +439,29 @@ class AtomicInMemoryDataset(AtomicDataset):
         num_types = N.shape[1]
         NT = torch.transpose(N, 1, 0)
 
-        if sigma is None:
-            try:
-                invN = torch.pinverse(N)
-                invNTN = torch.inverse(torch.matmul(NT, N))
-            except Exception as e:
+        try:
+            invNTN = torch.inverse(torch.matmul(NT, N))
+        except Exception as e:
+            if sigma is None:
                 raise RuntimeError(
                     f"Cannot get a solution {e} with sigma is None."
                     "set PerSpeciesShiftScale_sigma to i.e. 0.2"
                 )
-        else:
-            if sigma <= 0:
-                raise ValueError("sigma has to be > 0.")
-            NTN = torch.matmul(NT, N)
-            NTN += sigma * torch.diag(torch.ones(NTN.shape[0]))
-            invNTN = torch.inverse(NTN)
-            invN = torch.matmul(invNTN, NT)
+            else:
+                logging.warning(
+                    f"using ridge regression to compute per species weight."
+                    "Note that the result greatly depends on the sigma value"
+                )
+                NTN = torch.matmul(NT, N)
+                if sigma <= 0:
+                    raise ValueError("sigma has to be > 0.")
+                NTN += sigma * torch.diag(torch.ones(NTN.shape[0]))
+                invNTN = torch.inverse(NTN)
 
+        invN = torch.matmul(invNTN, NT)
         mean = torch.matmul(invN, arr)
-        res2 = torch.sum(torch.square(torch.matmul(N, mean) - arr))
+
+        res2 = (torch.square(torch.matmul(N, mean) - arr)).sum()
         if n < num_types:
             cov = res2 * invNTN / n
         else:
