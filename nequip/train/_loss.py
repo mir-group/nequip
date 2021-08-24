@@ -26,7 +26,7 @@ class SimpleLoss:
     """
 
     def __init__(self, func_name: str, params: dict = {}):
-        self.has_nan = params.get("has_nan", False)
+        self.ignore_nan = params.get("ignore_nan", False)
         func, _ = instantiate_from_cls_name(
             torch.nn,
             class_name=func_name,
@@ -44,13 +44,11 @@ class SimpleLoss:
         key: str,
         mean: bool = True,
     ):
-
-
         # zero the nan entries
-        has_nan = self.has_nan and torch.isnan(ref[key].mean())
+        has_nan = self.ignore_nan and torch.isnan(ref[key].mean())
         if has_nan:
-            not_nan = (ref[key]==ref[key]).int()
-            loss = self.func(pred[key], torch.nan_to_num(ref[key], nan=0.0))*not_nan
+            not_nan = (ref[key] == ref[key]).int()
+            loss = self.func(pred[key], torch.nan_to_num(ref[key], nan=0.0)) * not_nan
             if mean:
                 return loss.sum() / not_nan.sum()
             else:
@@ -80,11 +78,13 @@ class PerSpeciesLoss(SimpleLoss):
         if not mean:
             raise NotImplementedError("Cannot handle this yet")
 
-        has_nan = self.has_nan and torch.isnan(ref[key].mean())
+        has_nan = self.ignore_nan and torch.isnan(ref[key].mean())
 
         if has_nan:
             not_nan = (ref[key] == ref[key]).int()
-            per_atom_loss = self.func(pred[key], torch.nan_to_num(ref[key], nan=0.0))*not_nan
+            per_atom_loss = (
+                self.func(pred[key], torch.nan_to_num(ref[key], nan=0.0)) * not_nan
+            )
         else:
             per_atom_loss = self.func(pred[key], ref[key])
 

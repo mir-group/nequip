@@ -126,13 +126,15 @@ class LossStat:
     def __init__(self, loss_instance=None):
         self.loss_stat = {
             "total": RunningStats(
-                dim=tuple(), reduction=Reduction.MEAN, has_nan=False
+                dim=tuple(), reduction=Reduction.MEAN, ignore_nan=False
             )
         }
-        self.has_nan = {}
+        self.ignore_nan = {}
         if loss_instance is not None:
             for key, func in loss_instance.funcs.items():
-                self.has_nan[key] = func.has_nan if hasattr(func, "has_nan") else False
+                self.ignore_nan[key] = (
+                    func.ignore_nan if hasattr(func, "ignore_nan") else False
+                )
 
     def __call__(self, loss, loss_contrib):
         """
@@ -154,7 +156,7 @@ class LossStat:
                 self.loss_stat[k] = RunningStats(
                     dim=tuple(),
                     reduction=Reduction.MEAN,
-                    has_nan=self.has_nan.get(k, False),
+                    ignore_nan=self.ignore_nan.get(k, False),
                 )
                 device = v.get_device()
                 self.loss_stat[k].to(device="cpu" if device == -1 else device)
