@@ -168,11 +168,11 @@ def fresh_start(config):
         raise ValueError("One can only enable either global shift or per_species shift")
     logging.info(f"Enable per species scale/shift: {per_species_scale_shift}")
 
-    # = Determine what statistics need to be compute = 
+    # = Determine what statistics need to be compute =
     keys = []
     for variable in [global_shift, global_scale, scales, shifts]:
         if isinstance(variable, str) and variable.startswith("dataset"):
-            keys += [variable[len("dataset_"):]]
+            keys += [variable[len("dataset_") :]]
     keys = list(set(keys))
     if "force_rms" in keys and not force_training:
         raise ValueError(
@@ -180,22 +180,22 @@ def fresh_start(config):
         )
 
     # = Get statistics of training dataset =
-    value_dict = {}
+    dataset_statistics = {}
     if "force_rms" in keys:
         ((rms,),) = trainer.dataset_train.statistics(
             fields=[AtomicDataDict.FORCE_KEY],
             modes=["rms"],
             stride=config.dataset_statistics_stride,
         )
-        value_dict["dataset_force_rms"] = rms
+        dataset_statistics["dataset_force_rms"] = rms
     if "energy_std" in keys or "energy_mean" in keys:
         ((mean, std),) = trainer.dataset_train.statistics(
             fields=[AtomicDataDict.TOTAL_ENERGY_KEY],
             modes=["mean_std"],
             stride=config.dataset_statistics_stride,
         )
-        value_dict["dataset_energy_mean"] = mean
-        value_dict["dataset_energy_std"] = std
+        dataset_statistics["dataset_energy_mean"] = mean
+        dataset_statistics["dataset_energy_std"] = std
     if "per_species_energy_std" in keys or "per_species_energy_mean" in keys:
         ((mean, std),) = trainer.dataset_train.statistics(
             fields=[AtomicDataDict.TOTAL_ENERGY_KEY],
@@ -203,20 +203,23 @@ def fresh_start(config):
             stride=config.dataset_statistics_stride,
             sigma=sigma,
         )
-        value_dict["dataset_per_species_energy_mean"] = mean
-        value_dict["dataset_per_species_energy_std"] = std
+        dataset_statistics["dataset_per_species_energy_mean"] = mean
+        dataset_statistics["dataset_per_species_energy_std"] = std
 
-    # = Determine global shifts, scales =
-    # This is a bit awkward, but necessary for there to be a value
+    # = Determine global and per species shifts, scales =
+    # This is a bit awkward, but set_value function is
+    # necessary for there to be a value
     # in the config that signals "use dataset"
 
     global_shift = set_value(
         variable=global_shift,
         variable_name="global_shift",
-        value_dict=value_dict,
+        value_dict=dataset_statistics,
     )
     global_scale = set_value(
-        variable=global_scale, variable_name="global_scale", value_dict=value_dict
+        variable=global_scale,
+        variable_name="global_scale",
+        value_dict=dataset_statistics,
     )
 
     RESCALE_THRESHOLD = 1e-6
@@ -234,12 +237,12 @@ def fresh_start(config):
         scales = set_value(
             variable=scales,
             variable_name="per_species_scales",
-            value_dict=value_dict,
+            value_dict=dataset_statistics,
         )
         shifts = set_value(
             variable=shifts,
             variable_name="per_species_shifts",
-            value_dict=value_dict,
+            value_dict=dataset_statistics,
         )
         if scales is not None and torch.min(scales) < RESCALE_THRESHOLD:
             raise ValueError(

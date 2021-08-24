@@ -34,9 +34,27 @@ n_train: 5
 n_val: 5
 batch_size: 1
 max_epochs: 10
+learning_rate: 0.0
 
 # loss function
-loss_coeffs: total_energy
+loss_coeffs: 
+  total_energy: 0.0001
+  forces: 1.0
 
 # optimizer
 optimizer_name: Adam
+
+PerSpeciesScaleShift_trainable: true
+# # optional initial atomic energy shift for each species. in order of type. Defaults to zeros. 
+# # Another option is to use "dataset_energy_mean", which automatically compute the per atom energy mean
+# # but ^ this mode is not compatible with global_shift = "dataset_energy_mean"
+PerSpeciesScaleShift_shifts: dataset_per_species_energy_mean
+# # optional initial atomic energy scale for each species. in order of type. Defaults to ones.
+# # Another option is to use "dataset_energy_std", which automatically compute the per atom energy mean
+# # but ^ this mode is not compatible with global_shift = "dataset_energy_mean"
+PerSpeciesScaleShift_scales: dataset_per_species_energy_std
+PerSpeciesScaleShift_sigma: 4.0
+global_rescale_shift: null
+global_rescale_scale: dataset_force_rms
+# global_rescale_scale: null
+PerSpeciesScaleShift_enable: true

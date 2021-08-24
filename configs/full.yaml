@@ -224,11 +224,11 @@ PerSpeciesScaleShift_enable: false
 # if the PerSpeciesScaleShift is enabled, whether the shifts and scales are trainable
 PerSpeciesScaleShift_trainable: true
 # optional initial atomic energy shift for each species. in order of type. Defaults to zeros. 
-# Another option is to use "dataset_energy_mean", which automatically compute the per atom energy mean
+# Another option is to use "dataset_per_species_energy_mean", which automatically compute the per atom energy mean
 # but ^ this mode is not compatible with global_shift = "dataset_energy_mean"
 PerSpeciesScaleShift_shifts: [0.0, 0.0, 0.0]
 # optional initial atomic energy scale for each species. in order of type. Defaults to ones.
-# Another option is to use "dataset_energy_std", which automatically compute the per atom energy mean
+# Another option is to use "dataset_per_species_energy_std", which automatically compute the per atom energy mean
 # but ^ this mode is not compatible with global_shift = "dataset_energy_mean"
 PerSpeciesScaleShift_scales: [1.0, 1.0, 1.0]
 
@@ -241,6 +241,16 @@ global_rescale_scale: dataset_force_rms
 trainable_global_rescale_shift: false
 # whether the scale of the final global energy rescaling should be trainable
 trainable_global_rescale_scale: false
+
+# # example block to do good per species shifting
+# # note, sigma needs to be tuned 4.0 works the best for aspirin dataset.
+# PerSpeciesScaleShift_trainable: true
+# PerSpeciesScaleShift_shifts: dataset_per_species_energy_mean
+# PerSpeciesScaleShift_scales: dataset_per_species_energy_std
+# PerSpeciesScaleShift_sigma: 4.0
+# global_rescale_shift: null
+# global_rescale_scale: dataset_force_rms
+# PerSpeciesScaleShift_enable: true
 
 
 # Options for e3nn's set_optimization_defaults. A dict:
