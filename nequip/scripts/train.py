@@ -160,86 +160,64 @@ def fresh_start(config):
         "global_rescale_scale",
         "dataset_force_rms" if force_training else "dataset_energy_std",
     )
-
-    # = Get setting for per species shift =
-    def get_per_species(key, default):
-        return config.get(
-            f"PerSpeciesScaleShift_{key}",
-            config.get(f"per_species_scale_shift_{key}", default),
-        )
-
-    per_species_scale_shift = get_per_species("enable", False)
+    per_species_scale_shift = get_per_species(config, "enable", False)
+    scales = pop_per_species(config, "scales", None)
+    shifts = pop_per_species(config, "shifts", None)
+    sigma = pop_per_species(config, "sigma", None)
     if global_shift is not None and per_species_scale_shift:
         raise ValueError("One can only enable either global shift or per_species shift")
     logging.info(f"Enable per species scale/shift: {per_species_scale_shift}")
 
+    # = Determine what statistics need to be compute = 
+    keys = []
+    for variable in [global_shift, global_scale, scales, shifts]:
+        if isinstance(variable, str) and variable.startswith("dataset"):
+            keys += [variable[len("dataset_"):]]
+    keys = list(set(keys))
+    if "force_rms" in keys and not force_training:
+        raise ValueError(
+            "Cannot have global_scale = 'dataset_force_rms' without force training"
+        )
+
     # = Get statistics of training dataset =
-    if force_training:
-        ((force_rms,),) = trainer.dataset_train.statistics(
+    value_dict = {}
+    if "force_rms" in keys:
+        ((rms,),) = trainer.dataset_train.statistics(
             fields=[AtomicDataDict.FORCE_KEY],
             modes=["rms"],
             stride=config.dataset_statistics_stride,
         )
-    if global_scale == "dataset_energy_std" or global_shift == "dataset_energy_mean":
-        ((energies_mean, energies_std),) = trainer.dataset_train.statistics(
+        value_dict["dataset_force_rms"] = rms
+    if "energy_std" in keys or "energy_mean" in keys:
+        ((mean, std),) = trainer.dataset_train.statistics(
             fields=[AtomicDataDict.TOTAL_ENERGY_KEY],
             modes=["mean_std"],
             stride=config.dataset_statistics_stride,
         )
-    if per_species_scale_shift:
-
-        def pop_per_species(key, default):
-            return config.pop(
-                f"PerSpeciesScaleShift_{key}",
-                config.pop(f"per_species_scale_shift_{key}", default),
-            )
-
-        scales = pop_per_species("scales", None)
-        shifts = pop_per_species("shifts", None)
-        sigma = pop_per_species("sigma", None)
-        if scales == "dataset_energy_std" or shifts == "dataset_energy_mean":
-            (
-                (per_species_energies_mean, per_species_energies_std),
-            ) = trainer.dataset_train.statistics(
-                fields=[AtomicDataDict.TOTAL_ENERGY_KEY],
-                modes=["atom_type_mean_std"],
-                stride=config.dataset_statistics_stride,
-                sigma=sigma,
-            )
+        value_dict["dataset_energy_mean"] = mean
+        value_dict["dataset_energy_std"] = std
+    if "per_species_energy_std" in keys or "per_species_energy_mean" in keys:
+        ((mean, std),) = trainer.dataset_train.statistics(
+            fields=[AtomicDataDict.TOTAL_ENERGY_KEY],
+            modes=["atom_type_mean_std"],
+            stride=config.dataset_statistics_stride,
+            sigma=sigma,
+        )
+        value_dict["dataset_per_species_energy_mean"] = mean
+        value_dict["dataset_per_species_energy_std"] = std
 
     # = Determine global shifts, scales =
     # This is a bit awkward, but necessary for there to be a value
     # in the config that signals "use dataset"
 
-    if global_shift == "dataset_energy_mean":
-        global_shift = energies_mean
-    elif (
-        global_shift is None
-        or isinstance(global_shift, float)
-        or isinstance(global_shift, torch.Tensor)
-    ):
-        # valid values
-        pass
-    else:
-        raise ValueError(f"Invalid global shift `{global_shift}`")
-
-    if global_scale == "dataset_energy_std":
-        global_scale = energies_std
-    elif global_scale == "dataset_force_rms":
-        if not force_training:
-            raise ValueError(
-                "Cannot have global_scale = 'dataset_force_rms' without force training"
-            )
-        global_scale = force_rms
-    elif (
-        global_scale is None
-        or isinstance(global_scale, float)
-        or isinstance(global_scale, torch.Tensor)
-    ):
-        # valid values
-        pass
-    else:
-        raise ValueError(f"Invalid global scale `{global_scale}`")
+    global_shift = set_value(
+        variable=global_shift,
+        variable_name="global_shift",
+        value_dict=value_dict,
+    )
+    global_scale = set_value(
+        variable=global_scale, variable_name="global_scale", value_dict=value_dict
+    )
 
     RESCALE_THRESHOLD = 1e-6
     if isinstance(global_scale, float) and global_scale < RESCALE_THRESHOLD:
@@ -251,36 +229,26 @@ def fresh_start(config):
     # = Determine per species scale/shift =
     if per_species_scale_shift:
 
-        if scales == "dataset_energy_std":
-            scales = per_species_energies_std
-            if torch.min(scales) < RESCALE_THRESHOLD:
-                raise ValueError(
-                    f"Atomic energy scaling was very low: {torch.min(scales)}. "
-                    "If dataset values were used, does the dataset contain insufficient variation? Maybe try disabling global scaling with global_scale=None."
-                )
-        elif (
-            scales is None
-            or isinstance(scales, float)
-            or isinstance(scales, torch.Tensor)
-        ):
-            pass
-        else:
-            raise ValueError(f"Scales has to be number or but {scales}")
+        gs = 1 if global_scale is None else global_scale
 
-        config["PerSpeciesScaleShift_scales"] = scales
-
-        if shifts == "dataset_energy_mean":
-            shifts = per_species_energies_mean
-        elif (
-            shifts is None
-            or isinstance(shifts, float)
-            or isinstance(shifts, torch.Tensor)
-        ):
-            pass
-        else:
-            raise ValueError(f"Shifts has to be number but {shifts}")
-        config["PerSpeciesScaleShift_shifts"] = shifts
-        logging.debug(
+        scales = set_value(
+            variable=scales,
+            variable_name="per_species_scales",
+            value_dict=value_dict,
+        )
+        shifts = set_value(
+            variable=shifts,
+            variable_name="per_species_shifts",
+            value_dict=value_dict,
+        )
+        if scales is not None and torch.min(scales) < RESCALE_THRESHOLD:
+            raise ValueError(
+                f"Atomic energy scaling was very low: {torch.min(scales)}. "
+                "If dataset values were used, does the dataset contain insufficient variation? Maybe try disabling global scaling with global_scale=None."
+            )
+        config["PerSpeciesScaleShift_scales"] = None if scales is None else scales / gs
+        config["PerSpeciesScaleShift_shifts"] = None if shifts is None else shifts / gs
+        logging.info(
             f"Initially per atom outputs are scaled by: {scales}, eneriges are shifted by {shifts}."
         )
 
@@ -349,6 +317,34 @@ def fresh_start(config):
     trainer.train()
 
     return
+
+
+def pop_per_species(config, key, default):
+    return config.pop(
+        f"PerSpeciesScaleShift_{key}",
+        config.pop(f"per_species_scale_shift_{key}", default),
+    )
+
+
+def get_per_species(config, key, default):
+    return config.get(
+        f"PerSpeciesScaleShift_{key}",
+        config.get(f"per_species_scale_shift_{key}", default),
+    )
+
+
+def set_value(variable, variable_name, value_dict):
+    for key, value in value_dict.items():
+        if variable == key:
+            return value
+    if (
+        variable is None
+        or isinstance(variable, float)
+        or isinstance(variable, torch.Tensor)
+    ):
+        return variable
+    print("value_dict", value_dict.keys())
+    raise ValueError(f"Invalid {variable_name} `{variable}`")
 
 
 if __name__ == "__main__":
