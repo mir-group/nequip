@@ -37,7 +37,7 @@ def npz():
     yield dict(
         positions=np.random.random((nframes, natoms, 3)),
         force=np.random.random((nframes, natoms, 3)),
-        energy=np.random.random(nframes),
+        energy=np.random.random(nframes) * -600,
         Z=np.random.randint(1, MAX_ATOMIC_NUMBER, size=(nframes, natoms)),
     )
 
@@ -169,14 +169,22 @@ class TestPerAtomStatistics:
         assert torch.allclose(std, torch.zeros_like(e), atol=1e-4)
 
 
-class TestPerAtomStatistics2:
-    def test_same_species(self, npz_dataset):
+class TestPerAtomStatisticsSameSpecies:
+    @pytest.mark.parametrize("sigma", [0.1, 0.5, 1])
+    @pytest.mark.parametrize("fixed_field", [True, False])
+    def test_sigma(self, npz_dataset, sigma, fixed_field):
 
         # let all atoms to be the same type
-        n = npz_dataset.data[AtomicDataDict.BATCH_KEY]
-        new_n = torch.ones(n.shape, dtype=torch.int64)
-        new_n[::NATOMS] += 2
-        npz_dataset.data[AtomicDataDict.ATOMIC_NUMBERS_KEY] = new_n
+        num_nodes = npz_dataset.data[AtomicDataDict.BATCH_KEY].shape[0]
+        if fixed_field:
+            npz_dataset.data[AtomicDataDict.ATOMIC_NUMBERS_KEY] = None
+            new_n = torch.ones(NATOMS, dtype=torch.int64)
+            new_n[0] += 2
+            npz_dataset.fixed_fields[AtomicDataDict.ATOMIC_NUMBERS_KEY] = new_n
+        else:
+            new_n = torch.ones(num_nodes, dtype=torch.int64)
+            new_n[::NATOMS] += 2
+            npz_dataset.data[AtomicDataDict.ATOMIC_NUMBERS_KEY] = new_n
 
         # set up the transformer
         npz_dataset.transform = TypeMapper(
@@ -185,51 +193,33 @@ class TestPerAtomStatistics2:
             }
         )
 
-        # compute the ground truth
+        N, fixed_field = npz_dataset.type_count_per_graph()
+        N = N.type(torch.get_default_dtype())
+
+        # compute direct average as comparison
         E = npz_dataset.data[AtomicDataDict.TOTAL_ENERGY_KEY]
-        ref_E = E / (n.shape[0] / len(npz_dataset))
+        ref_E = E / (num_nodes / len(npz_dataset))
         ref_mean = ref_E.mean() * torch.ones(2)
         ref_std = ref_E.std() * torch.ones(2)
+        ref_res2 = torch.square(
+            torch.matmul(N, ref_mean.reshape([-1, 1])) - E.reshape([-1, 1])
+        ).sum()
 
         ((mean, std),) = npz_dataset.statistics(
-            [AtomicDataDict.TOTAL_ENERGY_KEY],
-            modes=["atom_type_mean_std"],
+            [AtomicDataDict.TOTAL_ENERGY_KEY], modes=["atom_type_mean_std"], sigma=sigma
         )
+
+        res = torch.matmul(N, mean.reshape([-1, 1])) - E.reshape([-1, 1])
+        res2 = torch.sum(torch.square(res))
+        print("residue", sigma, res2 - ref_res2)
         print("mean", mean, ref_mean)
-        assert torch.allclose(mean, ref_mean)
-        assert torch.allclose(std, ref_std)
+        print(std, ref_std)
 
-
-class TestPerAtomStatistics3:
-    def test_same_species(self, npz_dataset):
-
-        # let all atoms to be the same type
-        npz_dataset.data[AtomicDataDict.ATOMIC_NUMBERS_KEY] = None
-        npz_dataset.fixed_fields[AtomicDataDict.ATOMIC_NUMBERS_KEY] = torch.ones(
-            NATOMS, dtype=torch.int64
-        )
-        print("fixed_fields", npz_dataset.fixed_fields)
-
-        # set up the transformer
-        npz_dataset.transform = TypeMapper(
-            chemical_symbol_to_type={
-                chemical_symbols[n]: i for i, n in enumerate([1, 3])
-            }
-        )
-
-        # compute the ground truth
-        E = npz_dataset.data[AtomicDataDict.TOTAL_ENERGY_KEY]
-        ref_E = E / NATOMS
-        print(ref_E)
-        ref_mean = ref_E.mean().reshape([1])
-        ref_std = ref_E.std().reshape([1])
-
-        ((mean, std),) = npz_dataset.statistics(
-            [AtomicDataDict.TOTAL_ENERGY_KEY],
-            modes=["atom_type_mean_std"],
-        )
-        assert torch.allclose(mean, ref_mean)
-        assert torch.allclose(std, ref_std)
+        if sigma in [None, 0]:
+            assert torch.allclose(mean, ref_mean)
+            assert torch.allclose(std, ref_std)
+        # else:
+        #     assert res2 > ref_res2
 
 
 class TestReload:

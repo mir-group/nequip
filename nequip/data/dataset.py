@@ -8,6 +8,7 @@ import numpy as np
 import logging
 import tempfile
 import inspect
+from torch._C import Value
 import yaml
 import hashlib
 from os.path import dirname, basename, abspath
@@ -23,7 +24,6 @@ from nequip.data import AtomicData, AtomicDataDict
 from nequip.utils.batch_ops import bincount
 from ._util import _TORCH_INTEGER_DTYPES
 from .transforms import TypeMapper
-from nequip.data import transforms
 
 
 class AtomicDataset(Dataset):
@@ -324,7 +324,7 @@ class AtomicInMemoryDataset(AtomicDataset):
         stride: int = 1,
         unbiased: bool = True,
         modes: Optional[List[Union[str]]] = None,
-        **kwargs
+        **kwargs,
     ) -> List[tuple]:
 
         if self._indices is not None:
@@ -414,7 +414,9 @@ class AtomicInMemoryDataset(AtomicDataset):
             elif ana_mode == "atom_type_mean_std":
 
                 sigma = kwargs.pop("sigma", None)
-                mean, std = self.per_atom_type_statistics(graph_selector, arr, sigma=sigma)
+                mean, std = self.per_atom_type_statistics(
+                    graph_selector, arr, sigma=sigma
+                )
                 out.append((mean, std))
 
         return out
@@ -422,46 +424,45 @@ class AtomicInMemoryDataset(AtomicDataset):
     def per_atom_type_statistics(self, selector, arr, sigma=None):
 
         N, fixed_field = self.type_count_per_graph()
+        N = N.type(torch.get_default_dtype())
 
-        solved = False
-        if not fixed_field:
-            n = N.shape[0]
-            num_types = N.shape[1]
-
-            try:
-                N = N.type(torch.get_default_dtype())
-                N = N[selector]
-                if n < num_types and (sigma == 0.0 or sigma is None):
-                    raise RuntimeError("Not sufficient frames to obtain the variance")
-
-                NT = torch.transpose(N, 1, 0)
-                NTN = torch.matmul(NT, N)
-                if sigma is not None:
-                    NTN += sigma*torch.diag(torch.ones(num_types))
-                invNTN = torch.inverse(NTN)
-                invN = torch.matmul(invNTN,NT)
-
-                mean = torch.matmul(invN, arr)
-                res2 = torch.sum(torch.square(torch.matmul(N, mean) - arr))
-                if n < num_types:
-                    cov = res2 * invNTN / n
-                else:
-                    cov = res2 * invNTN / (n-num_types)
-                std = torch.sqrt(torch.diagonal(cov))
-                solved = True
-            except Exception as e:
-                logging.debug(
-                    f"Cannot get a solution {e}. Use average atomic energy instead"
-                )
-                N = N.sum(axis=1, keepdim=True)
-        else:
+        if fixed_field:
             num_types = N.shape[0]
-            N = N.sum()
+            n = arr.shape[0]
+            N = torch.matmul(
+                torch.ones((n, 1), dtype=torch.get_default_dtype()), N.reshape([1, -1])
+            )
+        else:
+            N = N[selector]
 
-        if not solved:
-            atomic_energy = arr / N
-            mean = atomic_energy.mean() * torch.ones(num_types)
-            std = atomic_energy.std() * torch.ones(num_types)
+        n = N.shape[0]
+        num_types = N.shape[1]
+        NT = torch.transpose(N, 1, 0)
+
+        if sigma is None:
+            try:
+                invN = torch.pinverse(N)
+                invNTN = torch.inverse(torch.matmul(NT, N))
+            except Exception as e:
+                raise RuntimeError(
+                    f"Cannot get a solution {e} with sigma is None."
+                    "set PerSpeciesShiftScale_sigma to i.e. 0.2"
+                )
+        else:
+            if sigma <= 0:
+                raise ValueError("sigma has to be > 0.")
+            NTN = torch.matmul(NT, N)
+            NTN += sigma * torch.diag(torch.ones(NTN.shape[0]))
+            invNTN = torch.inverse(NTN)
+            invN = torch.matmul(invNTN, NT)
+
+        mean = torch.matmul(invN, arr)
+        res2 = torch.sum(torch.square(torch.matmul(N, mean) - arr))
+        if n < num_types:
+            cov = res2 * invNTN / n
+        else:
+            cov = res2 * invNTN / (n - num_types)
+        std = torch.sqrt(torch.diagonal(cov))
 
         return mean.reshape([-1]), std.reshape([-1])
 

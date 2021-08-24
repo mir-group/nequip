@@ -241,6 +241,7 @@ def fresh_start(config):
     if per_species_scale_shift:
         scales = pop_per_species("scales", None)
         shifts = pop_per_species("shifts", None)
+        sigma = pop_per_species("sigma", None)
         if scales == "dataset_energy_std" or shifts == "dataset_energy_mean":
             (
                 (per_species_energies_mean, per_species_energies_std),
@@ -248,6 +249,7 @@ def fresh_start(config):
                 fields=[AtomicDataDict.TOTAL_ENERGY_KEY],
                 modes=["atom_type_mean_std"],
                 stride=config.dataset_statistics_stride,
+                sigma=sigma,
             )
 
         if scales == "dataset_energy_std":
@@ -257,6 +259,8 @@ def fresh_start(config):
                     f"Atomic energy scaling was very low: {torch.min(scales)}. "
                     "If dataset values were used, does the dataset contain insufficient variation? Maybe try disabling global scaling with global_scale=None."
                 )
+        elif scales == "dataset_force_rms" and force_training:
+            scales = force_rms * torch.ones(per_species_energies_mean.shape)
         elif (
             scales is None
             or isinstance(scales, float)
@@ -266,8 +270,11 @@ def fresh_start(config):
         else:
             raise ValueError(f"Scales has to be number or but {scales}")
 
-        if global_scale is not None and scales is not None:
-            scales = scales / global_scale
+        if not (global_scale is None or scales is None):
+            raise ValueError(
+                f"Only one intial values of global scale and local scale are allowed to be set"
+            )
+
         config["PerSpeciesScaleShift_scales"] = scales
 
         if shifts == "dataset_energy_mean":
@@ -280,13 +287,10 @@ def fresh_start(config):
             pass
         else:
             raise ValueError(f"Shifts has to be number but {shifts}")
-        if global_scale is not None and shifts is not None:
-            shifts = shifts / global_scale
         config["PerSpeciesScaleShift_shifts"] = shifts
         logging.debug(
             f"Initially per atom outputs are scaled by: {scales}, eneriges are shifted by {shifts}."
         )
-    # raise RuntimeError("hello")
 
     # = Build a model =
     model_builder = _load_callable(config.model_builder)
