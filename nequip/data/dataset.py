@@ -324,6 +324,7 @@ class AtomicInMemoryDataset(AtomicDataset):
         stride: int = 1,
         unbiased: bool = True,
         modes: Optional[List[Union[str]]] = None,
+        **kwargs
     ) -> List[tuple]:
 
         if self._indices is not None:
@@ -412,29 +413,40 @@ class AtomicInMemoryDataset(AtomicDataset):
 
             elif ana_mode == "atom_type_mean_std":
 
-                mean, std = self.per_atom_type_statistics(graph_selector, arr)
+                sigma = kwargs.pop("sigma", None)
+                mean, std = self.per_atom_type_statistics(graph_selector, arr, sigma=sigma)
                 out.append((mean, std))
 
         return out
 
-    def per_atom_type_statistics(self, selector, arr):
+    def per_atom_type_statistics(self, selector, arr, sigma=None):
 
         N, fixed_field = self.type_count_per_graph()
 
         solved = False
         if not fixed_field:
-            ntype = N.shape[1]
+            n = N.shape[0]
+            num_types = N.shape[1]
 
             try:
                 N = N.type(torch.get_default_dtype())
                 N = N[selector]
-                if N.shape[0] <= N.shape[1]:
+                if n < num_types and (sigma == 0.0 or sigma is None):
                     raise RuntimeError("Not sufficient frames to obtain the variance")
 
-                mean = torch.matmul(torch.pinverse(N), arr)
+                NT = torch.transpose(N, 1, 0)
+                NTN = torch.matmul(NT, N)
+                if sigma is not None:
+                    NTN += sigma*torch.diag(torch.ones(num_types))
+                invNTN = torch.inverse(NTN)
+                invN = torch.matmul(invNTN,NT)
+
+                mean = torch.matmul(invN, arr)
                 res2 = torch.sum(torch.square(torch.matmul(N, mean) - arr))
-                NTN = torch.matmul(torch.transpose(N, 1, 0), N)
-                cov = res2 * torch.inverse(NTN) / (N.shape[0] - N.shape[1])
+                if n < num_types:
+                    cov = res2 * invNTN / n
+                else:
+                    cov = res2 * invNTN / (n-num_types)
                 std = torch.sqrt(torch.diagonal(cov))
                 solved = True
             except Exception as e:
@@ -443,13 +455,14 @@ class AtomicInMemoryDataset(AtomicDataset):
                 )
                 N = N.sum(axis=1, keepdim=True)
         else:
-            ntype = N.shape[0]
+            num_types = N.shape[0]
             N = N.sum()
 
         if not solved:
             atomic_energy = arr / N
-            mean = atomic_energy.mean() * torch.ones(ntype)
-            std = atomic_energy.std() * torch.ones(ntype)
+            mean = atomic_energy.mean() * torch.ones(num_types)
+            std = atomic_energy.std() * torch.ones(num_types)
+
         return mean.reshape([-1]), std.reshape([-1])
 
     def type_count_per_graph(self):
