@@ -15,9 +15,9 @@ default_dtype: float32                                                          
 allow_tf32: True                                                                  # whether to use TensorFloat32 if it is available
 
 # network
-# Default model is energy + forces, if you want stress:
+# Name of the class/function to build the model with.
+# Packages outside of `nequip` are supported for custom models.
 # model_builder: nequip.models.StressForceModel
-# For just energy, see `minimal_eng.yaml`
 
 r_max: 4.0                                                                        # cutoff radius in length units
 

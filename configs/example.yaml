@@ -13,8 +13,8 @@ append: false                                                                   
 default_dtype: float32                                                            # type of float to use, e.g. float32 and float64
 
 # network
-# Default model is energy + forces, if you want stress:
-# model_builder: nequip.models.StressForceModel
+# Name of the class/function to build the model with.
+# Packages outside of `nequip` are supported for custom models.
 # For just energy, see `minimal_eng.yaml`
 
 r_max: 4.0                                                                        # cutoff radius in length units

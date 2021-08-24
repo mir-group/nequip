@@ -4,6 +4,8 @@ run_name: minimal
 seed: 0
 
 # network
+model_builder: nequip.models.StressForceModel
+
 num_basis: 8
 r_max: 4.0
 irreps_edge_sh: 0e + 1o
@@ -12,8 +14,8 @@ feature_irreps_hidden: 16x0o + 16x0e + 16x1o + 16x1e + 16x2o + 16x2e
 model_uniform_init: false
 
 # data
-dataset: aspirin
-dataset_file_name: benchmark_data/aspirin_ccsd-train.npz
+# this toy dataset is periodic
+dataset: EMTTest
 
 # logging
 wandb: false
@@ -22,7 +24,7 @@ wandb: false
 # training
 n_train: 5
 n_val: 5
-batch_size: 1
+batch_size: 2
 max_epochs: 10
 
 # loss function
