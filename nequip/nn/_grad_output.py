@@ -168,16 +168,19 @@ class StressOutput(GraphModuleMixin, torch.nn.Module):
         # Make the cell per-batch
         data = AtomicDataDict.with_batch(data)
         batch = data[AtomicDataDict.BATCH_KEY]
-        num_batch = batch.max() + 1
+        num_batch: int = int(batch.max().cpu().item()) + 1
         data[AtomicDataDict.CELL_KEY] = (
             data[AtomicDataDict.CELL_KEY].view(-1, 3, 3).expand(num_batch, 3, 3)
         )
         # Add the displacements
         # the GradientOutput will make them require grad
         # See https://github.com/atomistic-machine-learning/schnetpack/blob/master/src/schnetpack/atomistic/model.py#L45
-        displacement = torch.zeros_like(
-            data[AtomicDataDict.CELL_KEY], requires_grad=True
+        displacement = torch.zeros(
+            (num_batch, 3, 3),
+            dtype=data[AtomicDataDict.CELL_KEY].dtype,
+            device=data[AtomicDataDict.CELL_KEY].device,
         )
+        displacement.requires_grad_(True)
         data["_displacement"] = displacement
         pos = data[AtomicDataDict.POSITIONS_KEY]
         # bmm is natom in batch
