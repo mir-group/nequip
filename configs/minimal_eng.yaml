@@ -44,17 +44,11 @@ loss_coeffs:
 # optimizer
 optimizer_name: Adam
 
+# example block to do good per species shifting
+# note, sigma needs to be tuned 4.0 works the best for aspirin dataset.
 PerSpeciesScaleShift_trainable: true
-# # optional initial atomic energy shift for each species. in order of type. Defaults to zeros. 
-# # Another option is to use "dataset_energy_mean", which automatically compute the per atom energy mean
-# # but ^ this mode is not compatible with global_shift = "dataset_energy_mean"
 PerSpeciesScaleShift_shifts: dataset_per_species_energy_mean
-# # optional initial atomic energy scale for each species. in order of type. Defaults to ones.
-# # Another option is to use "dataset_energy_std", which automatically compute the per atom energy mean
-# # but ^ this mode is not compatible with global_shift = "dataset_energy_mean"
 PerSpeciesScaleShift_scales: dataset_per_species_energy_std
-PerSpeciesScaleShift_sigma: 4.0
 global_rescale_shift: null
 global_rescale_scale: dataset_force_rms
-# global_rescale_scale: null
 PerSpeciesScaleShift_enable: true

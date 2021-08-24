@@ -197,11 +197,13 @@ def fresh_start(config):
         dataset_statistics["dataset_energy_mean"] = mean
         dataset_statistics["dataset_energy_std"] = std
     if "per_species_energy_std" in keys or "per_species_energy_mean" in keys:
+        algorithm_kwargs = get_per_species(config, "algorithm_kwargs", {})
         ((mean, std),) = trainer.dataset_train.statistics(
             fields=[AtomicDataDict.TOTAL_ENERGY_KEY],
             modes=["atom_type_mean_std"],
             stride=config.dataset_statistics_stride,
             sigma=sigma,
+            algorithm_kwargs=algorithm_kwargs,
         )
         dataset_statistics["dataset_per_species_energy_mean"] = mean
         dataset_statistics["dataset_per_species_energy_std"] = std
@@ -346,7 +348,6 @@ def set_value(variable, variable_name, value_dict):
         or isinstance(variable, torch.Tensor)
     ):
         return variable
-    print("value_dict", value_dict.keys())
     raise ValueError(f"Invalid {variable_name} `{variable}`")
 
 

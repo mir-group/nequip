@@ -22,6 +22,7 @@ from torch_geometric.data import Batch, Dataset, download_url, extract_zip
 import nequip
 from nequip.data import AtomicData, AtomicDataDict
 from nequip.utils.batch_ops import bincount
+from nequip.utils.ridge_regression import ridge_regression, sklearn_ridge_regression
 from ._util import _TORCH_INTEGER_DTYPES
 from .transforms import TypeMapper
 
@@ -414,20 +415,20 @@ class AtomicInMemoryDataset(AtomicDataset):
             elif ana_mode == "atom_type_mean_std":
 
                 sigma = kwargs.pop("sigma", None)
+                algorithm_kwargs = kwargs.pop("algorithm_kwargs", {})
                 mean, std = self.per_atom_type_statistics(
-                    graph_selector, arr, sigma=sigma
+                    graph_selector, arr, sigma=sigma, algorithm_kwargs=algorithm_kwargs,
                 )
                 out.append((mean, std))
 
         return out
 
-    def per_atom_type_statistics(self, selector, arr, sigma=None):
+    def per_atom_type_statistics(self, selector, arr, sigma=None, algorithm_kwargs={}):
 
         N, fixed_field = self.type_count_per_graph()
         N = N.type(torch.get_default_dtype())
 
         if fixed_field:
-            num_types = N.shape[0]
             n = arr.shape[0]
             N = torch.matmul(
                 torch.ones((n, 1), dtype=torch.get_default_dtype()), N.reshape([1, -1])
@@ -435,40 +436,10 @@ class AtomicInMemoryDataset(AtomicDataset):
         else:
             N = N[selector]
 
-        n = N.shape[0]
-        num_types = N.shape[1]
-        NT = torch.transpose(N, 1, 0)
-
-        try:
-            invNTN = torch.inverse(torch.matmul(NT, N))
-        except Exception as e:
-            if sigma is None:
-                raise RuntimeError(
-                    f"Cannot get a solution {e} with sigma is None."
-                    "set PerSpeciesShiftScale_sigma to i.e. 0.2"
-                )
-            else:
-                logging.warning(
-                    f"using ridge regression to compute per species weight."
-                    "Note that the result greatly depends on the sigma value"
-                )
-                NTN = torch.matmul(NT, N)
-                if sigma <= 0:
-                    raise ValueError("sigma has to be > 0.")
-                NTN += sigma * torch.diag(torch.ones(NTN.shape[0]))
-                invNTN = torch.inverse(NTN)
-
-        invN = torch.matmul(invNTN, NT)
-        mean = torch.matmul(invN, arr)
-
-        res2 = (torch.square(torch.matmul(N, mean) - arr)).sum()
-        if n < num_types:
-            cov = res2 * invNTN / n
+        if len(algorithm_kwargs) == 0:
+            return ridge_regression(N, arr, sigma)
         else:
-            cov = res2 * invNTN / (n - num_types)
-        std = torch.sqrt(torch.diagonal(cov))
-
-        return mean.reshape([-1]), std.reshape([-1])
+            return sklearn_ridge_regression(N, arr, algorithm_kwargs)
 
     def type_count_per_graph(self):
         try:
