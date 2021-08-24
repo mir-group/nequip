@@ -68,6 +68,16 @@ key_mapping:
   R: pos                                                                           # raw atomic positions
 npz_fixed_field_keys:                                                              # fields that are repeated across different examples
   - atomic_numbers
+# A mapping of chemical species to type indexes is necessary if the dataset is provided with atomic numbers instead of type indexes.
+chemical_symbol_to_type:
+  H: 0
+  C: 1
+  O: 2
+# Alternatively, if the dataset has type indexes, the total number of types is all that is required:
+# type_names:
+#   0: my_type
+#   1: atom
+#   2: thing
 
 # As an alternative option to npz, you can also pass data ase ASE Atoms-objects
 # This can often be easier to work with, simply make sure the ASE Atoms object
@@ -174,6 +184,11 @@ optimizer_betas: !!python/tuple
 optimizer_eps: 1.0e-08
 optimizer_weight_decay: 0
 
+# gradient clipping using torch.nn.utils.clip_grad_norm_
+# see https://pytorch.org/docs/stable/generated/torch.nn.utils.clip_grad_norm_.html#torch.nn.utils.clip_grad_norm_
+# setting to inf or null disables it
+max_gradient_norm: null
+
 # weight initialization
 # this can be the importable name of any function that can be `model.apply`ed to initialize some weights in the model. NequIP provides a number of useful initializers:
 # For more details please see the docstrings of the individual initializers
@@ -208,9 +223,9 @@ lr_scheduler_factor: 0.5
 PerSpeciesScaleShift_enable: false
 # if the PerSpeciesScaleShift is enabled, whether the shifts and scales are trainable
 PerSpeciesScaleShift_trainable: true
-# optional initial atomic energy shift for each species. order should be the same as the allowed_species used in train.py. Defaults to zeros.
+# optional initial atomic energy shift for each species. in order of type. Defaults to zeros.
 PerSpeciesScaleShift_shifts: [0.0, 0.0, 0.0]
-# optional initial atomic energy scale for each species. order should be the same as the allowed_species used in train.py. Defaults to ones.
+# optional initial atomic energy scale for each species. in order of type. Defaults to ones.
 PerSpeciesScaleShift_scales: [1.0, 1.0, 1.0]
 
 # global energy shift. When "dataset_energy_mean" (the default), the mean energy of the dataset. When None, disables the global shift. When a number, used directly.

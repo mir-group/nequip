@@ -117,17 +117,13 @@ def data(float_tolerance):
         AtomicDataDict.FORCE_KEY: torch.rand(10, 3),
         AtomicDataDict.TOTAL_ENERGY_KEY: torch.rand((2, 1)),
         "k": torch.rand((2, 1)),
-        AtomicDataDict.SPECIES_INDEX_KEY: torch.as_tensor(
-            [1, 1, 1, 1, 1, 0, 0, 0, 0, 0]
-        ),
+        AtomicDataDict.ATOM_TYPE_KEY: torch.as_tensor([1, 1, 1, 1, 1, 0, 0, 0, 0, 0]),
     }
     ref = {
         AtomicDataDict.FORCE_KEY: torch.rand(10, 3),
         AtomicDataDict.TOTAL_ENERGY_KEY: torch.rand((2, 1)),
         "k": torch.rand((2, 1)),
-        AtomicDataDict.SPECIES_INDEX_KEY: torch.as_tensor(
-            [1, 1, 1, 1, 1, 0, 0, 0, 0, 0]
-        ),
+        AtomicDataDict.ATOM_TYPE_KEY: torch.as_tensor([1, 1, 1, 1, 1, 0, 0, 0, 0, 0]),
     }
     yield pred, ref
 
@@ -145,12 +141,12 @@ def data_w_NaN(float_tolerance, data):
     wo_nan_pred = {k: torch.clone(v) for k, v in _pred.items()}
     wo_nan_ref = {k: torch.clone(v) for k, v in _ref.items()}
     wo_nan_ref[AtomicDataDict.FORCE_KEY] = wo_nan_ref[AtomicDataDict.FORCE_KEY][1:-1]
-    wo_nan_ref[AtomicDataDict.SPECIES_INDEX_KEY] = wo_nan_ref[
-        AtomicDataDict.SPECIES_INDEX_KEY
-    ][1:-1]
+    wo_nan_ref[AtomicDataDict.ATOM_TYPE_KEY] = wo_nan_ref[AtomicDataDict.ATOM_TYPE_KEY][
+        1:-1
+    ]
     wo_nan_pred[AtomicDataDict.FORCE_KEY] = wo_nan_pred[AtomicDataDict.FORCE_KEY][1:-1]
-    wo_nan_pred[AtomicDataDict.SPECIES_INDEX_KEY] = wo_nan_pred[
-        AtomicDataDict.SPECIES_INDEX_KEY
+    wo_nan_pred[AtomicDataDict.ATOM_TYPE_KEY] = wo_nan_pred[
+        AtomicDataDict.ATOM_TYPE_KEY
     ][1:-1]
 
     yield pred, ref, wo_nan_pred, wo_nan_ref

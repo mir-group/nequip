@@ -6,19 +6,38 @@ from torch_geometric.data import Batch, Data
 
 
 class Collater(object):
-    def __init__(self, fixed_fields=[], exclude_keys=[]):
+    """Collate a list of ``AtomicData``.
+
+    Args:
+        fixed_fields: which fields are fixed fields
+        exclude_keys: keys to ignore in the input, not copying to the output
+    """
+
+    def __init__(
+        self,
+        fixed_fields: List[str] = [],
+        exclude_keys: List[str] = [],
+    ):
         self.fixed_fields = fixed_fields
-        self.exclude_keys = exclude_keys
         self._exclude_keys = set(exclude_keys)
 
     @classmethod
-    def for_dataset(cls, dataset, exclude_keys=[]):
+    def for_dataset(
+        cls,
+        dataset,
+        exclude_keys: List[str] = [],
+    ):
+        """Construct a collater appropriate to ``dataset``.
+
+        All kwargs besides ``fixed_fields`` are passed through to the constructor.
+        """
         return cls(
             fixed_fields=list(getattr(dataset, "fixed_fields", {}).keys()),
             exclude_keys=exclude_keys,
         )
 
-    def collate(self, batch: List[Data]):
+    def collate(self, batch: List[Data]) -> Batch:
+        """Collate a list of data"""
         # For fixed fields, we need to batch those that are per-node or
         # per-edge, since they need to be repeated in order to have the same
         # number of nodes/edges as the full batch graph.
@@ -39,12 +58,24 @@ class Collater(object):
             out[f] = batch[0][f]
         return out
 
-    def __call__(self, batch):
+    def __call__(self, batch: List[Data]) -> Batch:
+        """Collate a list of data"""
         return self.collate(batch)
+
+    @property
+    def exclude_keys(self):
+        return list(self._exclude_keys)
 
 
 class DataLoader(torch.utils.data.DataLoader):
-    def __init__(self, dataset, batch_size=1, shuffle=False, exclude_keys=[], **kwargs):
+    def __init__(
+        self,
+        dataset,
+        batch_size: int = 1,
+        shuffle: bool = False,
+        exclude_keys: List[str] = [],
+        **kwargs,
+    ):
         if "collate_fn" in kwargs:
             del kwargs["collate_fn"]
 
@@ -53,5 +84,5 @@ class DataLoader(torch.utils.data.DataLoader):
             batch_size,
             shuffle,
             collate_fn=Collater.for_dataset(dataset, exclude_keys=exclude_keys),
-            **kwargs
+            **kwargs,
         )

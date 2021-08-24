@@ -149,7 +149,7 @@ class Metrics:
                 params = {}
                 if self.per_species[key][reduction]:
                     # TO DO, this needs OneHot component. will need to be decoupled
-                    params = {"accumulate_by": pred[AtomicDataDict.SPECIES_INDEX_KEY]}
+                    params = {"accumulate_by": pred[AtomicDataDict.ATOM_TYPE_KEY]}
 
                 if stat.dim == () and not self.per_species[key][reduction]:
                     metrics[(key, reduction)] = stat.accumulate_batch(
@@ -178,7 +178,7 @@ class Metrics:
                 metrics[(key, reduction)] = stat.current_result()
         return metrics
 
-    def flatten_metrics(self, metrics, allowed_species=None):
+    def flatten_metrics(self, metrics, type_names=None):
 
         flat_dict = {}
         skip_keys = []
@@ -193,21 +193,14 @@ class Metrics:
             per_species = self.per_species[key][reduction]
 
             if per_species:
-
-                element_names = (
-                    list(range(value.shape[0]))
-                    if allowed_species is None
-                    else list(allowed_species)
-                )
-
                 if stat.output_dim == tuple():
                     for id_ele, v in enumerate(value):
-                        flat_dict[f"{element_names[id_ele]}_{item_name}"] = v.item()
+                        flat_dict[f"{type_names[id_ele]}_{item_name}"] = v.item()
 
                     flat_dict[f"all_{item_name}"] = value.mean().item()
                 else:
                     for id_ele, vec in enumerate(value):
-                        ele = element_names[id_ele]
+                        ele = type_names[id_ele]
                         for idx, v in enumerate(vec):
                             name = f"{ele}_{item_name}_{idx}"
                             flat_dict[name] = v.item()

@@ -24,7 +24,7 @@ class TestLoop:
             print(batch)
 
     def test_non_divisor(self, npz_dataset):
-        dataset = [npz_dataset.get(i) for i in range(7)]  # make it odd length
+        dataset = [npz_dataset[i] for i in range(7)]  # make it odd length
         dl = DataLoader(dataset, batch_size=2, shuffle=True, exclude_keys=["energy"])
         dl_iter = iter(dl)
         for _ in range(3):

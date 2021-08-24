@@ -282,7 +282,7 @@ def main(args=None, running_as_script: bool = True):
 
         while True:
             datas = [
-                dataset.get(int(idex))
+                dataset[int(idex)]
                 for idex in test_idcs[batch_i * batch_size : (batch_i + 1) * batch_size]
             ]
             if len(datas) == 0:

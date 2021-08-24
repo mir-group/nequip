@@ -25,7 +25,7 @@ def test_rescale(
 ):
     _, data = CH3CHO
     oh = OneHotAtomEncoding(
-        allowed_species=torch.unique(data[AtomicDataDict.ATOMIC_NUMBERS_KEY]),
+        num_types=3,
         irreps_in=data.irreps,
     )
 
