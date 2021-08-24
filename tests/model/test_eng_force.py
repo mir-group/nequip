@@ -2,6 +2,7 @@ import pytest
 
 import logging
 import tempfile
+import functools
 import torch
 from os.path import isfile
 
@@ -11,7 +12,7 @@ from e3nn import o3
 from e3nn.util.jit import script
 
 from nequip.data import AtomicDataDict, AtomicData
-from nequip.models import EnergyModel, ForceModel
+from nequip.models import EnergyModel, ForceModel, StressForceModel
 from nequip.nn import GraphModuleMixin, AtomwiseLinear
 from nequip.utils.initialization import uniform_initialize_equivariant_linears
 from nequip.utils.test import assert_AtomicData_equivariant
@@ -79,6 +80,7 @@ def config(request):
     params=[
         (ForceModel, AtomicDataDict.FORCE_KEY),
         (EnergyModel, AtomicDataDict.TOTAL_ENERGY_KEY),
+        (StressForceModel, AtomicDataDict.FORCE_KEY),
     ]
 )
 def model(request, config):
@@ -184,6 +186,38 @@ class TestWorkflow:
 
             new_model = torch.load(tmp.name)
             assert isinstance(new_model, type(instance))
+
+    def test_batch(self, model, atomic_batch, device, float_tolerance):
+        """Confirm that the results for individual examples are the same regardless of whether they are batched."""
+        allclose = functools.partial(torch.allclose, atol=float_tolerance)
+        instance, out_field = model
+        instance.to(device)
+        data = atomic_batch.to(device)
+        data1 = data.get_example(0)
+        data2 = data.get_example(1)
+        output1 = instance(AtomicData.to_AtomicDataDict(data1))
+        output2 = instance(AtomicData.to_AtomicDataDict(data2))
+        output = instance(AtomicData.to_AtomicDataDict(data))
+        if out_field in (AtomicDataDict.TOTAL_ENERGY_KEY, AtomicDataDict.STRESS_KEY):
+            assert allclose(
+                output1[out_field],
+                output[out_field][0],
+            )
+            assert allclose(
+                output2[out_field],
+                output[out_field][1],
+            )
+        elif out_field in (AtomicDataDict.FORCE_KEY,):
+            assert allclose(
+                output1[out_field],
+                output[out_field][output[AtomicDataDict.BATCH_KEY] == 0],
+            )
+            assert allclose(
+                output2[out_field],
+                output[out_field][output[AtomicDataDict.BATCH_KEY] == 1],
+            )
+        else:
+            raise NotImplementedError
 
 
 class TestGradient:
