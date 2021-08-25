@@ -2,7 +2,7 @@ from typing import Union
 import torch
 
 from ase.calculators.calculator import Calculator, all_changes
-
+from ase.stress import full_3x3_to_voigt_6_stress
 from nequip.data import AtomicData, AtomicDataDict
 import nequip.scripts.deploy
 
@@ -10,7 +10,7 @@ import nequip.scripts.deploy
 class NequIPCalculator(Calculator):
     """NequIP ASE Calculator."""
 
-    implemented_properties = ["energy", "forces"]
+    implemented_properties = ["energy", "forces","stress"]
 
     def __init__(
         self,
@@ -63,10 +63,15 @@ class NequIPCalculator(Calculator):
         out = self.model(AtomicData.to_AtomicDataDict(data))
         forces = out[AtomicDataDict.FORCE_KEY].detach().cpu().numpy()
         energy = out[AtomicDataDict.TOTAL_ENERGY_KEY].detach().cpu().item()
-
         # store results
         self.results = {
             "energy": energy * self.energy_units_to_eV,
             # force has units eng / len:
             "forces": forces * (self.energy_units_to_eV / self.length_units_to_A),
         }
+        if "stress" in properties:
+            stress = out[AtomicDataDict.STRESS_KEY].detach().cpu().numpy()
+            stress=stress.reshape(3,3)*(self.energy_units_to_eV/self.length_units_to_A**3)
+            #ase wants voigt format
+            stress_voigt=full_3x3_to_voigt_6_stress(stress)
+            self.results.update({'stress':stress_voigt})
