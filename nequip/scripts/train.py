@@ -221,17 +221,15 @@ def fresh_start(config):
     # == Build the model ==
     final_model = RescaleOutput(
         model=core_model,
-        scale_keys=[AtomicDataDict.TOTAL_ENERGY_KEY]
-        + (
-            [AtomicDataDict.FORCE_KEY]
-            if AtomicDataDict.FORCE_KEY in core_model.irreps_out
-            else []
-        )
-        + (
-            [AtomicDataDict.PER_ATOM_ENERGY_KEY]
-            if AtomicDataDict.PER_ATOM_ENERGY_KEY in core_model.irreps_out
-            else []
-        ),
+        scale_keys=[
+            k
+            for k in (
+                AtomicDataDict.TOTAL_ENERGY_KEY,
+                AtomicDataDict.FORCE_KEY,
+                AtomicDataDict.STRESS_KEY,
+            )
+            if k in core_model.irreps_out
+        ],
         scale_by=global_scale,
         shift_keys=AtomicDataDict.TOTAL_ENERGY_KEY,
         shift_by=global_shift,
