@@ -163,7 +163,6 @@ def fresh_start(config):
     per_species_scale_shift = get_per_species(config, "enable", False)
     scales = pop_per_species(config, "scales", None)
     shifts = pop_per_species(config, "shifts", None)
-    sigma = pop_per_species(config, "sigma", None)
     if global_shift is not None and per_species_scale_shift:
         raise ValueError("One can only enable either global shift or per_species shift")
     logging.info(f"Enable per species scale/shift: {per_species_scale_shift}")
@@ -197,13 +196,13 @@ def fresh_start(config):
         dataset_statistics["dataset_energy_mean"] = mean
         dataset_statistics["dataset_energy_std"] = std
     if "per_species_energy_std" in keys or "per_species_energy_mean" in keys:
-        algorithm_kwargs = get_per_species(config, "algorithm_kwargs", {})
+        alpha = get_per_species(config, "alpha", None)
+        algorithm_kwargs = {} if alpha is None else {"alpha": alpha}
         ((mean, std),) = trainer.dataset_train.statistics(
             fields=[AtomicDataDict.TOTAL_ENERGY_KEY],
             modes=["atom_type_mean_std"],
             stride=config.dataset_statistics_stride,
-            sigma=sigma,
-            algorithm_kwargs=algorithm_kwargs,
+            **{AtomicDataDict.TOTAL_ENERGY_KEY: algorithm_kwargs},
         )
         dataset_statistics["dataset_per_species_energy_mean"] = mean
         dataset_statistics["dataset_per_species_energy_std"] = std
