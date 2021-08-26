@@ -22,7 +22,7 @@ from torch_geometric.data import Batch, Dataset, download_url, extract_zip
 import nequip
 from nequip.data import AtomicData, AtomicDataDict
 from nequip.utils.batch_ops import bincount
-from nequip.utils.ridge_regression import ridge_regression, sklearn_ridge_regression
+from nequip.utils.regressor import gp
 from ._util import _TORCH_INTEGER_DTYPES
 from .transforms import TypeMapper
 
@@ -414,16 +414,15 @@ class AtomicInMemoryDataset(AtomicDataset):
 
             elif ana_mode == "atom_type_mean_std":
 
-                sigma = kwargs.pop("sigma", None)
-                algorithm_kwargs = kwargs.pop("algorithm_kwargs", {})
+                algorithm_kwargs = kwargs.pop(field, {})
                 mean, std = self.per_atom_type_statistics(
-                    graph_selector, arr, sigma=sigma, algorithm_kwargs=algorithm_kwargs,
+                    graph_selector, arr, **algorithm_kwargs,
                 )
                 out.append((mean, std))
 
         return out
 
-    def per_atom_type_statistics(self, selector, arr, sigma=None, algorithm_kwargs={}):
+    def per_atom_type_statistics(self, selector, arr, alpha=0.1):
 
         N, fixed_field = self.type_count_per_graph()
         N = N.type(torch.get_default_dtype())
@@ -435,11 +434,10 @@ class AtomicInMemoryDataset(AtomicDataset):
             )
         else:
             N = N[selector]
+        
+        mean, std = gp(N, arr, alpha=alpha)
+        return mean, std
 
-        if len(algorithm_kwargs) == 0:
-            return ridge_regression(N, arr, sigma)
-        else:
-            return sklearn_ridge_regression(N, arr, algorithm_kwargs)
 
     def type_count_per_graph(self):
         try:
