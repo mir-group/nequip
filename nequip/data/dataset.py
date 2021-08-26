@@ -416,7 +416,9 @@ class AtomicInMemoryDataset(AtomicDataset):
 
                 algorithm_kwargs = kwargs.pop(field, {})
                 mean, std = self.per_atom_type_statistics(
-                    graph_selector, arr, **algorithm_kwargs,
+                    graph_selector,
+                    arr,
+                    **algorithm_kwargs,
                 )
                 out.append((mean, std))
 
@@ -434,10 +436,9 @@ class AtomicInMemoryDataset(AtomicDataset):
             )
         else:
             N = N[selector]
-        
+
         mean, std = gp(N, arr, alpha=alpha)
         return mean, std
-
 
     def type_count_per_graph(self):
         try:
