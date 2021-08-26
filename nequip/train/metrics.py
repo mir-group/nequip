@@ -32,6 +32,8 @@ class Metrics:
                 default: "L1Loss"
     PerSpecies: whether compute the estimation for each species or not
 
+    the keys are case-sensitive.
+
 
     ```
     components = (
@@ -81,8 +83,16 @@ class Metrics:
             self.per_species[key][reduction] = per_species
 
     def init_runstat(self, params, error: torch.Tensor):
+        """
+        Initialize Runstat Counter based on the shape of the error matrix
+
+        Args:
+        params (dict): dictionary of additional arguments
+        error (torch.Tensor): error matrix
+        """
 
         kwargs = deepcopy(params)
+        # automatically define the dimensionality
         if "dim" not in kwargs:
             kwargs["dim"] = error.shape[1:]
 
@@ -123,7 +133,6 @@ class Metrics:
                 pred=pred,
                 ref=ref,
                 key=key,
-                atomic_weight_on=False,
                 mean=False,
             )
 

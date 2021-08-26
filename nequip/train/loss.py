@@ -29,7 +29,6 @@ class Loss:
      'force': (1.0, 'Weighted_L1Loss', param_dict)}
     ```
 
-    If atomic_weight_on is True, all the loss function will be weighed by ref[AtomicDataDict.WEIGHTS_KEY+key] (if it exists)
     The loss function can be a loss class name that is exactly the same (case sensitive) to the ones defined in torch.nn.
     It can also be a user define class type that
         - takes "reduction=none" as init argument
@@ -41,11 +40,9 @@ class Loss:
     def __init__(
         self,
         coeffs: Union[dict, str, List[str]],
-        atomic_weight_on: bool = False,
         coeff_schedule: str = "constant",
     ):
 
-        self.atomic_weight_on = atomic_weight_on
         self.coeff_schedule = coeff_schedule
         self.coeffs = {}
         self.funcs = {}
@@ -107,7 +104,6 @@ class Loss:
                 pred=pred,
                 ref=ref,
                 key=key,
-                atomic_weight_on=self.atomic_weight_on,
                 mean=True,
             )
             contrib[key] = _loss
@@ -117,23 +113,64 @@ class Loss:
 
 
 class LossStat:
-    def __init__(self, keys):
-        self.loss_stat = {"total": RunningStats(dim=tuple(), reduction=Reduction.MEAN)}
+    """
+    The class that accumulate the loss function values over all batches
+    for each loss component.
+
+    Args:
+
+    keys (null): redundant argument
+
+    """
+
+    def __init__(self, loss_instance=None):
+        self.loss_stat = {
+            "total": RunningStats(
+                dim=tuple(), reduction=Reduction.MEAN, ignore_nan=False
+            )
+        }
+        self.ignore_nan = {}
+        if loss_instance is not None:
+            for key, func in loss_instance.funcs.items():
+                self.ignore_nan[key] = (
+                    func.ignore_nan if hasattr(func, "ignore_nan") else False
+                )
 
     def __call__(self, loss, loss_contrib):
+        """
+        Args:
+
+        loss (torch.Tensor): the value of the total loss function for the current batch
+        loss (Dict(torch.Tensor)): the dictionary which contain the loss components
+        """
+
         results = {}
+
         results["loss"] = self.loss_stat["total"].accumulate_batch(loss).item()
+
+        # go through each component
         for k, v in loss_contrib.items():
+
+            # initialize for the 1st batch
             if k not in self.loss_stat:
-                self.loss_stat[k] = RunningStats(dim=tuple(), reduction=Reduction.MEAN)
+                self.loss_stat[k] = RunningStats(
+                    dim=tuple(),
+                    reduction=Reduction.MEAN,
+                    ignore_nan=self.ignore_nan.get(k, False),
+                )
                 device = v.get_device()
                 self.loss_stat[k].to(device="cpu" if device == -1 else device)
+
             results["loss_" + ABBREV.get(k, k)] = (
                 self.loss_stat[k].accumulate_batch(v).item()
             )
         return results
 
     def reset(self):
+        """
+        Reset all the counters to zero
+        """
+
         for v in self.loss_stat.values():
             v.reset()
 
