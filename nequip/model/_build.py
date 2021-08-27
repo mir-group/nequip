@@ -44,6 +44,20 @@ def model_from_config(
     Returns:
         The build model.
     """
+    # Pre-process config
+    if initialize and dataset is not None:
+        if "num_types" in config:
+            assert (
+                config["num_types"] == dataset.type_mapper.num_types
+            ), "inconsistant config & dataset"
+        if "type_names" in config:
+            assert (
+                config["type_names"] == dataset.type_mapper.type_names
+            ), "inconsistant config & dataset"
+        config["num_types"] = dataset.type_mapper.num_types
+        config["type_names"] = dataset.type_mapper.type_names
+
+    # Build
     builders = [
         _load_callable(b, prefix="nequip.model") for b in config["model_builders"]
     ]
