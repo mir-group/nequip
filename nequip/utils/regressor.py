@@ -37,7 +37,7 @@ def gp(X, y, alpha):
             iteration += 1
             logging.debug(f"GP fitting failed for {e.args}; \n"
                           f"           increase alpha to {alpha}")
-            if iteration < max_iteration:
+            if iteration >= max_iteration:
                 raise ValueError(f"Please set the per species shift and scale to zeros and ones. \n"
                                  "The dataset energy is to diverge to be solved with GP")
 
