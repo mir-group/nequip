@@ -442,9 +442,14 @@ class AtomicInMemoryDataset(AtomicDataset):
 
     def type_count_per_graph(self):
         try:
-            transformed = self.transform(self.data)
+            if AtomicDataDict.ATOM_TYPE_KEY in self.data:
+                transformed = self.data[AtomicDataDict.ATOM_TYPE_KEY]
+            elif AtomicDataDict.ATOMIC_NUMBERS_KEY in self.data:
+                transformed = self.transform.transform(self.data[AtomicDataDict.ATOMIC_NUMBERS_KEY])
+            else:
+                raise KeyError
             N = bincount(
-                transformed[AtomicDataDict.ATOM_TYPE_KEY],
+                transformed,
                 self.data[AtomicDataDict.BATCH_KEY],
             )
             fixed_field = False
