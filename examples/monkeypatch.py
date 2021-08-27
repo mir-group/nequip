@@ -9,7 +9,7 @@ from typing import Optional
 
 import torch
 
-from nequip.utils import Config, dataset_from_config
+from nequip.utils import Config, dataset_from_config, find_first_of_type
 from nequip.data import AtomicDataDict, AtomicData
 from nequip.nn import SequentialGraphNetwork, SaveForOutput
 
@@ -18,19 +18,6 @@ path = "../results/aspirin/minimal"
 
 # Load the model
 model = torch.load(path + "/best_model.pth")
-
-
-# Define helper function:
-def find_first_of_type(m: torch.nn.Module, kls) -> Optional[torch.nn.Module]:
-    """Find the first module of a given type in a module tree."""
-    if isinstance(m, kls):
-        return m
-    else:
-        for child in m.children():
-            tmp = find_first_of_type(child, kls)
-            if tmp is not None:
-                return tmp
-    return None
 
 
 # Find the SequentialGraphNetwork, which contains the

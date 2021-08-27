@@ -1,8 +1,7 @@
+from typing import Optional, Union, List
 import inspect
 import logging
-
 from importlib import import_module
-from typing import Optional, Union, List
 
 from nequip import data, datasets
 from nequip.data.transforms import TypeMapper
