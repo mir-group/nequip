@@ -12,9 +12,8 @@ from e3nn.util.jit import script
 
 from nequip.data import AtomicDataDict, AtomicData, Collater
 from nequip.data.transforms import TypeMapper
-from nequip.models import EnergyModel, ForceModel
+from nequip.model import model_from_config
 from nequip.nn import GraphModuleMixin, AtomwiseLinear
-from nequip.utils.initialization import uniform_initialize_equivariant_linears
 from nequip.utils.test import assert_AtomicData_equivariant
 
 
@@ -81,15 +80,17 @@ def config(request):
 
 @pytest.fixture(
     params=[
-        (ForceModel, AtomicDataDict.FORCE_KEY),
-        (EnergyModel, AtomicDataDict.TOTAL_ENERGY_KEY),
+        (["EnergyModel"], AtomicDataDict.FORCE_KEY),
+        (["EnergyModel", "ForceOutput"], AtomicDataDict.TOTAL_ENERGY_KEY),
     ]
 )
 def model(request, config):
     torch.manual_seed(0)
     np.random.seed(0)
     builder, out_field = request.param
-    return builder(**config), out_field
+    config = config.copy()
+    config["model_builders"] = builder
+    return builder(config=config), out_field
 
 
 @pytest.fixture(

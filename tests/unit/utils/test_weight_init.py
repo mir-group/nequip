@@ -2,7 +2,7 @@ import pytest
 
 import torch
 
-from nequip.utils.initialization import unit_uniform_init_, unit_orthogonal_init_
+from nequip.model._weight_init import unit_uniform_init_, unit_orthogonal_init_
 
 
 @pytest.mark.parametrize("init_func_", [unit_uniform_init_, unit_orthogonal_init_])

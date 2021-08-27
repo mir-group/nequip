@@ -2,7 +2,6 @@ import logging
 
 from nequip.data import AtomicDataDict
 from nequip.nn import (
-    GraphModuleMixin,
     SequentialGraphNetwork,
     AtomwiseLinear,
     AtomwiseReduce,

@@ -7,7 +7,10 @@ from nequip.data import AtomicDataDict, AtomicDataset
 
 
 def RescaleEnergyEtc(
-    model: GraphModuleMixin, config, dataset: AtomicDataset, initialize: bool
+    model: GraphModuleMixin,
+    config,
+    dataset: AtomicDataset,
+    initialize: bool,
 ):
     """Add global rescaling for energy(-based quantities).
 
@@ -83,7 +86,7 @@ def RescaleEnergyEtc(
         if global_shift is not None:
             global_shift = 0.0  # it has some kind of value
         if global_scale is not None:
-            global_scale = 1.0  # same
+            global_scale = 1.0  # same,
 
     # == Build the model ==
     return RescaleOutput(
