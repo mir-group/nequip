@@ -14,6 +14,7 @@ Most recent change on the bottom.
 - Save dataset parameters along with processed data
 - Gradient clipping
 - Arbitrary atom type support
+- Unified, modular model building and initialization architecture
 
 ### Changed
 - Name processed datasets based on a hash of their parameters to ensure only valid cached data is used
