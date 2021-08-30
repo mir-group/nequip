@@ -14,7 +14,8 @@ import yaml
 from copy import deepcopy
 from os.path import isfile
 from time import perf_counter, gmtime, strftime
-from typing import Optional, Union
+from typing import Optional, Union, Tuple
+from pathlib import Path
 
 
 if sys.version_info[1] >= 7:
@@ -33,12 +34,14 @@ import nequip
 from nequip.data import DataLoader, AtomicData, AtomicDataDict, AtomicDataset
 from nequip.utils import (
     Output,
+    Config,
     instantiate_from_cls_name,
     instantiate,
     save_file,
     load_file,
     atomic_write,
 )
+from nequip.model import model_from_config
 
 from .loss import Loss, LossStat
 from .metrics import Metrics
@@ -383,11 +386,6 @@ class Trainer:
                     "early_stopping"
                 ] = self.early_stopping.state_dict()
 
-        if hasattr(self.model, "save") and not issubclass(
-            type(self.model), torch.jit.ScriptModule
-        ):
-            dictionary["model_class"] = type(self.model)
-
         if training_progress:
             dictionary["progress"] = {}
             for key in ["iepoch", "best_epoch"]:
@@ -401,11 +399,18 @@ class Trainer:
             dictionary["progress"]["best_model_path"] = self.best_model_path
             dictionary["progress"]["last_model_path"] = self.last_model_path
             dictionary["progress"]["trainer_save_path"] = self.trainer_save_path
+            if hasattr(self, "config_save_path"):
+                dictionary["progress"]["config_save_path"] = self.config_save_path
 
         for code in [e3nn, nequip, torch, torch_geometric]:
             dictionary[f"{code.__name__}_version"] = code.__version__
 
         return dictionary
+
+    def save_final_config(self, config) -> None:
+        self.config_save_path = self.output.generate_file("config_final.yaml")
+        with open(self.config_save_path, "w+") as fp:
+            yaml.dump(dict(config), fp)
 
     def save(self, filename, format=None):
         """save the file as filename
@@ -498,18 +503,14 @@ class Trainer:
             # load the model from file
             iepoch = progress["iepoch"]
             if isfile(progress["last_model_path"]):
-                load_path = progress["last_model_path"]
+                load_path = Path(progress["last_model_path"])
                 iepoch = progress["iepoch"]
             else:
                 raise AttributeError("model weights & bias are not saved")
 
-            if "model_class" in d:
-                model = d["model_class"].load(load_path)
-            else:
-                if dictionary.get("compile_model", False):
-                    model = torch.jit.load(load_path)
-                else:
-                    model = torch.load(load_path)
+            model, _ = Trainer.load_model_from_training_session(
+                traindir=load_path.parent, model_name=load_path.name
+            )
             logging.debug(f"Reload the model from {load_path}")
 
             d.pop("progress")
@@ -553,6 +554,24 @@ class Trainer:
             )
 
         return trainer
+
+    @staticmethod
+    def load_model_from_training_session(
+        traindir, model_name="best_model.pth"
+    ) -> Tuple[torch.nn.Module, Config]:
+        traindir = str(traindir)
+        model_name = str(model_name)
+        config = Config.from_file(traindir + "/config_final.yaml")
+        if config.get("compile_model", False):
+            model = torch.jit.load(traindir + "/" + model_name)
+        else:
+            model_state_dict = torch.load(traindir + "/" + model_name)
+            model = model_from_config(
+                config=config,
+                initialize=False,
+            )
+            model.load_state_dict(model_state_dict)
+        return model, config
 
     def init(self):
         """initialize optimizer"""
@@ -955,15 +974,13 @@ class Trainer:
             self.save_model(path)
 
     def save_model(self, path):
-
         with atomic_write(path) as write_to:
-            if hasattr(self.model, "save"):
-                self.model.save(write_to)
+            if self.kwargs["compile_model"]:
+                torch.jit.save(self.model, write_to)
             else:
-                torch.save(self.model, write_to)
+                torch.save(self.model.state_dict(), write_to)
 
     def init_log(self):
-
         if self.restart:
             self.logger.info("! Restarting training ...")
         else:

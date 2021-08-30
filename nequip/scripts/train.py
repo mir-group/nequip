@@ -109,8 +109,8 @@ def fresh_start(config):
 
         trainer = Trainer(model=None, **dict(config))
 
-    output = trainer.output
-    config.update(output.updated_dict())
+    # what is this
+    config.update(trainer.output.updated_dict())
 
     # = Load the dataset =
     dataset = dataset_from_config(config, prefix="dataset")
@@ -139,8 +139,7 @@ def fresh_start(config):
         logging.info("Successfully compiled model...")
 
     # Record final config
-    with open(output.generate_file("config_final.yaml"), "w+") as fp:
-        yaml.dump(dict(config), fp)
+    trainer.save_final_config(config)
 
     # Equivar test
     if config.equivariance_test:
