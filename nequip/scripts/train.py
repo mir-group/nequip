@@ -1,5 +1,4 @@
 """ Train a network."""
-from typing import Union, Callable
 import logging
 import argparse
 import yaml
