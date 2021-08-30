@@ -283,7 +283,7 @@ class Trainer:
         if self.use_ema:
             self.ema = None
 
-        output = Output.get_output(timestr, dict(**_local_kwargs, **kwargs))
+        output = Output.get_output(dict(**_local_kwargs, **kwargs))
         self.output = output
 
         # timestr run_name root workdir logfile

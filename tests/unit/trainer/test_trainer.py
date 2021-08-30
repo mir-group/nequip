@@ -66,15 +66,19 @@ class TestTrainerSetUp:
 
 class TestDuplicateError:
     def test_duplicate_id_2(self, temp_data):
+        """
+        check whether the Output class can automatically
+        insert timestr when a workdir has pre-existed
+        """
 
         minimal_config["root"] = temp_data
 
         model = DummyNet(3)
         c1 = Trainer(model=model, **minimal_config)
-        logfile1 = c1.logfile
+        print("!!end of c1")
 
         c2 = Trainer(model=model, **minimal_config)
-        logfile2 = c2.logfile
+        print("!!end of c2")
 
         assert c1.root == c2.root
         assert c1.workdir != c2.workdir
@@ -318,7 +322,7 @@ class DummyNet(GraphModuleMixin, torch.nn.Module):
 
 
 class DummyScale(torch.nn.Module):
-    """ mimic the rescale model"""
+    """mimic the rescale model"""
 
     def __init__(self, key, scale, shift) -> None:
         super().__init__()

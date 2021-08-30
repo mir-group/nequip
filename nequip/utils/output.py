@@ -25,9 +25,8 @@ class Output:
         append (optional): if True, the workdir and files can be append
         screen (optional): if True, root logger print to screen
         verbose (optional): same as Logging verbose level
+        force_append (optional): flag for requeue. Forcing to append everything
     """
-
-    instances = {}
 
     def __init__(
         self,
@@ -63,16 +62,28 @@ class Output:
         self.screen = screen
         self.verbose = verbose
 
+        print(f"initialize, {timestr}")
+
         # open root folder for storing
         # if folder exists and not append, the folder name and filename will be updated
-        if ((not force_append) and (restart and not append)) or timestr is None:
-            timestr = datetime.datetime.fromtimestamp(time()).strftime(
-                "%Y-%m-%d_%H:%M:%S:%f"
-            )
+        if timestr is None:
+            if force_append:
+                logging.debug(f"Using default timestr for requeue")
+            elif restart and not append:
+                timestr = datetime.datetime.fromtimestamp(time()).strftime(
+                    "%Y-%m-%d_%H:%M:%S:%f"
+                )
+            else:
+                logging.info("Timestr is left as None")
+
+        print(f"changed, {timestr}")
+
         if not force_append:
             root = set_if_none(root, f".")
             run_name = set_if_none(run_name, f"NequIP")
             workdir = set_if_none(workdir, f"{root}/{run_name}")
+
+        print(f"workdir, {workdir}")
 
         assert "/" not in run_name
 
@@ -101,8 +112,6 @@ class Output:
                 file_name=logfile, screen=screen, propagate=True
             )
             logging.debug(f"  ...logfile {self.logfile} to")
-
-        Output.instances[self.timestr] = self
 
     def updated_dict(self):
         return dict(
@@ -182,22 +191,15 @@ class Output:
         }
 
     @classmethod
-    def get_output(cls, timestr: str, kwargs: dict = {}):
-        if len(kwargs) == 0:
-            return cls.instances.get(timestr, cls(root="./"))
-        else:
-            if "timestr" in kwargs:
-                timestr = kwargs.get("timestr", "./")
-                if timestr in cls.instances:
-                    return cls.instances[timestr]
+    def get_output(cls, kwargs: dict = {}):
 
-            d = inspect.signature(cls.__init__)
-            _kwargs = {
-                key: kwargs.get(key, None)
-                for key in list(d.parameters.keys())
-                if key not in ["self", "kwargs"]
-            }
-            return cls(**_kwargs)
+        d = inspect.signature(cls.__init__)
+        _kwargs = {
+            key: kwargs.get(key, None)
+            for key in list(d.parameters.keys())
+            if key not in ["self", "kwargs"]
+        }
+        return cls(**_kwargs)
 
     @classmethod
     def from_config(cls, config):
