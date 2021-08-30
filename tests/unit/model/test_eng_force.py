@@ -12,7 +12,7 @@ from e3nn.util.jit import script
 
 from nequip.data import AtomicDataDict, AtomicData, Collater
 from nequip.data.transforms import TypeMapper
-from nequip.model import model_from_config
+from nequip.model import model_from_config, xavier_initialize_FCs
 from nequip.nn import GraphModuleMixin, AtomwiseLinear
 from nequip.utils.test import assert_AtomicData_equivariant
 
@@ -80,8 +80,14 @@ def config(request):
 
 @pytest.fixture(
     params=[
-        (["EnergyModel"], AtomicDataDict.FORCE_KEY),
-        (["EnergyModel", "ForceOutput"], AtomicDataDict.TOTAL_ENERGY_KEY),
+        (
+            ["EnergyModel", "ForceOutput"],
+            AtomicDataDict.FORCE_KEY,
+        ),
+        (
+            ["EnergyModel"],
+            AtomicDataDict.TOTAL_ENERGY_KEY,
+        ),
     ]
 )
 def model(request, config):
@@ -90,7 +96,7 @@ def model(request, config):
     builder, out_field = request.param
     config = config.copy()
     config["model_builders"] = builder
-    return builder(config=config), out_field
+    return model_from_config(config), out_field
 
 
 @pytest.fixture(
@@ -121,8 +127,7 @@ class TestWorkflow:
 
         out_orig = instance(data)[out_field]
 
-        with torch.no_grad():
-            instance.apply(uniform_initialize_equivariant_linears)
+        instance = xavier_initialize_FCs(instance, initialize=True)
 
         out_unif = instance(data)[out_field]
         assert not torch.allclose(out_orig, out_unif)
@@ -161,7 +166,9 @@ class TestWorkflow:
             )
 
     def test_submods(self):
-        model = EnergyModel(**minimal_config2)
+        config = minimal_config2.copy()
+        config["model_builders"] = ["EnergyModel"]
+        model = model_from_config(config=config, initialize=True)
         assert isinstance(model.chemical_embedding, AtomwiseLinear)
         true_irreps = o3.Irreps(minimal_config2["chemical_embedding_irreps_out"])
         assert (
@@ -193,7 +200,9 @@ class TestWorkflow:
 
 class TestGradient:
     def test_numeric_gradient(self, config, atomic_batch, device, float_tolerance):
-        model = ForceModel(**config)
+        config = config.copy()
+        config["model_builders"] = ["EnergyModel", "ForceOutput"]
+        model = model_from_config(config=config, initialize=True)
         model.to(device)
         data = atomic_batch.to(device)
         output = model(AtomicData.to_AtomicDataDict(data))
@@ -226,7 +235,9 @@ class TestAutoGradient:
         c = Collater.for_dataset(nequip_dataset)
         batch = c([nequip_dataset[i] for i in range(len(nequip_dataset))])
         device = "cpu"
-        energy_model = EnergyModel(**config)
+        config = config.copy()
+        config["model_builders"] = ["EnergyModel"]
+        energy_model = model_from_config(config=config, initialize=True)
         energy_model.to(device)
         data = AtomicData.to_AtomicDataDict(batch.to(device))
         data[AtomicDataDict.POSITIONS_KEY].requires_grad = True
@@ -305,7 +316,9 @@ class TestCutoff:
         )
 
     def test_embedding_cutoff(self, config):
-        instance = EnergyModel(**config)
+        config = config.copy()
+        config["model_builders"] = ["EnergyModel"]
+        instance = model_from_config(config=config, initialize=True)
         r_max = config["r_max"]
 
         # make a synthetic three atom example

@@ -107,11 +107,8 @@ def test_metrics(nequip_dataset, BENCHMARK_ROOT, conffile, field, builder):
         )
         true_config["default_dtype"] = dtype
         true_config["max_epochs"] = 2
-        true_config["model_builder"] = builder
-
-        # to be a true identity, we can't have rescaling
-        true_config["global_rescale_shift"] = None
-        true_config["global_rescale_scale"] = None
+        # We just don't add rescaling:
+        true_config["model_builders"] = [builder]
 
         config_path = tmpdir + "/conf.yaml"
         with open(config_path, "w+") as fp:
@@ -180,11 +177,11 @@ def test_metrics(nequip_dataset, BENCHMARK_ROOT, conffile, field, builder):
         # == Check model ==
         model = torch.load(outdir + "/last_model.pth")
         assert isinstance(
-            model, RescaleOutput
+            model, builder
         )  # make sure trainer and this test aren't out of sync
 
         if builder == IdentityModel:
-            one = model.model.one
+            one = model.one
             # Since the loss is always zero, even though the constant
             # 1 was trainable, it shouldn't have changed
             assert torch.allclose(
