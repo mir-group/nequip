@@ -19,7 +19,7 @@ class IdentityModel(GraphModuleMixin, torch.nn.Module):
             irreps_in={
                 AtomicDataDict.TOTAL_ENERGY_KEY: "0e",
                 AtomicDataDict.FORCE_KEY: "1o",
-            }
+            },
         )
         self.one = torch.nn.Parameter(torch.as_tensor(1.0))
 
@@ -38,7 +38,7 @@ class ConstFactorModel(GraphModuleMixin, torch.nn.Module):
             irreps_in={
                 AtomicDataDict.TOTAL_ENERGY_KEY: "0e",
                 AtomicDataDict.FORCE_KEY: "1o",
-            }
+            },
         )
         # to keep the optimizer happy:
         self.dummy = torch.nn.Parameter(torch.zeros(1))
@@ -61,7 +61,7 @@ class LearningFactorModel(GraphModuleMixin, torch.nn.Module):
             irreps_in={
                 AtomicDataDict.TOTAL_ENERGY_KEY: "0e",
                 AtomicDataDict.FORCE_KEY: "1o",
-            }
+            },
         )
         # By using a big factor, we keep it in a nice descending part
         # of the optimization without too much oscilation in loss at
