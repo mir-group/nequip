@@ -176,12 +176,9 @@ def test_metrics(nequip_dataset, BENCHMARK_ROOT, conffile, field, builder):
 
         # == Check model ==
         model = torch.load(outdir + "/last_model.pth")
-        assert isinstance(
-            model, builder
-        )  # make sure trainer and this test aren't out of sync
 
         if builder == IdentityModel:
-            one = model.one
+            one = model["one"]
             # Since the loss is always zero, even though the constant
             # 1 was trainable, it shouldn't have changed
             assert torch.allclose(

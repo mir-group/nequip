@@ -12,6 +12,7 @@ import torch
 
 from nequip.utils import Config, dataset_from_config
 from nequip.data import AtomicData, Collater
+from nequip.train import Trainer
 from nequip.scripts.deploy import load_deployed_model
 from nequip.utils import load_file, instantiate
 from nequip.train.loss import Loss
@@ -165,9 +166,12 @@ def main(args=None, running_as_script: bool = True):
         model, _ = load_deployed_model(args.model, device=device)
         logger.info("loaded deployed model.")
     except ValueError:  # its not a deployed model
-        model = torch.load(args.model, map_location=device)
+        model, _ = Trainer.load_model_from_training_session(
+            traindir=args.model.parent, model_name=args.model.name
+        )
         model = model.to(device)
-        logger.info("loaded pickled Python model.")
+        logger.info("loaded model from training session")
+    model.eval()
 
     # Load a config file
     logger.info(

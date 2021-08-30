@@ -10,10 +10,13 @@ import torch
 import nequip
 from nequip.data import AtomicDataDict, AtomicData
 from nequip.scripts import deploy
+from nequip.train import Trainer
 
 
-def test_deploy(nequip_dataset, BENCHMARK_ROOT):
-
+@pytest.mark.parametrize(
+    "device", ["cpu"] + (["cuda"] if torch.cuda.is_available() else [])
+)
+def test_deploy(nequip_dataset, BENCHMARK_ROOT, device):
     dtype = str(torch.get_default_dtype())[len("torch.") :]
 
     # if torch.cuda.is_available():
@@ -50,8 +53,10 @@ def test_deploy(nequip_dataset, BENCHMARK_ROOT):
         assert deployed_path.is_file(), "Deploy didn't create file"
 
         # now test predictions the same
-        best_mod = torch.load(f"{tmpdir}/{run_name}/best_model.pth")
-        device = next(best_mod.parameters()).device
+        best_mod, _ = Trainer.load_model_from_training_session(
+            traindir=f"{tmpdir}/{run_name}/", model_name="best_model.pth", device=device
+        )
+        best_mod.eval()
         data = AtomicData.to_AtomicDataDict(nequip_dataset[0].to(device))
         # Needed because of debug mode:
         data[AtomicDataDict.TOTAL_ENERGY_KEY] = data[

@@ -557,19 +557,22 @@ class Trainer:
 
     @staticmethod
     def load_model_from_training_session(
-        traindir, model_name="best_model.pth"
+        traindir, model_name="best_model.pth", device="cpu"
     ) -> Tuple[torch.nn.Module, Config]:
         traindir = str(traindir)
         model_name = str(model_name)
         config = Config.from_file(traindir + "/config_final.yaml")
         if config.get("compile_model", False):
-            model = torch.jit.load(traindir + "/" + model_name)
+            model = torch.jit.load(traindir + "/" + model_name, map_location=device)
         else:
-            model_state_dict = torch.load(traindir + "/" + model_name)
+            model_state_dict = torch.load(
+                traindir + "/" + model_name, map_location=device
+            )
             model = model_from_config(
                 config=config,
                 initialize=False,
             )
+            model.to(device)
             model.load_state_dict(model_state_dict)
         return model, config
 
