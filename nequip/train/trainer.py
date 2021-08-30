@@ -978,7 +978,7 @@ class Trainer:
 
     def save_model(self, path):
         with atomic_write(path) as write_to:
-            if self.kwargs["compile_model"]:
+            if isinstance(self.model, torch.jit.ScriptModule):
                 torch.jit.save(self.model, write_to)
             else:
                 torch.save(self.model.state_dict(), write_to)
