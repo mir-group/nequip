@@ -27,14 +27,11 @@ def RescaleEnergyEtc(
 
     # = Get statistics of training dataset =
     if initialize:
-        stats_fields = []
-        stats_modes = []
+        stats = set()
         if global_scale == "dataset_energy_std":
-            stats_fields = [AtomicDataDict.TOTAL_ENERGY_KEY]
-            stats_modes = ["mean_std"]
+            stats.add((AtomicDataDict.TOTAL_ENERGY_KEY, "mean_std"))
         elif global_scale == "dataset_force_rms":
-            stats_fields = [AtomicDataDict.TOTAL_ENERGY_KEY, AtomicDataDict.FORCE_KEY]
-            stats_modes = ["mean_std", "rms"]
+            stats.add((AtomicDataDict.FORCE_KEY, "rms"))
         elif (
             global_scale is None
             or isinstance(global_scale, float)
@@ -45,23 +42,8 @@ def RescaleEnergyEtc(
         else:
             raise ValueError(f"Invalid global scale `{global_scale}`")
 
-        stats = dataset.statistics(
-            fields=stats_fields,
-            modes=stats_modes,
-            stride=config.dataset_statistics_stride,
-        )
-        ((energies_mean, energies_std),) = stats[:1]
-        del stats_modes
-        del stats_fields
-
-        # = Determine shifts, scales =
-        if global_scale == "dataset_energy_std":
-            global_scale = energies_std
-        elif global_scale == "dataset_force_rms":
-            global_scale = stats[1][0]
-
         if global_shift == "dataset_energy_mean":
-            global_shift = energies_mean
+            stats.add((AtomicDataDict.TOTAL_ENERGY_KEY, "mean_std"))
         elif (
             global_shift is None
             or isinstance(global_shift, float)
@@ -71,6 +53,29 @@ def RescaleEnergyEtc(
             pass
         else:
             raise ValueError(f"Invalid global shift `{global_shift}`")
+
+        # = Compute shifts and scales =
+        stats = list(stats)
+        computed_stats = dataset.statistics(
+            fields=[e[0] for e in stats],
+            modes=[e[1] for e in stats],
+            stride=config.dataset_statistics_stride,
+        )
+
+        def _find_stat(field, mode):
+            return next(
+                computed_stats[i]
+                for i, (this_field, this_mode) in enumerate(stats)
+                if this_field == field and this_mode == mode
+            )
+
+        if global_scale == "dataset_energy_std":
+            global_scale = _find_stat(AtomicDataDict.TOTAL_ENERGY_KEY, "mean_std")[1]
+        elif global_scale == "dataset_force_rms":
+            global_scale = _find_stat(AtomicDataDict.FORCE_KEY, "rms")[0]
+
+        if global_shift == "dataset_energy_mean":
+            global_shift = _find_stat(AtomicDataDict.TOTAL_ENERGY_KEY, "mean_std")[0]
 
         RESCALE_THRESHOLD = 1e-6
         if isinstance(global_scale, float) and global_scale < RESCALE_THRESHOLD:
