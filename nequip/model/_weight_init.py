@@ -40,5 +40,6 @@ def _xavier_initialize_fcs(mod: torch.nn.Module):
 
 def xavier_initialize_FCs(model: GraphModuleMixin, initialize: bool):
     if initialize:
-        model.apply(_xavier_initialize_fcs)
+        with torch.no_grad():
+            model.apply(_xavier_initialize_fcs)
     return model
