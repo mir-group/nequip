@@ -141,7 +141,7 @@ def main(args=None):
         logging.info("Froze TorchScript model")
 
         # load config
-        config_str = (args.train_dir / "model_config.yaml").read_text()
+        config_str = (args.train_dir / "config.yaml").read_text()
         config = yaml.load(config_str, Loader=yaml.Loader)
 
         # Deploy

@@ -44,7 +44,7 @@ sgn.insert_from_parameters(
 
 # Now, we can test our patched model:
 # Load the original config file --- this could be a new one too:
-config = Config.from_file(path + "/model_config.yaml")
+config = Config.from_file(path + "/config.yaml")
 # Load the dataset:
 # (Note that this loads the training dataset if there are separate training and validation datasets defined.)
 dataset = dataset_from_config(config)

@@ -47,13 +47,13 @@ def main(args=None, running_as_script: bool = True):
     )
     parser.add_argument(
         "--dataset-config",
-        help="A YAML config file specifying the dataset to load test data from. If omitted, `model_config.yaml` in `train_dir` will be used",
+        help="A YAML config file specifying the dataset to load test data from. If omitted, `config.yaml` in `train_dir` will be used",
         type=Path,
         default=None,
     )
     parser.add_argument(
         "--metrics-config",
-        help="A YAML config file specifying the metrics to compute. If omitted, `model_config.yaml` in `train_dir` will be used. If the config does not specify `metrics_components`, the default is to logging.debug MAEs and RMSEs for all fields given in the loss function. If the literal string `None`, no metrics will be computed.",
+        help="A YAML config file specifying the metrics to compute. If omitted, `config.yaml` in `train_dir` will be used. If the config does not specify `metrics_components`, the default is to logging.debug MAEs and RMSEs for all fields given in the loss function. If the literal string `None`, no metrics will be computed.",
         type=str,
         default=None,
     )
@@ -99,10 +99,10 @@ def main(args=None, running_as_script: bool = True):
     dataset_is_from_training: bool = False
     if args.train_dir:
         if args.dataset_config is None:
-            args.dataset_config = args.train_dir / "model_config.yaml"
+            args.dataset_config = args.train_dir / "config.yaml"
             dataset_is_from_training = True
         if args.metrics_config is None:
-            args.metrics_config = args.train_dir / "model_config.yaml"
+            args.metrics_config = args.train_dir / "config.yaml"
         if args.model is None:
             args.model = args.train_dir / "best_model.pth"
         if args.test_indexes is None:

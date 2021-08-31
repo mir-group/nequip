@@ -306,7 +306,7 @@ class Trainer:
         self.best_model_path = output.generate_file("best_model.pth")
         self.last_model_path = output.generate_file("last_model.pth")
         self.trainer_save_path = output.generate_file("trainer.pth")
-        self.model_config_path = self.output.generate_file("model_config.yaml")
+        self.config_path = self.output.generate_file("config.yaml")
 
         if not (seed is None or self.restart):
             torch.manual_seed(seed)
@@ -416,11 +416,11 @@ class Trainer:
 
         return dictionary
 
-    def save_model_config(self) -> None:
+    def save_config(self) -> None:
         save_file(
             item=self.as_dict(state_dict=False, training_progress=False),
             supported_formats=dict(yaml=["yaml"]),
-            filename=self.model_config_path,
+            filename=self.config_path,
             enforced_format=None,
         )
 
@@ -451,7 +451,7 @@ class Trainer:
         )
         logger.debug(f"Saved trainer to {filename}")
 
-        self.save_model_config()
+        self.save_config()
         self.save_model(self.last_model_path)
         logger.debug(f"Saved last model to to {self.last_model_path}")
 
@@ -569,7 +569,7 @@ class Trainer:
         traindir = str(traindir)
         model_name = str(model_name)
 
-        config = Config.from_file(traindir + "/model_config.yaml")
+        config = Config.from_file(traindir + "/config.yaml")
         if config.get("compile_model", False):
             model = torch.jit.load(traindir + "/" + model_name, map_location=device)
         else:
@@ -720,6 +720,8 @@ class Trainer:
             self.best_val_metrics = float("inf")
             self.best_epoch = 0
             self.iepoch = 0
+            self.save_config()
+            self.save_model(self.last_model_path)
 
         self.init_metrics()
 
@@ -985,6 +987,7 @@ class Trainer:
             self.save_model(path)
 
     def save_model(self, path):
+        self.save_config()
         with atomic_write(path) as write_to:
             if isinstance(self.model, torch.jit.ScriptModule):
                 torch.jit.save(self.model, write_to)
