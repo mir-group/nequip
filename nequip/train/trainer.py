@@ -14,7 +14,7 @@ import yaml
 from copy import deepcopy
 from os.path import isfile
 from time import perf_counter, gmtime, strftime
-from typing import Optional, Union, Tuple
+from typing import Callable, Optional, Union, Tuple
 from pathlib import Path
 
 
@@ -179,7 +179,7 @@ class Trainer:
 
     Additional Attributes:
 
-        init_params (list): list of parameters needed to reconstruct this instance
+        init_keys (list): list of parameters needed to reconstruct this instance
         device : torch device
         optim: optimizer
         lr_sched: scheduler
@@ -216,6 +216,8 @@ class Trainer:
     ```
     """
 
+    stop_keys = ["max_epochs", "early_stopping", "early_stopping_kwargs"]
+    object_keys = ["lr_sched", "optim", "ema", "early_stopping_conds"]
     lr_scheduler_module = torch.optim.lr_scheduler
     optim_module = torch.optim
 
@@ -232,7 +234,8 @@ class Trainer:
         loss_coeffs: Union[dict, str] = AtomicDataDict.TOTAL_ENERGY_KEY,
         metrics_components: Optional[Union[dict, str]] = None,
         metrics_key: str = ABBREV.get(LOSS_KEY, LOSS_KEY),
-        early_stopping: Optional[EarlyStopping] = None,
+        early_stopping_conds: Optional[EarlyStopping] = None,
+        early_stopping: Optional[Callable] = None,
         early_stopping_kwargs: Optional[dict] = None,
         max_epochs: int = 1000000,
         lr_sched=None,
@@ -275,14 +278,14 @@ class Trainer:
         self.model = model
         self.optim = optim
         self.lr_sched = lr_sched
+        self.early_stopping_conds = early_stopping_conds
 
         _local_kwargs = {}
-        for key in self.init_params:
+        for key in self.init_keys:
             setattr(self, key, locals()[key])
             _local_kwargs[key] = locals()[key]
 
-        if self.use_ema:
-            self.ema = None
+        self.ema = None
 
         output = Output.get_output(dict(**_local_kwargs, **kwargs))
         self.output = output
@@ -303,6 +306,7 @@ class Trainer:
         self.best_model_path = output.generate_file("best_model.pth")
         self.last_model_path = output.generate_file("last_model.pth")
         self.trainer_save_path = output.generate_file("trainer.pth")
+        self.model_config_path = self.output.generate_file("model_config.yaml")
 
         if not (seed is None or self.restart):
             torch.manual_seed(seed)
@@ -335,23 +339,21 @@ class Trainer:
         logging.debug("! Done Initialize Trainer")
 
     @property
-    def updated_dict(self):
-        return self.as_dict(state_dict=False, training_progress=False)
+    def init_keys(self):
+        return [
+            key
+            for key in list(inspect.signature(Trainer.__init__).parameters.keys())
+            if key not in (["self", "kwargs", "model"] + Trainer.object_keys)
+        ]
 
     @property
-    def init_params(self):
-        d = inspect.signature(Trainer.__init__)
-        names = list(d.parameters.keys())
-        for key in [
-            "model",
-            "optim",
-            "lr_sched",
-            "self",
-            "kwargs",
-        ]:
-            if key in names:
-                names.remove(key)
-        return names
+    def params(self):
+        return self.as_dict(state_dict=False, training_progress=False, kwargs=False)
+
+    def update_kwargs(self, config):
+        self.kwargs.update(
+            {key: value for key, value in config.items() if key not in self.init_keys}
+        )
 
     @property
     def logger(self):
@@ -361,7 +363,12 @@ class Trainer:
     def epoch_logger(self):
         return logging.getLogger(self.epoch_log)
 
-    def as_dict(self, state_dict: bool = False, training_progress: bool = False):
+    def as_dict(
+        self,
+        state_dict: bool = False,
+        training_progress: bool = False,
+        kwargs: bool = True,
+    ):
         """convert instance to a dictionary
         Args:
 
@@ -370,26 +377,23 @@ class Trainer:
 
         dictionary = {}
 
-        dictionary.update(getattr(self, "kwargs", {}))
-        for key in self.init_params:
+        for key in self.init_keys:
             dictionary[key] = getattr(self, key, None)
+
+        if kwargs:
+            dictionary.update(getattr(self, "kwargs", {}))
 
         if state_dict:
             dictionary["state_dict"] = {}
-            dictionary["state_dict"]["optim"] = self.optim.state_dict()
-            if self.lr_sched is not None:
-                dictionary["state_dict"]["lr_sched"] = self.lr_sched.state_dict()
+            for key in Trainer.object_keys:
+                item = getattr(self, key, None)
+                if item is not None:
+                    dictionary["state_dict"][key] = item.state_dict()
             dictionary["state_dict"]["rng_state"] = torch.get_rng_state()
             if torch.cuda.is_available():
                 dictionary["state_dict"]["cuda_rng_state"] = torch.cuda.get_rng_state(
                     device=self.device
                 )
-            if self.use_ema:
-                dictionary["state_dict"]["ema_state"] = self.ema.state_dict()
-            if self.early_stopping is not None:
-                dictionary["state_dict"][
-                    "early_stopping"
-                ] = self.early_stopping.state_dict()
 
         if training_progress:
             dictionary["progress"] = {}
@@ -412,21 +416,11 @@ class Trainer:
 
         return dictionary
 
-    def save_final_config(self, config=None) -> None:
-        print("call!!")
-        if config is not None:
-            for key in self.kwargs:
-                if key in config:
-                    self.kwargs[key] = config[key]
-        import os
-
-        print(os.listdir(self.output.workdir))
-        self.config_save_path = self.output.generate_file("config_final.yaml")
-        print("self.config_save_path", self.config_save_path)
-        self.config_save_path = save_file(
+    def save_model_config(self) -> None:
+        save_file(
             item=self.as_dict(state_dict=False, training_progress=False),
             supported_formats=dict(yaml=["yaml"]),
-            filename=self.config_save_path,
+            filename=self.model_config_path,
             enforced_format=None,
         )
 
@@ -457,13 +451,8 @@ class Trainer:
         )
         logger.debug(f"Saved trainer to {filename}")
 
+        self.save_model_config()
         self.save_model(self.last_model_path)
-        try:
-            self.save_final_config()
-        except RuntimeError:
-            logging.debug("Not saving final yaml as it has been saved")
-        except Exception as e:
-            raise RuntimeError(f"Error {str(e)}")
         logger.debug(f"Saved last model to to {self.last_model_path}")
 
         return filename
@@ -545,20 +534,14 @@ class Trainer:
 
         if state_dict is not None and trainer.model is not None:
             logging.debug("Reload optimizer and scheduler states")
-            trainer.optim.load_state_dict(state_dict["optim"])
-
-            if trainer.lr_sched is not None:
-                trainer.lr_sched.load_state_dict(state_dict["lr_sched"])
-
-            if trainer.early_stopping is not None:
-                trainer.early_stopping.load_state_dict(state_dict["early_stopping"])
+            for key in Trainer.object_keys:
+                item = getattr(trainer, key, None)
+                if item is not None:
+                    item.load_state_dict(state_dict[key])
 
             torch.set_rng_state(state_dict["rng_state"])
             if torch.cuda.is_available():
                 torch.cuda.set_rng_state(state_dict["cuda_rng_state"])
-
-            if trainer.use_ema:
-                trainer.ema.load_state_dict(state_dict["ema_state"])
 
         if "progress" in d:
             trainer.best_val_metrics = progress["best_val_metrics"]
@@ -585,11 +568,8 @@ class Trainer:
     ) -> Tuple[torch.nn.Module, Config]:
         traindir = str(traindir)
         model_name = str(model_name)
-        print("traindir", traindir)
-        import os
 
-        print(os.listdir(traindir))
-        config = Config.from_file(traindir + "/config_final.yaml")
+        config = Config.from_file(traindir + "/model_config.yaml")
         if config.get("compile_model", False):
             model = torch.jit.load(traindir + "/" + model_name, map_location=device)
         else:
@@ -664,9 +644,8 @@ class Trainer:
             all_args=self.kwargs,
         )
         self.loss_stat = LossStat(self.loss)
-        self._initialized = True
 
-        if self.early_stopping is None:
+        if self.early_stopping_conds is None:
             key_mapping, kwargs = instantiate(
                 EarlyStopping,
                 prefix="early_stopping",
@@ -690,7 +669,9 @@ class Trainer:
                             new_dict[f"{VALIDATION}_{k}"] = item[k]
                     kwargs[key] = new_dict
                     n_args += len(new_dict)
-            self.early_stopping = EarlyStopping(**kwargs) if n_args > 0 else None
+            self.early_stopping_conds = EarlyStopping(**kwargs) if n_args > 0 else None
+
+        self._initialized = True
 
     def init_metrics(self):
         if self.metrics_components is None:
@@ -715,14 +696,6 @@ class Trainer:
         ):
             self.metrics_key = f"{VALIDATION}_{self.metrics_key}"
 
-    def init_model(self):
-        logger = self.logger
-        logger.info(
-            "Number of weights: {}".format(
-                sum(p.numel() for p in self.model.parameters())
-            )
-        )
-
     def train(self):
         """Training"""
         if getattr(self, "dl_train", None) is None:
@@ -731,7 +704,11 @@ class Trainer:
             self.init()
 
         if not self.restart:
-            self.init_model()
+            self.logger.info(
+                "Number of weights: {}".format(
+                    sum(p.numel() for p in self.model.parameters())
+                )
+            )
 
         for callback in self.init_callbacks:
             callback(self)
@@ -839,8 +816,10 @@ class Trainer:
     def stop_cond(self):
         """kill the training early"""
 
-        if self.early_stopping is not None and hasattr(self, "mae_dict"):
-            early_stop, early_stop_args, debug_args = self.early_stopping(self.mae_dict)
+        if self.early_stopping_conds is not None and hasattr(self, "mae_dict"):
+            early_stop, early_stop_args, debug_args = self.early_stopping_conds(
+                self.mae_dict
+            )
             if debug_args is not None:
                 self.logger.debug(debug_args)
             if early_stop:

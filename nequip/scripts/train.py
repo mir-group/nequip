@@ -110,7 +110,7 @@ def fresh_start(config):
         trainer = Trainer(model=None, **dict(config))
 
     # what is this
-    config.update(trainer.updated_dict())
+    config.update(trainer.params)
 
     # = Load the dataset =
     dataset = dataset_from_config(config, prefix="dataset")
@@ -138,9 +138,6 @@ def fresh_start(config):
         final_model = e3nn.util.jit.script(final_model)
         logging.info("Successfully compiled model...")
 
-    # Record final config
-    trainer.save_final_config(config)
-
     # Equivar test
     if config.equivariance_test:
         from e3nn.util.test import format_equivariance_error
@@ -155,6 +152,8 @@ def fresh_start(config):
     trainer.model = final_model
 
     # Train
+    trainer.update_dict()
+    trainer.save()
     trainer.train()
 
     return

@@ -59,7 +59,8 @@ def model_from_config(
 
     # Build
     builders = [
-        _load_callable(b, prefix="nequip.model") for b in config["model_builders"]
+        _load_callable(b, prefix="nequip.model")
+        for b in config.get("model_builders", [])
     ]
 
     model = None
