@@ -222,6 +222,7 @@ class Trainer:
     def __init__(
         self,
         model,
+        model_builders: Optional[list] = [],
         run_name: Optional[str] = None,
         root: Optional[str] = None,
         timestr: Optional[str] = None,
@@ -334,6 +335,10 @@ class Trainer:
         logging.debug("! Done Initialize Trainer")
 
     @property
+    def updated_dict(self):
+        return self.as_dict(state_dict=False, training_progress=False)
+
+    @property
     def init_params(self):
         d = inspect.signature(Trainer.__init__)
         names = list(d.parameters.keys())
@@ -365,9 +370,9 @@ class Trainer:
 
         dictionary = {}
 
+        dictionary.update(getattr(self, "kwargs", {}))
         for key in self.init_params:
             dictionary[key] = getattr(self, key, None)
-        dictionary.update(getattr(self, "kwargs", {}))
 
         if state_dict:
             dictionary["state_dict"] = {}
@@ -407,10 +412,23 @@ class Trainer:
 
         return dictionary
 
-    def save_final_config(self, config) -> None:
+    def save_final_config(self, config=None) -> None:
+        print("call!!")
+        if config is not None:
+            for key in self.kwargs:
+                if key in config:
+                    self.kwargs[key] = config[key]
+        import os
+
+        print(os.listdir(self.output.workdir))
         self.config_save_path = self.output.generate_file("config_final.yaml")
-        with open(self.config_save_path, "w+") as fp:
-            yaml.dump(dict(config), fp)
+        print("self.config_save_path", self.config_save_path)
+        self.config_save_path = save_file(
+            item=self.as_dict(state_dict=False, training_progress=False),
+            supported_formats=dict(yaml=["yaml"]),
+            filename=self.config_save_path,
+            enforced_format=None,
+        )
 
     def save(self, filename, format=None):
         """save the file as filename
@@ -440,6 +458,12 @@ class Trainer:
         logger.debug(f"Saved trainer to {filename}")
 
         self.save_model(self.last_model_path)
+        try:
+            self.save_final_config()
+        except RuntimeError:
+            logging.debug("Not saving final yaml as it has been saved")
+        except Exception as e:
+            raise RuntimeError(f"Error {str(e)}")
         logger.debug(f"Saved last model to to {self.last_model_path}")
 
         return filename
@@ -561,19 +585,24 @@ class Trainer:
     ) -> Tuple[torch.nn.Module, Config]:
         traindir = str(traindir)
         model_name = str(model_name)
+        print("traindir", traindir)
+        import os
+
+        print(os.listdir(traindir))
         config = Config.from_file(traindir + "/config_final.yaml")
         if config.get("compile_model", False):
             model = torch.jit.load(traindir + "/" + model_name, map_location=device)
         else:
-            model_state_dict = torch.load(
-                traindir + "/" + model_name, map_location=device
-            )
             model = model_from_config(
                 config=config,
                 initialize=False,
             )
-            model.to(device)
-            model.load_state_dict(model_state_dict)
+            if model is not None:
+                model.to(device)
+                model_state_dict = torch.load(
+                    traindir + "/" + model_name, map_location=device
+                )
+                model.load_state_dict(model_state_dict)
         return model, config
 
     def init(self):

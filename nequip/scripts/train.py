@@ -110,7 +110,7 @@ def fresh_start(config):
         trainer = Trainer(model=None, **dict(config))
 
     # what is this
-    config.update(trainer.output.updated_dict())
+    config.update(trainer.updated_dict())
 
     # = Load the dataset =
     dataset = dataset_from_config(config, prefix="dataset")
