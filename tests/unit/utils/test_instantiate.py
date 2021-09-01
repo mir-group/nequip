@@ -1,7 +1,7 @@
 import pytest
 import yaml
 
-from nequip.utils import instantiate
+from nequip.utils.auto_init import instantiate
 
 
 simple_default = {"b": 1, "d": 31}

@@ -33,12 +33,13 @@ import nequip
 from nequip.data import DataLoader, AtomicData, AtomicDataDict, AtomicDataset
 from nequip.utils import (
     Output,
-    instantiate_from_cls_name,
-    instantiate,
     save_file,
     load_file,
     atomic_write,
 )
+from nequip.utils.auto_init import (
+    instantiate_from_cls_name,
+    instantiate,)
 
 from .loss import Loss, LossStat
 from .metrics import Metrics
