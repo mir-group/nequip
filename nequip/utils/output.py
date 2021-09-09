@@ -18,8 +18,6 @@ class Output:
     Args:
         run_name: unique name of the simulation
         root: the base folder where the processed data will be stored
-        workdir: the path where all log files will be stored. will be updated to root/{run_name}_{timestr} if the folder already exists.
-        timestr (optional): unique id to generate work folder and store the output instance. default is time stamp if not defined.
         logfile (optional): if define, an additional logger (from the root one) will be defined and write to the file
         restart (optional): if True, the append flag will be used.
         append (optional): if True, the workdir and files can be append
@@ -30,16 +28,12 @@ class Output:
 
     def __init__(
         self,
-        run_name: Optional[str] = None,
+        run_name: Optional[str] = "NequIP",
         root: Optional[str] = None,
-        timestr: Optional[str] = None,
-        workdir: Optional[str] = None,
         logfile: Optional[str] = None,
-        restart: bool = False,
         append: bool = False,
         screen: bool = False,
         verbose: str = "info",
-        force_append: bool = False,
     ):
 
         # add screen output to the universal logger
@@ -56,55 +50,24 @@ class Output:
         for handler in logger.handlers:
             handler.setFormatter(fmt=formatter)
 
-        self.restart = restart
         self.append = append
-        self.force_append = force_append
         self.screen = screen
         self.verbose = verbose
 
-        print(f"initialize, {timestr}")
-
         # open root folder for storing
         # if folder exists and not append, the folder name and filename will be updated
-        if timestr is None:
-            if force_append:
-                logging.debug(f"Using default timestr for requeue")
-            elif restart and not append:
-                timestr = datetime.datetime.fromtimestamp(time()).strftime(
-                    "%Y-%m-%d_%H:%M:%S:%f"
-                )
-            else:
-                logging.info("Timestr is left as None")
-
-        print(f"changed, {timestr}")
-
-        if not force_append:
-            root = set_if_none(root, f".")
-            run_name = set_if_none(run_name, f"NequIP")
-            workdir = set_if_none(workdir, f"{root}/{run_name}")
-
-        print(f"workdir, {workdir}")
+        self.root = set_if_none(root, f".")
+        self.run_name = run_name
+        self.workdir = f"{self.root}/{self.run_name}"
 
         assert "/" not in run_name
 
         # if folder exists in a non-append-mode or a fresh run
         # rename the work folder based on run name
-        if (
-            isdir(workdir)
-            and (((restart and not append) or (not restart)))
-            and not force_append
-        ):
-            logging.debug(f"  ...renaming workdir from {workdir} to")
+        if isdir(self.workdir) and not append:
+            raise RuntimeError(f"project {self.runname} already exist under {self.root}")
 
-            workdir = f"{root}/{run_name}_{timestr}"
-            logging.debug(f"  ...{workdir}")
-
-        makedirs(workdir, exist_ok=True)
-
-        self.timestr = timestr
-        self.run_name = run_name
-        self.root = root
-        self.workdir = workdir
+        makedirs(self.workdir, exist_ok=True)
 
         self.logfile = logfile
         if logfile is not None:
@@ -115,7 +78,6 @@ class Output:
 
     def updated_dict(self):
         return dict(
-            timestr=self.timestr,
             run_name=self.run_name,
             root=self.root,
             workdir=self.workdir,
