@@ -15,12 +15,12 @@ import e3nn.util.jit
 from nequip.model import model_from_config
 from nequip.utils import Config, dataset_from_config
 from nequip.utils.test import assert_AtomicData_equivariant, set_irreps_debug
+from nequip.scripts.restart import restart
 
 default_config = dict(
     requeue=False,
     wandb=False,
     wandb_project="NequIP",
-    wandb_resume=False,
     compile_model=False,
     model_builders=[
         "EnergyModel",
@@ -39,8 +39,40 @@ default_config = dict(
 
 
 def main(args=None):
-    fresh_start(parse_command_line(args))
+    config = parse_command_line(args)
+    if config["reqeueue"]:
+        requeue(config)
+    elif config["restart"]:
+        raise ValueError("Use nequip-restart to restart a run")
+    else:
+        fresh_start(config)
 
+def requeue(config):
+
+    config["wandb_resume"] = config["requeue"]
+
+    found_restart_file = isfile(config.workdir + "/trainer.pth")
+    config.append = found_restart_file
+
+    # for fresh new train
+    if not found_restart_file:
+        config.run_time = 1
+        fresh_start(config)
+    else:
+        new_config = Config(
+            dict(wandb_resume=True),
+            allow_list=[
+                "run_name",
+                "run_time",
+                "run_id",
+                "append",
+                "wandb_resume",
+            ],
+        )
+        new_config.update(config)
+        restart(config.workdir + "/trainer.pth", new_config, mode="requeue")
+
+    return
 
 def parse_command_line(args=None):
     parser = argparse.ArgumentParser(description="Train a NequIP model.")
@@ -152,7 +184,7 @@ def fresh_start(config):
     trainer.model = final_model
 
     # Train
-    trainer.update_dict()
+    trainer.update_kwargs(config)
     trainer.save()
     trainer.train()
 
