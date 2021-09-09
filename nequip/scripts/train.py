@@ -27,7 +27,6 @@ default_config = dict(
         "ForceOutput",
         "RescaleEnergyEtc",
     ],
-    model_initializers=[],
     dataset_statistics_stride=1,
     default_dtype="float32",
     allow_tf32=False,  # TODO: until we understand equivar issues
