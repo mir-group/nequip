@@ -1,11 +1,12 @@
 """ Train a network."""
 import logging
 import argparse
-import yaml
 
 # This is a weird hack to avoid Intel MKL issues on the cluster when this is called as a subprocess of a process that has itself initialized PyTorch.
 # Since numpy gets imported later anyway for dataset stuff, this shouldn't affect performance.
 import numpy as np  # noqa: F401
+
+from os.path import isfile
 
 import torch
 
@@ -15,10 +16,10 @@ import e3nn.util.jit
 from nequip.model import model_from_config
 from nequip.utils import Config, dataset_from_config
 from nequip.utils.test import assert_AtomicData_equivariant, set_irreps_debug
-from nequip.scripts.restart import restart
 
 default_config = dict(
-    requeue=False,
+    root = "./",
+    runname = "NequIP",
     wandb=False,
     wandb_project="NequIP",
     compile_model=False,
@@ -34,29 +35,25 @@ default_config = dict(
     model_debug_mode=False,
     equivariance_test=False,
     grad_anomaly_mode=False,
+    append=False,
 )
 
 
 def main(args=None):
+
     config = parse_command_line(args)
-    if config["reqeueue"]:
-        requeue(config)
-    elif config["restart"]:
-        raise ValueError("Use nequip-restart to restart a run")
-    else:
-        fresh_start(config)
 
-def requeue(config):
-
-    config["wandb_resume"] = config["requeue"]
-
-    found_restart_file = isfile(config.workdir + "/trainer.pth")
-    config.append = found_restart_file
+    found_restart_file = isfile(f"{config.root}/{config.run_name}/trainer.pth")
+    if found_restart_file and not config.append:
+        raise RuntimeError(
+            f"Training instance exists at {config.workdir}/trainer.pth. "
+            "either set append to True or use a different root or runname"
+        )
 
     # for fresh new train
     if not found_restart_file:
         config.run_time = 1
-        fresh_start(config)
+        trainer = fresh_start(config)
     else:
         new_config = Config(
             dict(wandb_resume=True),
@@ -69,9 +66,14 @@ def requeue(config):
             ],
         )
         new_config.update(config)
-        restart(config.workdir + "/trainer.pth", new_config, mode="requeue")
+        trainer = restart(config.workdir + "/trainer.pth", new_config, mode="requeue")
+
+    # Train
+    trainer.save()
+    trainer.train()
 
     return
+
 
 def parse_command_line(args=None):
     parser = argparse.ArgumentParser(description="Train a NequIP model.")
@@ -184,10 +186,62 @@ def fresh_start(config):
 
     # Train
     trainer.update_kwargs(config)
-    trainer.save()
-    trainer.train()
 
-    return
+    return trainer
+
+
+def restart(file_name, config, mode="update"):
+
+    # load the dictionary
+    dictionary = load_file(
+        supported_formats=dict(torch=["pt", "pth"]),
+        filename=file_name,
+        enforced_format="torch",
+    )
+
+    dictionary.update(config)
+    dictionary["run_time"] = 1 + dictionary.get("run_time", 0)
+
+    config = Config(dictionary, exclude_keys=["state_dict", "progress"])
+
+    # dtype, etc.
+    _set_global_options(config)
+
+    if config.wandb:
+        from nequip.train.trainer_wandb import TrainerWandB
+
+        # resume wandb run
+        if config.wandb_resume:
+            from nequip.utils.wandb import resume
+
+            resume(config)
+        else:
+            from nequip.utils.wandb import init_n_update
+
+            config = init_n_update(config)
+
+        trainer = TrainerWandB.from_dict(dictionary)
+    else:
+        from nequip.train.trainer import Trainer
+
+        trainer = Trainer.from_dict(dictionary)
+
+    config.update(trainer.output.updated_dict())
+
+    # = Load the dataset =
+    dataset = dataset_from_config(config, prefix="dataset")
+    logging.info(f"Successfully re-loaded the data set of type {dataset}...")
+    try:
+        validation_dataset = dataset_from_config(config, prefix="validation_dataset")
+        logging.info(
+            f"Successfully re-loaded the validation data set of type {validation_dataset}..."
+        )
+    except KeyError:
+        # It couldn't be found
+        validation_dataset = None
+    trainer.set_dataset(dataset, validation_dataset)
+
+    return trainer
 
 
 if __name__ == "__main__":

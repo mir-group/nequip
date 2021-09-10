@@ -28,8 +28,8 @@ class Output:
 
     def __init__(
         self,
-        run_name: Optional[str] = "NequIP",
-        root: Optional[str] = None,
+        root: str,
+        run_name: str,
         logfile: Optional[str] = None,
         append: bool = False,
         screen: bool = False,
@@ -65,7 +65,9 @@ class Output:
         # if folder exists in a non-append-mode or a fresh run
         # rename the work folder based on run name
         if isdir(self.workdir) and not append:
-            raise RuntimeError(f"project {self.runname} already exist under {self.root}")
+            raise RuntimeError(
+                f"project {self.runname} already exist under {self.root}"
+            )
 
         makedirs(self.workdir, exist_ok=True)
 

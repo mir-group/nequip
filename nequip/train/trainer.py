@@ -424,7 +424,7 @@ class Trainer:
             enforced_format=None,
         )
 
-    def save(self, filename, format=None):
+    def save(self, filename:Optional[str]=None, format=None):
         """save the file as filename
 
         Args:
@@ -432,6 +432,9 @@ class Trainer:
         filename (str): name of the file
         format (str): format of the file. yaml and json format will not save the weights.
         """
+
+        if filename is None:
+            filename = self.trainer_save_path
 
         logger = self.logger
 
@@ -697,6 +700,7 @@ class Trainer:
             self.metrics_key = f"{VALIDATION}_{self.metrics_key}"
 
     def train(self):
+
         """Training"""
         if getattr(self, "dl_train", None) is None:
             raise RuntimeError("You must call `set_dataset()` before calling `train()`")
@@ -720,8 +724,7 @@ class Trainer:
             self.best_val_metrics = float("inf")
             self.best_epoch = 0
             self.iepoch = 0
-            self.save_config()
-            self.save_model(self.last_model_path)
+            self.save()
 
         self.init_metrics()
 
@@ -735,7 +738,7 @@ class Trainer:
 
         self.final_log()
 
-        self.save(self.trainer_save_path)
+        self.save()
 
     def batch_step(self, data, validation=False):
         # no need to have gradients from old steps taking up memory
@@ -956,7 +959,7 @@ class Trainer:
             )
 
         if (self.iepoch + 1) % self.log_epoch_freq == 0:
-            self.save(self.trainer_save_path)
+            self.save()
 
         if (
             self.save_checkpoint_freq > 0
