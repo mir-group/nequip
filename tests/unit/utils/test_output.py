@@ -40,6 +40,7 @@ class TestReload:
     def test_restart(self, append):
         pass
 
+
 @pytest.fixture(scope="class")
 def root():
     with tempfile.TemporaryDirectory(prefix="output") as path:

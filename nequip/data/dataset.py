@@ -415,49 +415,52 @@ class AtomicInMemoryDataset(AtomicDataset):
                 std = torch.std(arr, dim=0, unbiased=unbiased)
                 out.append((mean, std))
 
-            elif ana_mode == "atom_type_mean_std":
+            elif ana_mode == "per_specie_mean_std":
 
                 algorithm_kwargs = kwargs.pop(field, {})
-                mean, std = self.per_atom_type_statistics(
+                mean, std = self.per_specie_statistics(
                     graph_selector,
                     arr,
                     **algorithm_kwargs,
                 )
                 out.append((mean, std))
 
+            elif ana_mode == "per_atom_mean_std":
+                N = torch.bincount[self.data[AtomicDataDict.BATCH_KEY]]
+                arr = arr / N
+                mean = torch.mean(arr, dim=0)
+                std = torch.std(arr, dim=0, unbiased=unbiased)
+                out.append((mean, std))
+
         return out
 
-    def per_atom_type_statistics(self, selector, arr, alpha=0.1):
+    def per_specie_statistics(self, selector, arr, alpha=0.1):
 
-        N, fixed_field = self.type_count_per_graph()
-        N = N.type(torch.get_default_dtype())
+        N = (self.specie_count_per_graph()).type(torch.get_default_dtype())
 
-        if fixed_field:
-            n = arr.shape[0]
+        if AtomicDataDict.ATOMIC_NUMBERS_KEY in self.fixed_fields:
             N = torch.matmul(
-                torch.ones((n, 1), dtype=torch.get_default_dtype()), N.reshape([1, -1])
+                torch.ones((arr.shape[0], 1), dtype=torch.get_default_dtype()), N.reshape([1, -1])
             )
         else:
             N = N[selector]
 
-        mean, std = gp(N, arr, alpha=alpha)
-        return mean, std
+        return gp(N, arr, alpha=alpha)
 
-    def type_count_per_graph(self):
-        try:
+    def specie_count_per_graph(self):
+        if AtomicDataDict.ATOMIC_NUMBERS_KEY in self.fixed_fields:
+            transformed = self.transform.transform(
+                self.fixed_fields[AtomicDataDict.ATOMIC_NUMBERS_KEY]
+            )
+            N = torch.bincount(transformed)
+            fixed_field = True
+        else:
             transformed = self.transform(self.data)
             N = bincount(
                 transformed[AtomicDataDict.ATOM_TYPE_KEY],
                 self.data[AtomicDataDict.BATCH_KEY],
             )
             fixed_field = False
-        except Exception as e:
-            logging.debug(f"The dataset has a fixed number of atoms in each frame {e}")
-            transformed = self.transform.transform(
-                self.fixed_fields[AtomicDataDict.ATOMIC_NUMBERS_KEY]
-            )
-            N = torch.bincount(transformed)
-            fixed_field = True
         return N, fixed_field
 
 

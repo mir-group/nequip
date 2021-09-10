@@ -239,32 +239,5 @@ def restart(config, update_config):
     return trainer
 
 
-def pop_per_species(config, key, default):
-    return config.pop(
-        f"PerSpeciesScaleShift_{key}",
-        config.pop(f"per_species_scale_shift_{key}", default),
-    )
-
-
-def get_per_species(config, key, default):
-    return config.get(
-        f"PerSpeciesScaleShift_{key}",
-        config.get(f"per_species_scale_shift_{key}", default),
-    )
-
-
-def set_value(variable, variable_name, value_dict):
-    for key, value in value_dict.items():
-        if variable == key:
-            return value
-    if (
-        variable is None
-        or isinstance(variable, float)
-        or isinstance(variable, torch.Tensor)
-    ):
-        return variable
-    raise ValueError(f"Invalid {variable_name} `{variable}`")
-
-
 if __name__ == "__main__":
     main()

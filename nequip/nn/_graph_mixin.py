@@ -233,7 +233,9 @@ class SequentialGraphNetwork(GraphModuleMixin, torch.nn.Sequential):
         self.append(name, instance)
         return
 
-    def insert(self, after: str, name: str, module: GraphModuleMixin) -> None:
+    def insert(
+        self, after: str, name: str, module: GraphModuleMixin, prepend: bool = False
+    ) -> None:
         """Insert a module after the module with name ``after``.
 
         Args:
@@ -247,8 +249,10 @@ class SequentialGraphNetwork(GraphModuleMixin, torch.nn.Sequential):
         names = list(self._modules.keys())
         modules = list(self._modules.values())
         idx = names.index(after)
-        names.insert(idx + 1, name)
-        modules.insert(idx + 1, module)
+        if not prepend:
+            idx += 1
+        names.insert(idx, name)
+        modules.insert(idx, module)
         self._modules = OrderedDict(zip(names, modules))
         # TODO: handle irreps
         return
@@ -260,6 +264,7 @@ class SequentialGraphNetwork(GraphModuleMixin, torch.nn.Sequential):
         name: str,
         builder: Callable,
         params: Dict[str, Any] = {},
+        prepend: bool = False,
     ) -> None:
         r"""Build a module from parameters and insert it after ``after``.
 
@@ -278,7 +283,7 @@ class SequentialGraphNetwork(GraphModuleMixin, torch.nn.Sequential):
             optional_args=params,
             all_args=shared_params,
         )
-        self.insert(after, name, instance)
+        self.insert(after=after, name=name, module=instance, prepend=prepend)
         return
 
     # Copied from https://pytorch.org/docs/stable/_modules/torch/nn/modules/container.html#Sequential
