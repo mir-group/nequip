@@ -56,13 +56,11 @@ def main(args=None):
         trainer = fresh_start(config)
     else:
         new_config = Config(
-            dict(wandb_resume=True),
             allow_list=[
                 "run_name",
                 "run_time",
                 "run_id",
                 "append",
-                "wandb_resume",
             ],
         )
         new_config.update(config)
@@ -209,17 +207,9 @@ def restart(file_name, config, mode="update"):
 
     if config.wandb:
         from nequip.train.trainer_wandb import TrainerWandB
+        from nequip.utils.wandb import resume
 
-        # resume wandb run
-        if config.wandb_resume:
-            from nequip.utils.wandb import resume
-
-            resume(config)
-        else:
-            from nequip.utils.wandb import init_n_update
-
-            config = init_n_update(config)
-
+        resume(config)
         trainer = TrainerWandB.from_dict(dictionary)
     else:
         from nequip.train.trainer import Trainer
