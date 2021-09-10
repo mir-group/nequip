@@ -96,6 +96,8 @@ def parse_command_line(args=None):
 
     if args.update_config is not None:
         update_config = Config.from_file(args.update_config, defaults={})
+    else:
+        update_config = {}
 
     return config, update_config
 
