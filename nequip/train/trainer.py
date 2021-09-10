@@ -281,7 +281,7 @@ class Trainer:
         self.trainer_save_path = output.generate_file("trainer.pth")
         self.config_path = self.output.generate_file("config.yaml")
 
-        if seed is None:
+        if seed is not None:
             torch.manual_seed(seed)
             np.random.seed(seed)
 
@@ -299,6 +299,8 @@ class Trainer:
         self.best_val_metrics = float("inf")
         self.best_epoch = 0
         self.iepoch = -1
+
+        self.init()
 
     def init_objects(self):
         # initialize optimizer
@@ -568,7 +570,6 @@ class Trainer:
         state_dict = d.pop("state_dict", None)
 
         trainer = cls(model=model, **d)
-        trainer.init_objects()
 
         if state_dict is not None and trainer.model is not None:
             logging.debug("Reload optimizer and scheduler states")
@@ -632,15 +633,6 @@ class Trainer:
         self.model.to(self.device)
         self.init_objects()
 
-        d = self.as_dict()
-        for key in list(d.keys()):
-            if not isinstance(d[key], (float, int, str, list, tuple)):
-                d[key] = repr(d[key])
-
-        d["start_time"] = strftime("%a, %d %b %Y %H:%M:%S", gmtime())
-
-        self.log_dictionary(d, name="Initialization")
-
         self._initialized = True
 
     def init_metrics(self):
@@ -678,6 +670,16 @@ class Trainer:
                     sum(p.numel() for p in self.model.parameters())
                 )
             )
+
+        if self.iepoch == -1:
+            d = self.as_dict()
+            for key in list(d.keys()):
+                if not isinstance(d[key], (float, int, str, list, tuple)):
+                    d[key] = repr(d[key])
+
+            d["start_time"] = strftime("%a, %d %b %Y %H:%M:%S", gmtime())
+
+            self.log_dictionary(d, name="Initialization")
 
         for callback in self.init_callbacks:
             callback(self)

@@ -36,11 +36,9 @@ class TestProject:
 
 
 class TestReload:
-    @pytest.mark.parametrize("restart", [True, False])
     @pytest.mark.parametrize("append", [True, False])
-    def test_restart(self, restart, append):
+    def test_restart(self, append):
         pass
-
 
 @pytest.fixture(scope="class")
 def root():

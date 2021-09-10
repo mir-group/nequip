@@ -26,6 +26,7 @@ DEBUG = False
 NATOMS = 3
 NFRAMES = 10
 minimal_config = dict(
+    run_name="test",
     n_train=4,
     n_val=4,
     exclude_keys=["sth"],
@@ -34,7 +35,7 @@ minimal_config = dict(
     learning_rate=1e-2,
     optimizer="Adam",
     seed=0,
-    restart=False,
+    append=False,
     T_0=50,
     T_mult=2,
     loss_coeffs={"forces": 2},
@@ -77,13 +78,8 @@ class TestDuplicateError:
         model = DummyNet(3)
         c1 = Trainer(model=model, **minimal_config)
 
-        c2 = Trainer(model=model, **minimal_config)
-
-        assert c1.root == c2.root
-        assert c1.workdir != c2.workdir
-        assert c1.logfile.endswith("log")
-        assert c2.logfile.endswith("log")
-
+        with pytest.raises(RuntimeError):
+            c2 = Trainer(model=model, **minimal_config)
 
 class TestSaveLoad:
     @pytest.mark.parametrize("state_dict", [True, False])
@@ -347,6 +343,7 @@ def scale_train(nequip_dataset):
             batch_size=2,
             loss_coeffs=AtomicDataDict.FORCE_KEY,
             root=path,
+            run_name="test_scale",
         )
         trainer.set_dataset(nequip_dataset)
         trainer.train()
