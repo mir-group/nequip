@@ -16,10 +16,11 @@ import e3nn.util.jit
 from nequip.model import model_from_config
 from nequip.utils import Config, dataset_from_config
 from nequip.utils.test import assert_AtomicData_equivariant, set_irreps_debug
+from nequip.utils import load_file
 
 default_config = dict(
-    root = "./",
-    runname = "NequIP",
+    root="./",
+    runname="NequIP",
     wandb=False,
     wandb_project="NequIP",
     compile_model=False,
@@ -41,12 +42,12 @@ default_config = dict(
 
 def main(args=None):
 
-    config = parse_command_line(args)
+    config, update_config = parse_command_line(args)
 
     found_restart_file = isfile(f"{config.root}/{config.run_name}/trainer.pth")
     if found_restart_file and not config.append:
         raise RuntimeError(
-            f"Training instance exists at {config.workdir}/trainer.pth. "
+            f"Training instance exists at {config.root}/{config.run_name}/trainer.pth. "
             "either set append to True or use a different root or runname"
         )
 
@@ -54,7 +55,7 @@ def main(args=None):
     if not found_restart_file:
         trainer = fresh_start(config)
     else:
-        trainer = restart(config)
+        trainer = restart(config, update_config)
 
     # Train
     trainer.save()
@@ -81,13 +82,22 @@ def parse_command_line(args=None):
         help="enable PyTorch autograd anomaly mode to debug NaN gradients. Do not use for production training!",
         action="store_true",
     )
+    parser.add_argument(
+        "--update_config",
+        help="overwrite the original values in the yaml file",
+        type=str,
+        default=None,
+    )
     args = parser.parse_args(args=args)
 
     config = Config.from_file(args.config, defaults=default_config)
     for flag in ("model_debug_mode", "equivariance_test", "grad_anomaly_mode"):
         config[flag] = getattr(args, flag) or config[flag]
 
-    return config
+    if args.update_config is not None:
+        update_config = Config.from_file(args.update_config, defaults={})
+
+    return config, update_config
 
 
 def _set_global_options(config):
@@ -179,7 +189,7 @@ def fresh_start(config):
     return trainer
 
 
-def restart(config):
+def restart(config, update_config):
 
     # load the dictionary
     restart_file = f"{config.root}/{config.run_name}/trainer.pth"
@@ -188,6 +198,7 @@ def restart(config):
         filename=restart_file,
         enforced_format="torch",
     )
+    dictionary.update(update_config)
 
     # compare dictionary to config
     # recursive loop, if same type but different value
@@ -208,8 +219,6 @@ def restart(config):
         from nequip.train.trainer import Trainer
 
         trainer = Trainer.from_dict(dictionary)
-
-    config.update(trainer.output.updated_dict())
 
     # = Load the dataset =
     dataset = dataset_from_config(config, prefix="dataset")

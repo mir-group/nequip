@@ -64,7 +64,7 @@ class Output:
         # rename the work folder based on run name
         if isdir(self.workdir) and not append:
             raise RuntimeError(
-                f"project {self.runname} already exist under {self.root}"
+                f"project {self.run_name} already exist under {self.root}"
             )
 
         makedirs(self.workdir, exist_ok=True)

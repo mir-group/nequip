@@ -138,12 +138,10 @@ class Trainer:
 
         max_epochs (int): maximum number of epochs
 
-        lr_sched (optional): scheduler
         learning_rate (float): initial learning rate
         lr_scheduler_name (str): scheduler name
         lr_scheduler_kwargs (dict): parameters to initialize the scheduler
 
-        optim (): optimizer
         optimizer_name (str): name for optimizer
         optim_kwargs (dict): parameters to initialize the optimizer
 
@@ -174,8 +172,6 @@ class Trainer:
 
         init_keys (list): list of parameters needed to reconstruct this instance
         device : torch device
-        optim: optimizer
-        lr_sched: scheduler
         dl_train (DataLoader): training data
         dl_val (DataLoader): test data
         iepoch (int): # of epoches ran
@@ -226,11 +222,9 @@ class Trainer:
         early_stopping: Optional[Callable] = None,
         early_stopping_kwargs: Optional[dict] = None,
         max_epochs: int = 1000000,
-        lr_sched=None,
         learning_rate: float = 1e-2,
         lr_scheduler_name: str = "none",
         lr_scheduler_kwargs: Optional[dict] = None,
-        optim=None,
         optimizer_name: str = "Adam",
         optimizer_kwargs: Optional[dict] = None,
         max_gradient_norm: float = float("inf"),
@@ -263,9 +257,6 @@ class Trainer:
 
         # store all init arguments
         self.model = model
-        self.optim = optim
-        self.lr_sched = lr_sched
-        self.early_stopping_conds = early_stopping_conds
 
         _local_kwargs = {}
         for key in self.init_keys:
@@ -307,7 +298,84 @@ class Trainer:
         # initialize training states
         self.best_val_metrics = float("inf")
         self.best_epoch = 0
-        self.iepoch = 0
+        self.iepoch = -1
+
+    def init_objects(self):
+        # initialize optimizer
+        self.optim, self.optimizer_kwargs = instantiate_from_cls_name(
+            module=torch.optim,
+            class_name=self.optimizer_name,
+            prefix="optimizer",
+            positional_args=dict(params=self.model.parameters(), lr=self.learning_rate),
+            all_args=self.kwargs,
+            optional_args=self.optimizer_kwargs,
+        )
+
+        self.max_gradient_norm = (
+            float(self.max_gradient_norm)
+            if self.max_gradient_norm is not None
+            else float("inf")
+        )
+
+        # initialize scheduler
+        assert (
+            self.lr_scheduler_name
+            in ["CosineAnnealingWarmRestarts", "ReduceLROnPlateau", "none"]
+        ) or (
+            (len(self.end_of_epoch_callbacks) + len(self.end_of_batch_callbacks)) > 0
+        ), f"{self.lr_scheduler_name} cannot be used unless callback functions are defined"
+        self.lr_sched = None
+        self.lr_scheduler_kwargs = {}
+        if self.lr_scheduler_name != "none":
+            self.lr_sched, self.lr_scheduler_kwargs = instantiate_from_cls_name(
+                module=torch.optim.lr_scheduler,
+                class_name=self.lr_scheduler_name,
+                prefix="lr_scheduler",
+                positional_args=dict(optimizer=self.optim),
+                optional_args=self.lr_scheduler_kwargs,
+                all_args=self.kwargs,
+            )
+
+        # initialize early stopping conditions
+        key_mapping, kwargs = instantiate(
+            EarlyStopping,
+            prefix="early_stopping",
+            optional_args=self.early_stopping_kwargs,
+            all_args=self.kwargs,
+            return_args_only=True,
+        )
+        n_args = 0
+        for key, item in kwargs.items():
+            # prepand VALIDATION string if k is not with
+            if isinstance(item, dict):
+                new_dict = {}
+                for k, v in item.items():
+                    if (
+                        k.startswith(VALIDATION)
+                        or k.startswith(TRAIN)
+                        or k in ["LR", "wall"]
+                    ):
+                        new_dict[k] = item[k]
+                    else:
+                        new_dict[f"{VALIDATION}_{k}"] = item[k]
+                kwargs[key] = new_dict
+                n_args += len(new_dict)
+        self.early_stopping_conds = EarlyStopping(**kwargs) if n_args > 0 else None
+
+        if self.use_ema and self.ema is None:
+            self.ema = ExponentialMovingAverage(
+                self.model.parameters(),
+                decay=self.ema_decay,
+                use_num_updates=self.ema_use_num_updates,
+            )
+
+        self.loss, _ = instantiate(
+            builder=Loss,
+            prefix="loss",
+            positional_args=dict(coeffs=self.loss_coeffs),
+            all_args=self.kwargs,
+        )
+        self.loss_stat = LossStat(self.loss)
 
     @property
     def init_keys(self):
@@ -395,7 +463,7 @@ class Trainer:
             enforced_format=None,
         )
 
-    def save(self, filename:Optional[str]=None, format=None):
+    def save(self, filename: Optional[str] = None, format=None):
         """save the file as filename
 
         Args:
@@ -472,16 +540,11 @@ class Trainer:
                 )
 
         # update the restart and append option
-        d["restart"] = True
         if append is not None:
             d["append"] = append
 
-        # update the file and folder name
-        output = Output.from_config(d)
-        d.update(output.updated_dict())
-
         model = None
-        iepoch = 0
+        iepoch = -1
         if "model" in d:
             model = d.pop("model")
         elif "progress" in d:
@@ -505,6 +568,7 @@ class Trainer:
         state_dict = d.pop("state_dict", None)
 
         trainer = cls(model=model, **d)
+        trainer.init_objects()
 
         if state_dict is not None and trainer.model is not None:
             logging.debug("Reload optimizer and scheduler states")
@@ -512,6 +576,7 @@ class Trainer:
                 item = getattr(trainer, key, None)
                 if item is not None:
                     item.load_state_dict(state_dict[key])
+            trainer._initialized = True
 
             torch.set_rng_state(state_dict["rng_state"])
             if torch.cuda.is_available():
@@ -565,85 +630,7 @@ class Trainer:
             return
 
         self.model.to(self.device)
-
-        if self.optim is None:
-            self.optim, self.optimizer_kwargs = instantiate_from_cls_name(
-                module=torch.optim,
-                class_name=self.optimizer_name,
-                prefix="optimizer",
-                positional_args=dict(
-                    params=self.model.parameters(), lr=self.learning_rate
-                ),
-                all_args=self.kwargs,
-                optional_args=self.optimizer_kwargs,
-            )
-
-            self.max_gradient_norm = (
-                float(self.max_gradient_norm)
-                if self.max_gradient_norm is not None
-                else float("inf")
-            )
-
-        if self.use_ema and self.ema is None:
-            self.ema = ExponentialMovingAverage(
-                self.model.parameters(),
-                decay=self.ema_decay,
-                use_num_updates=self.ema_use_num_updates,
-            )
-
-        if self.lr_sched is None:
-            assert (
-                self.lr_scheduler_name
-                in ["CosineAnnealingWarmRestarts", "ReduceLROnPlateau", "none"]
-            ) or (
-                (len(self.end_of_epoch_callbacks) + len(self.end_of_batch_callbacks))
-                > 0
-            ), f"{self.lr_scheduler_name} cannot be used unless callback functions are defined"
-            self.lr_sched = None
-            self.lr_scheduler_kwargs = {}
-            if self.lr_scheduler_name != "none":
-                self.lr_sched, self.lr_scheduler_kwargs = instantiate_from_cls_name(
-                    module=torch.optim.lr_scheduler,
-                    class_name=self.lr_scheduler_name,
-                    prefix="lr_scheduler",
-                    positional_args=dict(optimizer=self.optim),
-                    optional_args=self.lr_scheduler_kwargs,
-                    all_args=self.kwargs,
-                )
-
-        self.loss, _ = instantiate(
-            builder=Loss,
-            prefix="loss",
-            positional_args=dict(coeffs=self.loss_coeffs),
-            all_args=self.kwargs,
-        )
-        self.loss_stat = LossStat(self.loss)
-
-        if self.early_stopping_conds is None:
-            key_mapping, kwargs = instantiate(
-                EarlyStopping,
-                prefix="early_stopping",
-                optional_args=self.early_stopping_kwargs,
-                all_args=self.kwargs,
-                return_args_only=True,
-            )
-            n_args = 0
-            for key, item in kwargs.items():
-                # prepand VALIDATION string if k is not with
-                if isinstance(item, dict):
-                    new_dict = {}
-                    for k, v in item.items():
-                        if (
-                            k.startswith(VALIDATION)
-                            or k.startswith(TRAIN)
-                            or k in ["LR", "wall"]
-                        ):
-                            new_dict[k] = item[k]
-                        else:
-                            new_dict[f"{VALIDATION}_{k}"] = item[k]
-                    kwargs[key] = new_dict
-                    n_args += len(new_dict)
-            self.early_stopping_conds = EarlyStopping(**kwargs) if n_args > 0 else None
+        self.init_objects()
 
         d = self.as_dict()
         for key in list(d.keys()):
@@ -698,7 +685,7 @@ class Trainer:
         self.init_log()
         self.wall = perf_counter()
 
-        if self.iepoch == 0:
+        if self.iepoch == -1:
             self.save()
 
         self.init_metrics()
@@ -821,7 +808,7 @@ class Trainer:
     def epoch_step(self):
 
         datasets = [self.dl_train, self.dl_val]
-        categories = [TRAIN, VALIDATION]
+        categories = [TRAIN, VALIDATION] if self.iepoch >= 0 else [VALIDATION]
         self.metrics_dict = {}
         self.loss_dict = {}
 
@@ -902,8 +889,7 @@ class Trainer:
                 log_header += f" {key:>12s}"
 
         batch_logger = logging.getLogger(self.batch_log[batch_type])
-        if not self.batch_header_print[batch_type]:
-            self.batch_header_print[batch_type] = True
+        if self.iepoch == -1:
             batch_logger.info(header)
 
         if self.ibatch == 0:
@@ -977,8 +963,6 @@ class Trainer:
             self.logger.info("! Restarting training ...")
         else:
             self.logger.info("! Starting training ...")
-        self.epoch_header_print = False
-        self.batch_header_print = {TRAIN: False, VALIDATION: False}
 
     def final_log(self):
 
@@ -1001,7 +985,7 @@ class Trainer:
 
         header = "epoch, wall, LR"
 
-        categories = [TRAIN, VALIDATION]
+        categories = [TRAIN, VALIDATION] if self.iepoch > 0 else [VALIDATION]
         log_header = {}
         log_str = {}
 
@@ -1038,13 +1022,13 @@ class Trainer:
                     log_header[category] += f" {key:>12s}"
                 self.mae_dict[f"{category}_{key}"] = value
 
-        if not self.epoch_header_print:
+        if self.iepoch == -1:
             self.epoch_logger.info(header)
-            self.epoch_header_print = True
         self.epoch_logger.info(mat_str)
 
-        self.logger.info("\n\n  Train      " + log_header[TRAIN])
-        self.logger.info("! Train      " + log_str[TRAIN])
+        if self.iepoch > 0:
+            self.logger.info("\n\n  Train      " + log_header[TRAIN])
+            self.logger.info("! Train      " + log_str[TRAIN])
         self.logger.info("  Validation " + log_header[VALIDATION])
         self.logger.info("! Validation " + log_str[VALIDATION])
 
