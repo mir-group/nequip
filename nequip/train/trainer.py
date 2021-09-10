@@ -134,13 +134,6 @@ class Trainer:
 
         seed (int): random see number
 
-        run_name (str): run name.
-        root (str): the name of root dir to make work folders
-        timestr (optional, str): unique string to differentiate this trainer from others.
-
-        restart (bool) : If true, the init_model function will not be callsed. Default: False
-        append (bool): If true, the preexisted workfolder and files will be overwritten. And log files will be appended
-
         loss_coeffs (dict): dictionary to store coefficient and loss functions
 
         max_epochs (int): maximum number of epochs
@@ -225,12 +218,7 @@ class Trainer:
         self,
         model,
         model_builders: Optional[list] = [],
-        run_name: Optional[str] = None,
-        root: Optional[str] = None,
-        timestr: Optional[str] = None,
         seed: Optional[int] = None,
-        restart: bool = False,
-        append: bool = True,
         loss_coeffs: Union[dict, str] = AtomicDataDict.TOTAL_ENERGY_KEY,
         metrics_components: Optional[Union[dict, str]] = None,
         metrics_key: str = ABBREV.get(LOSS_KEY, LOSS_KEY),
@@ -274,7 +262,6 @@ class Trainer:
         logging.debug("* Initialize Trainer")
 
         # store all init arguments
-        self.root = root
         self.model = model
         self.optim = optim
         self.lr_sched = lr_sched
@@ -290,12 +277,7 @@ class Trainer:
         output = Output.get_output(dict(**_local_kwargs, **kwargs))
         self.output = output
 
-        # timestr run_name root workdir logfile
-        for key, value in output.updated_dict().items():
-            setattr(self, key, value)
-
-        if self.logfile is None:
-            self.logfile = output.open_logfile("log", propagate=True)
+        self.logfile = output.open_logfile("log", propagate=True)
         self.epoch_log = output.open_logfile("metrics_epoch.csv", propagate=False)
         self.batch_log = {
             TRAIN: output.open_logfile("metrics_batch_train.csv", propagate=False),
@@ -308,7 +290,7 @@ class Trainer:
         self.trainer_save_path = output.generate_file("trainer.pth")
         self.config_path = self.output.generate_file("config.yaml")
 
-        if not (seed is None or self.restart):
+        if seed is None:
             torch.manual_seed(seed)
             np.random.seed(seed)
 
@@ -322,21 +304,10 @@ class Trainer:
         self.lr_scheduler_kwargs = deepcopy(lr_scheduler_kwargs)
         self.early_stopping_kwargs = deepcopy(early_stopping_kwargs)
 
-        # initialize the optimizer and scheduler, the params will be updated in the function
-        self.init()
-
-        if not (restart and append):
-
-            d = self.as_dict()
-            for key in list(d.keys()):
-                if not isinstance(d[key], (float, int, str, list, tuple)):
-                    d[key] = repr(d[key])
-
-            d["start_time"] = strftime("%a, %d %b %Y %H:%M:%S", gmtime())
-
-            self.log_dictionary(d, name="Initialization")
-
-        logging.debug("! Done Initialize Trainer")
+        # initialize training states
+        self.best_val_metrics = float("inf")
+        self.best_epoch = 0
+        self.iepoch = 0
 
     @property
     def init_keys(self):
@@ -674,6 +645,15 @@ class Trainer:
                     n_args += len(new_dict)
             self.early_stopping_conds = EarlyStopping(**kwargs) if n_args > 0 else None
 
+        d = self.as_dict()
+        for key in list(d.keys()):
+            if not isinstance(d[key], (float, int, str, list, tuple)):
+                d[key] = repr(d[key])
+
+        d["start_time"] = strftime("%a, %d %b %Y %H:%M:%S", gmtime())
+
+        self.log_dictionary(d, name="Initialization")
+
         self._initialized = True
 
     def init_metrics(self):
@@ -706,8 +686,6 @@ class Trainer:
             raise RuntimeError("You must call `set_dataset()` before calling `train()`")
         if not self._initialized:
             self.init()
-
-        if not self.restart:
             self.logger.info(
                 "Number of weights: {}".format(
                     sum(p.numel() for p in self.model.parameters())
@@ -720,10 +698,7 @@ class Trainer:
         self.init_log()
         self.wall = perf_counter()
 
-        if not self.restart:
-            self.best_val_metrics = float("inf")
-            self.best_epoch = 0
-            self.iepoch = 0
+        if self.iepoch == 0:
             self.save()
 
         self.init_metrics()
@@ -998,7 +973,7 @@ class Trainer:
                 torch.save(self.model.state_dict(), write_to)
 
     def init_log(self):
-        if self.restart:
+        if self.iepoch > 0:
             self.logger.info("! Restarting training ...")
         else:
             self.logger.info("! Starting training ...")
@@ -1075,16 +1050,14 @@ class Trainer:
 
     def __del__(self):
 
-        if not self.append:
+        logger = self.logger
+        for hdl in logger.handlers:
+            hdl.flush()
+            hdl.close()
+        logger.handlers = []
 
-            logger = self.logger
-            for hdl in logger.handlers:
-                hdl.flush()
-                hdl.close()
-            logger.handlers = []
-
-            for i in range(len(logger.handlers)):
-                logger.handlers.pop()
+        for i in range(len(logger.handlers)):
+            logger.handlers.pop()
 
     def set_dataset(
         self,

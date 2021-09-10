@@ -19,11 +19,9 @@ class Output:
         run_name: unique name of the simulation
         root: the base folder where the processed data will be stored
         logfile (optional): if define, an additional logger (from the root one) will be defined and write to the file
-        restart (optional): if True, the append flag will be used.
         append (optional): if True, the workdir and files can be append
         screen (optional): if True, root logger print to screen
         verbose (optional): same as Logging verbose level
-        force_append (optional): flag for requeue. Forcing to append everything
     """
 
     def __init__(
@@ -78,14 +76,6 @@ class Output:
             )
             logging.debug(f"  ...logfile {self.logfile} to")
 
-    def updated_dict(self):
-        return dict(
-            run_name=self.run_name,
-            root=self.root,
-            workdir=self.workdir,
-            logfile=self.logfile,
-        )
-
     def generate_file(self, file_name: str):
         """
         only works with relative path. open a file
@@ -95,7 +85,7 @@ class Output:
             raise ValueError("filename should be a relative path file name")
         file_name = f"{self.workdir}/{file_name}"
 
-        if isfile(file_name) and not (self.restart and self.append):
+        if isfile(file_name) and not self.append:
             raise RuntimeError(
                 f"Tried to create file `{file_name}` but it already exists and either (1) append is disabled or (2) this run is not a restart"
             )

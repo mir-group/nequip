@@ -52,19 +52,9 @@ def main(args=None):
 
     # for fresh new train
     if not found_restart_file:
-        config.run_time = 1
         trainer = fresh_start(config)
     else:
-        new_config = Config(
-            allow_list=[
-                "run_name",
-                "run_time",
-                "run_id",
-                "append",
-            ],
-        )
-        new_config.update(config)
-        trainer = restart(config.workdir + "/trainer.pth", new_config, mode="requeue")
+        trainer = restart(config)
 
     # Train
     trainer.save()
@@ -122,6 +112,7 @@ def _set_global_options(config):
 
 
 def fresh_start(config):
+
     _set_global_options(config)
 
     # = Make the trainer =
@@ -188,17 +179,19 @@ def fresh_start(config):
     return trainer
 
 
-def restart(file_name, config, mode="update"):
+def restart(config):
 
     # load the dictionary
+    restart_file = f"{config.root}/{config.run_name}/trainer.pth"
     dictionary = load_file(
         supported_formats=dict(torch=["pt", "pth"]),
-        filename=file_name,
+        filename=restart_file,
         enforced_format="torch",
     )
 
-    dictionary.update(config)
-    dictionary["run_time"] = 1 + dictionary.get("run_time", 0)
+    # compare dictionary to config
+    # recursive loop, if same type but different value
+    # raise error
 
     config = Config(dictionary, exclude_keys=["state_dict", "progress"])
 
