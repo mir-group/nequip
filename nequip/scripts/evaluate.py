@@ -12,6 +12,7 @@ import torch
 
 from nequip.utils import Config, dataset_from_config
 from nequip.data import AtomicData, Collater
+from nequip.train import Trainer
 from nequip.scripts.deploy import load_deployed_model
 from nequip.utils import load_file, instantiate
 from nequip.train.loss import Loss
@@ -46,13 +47,13 @@ def main(args=None, running_as_script: bool = True):
     )
     parser.add_argument(
         "--dataset-config",
-        help="A YAML config file specifying the dataset to load test data from. If omitted, `config_final.yaml` in `train_dir` will be used",
+        help="A YAML config file specifying the dataset to load test data from. If omitted, `config.yaml` in `train_dir` will be used",
         type=Path,
         default=None,
     )
     parser.add_argument(
         "--metrics-config",
-        help="A YAML config file specifying the metrics to compute. If omitted, `config_final.yaml` in `train_dir` will be used. If the config does not specify `metrics_components`, the default is to logging.debug MAEs and RMSEs for all fields given in the loss function. If the literal string `None`, no metrics will be computed.",
+        help="A YAML config file specifying the metrics to compute. If omitted, `config.yaml` in `train_dir` will be used. If the config does not specify `metrics_components`, the default is to logging.debug MAEs and RMSEs for all fields given in the loss function. If the literal string `None`, no metrics will be computed.",
         type=str,
         default=None,
     )
@@ -98,10 +99,10 @@ def main(args=None, running_as_script: bool = True):
     dataset_is_from_training: bool = False
     if args.train_dir:
         if args.dataset_config is None:
-            args.dataset_config = args.train_dir / "config_final.yaml"
+            args.dataset_config = args.train_dir / "config.yaml"
             dataset_is_from_training = True
         if args.metrics_config is None:
-            args.metrics_config = args.train_dir / "config_final.yaml"
+            args.metrics_config = args.train_dir / "config.yaml"
         if args.model is None:
             args.model = args.train_dir / "best_model.pth"
         if args.test_indexes is None:
@@ -165,9 +166,12 @@ def main(args=None, running_as_script: bool = True):
         model, _ = load_deployed_model(args.model, device=device)
         logger.info("loaded deployed model.")
     except ValueError:  # its not a deployed model
-        model = torch.load(args.model, map_location=device)
+        model, _ = Trainer.load_model_from_training_session(
+            traindir=args.model.parent, model_name=args.model.name
+        )
         model = model.to(device)
-        logger.info("loaded pickled Python model.")
+        logger.info("loaded model from training session")
+    model.eval()
 
     # Load a config file
     logger.info(

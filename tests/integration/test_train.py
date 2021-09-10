@@ -19,7 +19,7 @@ class IdentityModel(GraphModuleMixin, torch.nn.Module):
             irreps_in={
                 AtomicDataDict.TOTAL_ENERGY_KEY: "0e",
                 AtomicDataDict.FORCE_KEY: "1o",
-            }
+            },
         )
         self.one = torch.nn.Parameter(torch.as_tensor(1.0))
 
@@ -38,7 +38,7 @@ class ConstFactorModel(GraphModuleMixin, torch.nn.Module):
             irreps_in={
                 AtomicDataDict.TOTAL_ENERGY_KEY: "0e",
                 AtomicDataDict.FORCE_KEY: "1o",
-            }
+            },
         )
         # to keep the optimizer happy:
         self.dummy = torch.nn.Parameter(torch.zeros(1))
@@ -61,7 +61,7 @@ class LearningFactorModel(GraphModuleMixin, torch.nn.Module):
             irreps_in={
                 AtomicDataDict.TOTAL_ENERGY_KEY: "0e",
                 AtomicDataDict.FORCE_KEY: "1o",
-            }
+            },
         )
         # By using a big factor, we keep it in a nice descending part
         # of the optimization without too much oscilation in loss at
@@ -107,11 +107,8 @@ def test_metrics(nequip_dataset, BENCHMARK_ROOT, conffile, field, builder):
         )
         true_config["default_dtype"] = dtype
         true_config["max_epochs"] = 2
-        true_config["model_builder"] = builder
-
-        # to be a true identity, we can't have rescaling
-        true_config["global_rescale_shift"] = None
-        true_config["global_rescale_scale"] = None
+        # We just don't add rescaling:
+        true_config["model_builders"] = [builder]
 
         config_path = tmpdir + "/conf.yaml"
         with open(config_path, "w+") as fp:
@@ -179,12 +176,9 @@ def test_metrics(nequip_dataset, BENCHMARK_ROOT, conffile, field, builder):
 
         # == Check model ==
         model = torch.load(outdir + "/last_model.pth")
-        assert isinstance(
-            model, RescaleOutput
-        )  # make sure trainer and this test aren't out of sync
 
         if builder == IdentityModel:
-            one = model.model.one
+            one = model["one"]
             # Since the loss is always zero, even though the constant
             # 1 was trainable, it shouldn't have changed
             assert torch.allclose(

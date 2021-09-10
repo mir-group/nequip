@@ -328,6 +328,12 @@ class AtomicInMemoryDataset(AtomicDataset):
         **kwargs,
     ) -> List[tuple]:
 
+        # Short circut:
+        if modes is not None:
+            assert len(modes) == len(fields)
+        if len(fields) == 0:
+            return []
+
         if self._indices is not None:
             selector = torch.as_tensor(self._indices)[::stride]
         else:
@@ -342,9 +348,6 @@ class AtomicInMemoryDataset(AtomicDataset):
         # hack for in1d: https://github.com/pytorch/pytorch/issues/3025#issuecomment-392601780
         # node_selector = (self.data.batch[..., None] == selector).any(-1)
         # but this is unnecessary because no backward is done through statistics
-
-        if modes is not None:
-            assert len(modes) == len(fields)
 
         out = []
         for ifield, field in enumerate(fields):

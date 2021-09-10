@@ -2,8 +2,6 @@ from typing import Optional
 
 import torch
 
-from torch_scatter import scatter
-
 
 def bincount(
     input: torch.Tensor, batch: Optional[torch.Tensor] = None, minlength: int = 0

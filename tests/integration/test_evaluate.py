@@ -8,6 +8,8 @@ import textwrap
 import shutil
 
 import numpy as np
+import ase.io
+
 import torch
 
 from nequip.data import AtomicDataDict
@@ -49,7 +51,7 @@ def training_session(request, BENCHMARK_ROOT, conffile):
         )
         true_config["default_dtype"] = dtype
         true_config["max_epochs"] = 2
-        true_config["model_builder"] = builder
+        true_config["model_builders"] = [builder]
 
         # to be a true identity, we can't have rescaling
         true_config["global_rescale_shift"] = None
@@ -152,6 +154,8 @@ def test_metrics(training_session, do_test_idcs, do_metrics):
     metrics = runit({"train-dir": outdir, "batch-size": 200, "device": "cpu"})
     # move out.xyz to out-orig.xyz
     shutil.move(tmpdir + "/out.xyz", tmpdir + "/out-orig.xyz")
+    # Load it
+    orig_atoms = ase.io.read(tmpdir + "/out-orig.xyz", index=":", format="extxyz")
 
     assert set(metrics.keys()) == expect_metrics
 
@@ -175,21 +179,16 @@ def test_metrics(training_session, do_test_idcs, do_metrics):
         )
         for k, v in metrics.items():
             assert np.all(np.abs(v - metrics2[k]) < 1e-5)
-        # Diff the output XYZ, which shouldn't change at all
-        # Use `cmp`, which is UNIX standard, to make efficient
-        # See https://stackoverflow.com/questions/12900538/fastest-way-to-tell-if-two-files-have-the-same-contents-in-unix-linux
-        cmp_retval = subprocess.run(
-            ["cmp", "--silent", tmpdir + "/out-orig.xyz", tmpdir + f"/{batch_size}.xyz"]
-        )
-        if cmp_retval.returncode == 0:
-            # same
-            pass
-        if cmp_retval.returncode == 1:
-            raise AssertionError(
-                f"Changing batch size to {batch_size} changed out.xyz!"
+
+        # Check the output XYZ
+        batch_atoms = ase.io.read(tmpdir + "/out-orig.xyz", index=":", format="extxyz")
+        for origframe, newframe in zip(orig_atoms, batch_atoms):
+            assert np.allclose(origframe.get_positions(), newframe.get_positions())
+            assert np.array_equal(
+                origframe.get_atomic_numbers(), newframe.get_atomic_numbers()
             )
-        else:
-            cmp_retval.check_returncode()  # error out for subprocess problem
+            assert np.array_equal(origframe.get_pbc(), newframe.get_pbc())
+            assert np.array_equal(origframe.get_cell(), newframe.get_cell())
 
     # Check GPU
     if torch.cuda.is_available():
