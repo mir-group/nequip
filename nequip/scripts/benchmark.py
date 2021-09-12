@@ -16,11 +16,9 @@ from nequip.scripts.train import _set_global_options, default_config
 
 
 def main(args=None, running_as_script: bool = True):
-    # in results dir, do: nequip-deploy build . deployed.pth
     parser = argparse.ArgumentParser(
         description=textwrap.dedent(
-            """
-            """
+            """Benchmark the approximate MD performance of a given model configuration / dataset pair."""
         )
     )
     parser.add_argument("config", help="configuration file")
@@ -36,6 +34,10 @@ def main(args=None, running_as_script: bool = True):
     parser.add_argument(
         "--n-data", help="Number of frames to use.", type=int, default=1,
     )
+
+    # TODO: option to profile
+    # TODO: option to show memory use
+
     # Parse the args
     args = parser.parse_args(args=args)
 
