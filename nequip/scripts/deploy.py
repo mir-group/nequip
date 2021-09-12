@@ -39,6 +39,15 @@ _ALL_METADATA_KEYS = [
 ]
 
 
+def _compile_for_deploy(model):
+    model.eval()
+
+    if not isinstance(model, torch.jit.ScriptModule):
+        model = script(model)
+
+    return torch.jit.freeze(model)
+
+
 def load_deployed_model(
     model_path: Union[pathlib.Path, str], device: Union[str, torch.device] = "cpu"
 ) -> Tuple[torch.jit.ScriptModule, Dict[str, str]]:
@@ -87,9 +96,7 @@ def main(args=None):
         "info", help="Get information from a deployed model file"
     )
     info_parser.add_argument(
-        "model_path",
-        help="Path to a deployed model file.",
-        type=pathlib.Path,
+        "model_path", help="Path to a deployed model file.", type=pathlib.Path,
     )
 
     build_parser = subparsers.add_parser("build", help="Build a deployment model")
@@ -99,9 +106,7 @@ def main(args=None):
         type=pathlib.Path,
     )
     build_parser.add_argument(
-        "out_file",
-        help="Output file for deployed model.",
-        type=pathlib.Path,
+        "out_file", help="Output file for deployed model.", type=pathlib.Path,
     )
 
     args = parser.parse_args(args=args)
@@ -131,14 +136,8 @@ def main(args=None):
         )
 
         # -- compile --
-        if not isinstance(model, torch.jit.ScriptModule):
-            model = script(model)
-            logging.info("Compiled model to TorchScript")
-
-        model.eval()  # just to be sure
-
-        model = torch.jit.freeze(model)
-        logging.info("Froze TorchScript model")
+        model = _compile_for_deploy(model)
+        logging.info("Compiled & optimized model.")
 
         # load config
         config_str = (args.train_dir / "config.yaml").read_text()
