@@ -1,6 +1,7 @@
 import sys
 import argparse
 import textwrap
+import tempfile
 import contextlib
 import itertools
 
@@ -9,7 +10,7 @@ from torch.utils.benchmark import Timer, Measurement
 from torch.utils.benchmark.utils.common import trim_sigfig, select_unit
 
 from nequip.utils import Config, dataset_from_config
-from nequip.data import AtomicData, AtomicDataDict
+from nequip.data import AtomicData
 from nequip.model import model_from_config
 from nequip.scripts.deploy import _compile_for_deploy
 from nequip.scripts.train import _set_global_options, default_config
@@ -35,14 +36,14 @@ def main(args=None):
         default=None,
     )
     parser.add_argument(
-        "-n", help="Number of trials.", type=int, default=30,
+        "-n",
+        help="Number of trials.",
+        type=int,
+        default=30,
     )
     parser.add_argument(
-        "--n-data", help="Number of frames to use.", type=int, default=1,
-    )
-    parser.add_argument(
-        "--profile-warmup",
-        help="Number of warmups for profiling. (Does not apply to timing.)",
+        "--n-data",
+        help="Number of frames to use.",
         type=int,
         default=1,
     )
@@ -84,8 +85,16 @@ def main(args=None):
     print("Loading model... ")
     model = model_from_config(config, initialize=True, dataset=dataset)
     model = model.to(device)
+    print("Compile...")
     # "Deploy" it
     model = _compile_for_deploy(model)
+    # save and reload to avoid bugs
+    with tempfile.NamedTemporaryFile() as f:
+        torch.jit.save(model, f.name)
+        model = torch.jit.load(f.name)
+
+    # Make sure we're warm past compilation
+    warmup = config["_jit_bailout_depth"]
 
     print("Starting...")
     if args.profile is not None:
@@ -95,21 +104,27 @@ def main(args=None):
             print(f"Wrote profiling trace to `{args.profile}`")
 
         with torch.profiler.profile(
-            activities=[torch.profiler.ProfilerActivity.CPU,]
+            activities=[
+                torch.profiler.ProfilerActivity.CPU,
+            ]
             + (
                 [torch.profiler.ProfilerActivity.CUDA]
                 if torch.cuda.is_available()
                 else []
             ),
             schedule=torch.profiler.schedule(
-                wait=1, warmup=args.profile_warmup, active=args.n, repeat=1
+                wait=1, warmup=warmup, active=args.n, repeat=1
             ),
             on_trace_ready=trace_handler,
         ) as p:
-            for _ in range(1 + args.profile_warmup + args.n):
+            for _ in range(1 + warmup + args.n):
                 model(next(datas))
                 p.step()
     else:
+        print("Warmup...")
+        for _ in range(warmup):
+            model(next(datas))
+
         # just time
         t = Timer(stmt="model(next(datas))", globals={"model": model, "datas": datas})
         perloop: Measurement = t.timeit(args.n)
@@ -119,7 +134,7 @@ def main(args=None):
             f"PLEASE NOTE: these are speeds for the MODEL, evaluated on --n-data={args.n_data} configurations kept in memory."
         )
         print(
-            "    \_ MD itself, memory copies, and other overhead will affect real-world performance."
+            "    \\_ MD itself, memory copies, and other overhead will affect real-world performance."
         )
         print()
         trim_time = trim_sigfig(perloop.times[0], perloop.significant_figures)
@@ -132,7 +147,7 @@ def main(args=None):
             "Assuming linear scaling — which is ALMOST NEVER true in practice, especially on GPU —"
         )
         print(
-            f"    \_ this comes out to {trim_time / n_atom:.2f} {time_unit}/atom/call"
+            f"    \\_ this comes out to {trim_time / n_atom:.2f} {time_unit}/atom/call"
         )
         ns_day = (86400.0 / trim_time) * 2e-6
         #     day in s^   step in s^       ^ 2fs / ns
@@ -143,4 +158,3 @@ def main(args=None):
 
 if __name__ == "__main__":
     main()
-

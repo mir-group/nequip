@@ -37,6 +37,7 @@ default_config = dict(
     equivariance_test=False,
     grad_anomaly_mode=False,
     append=False,
+    _jit_bailout_depth=2,  # avoid 20 iters of pain, see https://github.com/pytorch/pytorch/issues/52286
 )
 
 
@@ -111,6 +112,9 @@ def _set_global_options(config):
             # it is enabled, and we dont want it to, so disable:
             torch.backends.cuda.matmul.allow_tf32 = False
             torch.backends.cudnn.allow_tf32 = False
+
+    # For avoiding 20 steps of painfully slow JIT recompilation
+    torch._C._jit_set_bailout_depth(config["_jit_bailout_depth"])
 
     if config.model_debug_mode:
         set_irreps_debug(enabled=True)

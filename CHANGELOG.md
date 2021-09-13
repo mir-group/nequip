@@ -22,6 +22,9 @@ Most recent change on the bottom.
 - Do not use TensorFloat32 by default on Ampere GPUs until we understand it better
 - No atomic numbers in networks
 
+### Fixed
+- The first 20 epochs/calls of inference are no longer painfully slow for recompilation
+
 ### Removed
 - Removed `allowed_species`
 
