@@ -23,6 +23,12 @@ def main(args=None):
     )
     parser.add_argument("config", help="configuration file")
     parser.add_argument(
+        "--profile",
+        help="Profile instead of timing, creating and outputing a Chrome trace JSON to the given path.",
+        type=str,
+        default=None,
+    )
+    parser.add_argument(
         "--device",
         help="Device to run the model on. If not provided, defaults to CUDA if available and CPU otherwise.",
         type=str,
@@ -33,6 +39,12 @@ def main(args=None):
     )
     parser.add_argument(
         "--n-data", help="Number of frames to use.", type=int, default=1,
+    )
+    parser.add_argument(
+        "--profile-warmup",
+        help="Number of warmups for profiling. (Does not apply to timing.)",
+        type=int,
+        default=1,
     )
 
     # TODO: option to profile
@@ -76,28 +88,57 @@ def main(args=None):
     model = _compile_for_deploy(model)
 
     print("Starting...")
-    t = Timer(stmt="model(next(datas))", globals={"model": model, "datas": datas})
-    perloop: Measurement = t.timeit(args.n)
+    if args.profile is not None:
 
-    print(" -- Results --")
-    print(
-        f"PLEASE NOTE: these are speeds for the MODEL, evaluated on --n-data={args.n_data} configurations kept in memory."
-    )
-    print(
-        "    \_ MD itself, memory copies, and other overhead will affect real-world performance."
-    )
-    print()
-    trim_time = trim_sigfig(perloop.times[0], perloop.significant_figures)
-    time_unit, time_scale = select_unit(trim_time)
-    time_str = ("{:.%dg}" % perloop.significant_figures).format(trim_time / time_scale)
-    print(f"The average call took {time_str}{time_unit}")
-    print(
-        "Assuming linear scaling — which is ALMOST NEVER true in practice, especially on GPU —"
-    )
-    print(f"    \_ this comes out to {trim_time / n_atom:.2f} {time_unit}/atom/call")
-    ns_day = (86400.0 / trim_time) * 2e-6
-    #     day in s^   step in s^       ^ 2fs / ns
-    print(f"For this system, at a 2fs timestep, this comes out to {ns_day:.2f} ns/day")
+        def trace_handler(p):
+            p.export_chrome_trace(args.profile)
+            print(f"Wrote profiling trace to `{args.profile}`")
+
+        with torch.profiler.profile(
+            activities=[torch.profiler.ProfilerActivity.CPU,]
+            + (
+                [torch.profiler.ProfilerActivity.CUDA]
+                if torch.cuda.is_available()
+                else []
+            ),
+            schedule=torch.profiler.schedule(
+                wait=1, warmup=args.profile_warmup, active=args.n, repeat=1
+            ),
+            on_trace_ready=trace_handler,
+        ) as p:
+            for _ in range(1 + args.profile_warmup + args.n):
+                model(next(datas))
+                p.step()
+    else:
+        # just time
+        t = Timer(stmt="model(next(datas))", globals={"model": model, "datas": datas})
+        perloop: Measurement = t.timeit(args.n)
+
+        print(" -- Results --")
+        print(
+            f"PLEASE NOTE: these are speeds for the MODEL, evaluated on --n-data={args.n_data} configurations kept in memory."
+        )
+        print(
+            "    \_ MD itself, memory copies, and other overhead will affect real-world performance."
+        )
+        print()
+        trim_time = trim_sigfig(perloop.times[0], perloop.significant_figures)
+        time_unit, time_scale = select_unit(trim_time)
+        time_str = ("{:.%dg}" % perloop.significant_figures).format(
+            trim_time / time_scale
+        )
+        print(f"The average call took {time_str}{time_unit}")
+        print(
+            "Assuming linear scaling — which is ALMOST NEVER true in practice, especially on GPU —"
+        )
+        print(
+            f"    \_ this comes out to {trim_time / n_atom:.2f} {time_unit}/atom/call"
+        )
+        ns_day = (86400.0 / trim_time) * 2e-6
+        #     day in s^   step in s^       ^ 2fs / ns
+        print(
+            f"For this system, at a 2fs timestep, this comes out to {ns_day:.2f} ns/day"
+        )
 
 
 if __name__ == "__main__":
