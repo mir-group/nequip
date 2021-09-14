@@ -49,6 +49,12 @@ def main(args=None):
         type=int,
         default=1,
     )
+    parser.add_argument(
+        "--timestep",
+        help="MD timestep for ns/day esimation, in fs. Defauts to 2fs.",
+        type=float,
+        default=2,
+    )
 
     # TODO: option to profile
     # TODO: option to show memory use
@@ -88,6 +94,7 @@ def main(args=None):
     model = model_from_config(config, initialize=True, dataset=dataset)
     print("Compile...")
     # "Deploy" it
+    model.eval()
     model = script(model)
     # TODO!!: for now we just compile, but when
     # https://github.com/pytorch/pytorch/issues/64957#issuecomment-918632252
@@ -102,7 +109,7 @@ def main(args=None):
         model = torch.jit.load(f.name, map_location=device)
 
     # Make sure we're warm past compilation
-    warmup = config["_jit_bailout_depth"]
+    warmup = config["_jit_bailout_depth"] + 4  # just to be safe...
 
     if args.profile is not None:
 
@@ -131,7 +138,6 @@ def main(args=None):
     else:
         print("Warmup...")
         for _ in range(warmup):
-            print(_)
             model(next(datas).copy())
 
         print("Starting...")
@@ -163,10 +169,10 @@ def main(args=None):
         print(
             f"    \\_ this comes out to {per_atom_time/time_scale_per:g} {time_unit_per}/atom/call"
         )
-        ns_day = (86400.0 / trim_time) * 2e-6
-        #     day in s^   step in s^       ^ 2fs / ns
+        ns_day = (86400.0 / trim_time) * args.timestep * 1e-6
+        #     day in s^   step/s^       ^ 2fs / step      ^ fs / ns
         print(
-            f"For this system, at a 2fs timestep, this comes out to {ns_day:.2f} ns/day"
+            f"For this system, at a {args.timestep:.2f}fs timestep, this comes out to {ns_day:.2f} ns/day"
         )
 
 
