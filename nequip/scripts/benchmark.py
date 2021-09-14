@@ -9,6 +9,8 @@ import torch
 from torch.utils.benchmark import Timer, Measurement
 from torch.utils.benchmark.utils.common import trim_sigfig, select_unit
 
+from e3nn.util.jit import script
+
 from nequip.utils import Config, dataset_from_config
 from nequip.data import AtomicData
 from nequip.model import model_from_config
@@ -84,25 +86,31 @@ def main(args=None):
     # Load model:
     print("Loading model... ")
     model = model_from_config(config, initialize=True, dataset=dataset)
-    model = model.to(device)
     print("Compile...")
     # "Deploy" it
-    model = _compile_for_deploy(model)
+    model = script(model)
+    # TODO!!: for now we just compile, but when
+    # https://github.com/pytorch/pytorch/issues/64957#issuecomment-918632252
+    # is resolved, then should be deploying again
+    print(
+        "WARNING: this is currently not using deployed model, just scripted, because of PyTorch bugs"
+    )
+    # model = _compile_for_deploy(model)  # TODO make this an option
     # save and reload to avoid bugs
     with tempfile.NamedTemporaryFile() as f:
         torch.jit.save(model, f.name)
-        model = torch.jit.load(f.name)
+        model = torch.jit.load(f.name, map_location=device)
 
     # Make sure we're warm past compilation
     warmup = config["_jit_bailout_depth"]
 
-    print("Starting...")
     if args.profile is not None:
 
         def trace_handler(p):
             p.export_chrome_trace(args.profile)
             print(f"Wrote profiling trace to `{args.profile}`")
 
+        print("Starting...")
         with torch.profiler.profile(
             activities=[
                 torch.profiler.ProfilerActivity.CPU,
@@ -118,15 +126,19 @@ def main(args=None):
             on_trace_ready=trace_handler,
         ) as p:
             for _ in range(1 + warmup + args.n):
-                model(next(datas))
+                model(next(datas).copy())
                 p.step()
     else:
         print("Warmup...")
         for _ in range(warmup):
-            model(next(datas))
+            print(_)
+            model(next(datas).copy())
 
+        print("Starting...")
         # just time
-        t = Timer(stmt="model(next(datas))", globals={"model": model, "datas": datas})
+        t = Timer(
+            stmt="model(next(datas).copy())", globals={"model": model, "datas": datas}
+        )
         perloop: Measurement = t.timeit(args.n)
 
         print(" -- Results --")
@@ -146,8 +158,10 @@ def main(args=None):
         print(
             "Assuming linear scaling — which is ALMOST NEVER true in practice, especially on GPU —"
         )
+        per_atom_time = trim_time / n_atom
+        time_unit_per, time_scale_per = select_unit(per_atom_time)
         print(
-            f"    \\_ this comes out to {trim_time / n_atom:.2f} {time_unit}/atom/call"
+            f"    \\_ this comes out to {per_atom_time/time_scale_per:g} {time_unit_per}/atom/call"
         )
         ns_day = (86400.0 / trim_time) * 2e-6
         #     day in s^   step in s^       ^ 2fs / ns
