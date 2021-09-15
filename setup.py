@@ -23,6 +23,7 @@ setup(
             "nequip-restart = nequip.scripts.restart:main",
             "nequip-requeue = nequip.scripts.requeue:main",
             "nequip-evaluate = nequip.scripts.evaluate:main",
+            "nequip-benchmark = nequip.scripts.benchmark:main",
             "nequip-deploy = nequip.scripts.deploy:main",
         ]
     },

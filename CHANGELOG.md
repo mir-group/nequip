@@ -15,11 +15,15 @@ Most recent change on the bottom.
 - Gradient clipping
 - Arbitrary atom type support
 - Unified, modular model building and initialization architecture
+- Added `nequip-benchmark` script for benchmarking and profiling models
 
 ### Changed
 - Name processed datasets based on a hash of their parameters to ensure only valid cached data is used
 - Do not use TensorFloat32 by default on Ampere GPUs until we understand it better
 - No atomic numbers in networks
+
+### Fixed
+- The first 20 epochs/calls of inference are no longer painfully slow for recompilation
 
 ### Removed
 - Removed `allowed_species`

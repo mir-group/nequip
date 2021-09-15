@@ -6,7 +6,7 @@ import argparse
 # Since numpy gets imported later anyway for dataset stuff, this shouldn't affect performance.
 import numpy as np  # noqa: F401
 
-from os.path import isfile
+from os.path import isdir
 
 import torch
 
@@ -37,6 +37,7 @@ default_config = dict(
     equivariance_test=False,
     grad_anomaly_mode=False,
     append=False,
+    _jit_bailout_depth=2,  # avoid 20 iters of pain, see https://github.com/pytorch/pytorch/issues/52286
 )
 
 
@@ -44,10 +45,10 @@ def main(args=None):
 
     config, update_config = parse_command_line(args)
 
-    found_restart_file = isfile(f"{config.root}/{config.run_name}/trainer.pth")
+    found_restart_file = isdir(f"{config.root}/{config.run_name}")
     if found_restart_file and not config.append:
         raise RuntimeError(
-            f"Training instance exists at {config.root}/{config.run_name}/trainer.pth. "
+            f"Training instance exists at {config.root}/{config.run_name}; "
             "either set append to True or use a different root or runname"
         )
 
@@ -111,6 +112,10 @@ def _set_global_options(config):
             # it is enabled, and we dont want it to, so disable:
             torch.backends.cuda.matmul.allow_tf32 = False
             torch.backends.cudnn.allow_tf32 = False
+
+    # For avoiding 20 steps of painfully slow JIT recompilation
+    # See https://github.com/pytorch/pytorch/issues/52286
+    torch._C._jit_set_bailout_depth(config["_jit_bailout_depth"])
 
     if config.model_debug_mode:
         set_irreps_debug(enabled=True)
