@@ -17,7 +17,6 @@ def compute_stats(str_names, dataset, stride):
     stat_strs = []
     ids = []
     tuple_ids = []
-    mode_count = 0
     tuple_id_map = {"mean": 0, "std": 1, "rms": 0}
     for name in str_names:
         # remove dataset prefix
@@ -70,14 +69,15 @@ def RescaleEnergyEtc(
 
     If ``initialize`` is false, doesn't compute statistics.
     """
+
     global_scale = config.get(
         "global_rescale_scale",
-        "dataset_force_rms"
+        f"dataset_{AtomicDataDict.FORCE_KEY}_rms"
         if AtomicDataDict.FORCE_KEY in model.irreps_out
-        else "dataset_energy_std",
+        else f"dataset_{AtomicDataDict.TOTAL_ENERGY_KEY}_std",
     )
     # TODO: change this default?
-    global_shift = config.get("global_rescale_shift", "dataset_energy_mean")
+    global_shift = config.get("global_rescale_shift", f"dataset_{AtomicDataDict.TOTAL_ENERGY_KEY}_mean")
 
     # = Get statistics of training dataset =
     if initialize:
@@ -123,6 +123,10 @@ def RescaleEnergyEtc(
         if global_scale is not None:
             global_scale = 1.0  # same,
 
+    logging.info(
+        f"Initially outputs are scaled by: {global_scale}, eneriges are shifted by {global_shift}."
+    )
+
     # == Build the model ==
     return RescaleOutput(
         model=model,
@@ -166,11 +170,12 @@ def PerSpecieRescale(
     # = Determine energy rescale type =
     global_scale = config.get(
         "global_rescale_scale",
-        "dataset_force_rms" if force_training else "dataset_energy_std",
+        f"dataset_{AtomicDataDict.FORCE_KEY}_rms" if force_training else f"dataset_{AtomicDataDict.TOTAL_ENERGY_KEY}_std",
     )
     global_shift = config.get("global_rescale_shift", None)
     scales = config.get(module_prefix + "scales", None)
     shifts = config.get(module_prefix + "shifts", None)
+    trainable = config.get(module_prefix + "trainable", None)
 
     if global_shift is not None:
         raise ValueError("One can only enable either global shift or per_species shift")
@@ -184,7 +189,7 @@ def PerSpecieRescale(
             if isinstance(value, str):
                 str_names += [value]
             elif (
-                global_scale is None
+                value is None
                 or isinstance(value, float)
                 or isinstance(value, list)
                 or isinstance(value, torch.Tensor)
@@ -209,14 +214,15 @@ def PerSpecieRescale(
             global_scale = computed_stats[str_names.index(global_scale)]
 
         if global_scale is not None:
-            scales /= global_scale
+            if scales is not None:
+                scales = scales/global_scale
+            if shifts is not None:
+                shifts = shifts/global_scale
 
     else:
         # Put dummy values
-        if scales is not None:
-            scales = 1.0  # it has some kind of value
-        if shifts is not None:
-            shifts = 1.0  # same,
+        scales = None
+        shifts = None
 
     # first peel off the gradient part
     model_func = model.func if force_training else model
@@ -224,12 +230,16 @@ def PerSpecieRescale(
     # insert in per species shift
     model_func.insert_from_parameters(
         after="total_energy_sum",
-        shared_params=config,
         name="per_species_scale_shift",
+        shared_params=config,
         builder=PerSpeciesScaleShift,
         params=dict(
             field=AtomicDataDict.PER_ATOM_ENERGY_KEY,
             out_field=AtomicDataDict.PER_ATOM_ENERGY_KEY,
+            num_types= config.num_types,
+            shifts = shifts,
+            scales = scales,
+            trainable = trainable,
         ),
         prepend=True,
     )

@@ -172,9 +172,6 @@ def fresh_start(config):
     final_model = model_from_config(
         config=config, initialize=True, dataset=trainer.dataset_train
     )
-    logging.info(
-        f"Initially outputs are scaled by: {global_scale}, eneriges are shifted by {global_shift}."
-    )
 
     logging.info("Successfully built the network...")
 
