@@ -195,7 +195,10 @@ class Metrics:
             if per_species:
                 if stat.output_dim == tuple():
                     for id_ele, v in enumerate(value):
-                        flat_dict[f"{type_names[id_ele]}_{item_name}"] = v.item()
+                        if type_names is not None:
+                            flat_dict[f"{type_names[id_ele]}_{item_name}"] = v.item()
+                        else:
+                            flat_dict[f"{id_ele}_{item_name}"] = v.item()
 
                     flat_dict[f"all_{item_name}"] = value.mean().item()
                 else:

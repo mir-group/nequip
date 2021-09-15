@@ -431,7 +431,7 @@ class AtomicInMemoryDataset(AtomicDataset):
                 mean = torch.mean(arr, dim=0)
                 std = torch.std(arr, dim=0, unbiased=unbiased)
                 out.append((mean, std))
-            
+
             else:
                 raise ValueError(f"cannot handle this {ana_mode}")
 
@@ -461,7 +461,7 @@ class AtomicInMemoryDataset(AtomicDataset):
         else:
             transformed = self.transform(self.data)
             N = bincount(
-                transformed[AtomicDataDict.ATOM_TYPE_KEY],
+                transformed,
                 self.data[AtomicDataDict.BATCH_KEY],
             )
             fixed_field = False

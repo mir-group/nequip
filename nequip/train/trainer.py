@@ -878,6 +878,7 @@ class Trainer:
         # append details from metrics
         metrics, skip_keys = self.metrics.flatten_metrics(
             metrics=self.batch_metrics,
+            # TO DO, how about chemical to symbol
             type_names=self.model.config.get("type_names")
             if hasattr(self.model, "config")
             else None,
