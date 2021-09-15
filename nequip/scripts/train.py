@@ -6,7 +6,7 @@ import argparse
 # Since numpy gets imported later anyway for dataset stuff, this shouldn't affect performance.
 import numpy as np  # noqa: F401
 
-from os.path import isfile
+from os.path import isdir
 
 import torch
 
@@ -45,10 +45,10 @@ def main(args=None):
 
     config, update_config = parse_command_line(args)
 
-    found_restart_file = isfile(f"{config.root}/{config.run_name}/trainer.pth")
+    found_restart_file = isdir(f"{config.root}/{config.run_name}")
     if found_restart_file and not config.append:
         raise RuntimeError(
-            f"Training instance exists at {config.root}/{config.run_name}/trainer.pth. "
+            f"Training instance exists at {config.root}/{config.run_name}; "
             "either set append to True or use a different root or runname"
         )
 
