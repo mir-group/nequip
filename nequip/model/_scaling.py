@@ -223,24 +223,4 @@ def PerSpecieRescale(
         prepend=True,)
 
     # == Build the model ==
-    return RescaleOutput(
-        model=model,
-        scale_keys=[
-            k
-            for k in (
-                AtomicDataDict.TOTAL_ENERGY_KEY,
-                AtomicDataDict.PER_ATOM_ENERGY_KEY,
-                AtomicDataDict.FORCE_KEY,
-            )
-            if k in model.irreps_out
-        ],
-        scale_by=global_scale,
-        shift_keys=[
-            k for k in (AtomicDataDict.TOTAL_ENERGY_KEY,) if k in model.irreps_out
-        ],
-        shift_by=global_shift,
-        trainable_global_rescale_shift=False,
-        trainable_global_rescale_scale=config.get(
-            "trainable_global_rescale_scale", False
-        ),
-    )
+    return model
