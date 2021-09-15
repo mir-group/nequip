@@ -154,7 +154,7 @@ class TestPerAtomStatistics:
         )
 
         # design a ground truth
-        N, _ = npz_dataset.type_count_per_graph()
+        N, _ = npz_dataset.specie_count_per_graph()
         N = N.type(torch.get_default_dtype())
         e = torch.rand((N.shape[1], 1))
         E = torch.matmul(N, e)
@@ -162,7 +162,7 @@ class TestPerAtomStatistics:
 
         ((mean, std),) = npz_dataset.statistics(
             [AtomicDataDict.TOTAL_ENERGY_KEY],
-            modes=["atom_type_mean_std"],
+            modes=["per_specie_mean_std"],
         )
         e = e.reshape([-1])
         assert torch.allclose(mean, e)
@@ -193,7 +193,7 @@ class TestPerAtomStatisticsSameSpecies:
             }
         )
 
-        N, fixed_field = npz_dataset.type_count_per_graph()
+        N, fixed_field = npz_dataset.specie_count_per_graph()
         N = N.type(torch.get_default_dtype())
 
         # compute direct average as comparison
@@ -206,7 +206,7 @@ class TestPerAtomStatisticsSameSpecies:
         ).sum()
 
         ((mean, std),) = npz_dataset.statistics(
-            [AtomicDataDict.TOTAL_ENERGY_KEY], modes=["atom_type_mean_std"], sigma=sigma
+            [AtomicDataDict.TOTAL_ENERGY_KEY], modes=["per_specie_mean_std"], sigma=sigma
         )
 
         res = torch.matmul(N, mean.reshape([-1, 1])) - E.reshape([-1, 1])

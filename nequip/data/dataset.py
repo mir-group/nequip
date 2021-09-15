@@ -431,12 +431,16 @@ class AtomicInMemoryDataset(AtomicDataset):
                 mean = torch.mean(arr, dim=0)
                 std = torch.std(arr, dim=0, unbiased=unbiased)
                 out.append((mean, std))
+            
+            else:
+                raise ValueError(f"cannot handle this {ana_mode}")
 
         return out
 
     def per_specie_statistics(self, selector, arr, alpha=0.1):
 
-        N = (self.specie_count_per_graph()).type(torch.get_default_dtype())
+        N, _ = (self.specie_count_per_graph())
+        N = N.type(torch.get_default_dtype())
 
         if AtomicDataDict.ATOMIC_NUMBERS_KEY in self.fixed_fields:
             N = torch.matmul(
