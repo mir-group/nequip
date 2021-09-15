@@ -9,8 +9,8 @@ from typing import Optional
 
 import torch
 
-from nequip.utils import Config, dataset_from_config, find_first_of_type
-from nequip.data import AtomicDataDict, AtomicData
+from nequip.utils import Config, find_first_of_type
+from nequip.data import AtomicDataDict, AtomicData, dataset_from_config
 from nequip.nn import SequentialGraphNetwork, SaveForOutput
 
 # The path to the original training session

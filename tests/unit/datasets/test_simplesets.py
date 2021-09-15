@@ -4,7 +4,7 @@ from os.path import isdir
 from shutil import rmtree
 
 from nequip.utils.config import Config
-from nequip.utils.auto_init import dataset_from_config
+from nequip.data import dataset_from_config
 
 
 include_frames = [0, 1]

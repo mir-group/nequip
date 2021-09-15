@@ -11,8 +11,8 @@ from torch.utils.benchmark.utils.common import trim_sigfig, select_unit
 
 from e3nn.util.jit import script
 
-from nequip.utils import Config, dataset_from_config
-from nequip.data import AtomicData
+from nequip.utils import Config
+from nequip.data import AtomicData, dataset_from_config
 from nequip.model import model_from_config
 from nequip.scripts.deploy import _compile_for_deploy
 from nequip.scripts.train import _set_global_options, default_config
