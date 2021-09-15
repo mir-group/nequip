@@ -439,12 +439,13 @@ class AtomicInMemoryDataset(AtomicDataset):
 
     def per_specie_statistics(self, selector, arr, alpha=0.1):
 
-        N, _ = (self.specie_count_per_graph())
+        N, _ = self.specie_count_per_graph()
         N = N.type(torch.get_default_dtype())
 
         if AtomicDataDict.ATOMIC_NUMBERS_KEY in self.fixed_fields:
             N = torch.matmul(
-                torch.ones((arr.shape[0], 1), dtype=torch.get_default_dtype()), N.reshape([1, -1])
+                torch.ones((arr.shape[0], 1), dtype=torch.get_default_dtype()),
+                N.reshape([1, -1]),
             )
         else:
             N = N[selector]

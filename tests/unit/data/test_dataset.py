@@ -207,7 +207,9 @@ class TestPerAtomStatisticsSameSpecies:
         ).sum()
 
         ((mean, std),) = npz_dataset.statistics(
-            [AtomicDataDict.TOTAL_ENERGY_KEY], modes=["per_specie_mean_std"], sigma=sigma
+            [AtomicDataDict.TOTAL_ENERGY_KEY],
+            modes=["per_specie_mean_std"],
+            sigma=sigma,
         )
 
         res = torch.matmul(N, mean.reshape([-1, 1])) - E.reshape([-1, 1])

@@ -3,13 +3,14 @@ import logging
 import torch
 from torch._C import Value
 
-from nequip.nn import RescaleOutput, GraphModuleMixin, GradientOutput, PerSpeciesScaleShift,
+from nequip.nn import RescaleOutput, GraphModuleMixin, PerSpeciesScaleShift
 from nequip.data import AtomicDataDict, AtomicDataset
 from ._grads import ForceOutput
 
+
 def compute_stats(str_names, dataset, stride):
 
-    # parse the list of string to field, mode 
+    # parse the list of string to field, mode
     # and record which quantity correspond to which computed_item
     stat_modes = []
     stat_fields = []
@@ -17,27 +18,27 @@ def compute_stats(str_names, dataset, stride):
     ids = []
     tuple_ids = []
     mode_count = 0
-    tuple_id_map = {"mean":0, "std":1, "rms":0}
+    tuple_id_map = {"mean": 0, "std": 1, "rms": 0}
     for name in str_names:
         # remove dataset prefix
         if name.startswith("dataset_"):
-            name = name[len("dataset_"):]
+            name = name[len("dataset_") :]
         # identify per_species and per_atom modes
         prefix = ""
         if name.startswith("per_species_"):
-            name = name[len("per_species_"):]
+            name = name[len("per_species_") :]
             prefix = "per_species_"
         elif name.startswith("per_atom_"):
-            name = name[len("per_atom_"):]
+            name = name[len("per_atom_") :]
             prefix = "per_atom_"
-        
+
         stat = name.split("_")[-1]
         field = "_".join(name.split("_")[:-1])
         if stat in ["mean", "std"]:
-            stat_mode = prefix+"mean_std"
+            stat_mode = prefix + "mean_std"
             stat_str = field + prefix + "mean_std"
         elif stat in ["rms"]:
-            stat_mode = prefix+"rms"
+            stat_mode = prefix + "rms"
             stat_str = field + prefix + "rms"
         else:
             raise ValueError(f"Cannot handle {stat} type quantity")
@@ -57,6 +58,7 @@ def compute_stats(str_names, dataset, stride):
         stride=stride,
     )
     return [values[idx][tuple_ids[i]] for i, idx in enumerate(ids)]
+
 
 def RescaleEnergyEtc(
     model: GraphModuleMixin,
@@ -94,7 +96,11 @@ def RescaleEnergyEtc(
                 raise ValueError(f"Invalid global scale `{global_scale}`")
 
         # = Compute shifts and scales =
-        computed_stats = compute_stats(str_names=str_names, dataset=dataset, stride=config.dataset_statistics_stride)
+        computed_stats = compute_stats(
+            str_names=str_names,
+            dataset=dataset,
+            stride=config.dataset_statistics_stride,
+        )
 
         if isinstance(global_scale, str):
             global_scale = computed_stats[str_names.index(global_scale)]
@@ -160,10 +166,11 @@ def PerSpecieRescale(
     # = Determine energy rescale type =
     global_scale = config.get(
         "global_rescale_scale",
-        "dataset_force_rms" if force_training else "dataset_energy_std",)
+        "dataset_force_rms" if force_training else "dataset_energy_std",
+    )
     global_shift = config.get("global_rescale_shift", None)
-    scales = config.get(module_prefix+"scales", None)
-    shifts = config.get(module_prefix+"shifts", None)
+    scales = config.get(module_prefix + "scales", None)
+    shifts = config.get(module_prefix + "shifts", None)
 
     if global_shift is not None:
         raise ValueError("One can only enable either global shift or per_species shift")
@@ -188,7 +195,11 @@ def PerSpecieRescale(
                 raise ValueError(f"Invalid global scale `{global_scale}`")
 
         # = Compute shifts and scales =
-        computed_stats = compute_stats(str_names=str_names, dataset=dataset, stride=config.dataset_statistics_stride)
+        computed_stats = compute_stats(
+            str_names=str_names,
+            dataset=dataset,
+            stride=config.dataset_statistics_stride,
+        )
 
         if isinstance(scales, str):
             scales = computed_stats[str_names.index(scales)]
@@ -196,7 +207,7 @@ def PerSpecieRescale(
             shifts = computed_stats[str_names.index(shifts)]
         if isinstance(global_scale, str):
             global_scale = computed_stats[str_names.index(global_scale)]
-        
+
         if global_scale is not None:
             scales /= global_scale
 
@@ -209,7 +220,7 @@ def PerSpecieRescale(
 
     # first peel off the gradient part
     model_func = model.func if force_training else model
-    
+
     # insert in per species shift
     model_func.insert_from_parameters(
         after="total_energy_sum",
@@ -220,7 +231,8 @@ def PerSpecieRescale(
             field=AtomicDataDict.PER_ATOM_ENERGY_KEY,
             out_field=AtomicDataDict.PER_ATOM_ENERGY_KEY,
         ),
-        prepend=True,)
+        prepend=True,
+    )
 
     # == Build the model ==
     return model
