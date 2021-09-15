@@ -81,6 +81,7 @@ class TestDuplicateError:
         with pytest.raises(RuntimeError):
             c2 = Trainer(model=model, **minimal_config)
 
+
 class TestSaveLoad:
     @pytest.mark.parametrize("state_dict", [True, False])
     @pytest.mark.parametrize("training_progress", [True, False])

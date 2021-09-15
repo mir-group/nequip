@@ -13,8 +13,9 @@ from nequip.data import (
     AtomicInMemoryDataset,
     NpzDataset,
     ASEDataset,
+    dataset_from_config,
 )
-from nequip.utils import dataset_from_config, Config
+from nequip.utils import Config
 
 
 @pytest.fixture(scope="module")

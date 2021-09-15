@@ -14,7 +14,8 @@ import e3nn
 import e3nn.util.jit
 
 from nequip.model import model_from_config
-from nequip.utils import Config, dataset_from_config
+from nequip.utils import Config
+from nequip.data import dataset_from_config
 from nequip.utils.test import assert_AtomicData_equivariant, set_irreps_debug
 from nequip.utils import load_file
 
