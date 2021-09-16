@@ -14,7 +14,7 @@ from nequip.utils import Config
 from nequip.data import AtomicData, Collater, dataset_from_config
 from nequip.train import Trainer
 from nequip.scripts.deploy import load_deployed_model
-from nequip.utils.auto_init import load_file, instantiate
+from nequip.utils import load_file, instantiate
 from nequip.train.loss import Loss
 from nequip.train.metrics import Metrics
 
