@@ -15,7 +15,17 @@ def dataset_from_config(config, prefix: str = "dataset") -> AtomicDataset:
 
     Examples see tests/data/test_dataset.py TestFromConfig
     and tests/datasets/test_simplest.py
+
+    Args:
+
+    config (dict, nequip.utils.Config): dict/object that store all the parameters
+    prefix (str): Optional. The prefix of all dataset parameters
+
+    Return:
+
+    dataset (nequip.data.AtomicDataset)
     """
+
     config_dataset = config.get(prefix, None)
     if config_dataset is None:
         raise KeyError(f"Dataset with prefix `{prefix}` isn't present in this config!")
