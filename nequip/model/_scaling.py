@@ -1,4 +1,5 @@
 import logging
+from typing import List
 
 import torch
 from torch._C import Value
@@ -6,57 +7,6 @@ from torch._C import Value
 from nequip.nn import RescaleOutput, GraphModuleMixin, PerSpeciesScaleShift
 from nequip.data import AtomicDataDict, AtomicDataset
 from ._grads import ForceOutput
-
-
-def compute_stats(str_names, dataset, stride):
-
-    # parse the list of string to field, mode
-    # and record which quantity correspond to which computed_item
-    stat_modes = []
-    stat_fields = []
-    stat_strs = []
-    ids = []
-    tuple_ids = []
-    tuple_id_map = {"mean": 0, "std": 1, "rms": 0}
-    for name in str_names:
-        # remove dataset prefix
-        if name.startswith("dataset_"):
-            name = name[len("dataset_") :]
-        # identify per_species and per_atom modes
-        prefix = ""
-        if name.startswith("per_species_"):
-            name = name[len("per_species_") :]
-            prefix = "per_species_"
-        elif name.startswith("per_atom_"):
-            name = name[len("per_atom_") :]
-            prefix = "per_atom_"
-
-        stat = name.split("_")[-1]
-        field = "_".join(name.split("_")[:-1])
-        if stat in ["mean", "std"]:
-            stat_mode = prefix + "mean_std"
-            stat_str = field + prefix + "mean_std"
-        elif stat in ["rms"]:
-            stat_mode = prefix + "rms"
-            stat_str = field + prefix + "rms"
-        else:
-            raise ValueError(f"Cannot handle {stat} type quantity")
-
-        if stat_str in stat_strs:
-            ids += [stat_strs.index(stat_str)]
-        else:
-            ids += [len(stat_strs)]
-            stat_strs += [stat_str]
-            stat_modes += [stat_mode]
-            stat_fields += [field]
-        tuple_ids += [tuple_id_map[stat]]
-
-    values = dataset.statistics(
-        fields=stat_fields,
-        modes=stat_modes,
-        stride=stride,
-    )
-    return [values[idx][tuple_ids[i]] for i, idx in enumerate(ids)]
 
 
 def RescaleEnergyEtc(
@@ -246,3 +196,67 @@ def PerSpecieRescale(
 
     # == Build the model ==
     return model
+
+
+def compute_stats(str_names:List[str], dataset, stride: int):
+    """return the values of statistics over dataset
+    quantity name should be dataset_key_stat, where key can be any key
+    that exists in the dataset, stat can be mean, std
+
+    Args:
+
+    str_names: list of strings that define the quantity to compute
+    dataset: dataset object to run the stats over
+    stride: # frames to skip for every one frame to include
+    """
+
+    # parse the list of string to field, mode
+    # and record which quantity correspond to which computed_item
+    stat_modes = []
+    stat_fields = []
+    stat_strs = []
+    ids = []
+    tuple_ids = []
+    tuple_id_map = {"mean": 0, "std": 1, "rms": 0}
+    for name in str_names:
+
+        # remove dataset prefix
+        if name.startswith("dataset_"):
+            name = name[len("dataset_") :]
+        # identify per_species and per_atom modes
+        prefix = ""
+        if name.startswith("per_species_"):
+            name = name[len("per_species_") :]
+            prefix = "per_species_"
+        elif name.startswith("per_atom_"):
+            name = name[len("per_atom_") :]
+            prefix = "per_atom_"
+
+        stat = name.split("_")[-1]
+        field = "_".join(name.split("_")[:-1])
+        if stat in ["mean", "std"]:
+            stat_mode = prefix + "mean_std"
+            stat_str = field + prefix + "mean_std"
+        elif stat in ["rms"]:
+            stat_mode = prefix + "rms"
+            stat_str = field + prefix + "rms"
+        else:
+            raise ValueError(f"Cannot handle {stat} type quantity")
+
+        if stat_str in stat_strs:
+            ids += [stat_strs.index(stat_str)]
+        else:
+            ids += [len(stat_strs)]
+            stat_strs += [stat_str]
+            stat_modes += [stat_mode]
+            stat_fields += [field]
+        tuple_ids += [tuple_id_map[stat]]
+
+    values = dataset.statistics(
+        fields=stat_fields,
+        modes=stat_modes,
+        stride=stride,
+    )
+    return [values[idx][tuple_ids[i]] for i, idx in enumerate(ids)]
+
+
