@@ -433,17 +433,42 @@ class AtomicInMemoryDataset(AtomicDataset):
             elif ana_mode.startswith("per_atom"):
 
                 ana_mode = ana_mode[len("per_atom") + 1 :]
-
-                N = torch.bincount[self.data[AtomicDataDict.BATCH_KEY]]
-                arr = arr / N
-                mean = torch.mean(arr, dim=0)
-                std = torch.std(arr, dim=0, unbiased=unbiased)
-                out.append((mean, std))
+                results = self.per_atom_statistics(
+                    ana_mode,
+                    arr,
+                )
+                out.append(results)
 
             else:
-                raise ValueError(f"cannot handle this {ana_mode}")
+                raise NotImplementedError(f"cannot handle this {ana_mode}")
 
         return out
+
+    def per_atom_statistics(self, ana_mode, arr):
+
+        if len(arr.shape) == 1 and arr.shape[0] == N.shape[0]:
+            pass
+        elif len(arr.shape) == 2 and arr.shape[1] == 1:
+            pass
+        else:
+            raise ValueError(
+                f"per atom analysis cannot handle the shape of {arr.shape}"
+            )
+
+        if ana_mode == "mean_std":
+            N = torch.bincount(self.data[AtomicDataDict.BATCH_KEY])
+            arr = arr / N
+            mean = torch.mean(arr, dim=0)
+            std = torch.std(arr, dim=0, unbiased=unbiased)
+            return mean, std
+        elif ana_mode == "rms":
+            N = torch.bincount(self.data[AtomicDataDict.BATCH_KEY])
+            arr = arr / N
+            return (torch.sqrt(torch.mean(arr * arr)),)
+        else:
+            raise NotImplementedError(
+                f"{ana_mode} for per atom analysis is not implemented"
+            )
 
     def per_species_statistics(self, ana_mode, selector, arr, alpha=0.1):
 
@@ -463,7 +488,14 @@ class AtomicInMemoryDataset(AtomicDataset):
         else:
             N = N[selector]
 
-        return gp(N, arr, alpha=alpha)
+        if len(arr.shape) == 1 and arr.shape[0] == N.shape[0]:
+            return gp(N, arr, alpha=alpha)
+        elif len(arr.shape) == 2 and arr.shape[1] == 1:
+            return gp(N, arr, alpha=alpha)
+        else:
+            raise NotImplementedError(
+                f"per species analysis for shape {arr.shape} is not implemented"
+            )
 
     def species_count_per_graph(self):
         if AtomicDataDict.ATOMIC_NUMBERS_KEY in self.fixed_fields:

@@ -6,6 +6,9 @@ from sklearn.gaussian_process.kernels import DotProduct
 
 def gp(X, y, alpha, max_iteration: int = 20):
 
+    if len(y.shape) == 1:
+        y = y.reshape([-1, 1])
+
     not_fit = True
     iteration = 0
     mean = None
