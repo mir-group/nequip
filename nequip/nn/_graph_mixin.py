@@ -295,9 +295,9 @@ class SequentialGraphNetwork(GraphModuleMixin, torch.nn.Sequential):
             insert_location = after
         elif before is None:
             insert_location = before
-        idx = list(self._modules.keys()).index(insert_location)
+        idx = list(self._modules.keys()).index(insert_location)-1
         if before is None:
-            idx -= 1
+            idx += 1
         instance, _ = instantiate(
             builder=builder,
             prefix=name,
