@@ -234,22 +234,35 @@ class SequentialGraphNetwork(GraphModuleMixin, torch.nn.Sequential):
         return
 
     def insert(
-        self, after: str, name: str, module: GraphModuleMixin, prepend: bool = False
+        self,
+        name: str,
+        module: GraphModuleMixin,
+        after: Optional[str] = None,
+        before: Optional[str] = None,
     ) -> None:
         """Insert a module after the module with name ``after``.
 
         Args:
-            after: the module to insert after
             name: the name of the module to insert
             module: the moldule to insert
+            after: the module to insert after
+            before: the module to insert before
         """
+
+        if before is None == after is None:
+            raise ValueError("Only one of before or after argument needs to be defined")
+        elif before is None:
+            insert_location = after
+        elif before is None:
+            insert_location = before
+
         # This checks names, etc.
         self.add_module(name, module)
         # Now insert in the right place by overwriting
         names = list(self._modules.keys())
         modules = list(self._modules.values())
-        idx = names.index(after)
-        if not prepend:
+        idx = names.index(insert_location)
+        if before is None:
             idx += 1
         names.insert(idx, name)
         modules.insert(idx, module)
@@ -259,23 +272,32 @@ class SequentialGraphNetwork(GraphModuleMixin, torch.nn.Sequential):
 
     def insert_from_parameters(
         self,
-        after: str,
         shared_params: Mapping,
         name: str,
         builder: Callable,
         params: Dict[str, Any] = {},
-        prepend: bool = False,
+        after: Optional[str] = None,
+        before: Optional[str] = None,
     ) -> None:
         r"""Build a module from parameters and insert it after ``after``.
 
         Args:
-            after: the name of the module to insert after
             shared_params (dict-like): shared parameters from which to pull when instantiating the module
             name (str): the name for the module
             builder (callable): a class or function to build a module
             params (dict, optional): extra specific parameters for this module that take priority over those in ``shared_params``
+            after: the name of the module to insert after
+            before: the name of the module to insert before
         """
-        idx = list(self._modules.keys()).index(after)
+        if before is None == after is None:
+            raise ValueError("Only one of before or after argument needs to be defined")
+        elif before is None:
+            insert_location = after
+        elif before is None:
+            insert_location = before
+        idx = list(self._modules.keys()).index(insert_location)-1
+        if before is None:
+            idx += 1
         instance, _ = instantiate(
             builder=builder,
             prefix=name,
@@ -283,7 +305,7 @@ class SequentialGraphNetwork(GraphModuleMixin, torch.nn.Sequential):
             optional_args=params,
             all_args=shared_params,
         )
-        self.insert(after=after, name=name, module=instance, prepend=prepend)
+        self.insert(after=after, before=before, name=name, module=instance)
         return
 
     # Copied from https://pytorch.org/docs/stable/_modules/torch/nn/modules/container.html#Sequential
