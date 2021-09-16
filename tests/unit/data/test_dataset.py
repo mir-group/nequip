@@ -144,7 +144,7 @@ class TestStatistics:
 
 
 class TestPerSpeciesStatistics:
-    def test_vary_species(self, npz_dataset):
+    def test_full_rank(self, npz_dataset):
 
         # set up the transformer
         unique = torch.unique(npz_dataset.data[AtomicDataDict.ATOMIC_NUMBERS_KEY])
@@ -157,51 +157,63 @@ class TestPerSpeciesStatistics:
         # design a ground truth
         N, _ = npz_dataset.species_count_per_graph()
         N = N.type(torch.get_default_dtype())
-        e = torch.rand((N.shape[1], 1))
-        E = torch.matmul(N, e)
+        # use zero noise
+        ref_mean, ref_std, E = generate_E(N, 100, 0)
         npz_dataset.data[AtomicDataDict.TOTAL_ENERGY_KEY] = E
 
         ((mean, std),) = npz_dataset.statistics(
             [AtomicDataDict.TOTAL_ENERGY_KEY],
             modes=["per_species_mean_std"],
+            kwargs={
+                AtomicDataDict.TOTAL_ENERGY_KEY
+                + "per_species_mean_std": {"alpha": 1e-6}
+            },
         )
-        e = e.reshape([-1])
-        assert torch.allclose(mean, e)
-        assert torch.allclose(std, torch.zeros_like(e), atol=1e-4)
+        ref_mean = ref_mean.reshape([-1])
+        print("mean", mean, mean - ref_mean)
+        print("std", std, ref_std)
+        ref_mean = ref_mean.reshape([-1])
+        assert torch.allclose(mean, ref_mean, rtol=1e-1)
+        assert torch.allclose(std, torch.zeros_like(ref_mean), atol=1e-2)
 
-
-class TestPerSpeciesStatisticsSameSpecies:
-    @pytest.mark.parametrize("sigma", [0.1, 0.5, 1])
+    @pytest.mark.parametrize("alpha", [1e-10, 1e-6, 0.1, 0.5, 1])
     @pytest.mark.parametrize("fixed_field", [True, False])
-    def test_sigma(self, npz_dataset, sigma, fixed_field):
+    def test_rank_deficient(self, npz_dataset, alpha, fixed_field):
 
-        # let all atoms to be the same type
+        ntype = 2
+
+        # let all atoms to be the same type distribution
         num_nodes = npz_dataset.data[AtomicDataDict.BATCH_KEY].shape[0]
         if fixed_field:
             npz_dataset.data[AtomicDataDict.ATOMIC_NUMBERS_KEY] = None
             new_n = torch.ones(NATOMS, dtype=torch.int64)
-            new_n[0] += 2
+            new_n[0] += ntype
             npz_dataset.fixed_fields[AtomicDataDict.ATOMIC_NUMBERS_KEY] = new_n
         else:
+            npz_dataset.fixed_fields.pop(AtomicDataDict.ATOMIC_NUMBERS_KEY, None)
             new_n = torch.ones(num_nodes, dtype=torch.int64)
-            new_n[::NATOMS] += 2
+            new_n[::NATOMS] += ntype
             npz_dataset.data[AtomicDataDict.ATOMIC_NUMBERS_KEY] = new_n
 
         # set up the transformer
         npz_dataset.transform = TypeMapper(
             chemical_symbol_to_type={
-                chemical_symbols[n]: i for i, n in enumerate([1, 3])
+                chemical_symbols[n]: i for i, n in enumerate([1, ntype + 1])
             }
         )
 
-        N, fixed_field = npz_dataset.species_count_per_graph()
+        n_frames = len(npz_dataset)
+        N, _fixed_field = npz_dataset.species_count_per_graph()
         N = N.type(torch.get_default_dtype())
+        if fixed_field:
+            N = torch.matmul(torch.ones((n_frames, 1)), N)
 
-        # compute direct average as comparison
-        E = npz_dataset.data[AtomicDataDict.TOTAL_ENERGY_KEY]
-        ref_E = E / (num_nodes / len(npz_dataset))
-        ref_mean = ref_E.mean() * torch.ones(2)
-        ref_std = ref_E.std() * torch.ones(2)
+        assert _fixed_field == fixed_field
+
+        ref_mean, ref_std, E = generate_E(N, 100, 0.5)
+
+        npz_dataset.data[AtomicDataDict.TOTAL_ENERGY_KEY] = E
+
         ref_res2 = torch.square(
             torch.matmul(N, ref_mean.reshape([-1, 1])) - E.reshape([-1, 1])
         ).sum()
@@ -209,16 +221,19 @@ class TestPerSpeciesStatisticsSameSpecies:
         ((mean, std),) = npz_dataset.statistics(
             [AtomicDataDict.TOTAL_ENERGY_KEY],
             modes=["per_species_mean_std"],
-            sigma=sigma,
+            kwargs={
+                AtomicDataDict.TOTAL_ENERGY_KEY
+                + "per_species_mean_std": {"alpha": alpha}
+            },
         )
 
         res = torch.matmul(N, mean.reshape([-1, 1])) - E.reshape([-1, 1])
         res2 = torch.sum(torch.square(res))
-        print("residue", sigma, res2 - ref_res2)
-        print("mean", mean, ref_mean)
-        print(std, ref_std)
+        print("residue", alpha, res2 - ref_res2)
+        print("mean", mean, ref_mean, mean - ref_mean)
+        print("std", std, ref_std)
 
-        if sigma in [None, 0]:
+        if alpha in [None, 0]:
             assert torch.allclose(mean, ref_mean)
             assert torch.allclose(std, ref_std)
         # else:
@@ -313,3 +328,13 @@ class TestFromList:
             assert np.array_equal(
                 mol.get_atomic_numbers(), dataset[i].to_ase().get_atomic_numbers()
             )
+
+
+def generate_E(N, mean, std):
+    torch.manual_seed(0)
+    ref_mean = torch.rand((N.shape[1])) * mean
+    t_mean = torch.ones((N.shape[0], 1)) * ref_mean.reshape([1, -1])
+    ref_std = torch.rand((N.shape[1])) * std
+    t_std = torch.ones((N.shape[0], 1)) * ref_std.reshape([1, -1])
+    E = torch.normal(t_mean, t_std)
+    return ref_mean, ref_std, (N * E).sum(axis=-1)

@@ -325,7 +325,7 @@ class AtomicInMemoryDataset(AtomicDataset):
         stride: int = 1,
         unbiased: bool = True,
         modes: Optional[List[Union[str]]] = None,
-        **kwargs,
+        kwargs: Optional[Dict[str, dict]] = {},
     ) -> List[tuple]:
 
         # Short circut:
@@ -377,6 +377,7 @@ class AtomicInMemoryDataset(AtomicDataset):
                 raise NotImplementedError(
                     "AtomicDataset.statistics cannot currently handle datasets whose number of examples is the same as their number of nodes"
                 )
+
             if obj is self.fixed_fields:
                 # arr is fixed, nothing to select.
                 pass
@@ -417,9 +418,10 @@ class AtomicInMemoryDataset(AtomicDataset):
 
             elif ana_mode.startswith("per_species"):
 
-                ana_mode = ana_mode[len("per_species") + 1]
+                algorithm_kwargs = kwargs.pop(field + ana_mode, {})
 
-                algorithm_kwargs = kwargs.pop(field, {})
+                ana_mode = ana_mode[len("per_species") + 1 :]
+
                 results = self.per_species_statistics(
                     ana_mode,
                     graph_selector,
@@ -428,7 +430,10 @@ class AtomicInMemoryDataset(AtomicDataset):
                 )
                 out.append(results)
 
-            elif ana_mode == "per_atom_mean_std":
+            elif ana_mode.startswith("per_atom"):
+
+                ana_mode = ana_mode[len("per_atom") + 1 :]
+
                 N = torch.bincount[self.data[AtomicDataDict.BATCH_KEY]]
                 arr = arr / N
                 mean = torch.mean(arr, dim=0)
@@ -447,10 +452,10 @@ class AtomicInMemoryDataset(AtomicDataset):
                 f"{ana_mode} for per species analysis is not implemented"
             )
 
-        N, _ = self.species_count_per_graph()
+        N, fixed_field = self.species_count_per_graph()
         N = N.type(torch.get_default_dtype())
 
-        if AtomicDataDict.ATOMIC_NUMBERS_KEY in self.fixed_fields:
+        if fixed_field:
             N = torch.matmul(
                 torch.ones((arr.shape[0], 1), dtype=torch.get_default_dtype()),
                 N.reshape([1, -1]),
@@ -466,9 +471,12 @@ class AtomicInMemoryDataset(AtomicDataset):
                 self.fixed_fields[AtomicDataDict.ATOMIC_NUMBERS_KEY]
             )
             N = torch.bincount(transformed)
+            N = N.reshape([1, -1])
             fixed_field = True
         else:
-            transformed = self.transform(self.data)
+            transformed = self.transform.transform(
+                self.data[AtomicDataDict.ATOMIC_NUMBERS_KEY]
+            )
             N = bincount(
                 transformed,
                 self.data[AtomicDataDict.BATCH_KEY],

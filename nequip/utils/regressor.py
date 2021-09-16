@@ -4,11 +4,12 @@ from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import DotProduct
 
 
-def gp(X, y, alpha):
+def gp(X, y, alpha, max_iteration: int = 20):
 
     not_fit = True
-    max_iteration = 20
     iteration = 0
+    mean = None
+    std = None
     while not_fit:
         try:
             kernel = DotProduct(sigma_0=0, sigma_0_bounds="fixed")
@@ -36,13 +37,15 @@ def gp(X, y, alpha):
             not_fit = False
 
         except Exception as e:
-            alpha = alpha * 2
-            iteration += 1
-            logging.debug(
-                f"GP fitting failed for {e.args}; \n"
-                f"           increase alpha to {alpha}"
-            )
-            if iteration >= max_iteration:
+            logging.info(f"GP fitting failed for {e.args}")
+            if alpha == 0 or alpha is None:
+                not_fit = False
+            else:
+                alpha = alpha * 2
+                iteration += 1
+                logging.debug(f"           increase alpha to {alpha}")
+
+            if iteration >= max_iteration or not_fit == False:
                 raise ValueError(
                     f"Please set the per species shift and scale to zeros and ones. \n"
                     "The dataset energy is to diverge to be solved with GP"
