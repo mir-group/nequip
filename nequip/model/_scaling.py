@@ -27,7 +27,9 @@ def RescaleEnergyEtc(
         else f"dataset_{AtomicDataDict.TOTAL_ENERGY_KEY}_std",
     )
     # TODO: change this default?
-    global_shift = config.get("global_rescale_shift", f"dataset_{AtomicDataDict.TOTAL_ENERGY_KEY}_mean")
+    global_shift = config.get(
+        "global_rescale_shift", f"dataset_{AtomicDataDict.TOTAL_ENERGY_KEY}_mean"
+    )
 
     # = Get statistics of training dataset =
     if initialize:
@@ -103,7 +105,7 @@ def RescaleEnergyEtc(
     )
 
 
-def PerSpecieRescale(
+def PerSpeciesRescale(
     model: GraphModuleMixin,
     config,
     dataset: AtomicDataset,
@@ -120,7 +122,9 @@ def PerSpecieRescale(
     # = Determine energy rescale type =
     global_scale = config.get(
         "global_rescale_scale",
-        f"dataset_{AtomicDataDict.FORCE_KEY}_rms" if force_training else f"dataset_{AtomicDataDict.TOTAL_ENERGY_KEY}_std",
+        f"dataset_{AtomicDataDict.FORCE_KEY}_rms"
+        if force_training
+        else f"dataset_{AtomicDataDict.TOTAL_ENERGY_KEY}_std",
     )
     global_shift = config.get("global_rescale_shift", None)
     scales = config.get(module_prefix + "scales", None)
@@ -165,9 +169,9 @@ def PerSpecieRescale(
 
         if global_scale is not None:
             if scales is not None:
-                scales = scales/global_scale
+                scales = scales / global_scale
             if shifts is not None:
-                shifts = shifts/global_scale
+                shifts = shifts / global_scale
 
     else:
         # Put dummy values
@@ -186,10 +190,10 @@ def PerSpecieRescale(
         params=dict(
             field=AtomicDataDict.PER_ATOM_ENERGY_KEY,
             out_field=AtomicDataDict.PER_ATOM_ENERGY_KEY,
-            num_types= config.num_types,
-            shifts = shifts,
-            scales = scales,
-            trainable = trainable,
+            num_types=config.num_types,
+            shifts=shifts,
+            scales=scales,
+            trainable=trainable,
         ),
         prepend=True,
     )
@@ -198,7 +202,7 @@ def PerSpecieRescale(
     return model
 
 
-def compute_stats(str_names:List[str], dataset, stride: int):
+def compute_stats(str_names: List[str], dataset, stride: int):
     """return the values of statistics over dataset
     quantity name should be dataset_key_stat, where key can be any key
     that exists in the dataset, stat can be mean, std
@@ -258,5 +262,3 @@ def compute_stats(str_names:List[str], dataset, stride: int):
         stride=stride,
     )
     return [values[idx][tuple_ids[i]] for i, idx in enumerate(ids)]
-
-

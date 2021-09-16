@@ -143,7 +143,7 @@ class TestStatistics:
         )
 
 
-class TestPerAtomStatistics:
+class TestPerSpeciesStatistics:
     def test_vary_species(self, npz_dataset):
 
         # set up the transformer
@@ -155,7 +155,7 @@ class TestPerAtomStatistics:
         )
 
         # design a ground truth
-        N, _ = npz_dataset.specie_count_per_graph()
+        N, _ = npz_dataset.species_count_per_graph()
         N = N.type(torch.get_default_dtype())
         e = torch.rand((N.shape[1], 1))
         E = torch.matmul(N, e)
@@ -163,14 +163,14 @@ class TestPerAtomStatistics:
 
         ((mean, std),) = npz_dataset.statistics(
             [AtomicDataDict.TOTAL_ENERGY_KEY],
-            modes=["per_specie_mean_std"],
+            modes=["per_species_mean_std"],
         )
         e = e.reshape([-1])
         assert torch.allclose(mean, e)
         assert torch.allclose(std, torch.zeros_like(e), atol=1e-4)
 
 
-class TestPerAtomStatisticsSameSpecies:
+class TestPerSpeciesStatisticsSameSpecies:
     @pytest.mark.parametrize("sigma", [0.1, 0.5, 1])
     @pytest.mark.parametrize("fixed_field", [True, False])
     def test_sigma(self, npz_dataset, sigma, fixed_field):
@@ -194,7 +194,7 @@ class TestPerAtomStatisticsSameSpecies:
             }
         )
 
-        N, fixed_field = npz_dataset.specie_count_per_graph()
+        N, fixed_field = npz_dataset.species_count_per_graph()
         N = N.type(torch.get_default_dtype())
 
         # compute direct average as comparison
@@ -208,7 +208,7 @@ class TestPerAtomStatisticsSameSpecies:
 
         ((mean, std),) = npz_dataset.statistics(
             [AtomicDataDict.TOTAL_ENERGY_KEY],
-            modes=["per_specie_mean_std"],
+            modes=["per_species_mean_std"],
             sigma=sigma,
         )
 

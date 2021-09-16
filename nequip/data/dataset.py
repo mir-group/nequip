@@ -415,15 +415,18 @@ class AtomicInMemoryDataset(AtomicDataset):
                 std = torch.std(arr, dim=0, unbiased=unbiased)
                 out.append((mean, std))
 
-            elif ana_mode == "per_specie_mean_std":
+            elif ana_mode.startswith("per_species"):
+
+                ana_mode = ana_mode[len("per_species") + 1]
 
                 algorithm_kwargs = kwargs.pop(field, {})
-                mean, std = self.per_specie_statistics(
+                results = self.per_species_statistics(
+                    ana_mode,
                     graph_selector,
                     arr,
                     **algorithm_kwargs,
                 )
-                out.append((mean, std))
+                out.append(results)
 
             elif ana_mode == "per_atom_mean_std":
                 N = torch.bincount[self.data[AtomicDataDict.BATCH_KEY]]
@@ -437,9 +440,14 @@ class AtomicInMemoryDataset(AtomicDataset):
 
         return out
 
-    def per_specie_statistics(self, selector, arr, alpha=0.1):
+    def per_species_statistics(self, ana_mode, selector, arr, alpha=0.1):
 
-        N, _ = self.specie_count_per_graph()
+        if ana_mode != "mean_std":
+            raise NotImplementedError(
+                f"{ana_mode} for per species analysis is not implemented"
+            )
+
+        N, _ = self.species_count_per_graph()
         N = N.type(torch.get_default_dtype())
 
         if AtomicDataDict.ATOMIC_NUMBERS_KEY in self.fixed_fields:
@@ -452,7 +460,7 @@ class AtomicInMemoryDataset(AtomicDataset):
 
         return gp(N, arr, alpha=alpha)
 
-    def specie_count_per_graph(self):
+    def species_count_per_graph(self):
         if AtomicDataDict.ATOMIC_NUMBERS_KEY in self.fixed_fields:
             transformed = self.transform.transform(
                 self.fixed_fields[AtomicDataDict.ATOMIC_NUMBERS_KEY]

@@ -50,7 +50,7 @@ class TestLoss:
 
         assert isinstance(loss_value, torch.Tensor)
 
-    def test_per_specie(self, data):
+    def test_per_species(self, data):
 
         pred, ref = data
 
@@ -85,7 +85,7 @@ class TestNaN:
         for k in contb:
             assert torch.isclose(contb_wo_nan[k], contb[k])
 
-    def test_per_specie(self, data_w_NaN):
+    def test_per_species(self, data_w_NaN):
 
         pred, ref, wo_nan_pred, wo_nan_ref = data_w_NaN
 
