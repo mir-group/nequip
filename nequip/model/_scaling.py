@@ -27,7 +27,9 @@ def RescaleEnergyEtc(
         else f"dataset_{AtomicDataDict.TOTAL_ENERGY_KEY}_std",
     )
     # TODO: change this default?
-    global_shift = config.get("global_rescale_shift", f"dataset_{AtomicDataDict.TOTAL_ENERGY_KEY}_mean")
+    global_shift = config.get(
+        "global_rescale_shift", f"dataset_{AtomicDataDict.TOTAL_ENERGY_KEY}_mean"
+    )
 
     # = Get statistics of training dataset =
     if initialize:
@@ -103,7 +105,7 @@ def RescaleEnergyEtc(
     )
 
 
-def compute_stats(str_names:List[str], dataset, stride: int):
+def compute_stats(str_names: List[str], dataset, stride: int):
     """return the values of statistics over dataset
     quantity name should be dataset_key_stat, where key can be any key
     that exists in the dataset, stat can be mean, std
@@ -163,5 +165,3 @@ def compute_stats(str_names:List[str], dataset, stride: int):
         stride=stride,
     )
     return [values[idx][tuple_ids[i]] for i, idx in enumerate(ids)]
-
-
