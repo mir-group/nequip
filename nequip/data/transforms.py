@@ -80,14 +80,6 @@ class TypeMapper:
             # TODO: torch_geometric data doesn't support `del` yet
             delattr(data, AtomicDataDict.ATOMIC_NUMBERS_KEY)
 
-            if atomic_numbers.min() < self._min_Z or atomic_numbers.max() > self._max_Z:
-                bad_set = (
-                    set(torch.unique(atomic_numbers).cpu().tolist()) - self._valid_set
-                )
-                raise ValueError(
-                    f"Data included atomic numbers {bad_set} that are not part of the atomic number -> type mapping!"
-                )
-
             data[AtomicDataDict.ATOM_TYPE_KEY] = self.transform(atomic_numbers)
 
             if data[AtomicDataDict.ATOM_TYPE_KEY].min() < 0:
@@ -104,6 +96,8 @@ class TypeMapper:
         return data
 
     def transform(self, atomic_numbers):
+        """core function to transform an array to specie index list"""
+
         if atomic_numbers.min() < self._min_Z or atomic_numbers.max() > self._max_Z:
             bad_set = set(torch.unique(atomic_numbers).cpu().tolist()) - self._valid_set
             raise ValueError(
