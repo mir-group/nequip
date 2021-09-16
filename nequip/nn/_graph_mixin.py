@@ -253,7 +253,7 @@ class SequentialGraphNetwork(GraphModuleMixin, torch.nn.Sequential):
             raise ValueError("Only one of before or after argument needs to be defined")
         elif before is None:
             insert_location = after
-        elif before is None:
+        else:
             insert_location = before
 
         # This checks names, etc.
@@ -293,9 +293,9 @@ class SequentialGraphNetwork(GraphModuleMixin, torch.nn.Sequential):
             raise ValueError("Only one of before or after argument needs to be defined")
         elif before is None:
             insert_location = after
-        elif before is None:
+        else:
             insert_location = before
-        idx = list(self._modules.keys()).index(insert_location)-1
+        idx = list(self._modules.keys()).index(insert_location) - 1
         if before is None:
             idx += 1
         instance, _ = instantiate(
