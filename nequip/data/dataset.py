@@ -433,10 +433,7 @@ class AtomicInMemoryDataset(AtomicDataset):
             elif ana_mode.startswith("per_atom"):
 
                 ana_mode = ana_mode[len("per_atom") + 1 :]
-                results = self.per_atom_statistics(
-                    ana_mode,
-                    arr,
-                )
+                results = self.per_atom_statistics(ana_mode, arr, unbiased)
                 out.append(results)
 
             else:
@@ -444,7 +441,9 @@ class AtomicInMemoryDataset(AtomicDataset):
 
         return out
 
-    def per_atom_statistics(self, ana_mode, arr):
+    def per_atom_statistics(
+        self, ana_mode: str, arr: torch.Tensor, unbiased: bool = True
+    ):
 
         if len(arr.shape) == 1 and arr.shape[0] == N.shape[0]:
             pass
@@ -470,7 +469,9 @@ class AtomicInMemoryDataset(AtomicDataset):
                 f"{ana_mode} for per atom analysis is not implemented"
             )
 
-    def per_species_statistics(self, ana_mode, selector, arr, alpha=0.1):
+    def per_species_statistics(
+        self, ana_mode: str, selector, arr: torch.Tensor, alpha: Optional[float] = 0.1
+    ):
 
         if ana_mode != "mean_std":
             raise NotImplementedError(
