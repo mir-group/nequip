@@ -71,6 +71,26 @@ class TestLoss:
             contb[AtomicDataDict.FORCE_KEY], (loss_ref_0 + loss_ref_1) / 2.0
         )
 
+    def test_per_atom(self, data):
+
+        pred, ref = data
+
+        config = {AtomicDataDict.TOTAL_ENERGY_KEY: (1.0, "PerAtomMSELoss")}
+        loss = Loss(coeffs=config)
+
+        l, contb = loss(pred, ref)
+
+        # first half data are specie 1
+        loss_ref_1 = torch.square( (pred[AtomicDataDict.TOTAL_ENERGY_KEY][0] - ref[AtomicDataDict.TOTAL_ENERGY_KEY][0])) 
+        loss_ref_2 = torch.square( (pred[AtomicDataDict.TOTAL_ENERGY_KEY][1] - ref[AtomicDataDict.TOTAL_ENERGY_KEY][1]))
+
+        # first half data are specie 1
+        loss_ref_1 = torch.square( (pred[AtomicDataDict.TOTAL_ENERGY_KEY][0] - ref[AtomicDataDict.TOTAL_ENERGY_KEY][0])/3.0) 
+        loss_ref_2 = torch.square( (pred[AtomicDataDict.TOTAL_ENERGY_KEY][1] - ref[AtomicDataDict.TOTAL_ENERGY_KEY][1])/7.0)
+        loss_ref = (loss_ref_1 + loss_ref_2)/2.
+
+        assert torch.isclose( l, loss_ref)
+
 
 class TestNaN:
     def test_loss(self, data_w_NaN):
@@ -120,6 +140,7 @@ def data(float_tolerance):
         AtomicDataDict.ATOM_TYPE_KEY: torch.as_tensor([1, 1, 1, 1, 1, 0, 0, 0, 0, 0]),
     }
     ref = {
+        AtomicDataDict.BATCH_KEY: torch.tensor([0, 0, 0, 1, 1, 1, 1, 1, 1, 1], dtype=torch.int),
         AtomicDataDict.FORCE_KEY: torch.rand(10, 3),
         AtomicDataDict.TOTAL_ENERGY_KEY: torch.rand((2, 1)),
         "k": torch.rand((2, 1)),

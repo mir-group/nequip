@@ -35,6 +35,7 @@ class SimpleLoss:
             optional_args=params,
             all_args={},
         )
+        self.func_name = func_name
         self.func = func
 
     def __call__(
@@ -70,11 +71,13 @@ class PerAtomLoss(SimpleLoss):
     ):
         # zero the nan entries
         has_nan = self.ignore_nan and torch.isnan(ref[key].mean())
-        N = torch.bincount(self.data[AtomicDataDict.BATCH_KEY])
+        N = torch.bincount(ref[AtomicDataDict.BATCH_KEY])
+        N = N.reshape(pred[key].shape)
         if has_nan:
             not_nan = (ref[key] == ref[key]).int()
-            loss = self.func(pred[key], torch.nan_to_num(ref[key], nan=0.0)) * not_nan
-            loss = loss / N
+            loss = self.func(pred[key], torch.nan_to_num(ref[key], nan=0.0)) * not_nan / N
+            if self.func_name == "MSELoss":
+                loss = loss / N 
             if mean:
                 return loss.sum() / not_nan.sum()
             else:
@@ -82,6 +85,8 @@ class PerAtomLoss(SimpleLoss):
         else:
             loss = self.func(pred[key], ref[key])
             loss = loss / N
+            if self.func_name == "MSELoss":
+                loss = loss / N 
             if mean:
                 return loss.mean()
             else:

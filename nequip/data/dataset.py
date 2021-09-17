@@ -18,6 +18,7 @@ import ase
 
 import torch
 from torch_geometric.data import Batch, Dataset, download_url, extract_zip
+from torch_scatter import scatter
 
 import nequip
 from nequip.data import AtomicData, AtomicDataDict
@@ -416,11 +417,11 @@ class AtomicInMemoryDataset(AtomicDataset):
                 std = torch.std(arr, dim=0, unbiased=unbiased)
                 out.append((mean, std))
 
-            elif ana_mode.startswith("per_species"):
+            elif ana_mode.startswith("per_species_"):
 
                 algorithm_kwargs = kwargs.pop(field + ana_mode, {})
 
-                ana_mode = ana_mode[len("per_species") + 1 :]
+                ana_mode = ana_mode[len("per_species_") :]
 
                 results = self.per_species_statistics(
                     ana_mode,
@@ -430,14 +431,14 @@ class AtomicInMemoryDataset(AtomicDataset):
                 )
                 out.append(results)
 
-            elif ana_mode.startswith("per_atom"):
+            elif ana_mode.startswith("per_atom_"):
 
-                ana_mode = ana_mode[len("per_atom") + 1 :]
+                ana_mode = ana_mode[len("per_atom_") :]
                 results = self.per_atom_statistics(ana_mode, arr, unbiased)
                 out.append(results)
 
             else:
-                raise NotImplementedError(f"cannot handle this {ana_mode}")
+                raise NotImplementedError(f"Cannot handle this {ana_mode}")
 
         return out
 
@@ -473,30 +474,43 @@ class AtomicInMemoryDataset(AtomicDataset):
         self, ana_mode: str, selector, arr: torch.Tensor, alpha: Optional[float] = 0.1
     ):
 
-        if ana_mode != "mean_std":
-            raise NotImplementedError(
-                f"{ana_mode} for per species analysis is not implemented"
-            )
+        if len(arr.shape) == 1 or (len(arr.shape)==2 and arr.shape[1]==1):
 
-        N, fixed_field = self.species_count_per_graph()
-        N = N.type(torch.get_default_dtype())
+            if ana_mode != "mean_std":
+                raise NotImplementedError(
+                    f"{ana_mode} for per species analysis is not implemented for shape {arr.shape}"
+                )
 
-        if fixed_field:
-            N = torch.matmul(
-                torch.ones((arr.shape[0], 1), dtype=torch.get_default_dtype()),
-                N.reshape([1, -1]),
-            )
-        else:
-            N = N[selector]
+            N, fixed_field = self.species_count_per_graph()
+            N = N.type(torch.get_default_dtype())
 
-        if len(arr.shape) == 1 and arr.shape[0] == N.shape[0]:
+            if fixed_field:
+                N = torch.matmul(
+                    torch.ones((arr.shape[0], 1), dtype=torch.get_default_dtype()),
+                    N.reshape([1, -1]),
+                )
+            else:
+                N = N[selector]
+
             return gp(N, arr, alpha=alpha)
-        elif len(arr.shape) == 2 and arr.shape[1] == 1:
-            return gp(N, arr, alpha=alpha)
+
         else:
-            raise NotImplementedError(
-                f"per species analysis for shape {arr.shape} is not implemented"
-            )
+            if AtomicDataDict.ATOMIC_NUMBERS_KEY in self.fixed_fields:
+                spe_idx = self.transform.transform(
+                    self.fixed_fields[AtomicDataDict.ATOMIC_NUMBERS_KEY]
+                )
+                spe_idx = torch.matmul(
+                    torch.ones((arr.shape[0], 1), dtype=torch.get_default_dtype()),
+                    spe_idx.reshape([1, -1]),
+                )
+            else:
+                spe_idx = self.transform.transform(
+                    self.data[AtomicDataDict.ATOMIC_NUMBERS_KEY]
+                )
+                spe_idx = spe_idx[selector]
+            mean = scatter(arr, spe_idx, reduce="mean", dim=0)
+            std = scatter(arr, spe_idx, reduce="std", dim=0)
+            return mean, std
 
     def species_count_per_graph(self):
         if AtomicDataDict.ATOMIC_NUMBERS_KEY in self.fixed_fields:
