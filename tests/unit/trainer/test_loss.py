@@ -80,16 +80,25 @@ class TestLoss:
 
         l, contb = loss(pred, ref)
 
-        # first half data are specie 1
-        loss_ref_1 = torch.square( (pred[AtomicDataDict.TOTAL_ENERGY_KEY][0] - ref[AtomicDataDict.TOTAL_ENERGY_KEY][0])) 
-        loss_ref_2 = torch.square( (pred[AtomicDataDict.TOTAL_ENERGY_KEY][1] - ref[AtomicDataDict.TOTAL_ENERGY_KEY][1]))
+        # first graph
+        loss_ref_1 = torch.square(
+            (
+                pred[AtomicDataDict.TOTAL_ENERGY_KEY][0]
+                - ref[AtomicDataDict.TOTAL_ENERGY_KEY][0]
+            )
+            / 3.0
+        )
+        # second graph
+        loss_ref_2 = torch.square(
+            (
+                pred[AtomicDataDict.TOTAL_ENERGY_KEY][1]
+                - ref[AtomicDataDict.TOTAL_ENERGY_KEY][1]
+            )
+            / 7.0
+        )
+        loss_ref = (loss_ref_1 + loss_ref_2) / 2.0
 
-        # first half data are specie 1
-        loss_ref_1 = torch.square( (pred[AtomicDataDict.TOTAL_ENERGY_KEY][0] - ref[AtomicDataDict.TOTAL_ENERGY_KEY][0])/3.0) 
-        loss_ref_2 = torch.square( (pred[AtomicDataDict.TOTAL_ENERGY_KEY][1] - ref[AtomicDataDict.TOTAL_ENERGY_KEY][1])/7.0)
-        loss_ref = (loss_ref_1 + loss_ref_2)/2.
-
-        assert torch.isclose( l, loss_ref)
+        assert torch.isclose(l, loss_ref)
 
 
 class TestNaN:
@@ -121,6 +130,37 @@ class TestNaN:
         for k in contb:
             assert torch.isclose(contb_wo_nan[k], contb[k])
 
+    def test_per_atom(self, data_w_NaN):
+
+        pred, ref, wo_nan_pred, wo_nan_ref = data_w_NaN
+
+        config = {
+            AtomicDataDict.TOTAL_ENERGY_KEY: (
+                1.0,
+                "PerAtomMSELoss",
+                {"ignore_nan": True},
+            )
+        }
+        loss = Loss(coeffs=config)
+        l_wo_nan, contb_wo_nan = loss(wo_nan_pred, wo_nan_ref)
+
+        l, contb = loss(pred, ref)
+
+        assert torch.isclose(l_wo_nan, l)
+        for k in contb:
+            assert torch.isclose(contb_wo_nan[k], contb[k])
+
+        # first half data are specie 1
+        loss_ref = torch.square(
+            (
+                pred[AtomicDataDict.TOTAL_ENERGY_KEY][0]
+                - ref[AtomicDataDict.TOTAL_ENERGY_KEY][0]
+            )
+            / 3.0
+        )
+
+        assert torch.isclose(l, loss_ref)
+
 
 @pytest.fixture(scope="class")
 def loss(request):
@@ -140,7 +180,9 @@ def data(float_tolerance):
         AtomicDataDict.ATOM_TYPE_KEY: torch.as_tensor([1, 1, 1, 1, 1, 0, 0, 0, 0, 0]),
     }
     ref = {
-        AtomicDataDict.BATCH_KEY: torch.tensor([0, 0, 0, 1, 1, 1, 1, 1, 1, 1], dtype=torch.int),
+        AtomicDataDict.BATCH_KEY: torch.tensor(
+            [0, 0, 0, 1, 1, 1, 1, 1, 1, 1], dtype=torch.int
+        ),
         AtomicDataDict.FORCE_KEY: torch.rand(10, 3),
         AtomicDataDict.TOTAL_ENERGY_KEY: torch.rand((2, 1)),
         "k": torch.rand((2, 1)),
@@ -158,16 +200,24 @@ def data_w_NaN(float_tolerance, data):
     ref = {k: torch.clone(v) for k, v in _ref.items()}
     ref[AtomicDataDict.FORCE_KEY][-1] = float("nan")
     ref[AtomicDataDict.FORCE_KEY][0] = float("nan")
+    ref[AtomicDataDict.TOTAL_ENERGY_KEY][1] = float("nan")
 
     wo_nan_pred = {k: torch.clone(v) for k, v in _pred.items()}
     wo_nan_ref = {k: torch.clone(v) for k, v in _ref.items()}
     wo_nan_ref[AtomicDataDict.FORCE_KEY] = wo_nan_ref[AtomicDataDict.FORCE_KEY][1:-1]
+    wo_nan_ref[AtomicDataDict.TOTAL_ENERGY_KEY] = wo_nan_ref[
+        AtomicDataDict.TOTAL_ENERGY_KEY
+    ][:1]
     wo_nan_ref[AtomicDataDict.ATOM_TYPE_KEY] = wo_nan_ref[AtomicDataDict.ATOM_TYPE_KEY][
         1:-1
     ]
+    wo_nan_ref[AtomicDataDict.BATCH_KEY] = torch.tensor([0, 0, 0], dtype=torch.int)
     wo_nan_pred[AtomicDataDict.FORCE_KEY] = wo_nan_pred[AtomicDataDict.FORCE_KEY][1:-1]
     wo_nan_pred[AtomicDataDict.ATOM_TYPE_KEY] = wo_nan_pred[
         AtomicDataDict.ATOM_TYPE_KEY
     ][1:-1]
+    wo_nan_pred[AtomicDataDict.TOTAL_ENERGY_KEY] = wo_nan_pred[
+        AtomicDataDict.TOTAL_ENERGY_KEY
+    ][:1]
 
     yield pred, ref, wo_nan_pred, wo_nan_ref

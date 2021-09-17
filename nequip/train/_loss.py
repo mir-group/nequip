@@ -93,6 +93,40 @@ class PerAtomLoss(SimpleLoss):
                 return loss
 
 
+class PerAtomLoss(SimpleLoss):
+    def __call__(
+        self,
+        pred: dict,
+        ref: dict,
+        key: str,
+        mean: bool = True,
+    ):
+        # zero the nan entries
+        has_nan = self.ignore_nan and torch.isnan(ref[key].mean())
+        N = torch.bincount(ref[AtomicDataDict.BATCH_KEY])
+        N = N.reshape(pred[key].shape)
+        if has_nan:
+            not_nan = (ref[key] == ref[key]).int()
+            loss = (
+                self.func(pred[key], torch.nan_to_num(ref[key], nan=0.0)) * not_nan / N
+            )
+            if self.func_name == "MSELoss":
+                loss = loss / N
+            if mean:
+                return loss.sum() / not_nan.sum()
+            else:
+                return loss
+        else:
+            loss = self.func(pred[key], ref[key])
+            loss = loss / N
+            if self.func_name == "MSELoss":
+                loss = loss / N
+            if mean:
+                return loss.mean()
+            else:
+                return loss
+
+
 class PerSpeciesLoss(SimpleLoss):
     """Compute loss for each species and average among the same species
     before summing them up.
