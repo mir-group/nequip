@@ -54,6 +54,7 @@ class Metrics:
 
         self.running_stats = {}
         self.per_species = {}
+        self.per_atom = {}
         self.funcs = {}
         self.kwargs = {}
         for component in components:
@@ -64,10 +65,12 @@ class Metrics:
 
             # default is to flatten the array
             per_species = params.pop("PerSpecies", False)
+            per_atom = params.pop("PerAtom", False)
 
             if key not in self.running_stats:
                 self.running_stats[key] = {}
                 self.per_species[key] = {}
+                self.per_atom[key] = {}
                 self.funcs[key] = find_loss_function(functional, {})
                 self.kwargs[key] = {}
 
@@ -81,6 +84,7 @@ class Metrics:
             self.kwargs[key][reduction].update(kwargs)
 
             self.per_species[key][reduction] = per_species
+            self.per_atom[key][reduction] = per_atom
 
     def init_runstat(self, params, error: torch.Tensor):
         """
@@ -128,7 +132,9 @@ class Metrics:
     def __call__(self, pred: dict, ref: dict):
 
         metrics = {}
+        N = None
         for key, func in self.funcs.items():
+
             error = func(
                 pred=pred,
                 ref=ref,
@@ -150,6 +156,10 @@ class Metrics:
                 if self.per_species[key][reduction]:
                     # TO DO, this needs OneHot component. will need to be decoupled
                     params = {"accumulate_by": pred[AtomicDataDict.ATOM_TYPE_KEY]}
+                if self.per_atom[key][reduction]:
+                    if N is None:
+                        N = torch.bincount(ref[AtomicDataDict.BATCH_KEY])
+                    error = error/N
 
                 if stat.dim == () and not self.per_species[key][reduction]:
                     metrics[(key, reduction)] = stat.accumulate_batch(
@@ -187,13 +197,17 @@ class Metrics:
             key, reduction = k
             short_name = ABBREV.get(key, key)
 
-            item_name = f"{short_name}_{reduction}"
+            per_atom = self.per_atom[key][reduction]
+            suffix = "/N" if per_atom else ""
+            item_name = f"{short_name}{suffix}_{reduction}"
 
             stat = self.running_stats[key][reduction]
             per_species = self.per_species[key][reduction]
 
             if per_species:
                 if stat.output_dim == tuple():
+                    if type_names is None:
+                        type_names = [i for i in range(len(value))]
                     for id_ele, v in enumerate(value):
                         flat_dict[f"{type_names[id_ele]}_{item_name}"] = v.item()
 
