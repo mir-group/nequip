@@ -81,11 +81,16 @@ class TestWeight:
                 assert k in ["forces"]
 
         # mae should be the same cause # of type 0 == # of type 1
+        dim = {"dim": 3, "report_per_component": per_comp}
+        hash_str_ref = Metrics.hash_component((AtomicDataDict.FORCE_KEY, "mae", dim))
+        dim["PerSpecies"] = True
+        hash_str = Metrics.hash_component((AtomicDataDict.FORCE_KEY, "mae", dim))
         assert torch.allclose(
-            w_contb[("forces", "mae")].mean(dim=0), contb[("forces", "mae")]
+            w_contb[("forces", hash_str)].mean(dim=0), contb[("forces", hash_str_ref)]
         )
-        assert torch.allclose(w_contb[("forces", "rmse")][0], loss_ref_0)
-        assert torch.allclose(w_contb[("forces", "rmse")][1], loss_ref_1)
+        hash_str = Metrics.hash_component((AtomicDataDict.FORCE_KEY, "rmse", dim))
+        assert torch.allclose(w_contb[("forces", hash_str)][0], loss_ref_0)
+        assert torch.allclose(w_contb[("forces", hash_str)][1], loss_ref_1)
 
 
 @pytest.fixture(scope="class", params=metrics_tests)

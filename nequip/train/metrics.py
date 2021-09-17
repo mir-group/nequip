@@ -1,5 +1,8 @@
 from copy import deepcopy
+from hashlib import sha1
 from typing import Union, Sequence, Tuple
+
+import yaml
 
 import torch
 
@@ -53,38 +56,40 @@ class Metrics:
     ):
 
         self.running_stats = {}
-        self.per_species = {}
-        self.per_atom = {}
+        self.params = {}
         self.funcs = {}
         self.kwargs = {}
         for component in components:
 
             key, reduction, params = Metrics.parse(component)
 
-            functional = params.pop("functional", "L1Loss")
+            params["PerSpecies"] = params.get("PerSpecies", False)
+            params["PerAtom"] = params.get("PerAtom", False)
+
+            param_hash = Metrics.hash_component(component)
+
+            functional = params.get("functional", "L1Loss")
 
             # default is to flatten the array
-            per_species = params.pop("PerSpecies", False)
-            per_atom = params.pop("PerAtom", False)
 
             if key not in self.running_stats:
                 self.running_stats[key] = {}
-                self.per_species[key] = {}
-                self.per_atom[key] = {}
                 self.funcs[key] = find_loss_function(functional, {})
                 self.kwargs[key] = {}
+                self.params[key] = {}
 
             # store for initialization
             kwargs = deepcopy(params)
+            kwargs.pop("functional", "L1Loss")
+            kwargs.pop("PerSpecies")
+            kwargs.pop("PerAtom")
 
             # by default, report a scalar that is mae and rmse over all component
-            self.kwargs[key][reduction] = dict(
+            self.kwargs[key][param_hash] = dict(
                 reduction=metrics_to_reduction.get(reduction, reduction),
             )
-            self.kwargs[key][reduction].update(kwargs)
-
-            self.per_species[key][reduction] = per_species
-            self.per_atom[key][reduction] = per_atom
+            self.kwargs[key][param_hash].update(kwargs)
+            self.params[key][param_hash] = (reduction, params)
 
     def init_runstat(self, params, error: torch.Tensor):
         """
@@ -107,6 +112,11 @@ class Metrics:
         rs = RunningStats(**kwargs)
         rs.to(device=error.device)
         return rs
+
+    @staticmethod
+    def hash_component(component):
+        buffer = yaml.dump(component).encode("ascii")
+        return sha1(buffer).hexdigest()
 
     @staticmethod
     def parse(component):
@@ -142,31 +152,39 @@ class Metrics:
                 mean=False,
             )
 
-            for reduction, kwargs in self.kwargs[key].items():
+            for param_hash, kwargs in self.kwargs[key].items():
+
+                reduction, params = self.params[key][param_hash]
+                per_species = params["PerSpecies"]
+                per_atom = params["PerAtom"]
 
                 # initialize the internal run_stat base on the error shape
                 if reduction not in self.running_stats[key]:
-                    self.running_stats[key][reduction] = self.init_runstat(
+                    self.running_stats[key][param_hash] = self.init_runstat(
                         params=kwargs, error=error
                     )
 
-                stat = self.running_stats[key][reduction]
+                stat = self.running_stats[key][param_hash]
 
                 params = {}
-                if self.per_species[key][reduction]:
+                if per_species:
                     # TO DO, this needs OneHot component. will need to be decoupled
                     params = {"accumulate_by": pred[AtomicDataDict.ATOM_TYPE_KEY]}
-                if self.per_atom[key][reduction]:
+                if per_atom:
                     if N is None:
                         N = torch.bincount(ref[AtomicDataDict.BATCH_KEY])
-                    error = error / N
+                    error_N = error / N
+                else:
+                    error_N = error
 
-                if stat.dim == () and not self.per_species[key][reduction]:
-                    metrics[(key, reduction)] = stat.accumulate_batch(
-                        error.flatten(), **params
+                if stat.dim == () and not per_species:
+                    metrics[(key, param_hash)] = stat.accumulate_batch(
+                        error_N.flatten(), **params
                     )
                 else:
-                    metrics[(key, reduction)] = stat.accumulate_batch(error, **params)
+                    metrics[(key, param_hash)] = stat.accumulate_batch(
+                        error_N, **params
+                    )
 
         return metrics
 
@@ -194,15 +212,17 @@ class Metrics:
         skip_keys = []
         for k, value in metrics.items():
 
-            key, reduction = k
+            key, param_hash = k
+            reduction, params = self.params[key][param_hash]
+
             short_name = ABBREV.get(key, key)
 
-            per_atom = self.per_atom[key][reduction]
+            per_atom = params["PerAtom"]
             suffix = "/N" if per_atom else ""
             item_name = f"{short_name}{suffix}_{reduction}"
 
-            stat = self.running_stats[key][reduction]
-            per_species = self.per_species[key][reduction]
+            stat = self.running_stats[key][param_hash]
+            per_species = params["PerSpecies"]
 
             if per_species:
                 if stat.output_dim == tuple():
