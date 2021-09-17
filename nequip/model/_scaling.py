@@ -65,9 +65,6 @@ def RescaleEnergyEtc(
                 f"Global energy scaling was very low: {global_scale}. If dataset values were used, does the dataset contain insufficient variation? Maybe try disabling global scaling with global_scale=None."
             )
 
-        logging.debug(
-            f"Initially outputs are scaled by: {global_scale}, eneriges are shifted by {global_shift}."
-        )
     else:
         # Put dummy values
         if global_shift is not None:
@@ -75,8 +72,8 @@ def RescaleEnergyEtc(
         if global_scale is not None:
             global_scale = 1.0  # same,
 
-    logging.info(
-        f"Initially outputs are scaled by: {global_scale}, eneriges are shifted by {global_shift}."
+    logging.debug(
+        f"Initially outputs are globally scaled by: {global_scale}, total_energy are globally shifted by {global_shift}."
     )
 
     # == Build the model ==
@@ -151,7 +148,7 @@ def PerSpeciesRescale(
                 # valid values
                 pass
             else:
-                raise ValueError(f"Invalid global scale `{global_scale}`")
+                raise ValueError(f"Invalid value `{value}`")
 
         # = Compute shifts and scales =
         computed_stats = compute_stats(
@@ -162,15 +159,21 @@ def PerSpeciesRescale(
 
         if isinstance(scales, str):
             scales = computed_stats[str_names.index(scales)]
+
         if isinstance(shifts, str):
             shifts = computed_stats[str_names.index(shifts)]
+
         if isinstance(global_scale, str):
             global_scale = computed_stats[str_names.index(global_scale)]
 
         if global_scale is not None:
-            if scales is not None:
+            if scales is None:
+                scales = 1.0 / global_scale
+            else:
                 scales = scales / global_scale
-            if shifts is not None:
+            if shifts is None:
+                shifts = 1.0 / global_scale
+            else:
                 shifts = shifts / global_scale
 
     else:
@@ -196,6 +199,8 @@ def PerSpeciesRescale(
             trainable=trainable,
         ),
     )
+
+    logging.debug(f"Atomic outputs are scaled by: {scales}, shifted by {shifts}.")
 
     # == Build the model ==
     return model
