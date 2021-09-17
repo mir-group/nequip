@@ -38,14 +38,14 @@ def RescaleEnergyEtc(
             if isinstance(value, str):
                 str_names += [value]
             elif (
-                global_scale is None
+                value is None
                 or isinstance(value, float)
                 or isinstance(value, torch.Tensor)
             ):
                 # valid values
                 pass
             else:
-                raise ValueError(f"Invalid global scale `{global_scale}`")
+                raise ValueError(f"Invalid global scale `{value}`")
 
         # = Compute shifts and scales =
         computed_stats = compute_stats(
@@ -183,7 +183,7 @@ def PerSpeciesRescale(
 
     # insert in per species shift
     model_func.insert_from_parameters(
-        after="total_energy_sum",
+        before="total_energy_sum",
         name="per_species_scale_shift",
         shared_params=config,
         builder=PerSpeciesScaleShift,
@@ -195,7 +195,6 @@ def PerSpeciesRescale(
             scales=scales,
             trainable=trainable,
         ),
-        prepend=True,
     )
 
     # == Build the model ==

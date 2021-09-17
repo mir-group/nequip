@@ -5,7 +5,10 @@ seed: 0
 
 # network
 model_builders:
-  - nequip.models.EnergyModel
+- EnergyModel
+- PerSpeciesRescale
+- ForceOutput
+- RescaleEnergyEtc
 num_basis: 8
 r_max: 4.0
 irreps_edge_sh: 0e + 1o
@@ -39,8 +42,12 @@ learning_rate: 0.0
 
 # loss function
 loss_coeffs: 
-  total_energy: 0.0001
-  forces: 1.0
+  total_energy: 
+  - 0.0001
+  - PerAtomMSELoss
+  forces:
+  - 1.0
+  - PerSpeciesMSELoss
 
 # optimizer
 optimizer_name: Adam
@@ -48,8 +55,8 @@ optimizer_name: Adam
 # example block to do good per species shifting
 # note, sigma needs to be tuned 4.0 works the best for aspirin dataset.
 PerSpeciesScaleShift_trainable: true
-PerSpeciesScaleShift_shifts: dataset_per_species_energy_mean
-PerSpeciesScaleShift_scales: dataset_per_species_energy_std
+PerSpeciesScaleShift_shifts: dataset_per_species_total_energy_mean
+PerSpeciesScaleShift_scales: dataset_per_species_total_energy_std
 global_rescale_shift: null
-global_rescale_scale: dataset_force_rms
+global_rescale_scale: dataset_forces_rms
 PerSpeciesScaleShift_enable: true
