@@ -159,7 +159,7 @@ class Metrics:
                 if self.per_atom[key][reduction]:
                     if N is None:
                         N = torch.bincount(ref[AtomicDataDict.BATCH_KEY])
-                    error = error/N
+                    error = error / N
 
                 if stat.dim == () and not self.per_species[key][reduction]:
                     metrics[(key, reduction)] = stat.accumulate_batch(
