@@ -31,7 +31,7 @@ chemical_symbol_to_type:
 # logging
 wandb: false
 wandb_project: aspirin
-# verbose: debug
+verbose: debug
 
 # training
 n_train: 5
@@ -74,8 +74,8 @@ optimizer_name: Adam
 # example block to do good per species shifting
 # note, sigma needs to be tuned 4.0 works the best for aspirin dataset.
 PerSpeciesScaleShift_trainable: true
-PerSpeciesScaleShift_shifts: dataset_per_species_total_energy_mean
-PerSpeciesScaleShift_scales: dataset_per_species_total_energy_std
+PerSpeciesScaleShift_shifts: dataset_per_atom_total_energy_mean
+PerSpeciesScaleShift_scales: dataset_forces_rms
 global_rescale_shift: null
 global_rescale_scale: dataset_forces_rms
 PerSpeciesScaleShift_enable: true

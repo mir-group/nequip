@@ -18,7 +18,7 @@ import ase
 
 import torch
 from torch_geometric.data import Batch, Dataset, download_url, extract_zip
-from torch_scatter import scatter
+from torch_scatter import scatter, scatter_std
 
 import nequip
 from nequip.data import AtomicData, AtomicDataDict
@@ -426,7 +426,9 @@ class AtomicInMemoryDataset(AtomicDataset):
                 results = self.per_species_statistics(
                     ana_mode,
                     graph_selector,
+                    node_selector,
                     arr,
+                    unbiased,
                     **algorithm_kwargs,
                 )
                 out.append(results)
@@ -458,8 +460,8 @@ class AtomicInMemoryDataset(AtomicDataset):
         if ana_mode == "mean_std":
             N = torch.bincount(self.data[AtomicDataDict.BATCH_KEY])
             arr = arr / N
-            mean = torch.mean(arr, dim=0)
-            std = torch.std(arr, dim=0, unbiased=unbiased)
+            mean = torch.mean(arr)
+            std = torch.std(arr, unbiased=unbiased)
             return mean, std
         elif ana_mode == "rms":
             N = torch.bincount(self.data[AtomicDataDict.BATCH_KEY])
@@ -471,10 +473,16 @@ class AtomicInMemoryDataset(AtomicDataset):
             )
 
     def per_species_statistics(
-        self, ana_mode: str, selector, arr: torch.Tensor, alpha: Optional[float] = 0.1
+        self,
+        ana_mode: str,
+        graph_selector,
+        node_selector,
+        arr: torch.Tensor,
+        unbiased: bool = True,
+        alpha: Optional[float] = 0.1,
     ):
 
-        if len(arr.shape) == 1 or (len(arr.shape)==2 and arr.shape[1]==1):
+        if len(arr.shape) == 1 or (len(arr.shape) == 2 and arr.shape[1] == 1):
 
             if ana_mode != "mean_std":
                 raise NotImplementedError(
@@ -490,7 +498,7 @@ class AtomicInMemoryDataset(AtomicDataset):
                     N.reshape([1, -1]),
                 )
             else:
-                N = N[selector]
+                N = N[graph_selector]
 
             return gp(N, arr, alpha=alpha)
 
@@ -499,18 +507,27 @@ class AtomicInMemoryDataset(AtomicDataset):
                 spe_idx = self.transform.transform(
                     self.fixed_fields[AtomicDataDict.ATOMIC_NUMBERS_KEY]
                 )
-                spe_idx = torch.matmul(
-                    torch.ones((arr.shape[0], 1), dtype=torch.get_default_dtype()),
-                    spe_idx.reshape([1, -1]),
-                )
+                spe_idx = torch.ones(
+                    (self.data.num_graphs, 1), dtype=torch.long
+                ) * spe_idx.reshape([1, -1])
+                spe_idx = spe_idx.reshape([-1, 1])
+                spe_idx = spe_idx[node_selector]
             else:
                 spe_idx = self.transform.transform(
                     self.data[AtomicDataDict.ATOMIC_NUMBERS_KEY]
                 )
-                spe_idx = spe_idx[selector]
-            mean = scatter(arr, spe_idx, reduce="mean", dim=0)
-            std = scatter(arr, spe_idx, reduce="std", dim=0)
-            return mean, std
+                spe_idx = spe_idx[node_selector]
+
+            if ana_mode == "mean_std":
+                mean = scatter(arr, spe_idx, reduce="mean", dim=0)
+                std = scatter_std(arr, spe_idx, dim=0, unbiased=unbiased)
+                return mean, std
+            elif ana_mode == "rms":
+                rms = scatter(arr * arr, spe_idx, reduce="mean", dim=0)
+                dims = len(rms.shape) - 1
+                for i in range(dims):
+                    rms = rms.mean(axis=-1)
+                return (torch.sqrt(rms),)
 
     def species_count_per_graph(self):
         if AtomicDataDict.ATOMIC_NUMBERS_KEY in self.fixed_fields:
