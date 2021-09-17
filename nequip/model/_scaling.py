@@ -45,7 +45,7 @@ def RescaleEnergyEtc(
                 # valid values
                 pass
             else:
-                raise ValueError(f"Invalid global scale `{global_scale}`")
+                raise ValueError(f"Invalid global scale `{value}`")
 
         # = Compute shifts and scales =
         computed_stats = compute_stats(
