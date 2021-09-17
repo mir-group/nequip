@@ -149,6 +149,11 @@ loss_coeffs:                                                                    
 #   - MSELoss
 #
 # loss_coeffs:
+#   total_energy:
+#   - 1.0
+#   - PerAtomMSELoss
+#
+# loss_coeffs:
 #   forces:
 #   - 1.0
 #   - PerSpeciesL1Loss
