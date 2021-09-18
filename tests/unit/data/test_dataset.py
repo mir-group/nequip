@@ -144,63 +144,43 @@ class TestStatistics:
 
 
 class TestPerSpeciesStatistics:
-    def test_full_rank(self, npz_dataset):
-
-        # set up the transformer
-        unique = torch.unique(npz_dataset.data[AtomicDataDict.ATOMIC_NUMBERS_KEY])
-        npz_dataset.transform = TypeMapper(
-            chemical_symbol_to_type={
-                chemical_symbols[n]: i for i, n in enumerate(unique)
-            }
-        )
-
-        # design a ground truth
-        N, _ = npz_dataset.species_count_per_graph()
-        N = N.type(torch.get_default_dtype())
-        # use zero noise
-        ref_mean, ref_std, E = generate_E(N, 100, 0)
-        npz_dataset.data[AtomicDataDict.TOTAL_ENERGY_KEY] = E
-
-        ((mean, std),) = npz_dataset.statistics(
-            [AtomicDataDict.TOTAL_ENERGY_KEY],
-            modes=["per_species_mean_std"],
-            kwargs={
-                AtomicDataDict.TOTAL_ENERGY_KEY
-                + "per_species_mean_std": {"alpha": 1e-6}
-            },
-        )
-        ref_mean = ref_mean.reshape([-1])
-        print("mean", mean, mean - ref_mean)
-        print("std", std, ref_std)
-        ref_mean = ref_mean.reshape([-1])
-        assert torch.allclose(mean, ref_mean, rtol=1e-1)
-        assert torch.allclose(std, torch.zeros_like(ref_mean), atol=1e-2)
-
     @pytest.mark.parametrize("alpha", [1e-10, 1e-6, 0.1, 0.5, 1])
     @pytest.mark.parametrize("fixed_field", [True, False])
-    def test_rank_deficient(self, npz_dataset, alpha, fixed_field):
+    @pytest.mark.parametrize("full_rank", [True, False])
+    def test_per_graph_field(self, npz_dataset, alpha, fixed_field, full_rank):
 
-        ntype = 2
+        if full_rank:
+            if fixed_field:
+                return
 
-        # let all atoms to be the same type distribution
-        num_nodes = npz_dataset.data[AtomicDataDict.BATCH_KEY].shape[0]
-        if fixed_field:
-            npz_dataset.data[AtomicDataDict.ATOMIC_NUMBERS_KEY] = None
-            new_n = torch.ones(NATOMS, dtype=torch.int64)
-            new_n[0] += ntype
-            npz_dataset.fixed_fields[AtomicDataDict.ATOMIC_NUMBERS_KEY] = new_n
+            unique = torch.unique(npz_dataset.data[AtomicDataDict.ATOMIC_NUMBERS_KEY])
+            npz_dataset.transform = TypeMapper(
+                chemical_symbol_to_type={
+                    chemical_symbols[n]: i for i, n in enumerate(unique)
+                }
+            )
         else:
-            npz_dataset.fixed_fields.pop(AtomicDataDict.ATOMIC_NUMBERS_KEY, None)
-            new_n = torch.ones(num_nodes, dtype=torch.int64)
-            new_n[::NATOMS] += ntype
-            npz_dataset.data[AtomicDataDict.ATOMIC_NUMBERS_KEY] = new_n
+            ntype = 2
 
-        # set up the transformer
-        npz_dataset.transform = TypeMapper(
-            chemical_symbol_to_type={
-                chemical_symbols[n]: i for i, n in enumerate([1, ntype + 1])
-            }
-        )
+            # let all atoms to be the same type distribution
+            num_nodes = npz_dataset.data[AtomicDataDict.BATCH_KEY].shape[0]
+            if fixed_field:
+                npz_dataset.data[AtomicDataDict.ATOMIC_NUMBERS_KEY] = None
+                new_n = torch.ones(NATOMS, dtype=torch.int64)
+                new_n[0] += ntype
+                npz_dataset.fixed_fields[AtomicDataDict.ATOMIC_NUMBERS_KEY] = new_n
+            else:
+                npz_dataset.fixed_fields.pop(AtomicDataDict.ATOMIC_NUMBERS_KEY, None)
+                new_n = torch.ones(num_nodes, dtype=torch.int64)
+                new_n[::NATOMS] += ntype
+                npz_dataset.data[AtomicDataDict.ATOMIC_NUMBERS_KEY] = new_n
+
+            # set up the transformer
+            npz_dataset.transform = TypeMapper(
+                chemical_symbol_to_type={
+                    chemical_symbols[n]: i for i, n in enumerate([1, ntype + 1])
+                }
+            )
 
         n_frames = len(npz_dataset)
         N, _fixed_field = npz_dataset.species_count_per_graph()
@@ -210,7 +190,10 @@ class TestPerSpeciesStatistics:
 
         assert _fixed_field == fixed_field
 
-        ref_mean, ref_std, E = generate_E(N, 100, 0.5)
+        if alpha == 1e-10:
+            ref_mean, ref_std, E = generate_E(N, 100, 0.0)
+        else:
+            ref_mean, ref_std, E = generate_E(N, 100, 0.5)
 
         npz_dataset.data[AtomicDataDict.TOTAL_ENERGY_KEY] = E
 
@@ -230,12 +213,13 @@ class TestPerSpeciesStatistics:
         res = torch.matmul(N, mean.reshape([-1, 1])) - E.reshape([-1, 1])
         res2 = torch.sum(torch.square(res))
         print("residue", alpha, res2 - ref_res2)
-        print("mean", mean, ref_mean, mean - ref_mean)
+        print("mean", mean, ref_mean)
+        print("diff in mean", mean - ref_mean)
         print("std", std, ref_std)
 
-        if alpha in [None, 0]:
-            assert torch.allclose(mean, ref_mean)
-            assert torch.allclose(std, ref_std)
+        if alpha == 1e-10 and full_rank:
+            assert torch.allclose(mean, ref_mean, rtol=1e-1)
+            assert torch.allclose(std, torch.zeros_like(ref_mean), atol=1e-2)
         # else:
         #     assert res2 > ref_res2
 
