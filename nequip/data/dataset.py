@@ -497,22 +497,20 @@ class AtomicInMemoryDataset(AtomicDataset):
             return gp(N, arr, alpha=alpha)
 
         else:
-            print("anamode", ana_mode)
-            print(arr.shape, spe_idx.shape)
+            arr = arr.type(torch.get_default_dtype())
+            if len(arr.shape) == 1:
+                arr = arr.reshape([spe_idx.shape[0], -1])
 
             if ana_mode == "mean_std":
-                arr = arr.type(torch.get_default_dtype())
-                if len(arr.shape) == 1:
-                    arr = arr.reshape([spe_idx.shape[0], -1])
                 mean = scatter(arr, spe_idx, reduce="mean", dim=0)
                 std = scatter_std(arr, spe_idx, dim=0, unbiased=unbiased)
                 return mean, std
             elif ana_mode == "rms":
-                rms = scatter(arr * arr, spe_idx, reduce="mean", dim=0)
-                dims = len(rms.shape) - 1
+                square = scatter(arr * arr, spe_idx, reduce="mean", dim=0)
+                dims = len(square.shape) - 1
                 for i in range(dims):
-                    rms = rms.mean(axis=-1)
-                return (torch.sqrt(rms),)
+                    square = square.mean(axis=-1)
+                return (torch.sqrt(square),)
 
     def species_count_per_graph(
         self, node_selector=None, graph_selector=None, return_spe_idx: bool = False
