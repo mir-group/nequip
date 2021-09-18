@@ -31,7 +31,7 @@ MAX_ATOMIC_NUMBER: int = 5
 NATOMS = 3
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def npz():
     natoms = NATOMS
     nframes = 8
@@ -43,14 +43,14 @@ def npz():
     )
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def npz_data(npz):
     with tempfile.NamedTemporaryFile(suffix=".npz") as path:
         np.savez(path.name, **npz)
         yield path.name
 
 
-@pytest.fixture(scope="class")
+@pytest.fixture(scope="function")
 def npz_dataset(npz_data, temp_data):
     a = NpzDataset(
         file_name=npz_data,
@@ -132,7 +132,6 @@ class TestStatistics:
             [AtomicDataDict.ATOMIC_NUMBERS_KEY, AtomicDataDict.FORCE_KEY],
             modes=["count", "rms"],
         )
-        print("npz", npz["Z"])
 
         uniq, count = np.unique(npz["Z"][0].ravel(), return_counts=True)
         assert np.all(Z_unique.numpy() == uniq)
@@ -144,51 +143,29 @@ class TestStatistics:
 
 
 class TestPerSpeciesStatistics:
+    @pytest.mark.parametrize("fixed_field", [True, False])
+    def test_per_node_field(self, npz_dataset, fixed_field):
+
+        # set up the transformer
+        npz.dataset = set_up_transformer(npz_dataset, not fixed_field, fixed_field)
+
+        ((mean, std),) = npz_dataset.statistics(
+            [AtomicDataDict.BATCH_KEY],
+            modes=["per_species_mean_std"],
+        )
+        print(mean, std)
+
     @pytest.mark.parametrize("alpha", [1e-10, 1e-6, 0.1, 0.5, 1])
     @pytest.mark.parametrize("fixed_field", [True, False])
     @pytest.mark.parametrize("full_rank", [True, False])
     def test_per_graph_field(self, npz_dataset, alpha, fixed_field, full_rank):
 
-        if full_rank:
-            if fixed_field:
-                return
+        npz_dataset = set_up_transformer(npz_dataset, full_rank, fixed_field)
+        if npz_dataset is None:
+            return
 
-            unique = torch.unique(npz_dataset.data[AtomicDataDict.ATOMIC_NUMBERS_KEY])
-            npz_dataset.transform = TypeMapper(
-                chemical_symbol_to_type={
-                    chemical_symbols[n]: i for i, n in enumerate(unique)
-                }
-            )
-        else:
-            ntype = 2
-
-            # let all atoms to be the same type distribution
-            num_nodes = npz_dataset.data[AtomicDataDict.BATCH_KEY].shape[0]
-            if fixed_field:
-                npz_dataset.data[AtomicDataDict.ATOMIC_NUMBERS_KEY] = None
-                new_n = torch.ones(NATOMS, dtype=torch.int64)
-                new_n[0] += ntype
-                npz_dataset.fixed_fields[AtomicDataDict.ATOMIC_NUMBERS_KEY] = new_n
-            else:
-                npz_dataset.fixed_fields.pop(AtomicDataDict.ATOMIC_NUMBERS_KEY, None)
-                new_n = torch.ones(num_nodes, dtype=torch.int64)
-                new_n[::NATOMS] += ntype
-                npz_dataset.data[AtomicDataDict.ATOMIC_NUMBERS_KEY] = new_n
-
-            # set up the transformer
-            npz_dataset.transform = TypeMapper(
-                chemical_symbol_to_type={
-                    chemical_symbols[n]: i for i, n in enumerate([1, ntype + 1])
-                }
-            )
-
-        n_frames = len(npz_dataset)
-        N, _fixed_field = npz_dataset.species_count_per_graph()
+        N = npz_dataset.species_count_per_graph()
         N = N.type(torch.get_default_dtype())
-        if fixed_field:
-            N = torch.matmul(torch.ones((n_frames, 1)), N)
-
-        assert _fixed_field == fixed_field
 
         if alpha == 1e-10:
             ref_mean, ref_std, E = generate_E(N, 100, 0.0)
@@ -322,3 +299,41 @@ def generate_E(N, mean, std):
     t_std = torch.ones((N.shape[0], 1)) * ref_std.reshape([1, -1])
     E = torch.normal(t_mean, t_std)
     return ref_mean, ref_std, (N * E).sum(axis=-1)
+
+
+def set_up_transformer(npz_dataset, full_rank, fixed_field):
+
+    if full_rank:
+
+        if fixed_field:
+            return
+
+        unique = torch.unique(npz_dataset.data[AtomicDataDict.ATOMIC_NUMBERS_KEY])
+        npz_dataset.transform = TypeMapper(
+            chemical_symbol_to_type={
+                chemical_symbols[n]: i for i, n in enumerate(unique)
+            }
+        )
+    else:
+        ntype = 2
+
+        # let all atoms to be the same type distribution
+        num_nodes = npz_dataset.data[AtomicDataDict.BATCH_KEY].shape[0]
+        if fixed_field:
+            npz_dataset.data[AtomicDataDict.ATOMIC_NUMBERS_KEY] = None
+            new_n = torch.ones(NATOMS, dtype=torch.int64)
+            new_n[0] += ntype
+            npz_dataset.fixed_fields[AtomicDataDict.ATOMIC_NUMBERS_KEY] = new_n
+        else:
+            npz_dataset.fixed_fields.pop(AtomicDataDict.ATOMIC_NUMBERS_KEY, None)
+            new_n = torch.ones(num_nodes, dtype=torch.int64)
+            new_n[::NATOMS] += ntype
+            npz_dataset.data[AtomicDataDict.ATOMIC_NUMBERS_KEY] = new_n
+
+        # set up the transformer
+        npz_dataset.transform = TypeMapper(
+            chemical_symbol_to_type={
+                chemical_symbols[n]: i for i, n in enumerate([1, ntype + 1])
+            }
+        )
+    return npz_dataset

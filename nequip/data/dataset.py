@@ -425,8 +425,8 @@ class AtomicInMemoryDataset(AtomicDataset):
 
                 results = self.per_species_statistics(
                     ana_mode,
-                    graph_selector,
                     node_selector,
+                    graph_selector,
                     arr,
                     unbiased,
                     **algorithm_kwargs,
@@ -475,50 +475,35 @@ class AtomicInMemoryDataset(AtomicDataset):
     def per_species_statistics(
         self,
         ana_mode: str,
-        graph_selector,
         node_selector,
+        graph_selector,
         arr: torch.Tensor,
         unbiased: bool = True,
         alpha: Optional[float] = 0.1,
     ):
+        N, spe_idx = self.species_count_per_graph(
+            node_selector, graph_selector, return_spe_idx=True
+        )
 
-        if len(arr.shape) == 1 or (len(arr.shape) == 2 and arr.shape[1] == 1):
+        if len(arr.reshape(-1)) == N.shape[0]:
 
             if ana_mode != "mean_std":
                 raise NotImplementedError(
                     f"{ana_mode} for per species analysis is not implemented for shape {arr.shape}"
                 )
 
-            N, fixed_field = self.species_count_per_graph()
             N = N.type(torch.get_default_dtype())
-
-            if fixed_field:
-                N = torch.matmul(
-                    torch.ones((arr.shape[0], 1), dtype=torch.get_default_dtype()),
-                    N.reshape([1, -1]),
-                )
-            else:
-                N = N[graph_selector]
 
             return gp(N, arr, alpha=alpha)
 
         else:
-            if AtomicDataDict.ATOMIC_NUMBERS_KEY in self.fixed_fields:
-                spe_idx = self.transform.transform(
-                    self.fixed_fields[AtomicDataDict.ATOMIC_NUMBERS_KEY]
-                )
-                spe_idx = torch.ones(
-                    (self.data.num_graphs, 1), dtype=torch.long
-                ) * spe_idx.reshape([1, -1])
-                spe_idx = spe_idx.reshape([-1, 1])
-                spe_idx = spe_idx[node_selector]
-            else:
-                spe_idx = self.transform.transform(
-                    self.data[AtomicDataDict.ATOMIC_NUMBERS_KEY]
-                )
-                spe_idx = spe_idx[node_selector]
+            print("anamode", ana_mode)
+            print(arr.shape, spe_idx.shape)
 
             if ana_mode == "mean_std":
+                arr = arr.type(torch.get_default_dtype())
+                if len(arr.shape) == 1:
+                    arr = arr.reshape([spe_idx.shape[0], -1])
                 mean = scatter(arr, spe_idx, reduce="mean", dim=0)
                 std = scatter_std(arr, spe_idx, dim=0, unbiased=unbiased)
                 return mean, std
@@ -529,24 +514,39 @@ class AtomicInMemoryDataset(AtomicDataset):
                     rms = rms.mean(axis=-1)
                 return (torch.sqrt(rms),)
 
-    def species_count_per_graph(self):
+    def species_count_per_graph(
+        self, node_selector=None, graph_selector=None, return_spe_idx: bool = False
+    ):
         if AtomicDataDict.ATOMIC_NUMBERS_KEY in self.fixed_fields:
-            transformed = self.transform.transform(
+            spe_idx = self.transform.transform(
                 self.fixed_fields[AtomicDataDict.ATOMIC_NUMBERS_KEY]
             )
-            N = torch.bincount(transformed)
+            N = torch.bincount(spe_idx)
             N = N.reshape([1, -1])
-            fixed_field = True
+            N = torch.ones((self.data.num_graphs, 1)) * N.reshape([1, -1])
+            if return_spe_idx:
+                spe_idx = torch.ones(
+                    (self.data.num_graphs, 1), dtype=torch.long
+                ) * spe_idx.reshape([1, -1])
         else:
-            transformed = self.transform.transform(
+            spe_idx = self.transform.transform(
                 self.data[AtomicDataDict.ATOMIC_NUMBERS_KEY]
             )
             N = bincount(
-                transformed,
+                spe_idx,
                 self.data[AtomicDataDict.BATCH_KEY],
             )
-            fixed_field = False
-        return N, fixed_field
+        if graph_selector is not None:
+            N = N[graph_selector]
+        if return_spe_idx:
+            if node_selector is not None:
+                spe_idx = spe_idx.reshape([-1, 1])
+                spe_idx = spe_idx[node_selector]
+            elif graph_selector is not None:
+                spe_idx = spe_idx[graph_selector]
+            return N, spe_idx
+        else:
+            return N
 
 
 # TODO: document fixed field mapped key behavior more clearly
