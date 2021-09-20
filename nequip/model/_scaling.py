@@ -117,6 +117,7 @@ def PerSpeciesRescale(
     force_training = AtomicDataDict.FORCE_KEY in model.irreps_out
 
     # = Determine energy rescale type =
+    # TO DO, how to make the default consistent with the global scale function?
     global_scale = config.get(
         "global_rescale_scale",
         f"dataset_{AtomicDataDict.FORCE_KEY}_rms"
@@ -167,13 +168,9 @@ def PerSpeciesRescale(
             global_scale = computed_stats[str_names.index(global_scale)]
 
         if global_scale is not None:
-            if scales is None:
-                scales = 1.0 / global_scale
-            else:
+            if scales is not None:
                 scales = scales / global_scale
-            if shifts is None:
-                shifts = 1.0 / global_scale
-            else:
+            if shifts is not None:
                 shifts = shifts / global_scale
 
     else:
