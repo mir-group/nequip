@@ -188,14 +188,15 @@ class TestWorkflow:
         output = instance(AtomicData.to_AtomicDataDict(data))
         assert out_field in output
 
-    def test_saveload(self, model):
-        with tempfile.NamedTemporaryFile(suffix=".pth") as tmp:
-            instance, _ = model
-            torch.save(instance, tmp.name)
-            assert isfile(tmp.name)
+    # # the pickle test will be removed since this is no longer a requirement
+    # def test_saveload(self, model):
+    #     with tempfile.NamedTemporaryFile(suffix=".pth") as tmp:
+    #         instance, _ = model
+    #         torch.save(instance, tmp.name)
+    #         assert isfile(tmp.name)
 
-            new_model = torch.load(tmp.name)
-            assert isinstance(new_model, type(instance))
+    #         new_model = torch.load(tmp.name)
+    #         assert isinstance(new_model, type(instance))
 
 
 class TestGradient:
