@@ -4,6 +4,7 @@ run_name: minimal_eng
 seed: 0
 
 # network
+model_builder: nequip.models.EnergyModel
 num_basis: 8
 r_max: 4.0
 irreps_edge_sh: 0e + 1o
@@ -33,35 +34,9 @@ n_train: 5
 n_val: 5
 batch_size: 1
 max_epochs: 10
-learning_rate: 0.0
 
 # loss function
-loss_coeffs: 
-  total_energy: 
-  - 1.0
-  - PerAtomL1Loss
-  forces:
-  - 1.0
-  - PerSpeciesMSELoss
-
-metrics_components:
-  - - forces                               # key
-    - rmse                                 # "rmse" or "mse"
-    - PerSpecies: True                     # if true, per species contribution is counted separately
-      report_per_component: False          # if true, statistics on each component (i.e. fx, fy, fz) will be counted separately
-  - - forces
-    - mae
-    - PerSpecies: True
-      report_per_component: False
-  - - total_energy
-    - mae
-    - PerAtom: True                        # if true, per species contribution is counted separately
-  - - total_energy
-    - mae
-    - PerAtom: False                       # if true, per species contribution is counted separately
-  - - total_energy
-    - rmse
-    - PerAtom: True                        # if true, per species contribution is counted separately
+loss_coeffs: total_energy
 
 # optimizer
 optimizer_name: Adam
