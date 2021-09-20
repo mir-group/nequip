@@ -16,6 +16,7 @@ Most recent change on the bottom.
 - Arbitrary atom type support
 - Unified, modular model building and initialization architecture
 - Added `nequip-benchmark` script for benchmarking and profiling models
+- Add before option to SequentialGraphNetwork.insert
 
 ### Changed
 - Name processed datasets based on a hash of their parameters to ensure only valid cached data is used
