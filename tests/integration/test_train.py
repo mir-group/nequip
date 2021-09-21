@@ -97,11 +97,12 @@ def test_metrics(nequip_dataset, BENCHMARK_ROOT, conffile, field, builder):
     path_to_this_file = pathlib.Path(__file__)
     config_path = path_to_this_file.parents[2] / f"configs/{conffile}"
     true_config = yaml.load(config_path.read_text(), Loader=yaml.Loader)
+
     with tempfile.TemporaryDirectory() as tmpdir:
         # Save time
         run_name = "test_train_" + dtype
         true_config["run_name"] = run_name
-        true_config["root"] = tmpdir
+        true_config["root"] = "test_run"
         true_config["dataset_file_name"] = str(
             BENCHMARK_ROOT / "aspirin_ccsd-train.npz"
         )
@@ -119,16 +120,22 @@ def test_metrics(nequip_dataset, BENCHMARK_ROOT, conffile, field, builder):
         env["PYTHONPATH"] = ":".join(
             [str(path_to_this_file.parent)] + env.get("PYTHONPATH", "").split(":")
         )
+        screen = open(tmpdir + "/screen", "w+")
         retcode = subprocess.run(
-            ["nequip-train", str(config_path)], cwd=tmpdir, env=env
+            ["nequip-train", "conf.yaml"],
+            cwd=tmpdir,
+            env=env,
+            stdout=screen,
+            stderr=screen,
         )
         retcode.check_returncode()
 
         # == Load metrics ==
-        outdir = f"{true_config['root']}/{true_config['run_name']}/"
+        outdir = f"{tmpdir}/{true_config['root']}/{true_config['run_name']}/"
 
         if builder == IdentityModel or builder == LearningFactorModel:
             for which in ("train", "val"):
+
                 dat = np.genfromtxt(
                     f"{outdir}/metrics_batch_{which}.csv",
                     delimiter=",",
@@ -158,10 +165,11 @@ def test_metrics(nequip_dataset, BENCHMARK_ROOT, conffile, field, builder):
         for field in dat.dtype.names:
             if field == "epoch" or field == "wall" or field == "LR":
                 continue
+
             # Everything else should be a loss or a metric
             if builder == IdentityModel:
                 assert np.allclose(
-                    dat[field], 0.0
+                    dat[field][1:], 0.0
                 ), f"Loss/metric `{field}` wasn't all equal to zero for epoch"
             elif builder == ConstFactorModel:
                 # otherwise just check its constant.
