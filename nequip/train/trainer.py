@@ -1035,13 +1035,12 @@ class Trainer:
 
         if self.iepoch == 0:
             self.init_epoch_logger.info(header)
+            self.init_epoch_logger.info(mat_str)
         elif self.iepoch == 1:
             self.epoch_logger.info(header)
 
         if self.iepoch > 0:
             self.epoch_logger.info(mat_str)
-        else:
-            self.init_epoch_logger.info(mat_str)
 
         if self.iepoch > 0:
             self.logger.info("\n\n  Train      " + log_header[TRAIN])
