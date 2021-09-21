@@ -14,6 +14,7 @@ Most recent change on the bottom.
 - Save dataset parameters along with processed data
 - Gradient clipping
 - Arbitrary atom type support
+- Normalize total energy loss by the number of atoms via PerAtomLoss
 
 ### Changed
 - Name processed datasets based on a hash of their parameters to ensure only valid cached data is used

@@ -318,7 +318,7 @@ class DummyNet(GraphModuleMixin, torch.nn.Module):
 
 
 class DummyScale(torch.nn.Module):
-    """ mimic the rescale model"""
+    """mimic the rescale model"""
 
     def __init__(self, key, scale, shift) -> None:
         super().__init__()
