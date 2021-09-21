@@ -127,7 +127,7 @@ def PerSpeciesRescale(
     global_shift = config.get("global_rescale_shift", None)
     scales = config.get(module_prefix + "scales", None)
     shifts = config.get(module_prefix + "shifts", None)
-    trainable = config.get(module_prefix + "trainable", None)
+    trainable = config.get(module_prefix + "trainable", False)
 
     if global_shift is not None:
         raise ValueError("One can only enable either global shift or per_species shift")
