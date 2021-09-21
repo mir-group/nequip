@@ -891,13 +891,15 @@ class Trainer:
                 log_header += f" {key:>12s}"
 
         batch_logger = logging.getLogger(self.batch_log[batch_type])
-        if self.iepoch == -1:
-            batch_logger.info(header)
 
         if self.ibatch == 0:
             self.logger.info("")
             self.logger.info(f"{batch_type}")
             self.logger.info(log_header)
+            if (self.iepoch == -1 and batch_type == VALIDATION) or (
+                self.iepoch == 0 and batch_type == TRAIN
+            ):
+                batch_logger.info(header)
 
         batch_logger.info(mat_str)
         if (self.ibatch + 1) % self.log_batch_freq == 0 or (
