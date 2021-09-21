@@ -94,7 +94,8 @@ def load_file(supported_formats: dict, filename: str, enforced_format: str = Non
         format = enforced_format
 
     if not isfile(filename):
-        raise OSError(f"file {filename} is not found")
+        abs_path = str(Path(filename).resolve())
+        raise OSError(f"file {filename} at {abs_path} is not found")
 
     if format == "json":
         import json

@@ -270,6 +270,9 @@ class Trainer:
 
         self.logfile = output.open_logfile("log", propagate=True)
         self.epoch_log = output.open_logfile("metrics_epoch.csv", propagate=False)
+        self.init_epoch_log = output.open_logfile(
+            "metrics_initialization.csv", propagate=False
+        )
         self.batch_log = {
             TRAIN: output.open_logfile("metrics_batch_train.csv", propagate=False),
             VALIDATION: output.open_logfile("metrics_batch_val.csv", propagate=False),
@@ -403,6 +406,10 @@ class Trainer:
     @property
     def epoch_logger(self):
         return logging.getLogger(self.epoch_log)
+
+    @property
+    def init_epoch_logger(self):
+        return logging.getLogger(self.init_epoch_log)
 
     def as_dict(
         self,
@@ -892,13 +899,15 @@ class Trainer:
                 log_header += f" {key:>12s}"
 
         batch_logger = logging.getLogger(self.batch_log[batch_type])
-        if self.iepoch == -1:
-            batch_logger.info(header)
 
         if self.ibatch == 0:
             self.logger.info("")
             self.logger.info(f"{batch_type}")
             self.logger.info(log_header)
+            if (self.iepoch == -1 and batch_type == VALIDATION) or (
+                self.iepoch == 0 and batch_type == TRAIN
+            ):
+                batch_logger.info(header)
 
         batch_logger.info(mat_str)
         if (self.ibatch + 1) % self.log_batch_freq == 0 or (
@@ -1025,15 +1034,22 @@ class Trainer:
                     log_header[category] += f" {key:>12s}"
                 self.mae_dict[f"{category}_{key}"] = value
 
-        if self.iepoch == -1:
+        if self.iepoch == 0:
+            self.init_epoch_logger.info(header)
+        elif self.iepoch == 1:
             self.epoch_logger.info(header)
-        self.epoch_logger.info(mat_str)
+
+        if self.iepoch > 0:
+            self.epoch_logger.info(mat_str)
+        else:
+            self.init_epoch_logger.info(mat_str)
 
         if self.iepoch > 0:
             self.logger.info("\n\n  Train      " + log_header[TRAIN])
             self.logger.info("! Train      " + log_str[TRAIN])
-        self.logger.info("  Validation " + log_header[VALIDATION])
-        self.logger.info("! Validation " + log_str[VALIDATION])
+            self.logger.info("! Validation " + log_str[VALIDATION])
+        else:
+            self.logger.info("! Initial Validation " + log_str[VALIDATION])
 
     def __del__(self):
 
