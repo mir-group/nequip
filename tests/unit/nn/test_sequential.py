@@ -1,3 +1,4 @@
+import pytest
 import torch
 
 from nequip.data import AtomicDataDict
@@ -40,13 +41,15 @@ def test_append():
     assert out["thing"].shape == out[AtomicDataDict.NODE_FEATURES_KEY].shape
 
 
-def test_insert():
+@pytest.mark.parametrize("mode", {"before", "after"})
+def test_insert(mode):
     sgn = SequentialGraphNetwork.from_parameters(
         shared_params={"num_types": 3},
         layers={"one_hot": OneHotAtomEncoding, "lin2": AtomwiseLinear},
     )
+    keys = {"before": "lin2", "after": "one_hot"}
     sgn.insert_from_parameters(
-        after="one_hot",
+        **{mode: keys[mode]},
         shared_params={"out_field": "thing"},
         name="lin1",
         builder=AtomwiseLinear,
