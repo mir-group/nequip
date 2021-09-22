@@ -120,14 +120,17 @@ def test_metrics(nequip_dataset, BENCHMARK_ROOT, conffile, field, builder):
         env["PYTHONPATH"] = ":".join(
             [str(path_to_this_file.parent)] + env.get("PYTHONPATH", "").split(":")
         )
-        retcode = subprocess.run(
-            ["nequip-train", "conf.yaml"],
-            cwd=tmpdir,
-            env=env,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-        retcode.check_returncode()
+        with open(f"{tmpdir}/screen", "w+") as screen:
+            retcode = subprocess.run(
+                ["nequip-train", "conf.yaml"],
+                cwd=tmpdir,
+                env=env,
+                # stdout=subprocess.PIPE,
+                # stderr=subprocess.PIPE,
+                stdout=screen,
+                stderr=screen,
+            )
+            retcode.check_returncode()
 
         # == Load metrics ==
         outdir = f"{tmpdir}/{true_config['root']}/{true_config['run_name']}/"

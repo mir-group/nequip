@@ -154,12 +154,12 @@ class Metrics:
 
             for param_hash, kwargs in self.kwargs[key].items():
 
-                reduction, params = self.params[key][param_hash]
+                _, params = self.params[key][param_hash]
                 per_species = params["PerSpecies"]
                 per_atom = params["PerAtom"]
 
                 # initialize the internal run_stat base on the error shape
-                if reduction not in self.running_stats[key]:
+                if param_hash not in self.running_stats[key]:
                     self.running_stats[key][param_hash] = self.init_runstat(
                         params=kwargs, error=error
                     )
