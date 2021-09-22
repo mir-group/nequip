@@ -45,7 +45,7 @@ def training_session(request, BENCHMARK_ROOT, conffile):
         # Save time
         run_name = "test_train_" + dtype
         true_config["run_name"] = run_name
-        true_config["root"] = tmpdir
+        true_config["root"] = "./"
         true_config["dataset_file_name"] = str(
             BENCHMARK_ROOT / "aspirin_ccsd-train.npz"
         )
@@ -67,7 +67,7 @@ def training_session(request, BENCHMARK_ROOT, conffile):
             [str(path_to_this_file.parent)] + env.get("PYTHONPATH", "").split(":")
         )
         retcode = subprocess.run(
-            ["nequip-train", str(config_path)], cwd=tmpdir, env=env
+            ["nequip-train", "conf.yaml"], cwd=tmpdir, env=env
         )
         retcode.check_returncode()
 
@@ -77,14 +77,15 @@ def training_session(request, BENCHMARK_ROOT, conffile):
 @pytest.mark.parametrize("do_test_idcs", [True, False])
 @pytest.mark.parametrize("do_metrics", [True, False])
 def test_metrics(training_session, do_test_idcs, do_metrics):
+
     builder, true_config, tmpdir, env = training_session
     # == Run test error ==
     outdir = f"{true_config['root']}/{true_config['run_name']}/"
 
     default_params = {
         "train-dir": outdir,
-        "output": tmpdir + "/out.xyz",
-        "log": tmpdir + "/out.log",
+        "output": "out.xyz",
+        "log": "out.log",
     }
 
     def runit(params: dict):
@@ -119,8 +120,8 @@ def test_metrics(training_session, do_test_idcs, do_metrics):
         # The Aspirin dataset is 1000 frames long
         # Pick some arbitrary number of frames
         test_idcs_arr = torch.randperm(1000)[:257]
-        test_idcs = tmpdir + "/some-test-idcs.pth"
-        torch.save(test_idcs_arr, test_idcs)
+        test_idcs = "some-test-idcs.pth"
+        torch.save(test_idcs_arr, f"{tmpdir}/{test_idcs}")
     else:
         test_idcs = None  # ignore and use default
     default_params["test-indexes"] = test_idcs
@@ -128,8 +129,8 @@ def test_metrics(training_session, do_test_idcs, do_metrics):
     # Metrics
     if do_metrics:
         # Write an explicit metrics file
-        metrics_yaml = tmpdir + "/my-metrics.yaml"
-        with open(metrics_yaml, "w") as f:
+        metrics_yaml = "my-metrics.yaml"
+        with open(f"{tmpdir}/{metrics_yaml}", "w") as f:
             # Write out a fancier metrics file
             # We don't use PerSpecies here since the simple models don't fill ATOM_TYPE_KEY right now
             # ^ TODO!
@@ -173,8 +174,8 @@ def test_metrics(training_session, do_test_idcs, do_metrics):
                 "train-dir": outdir,
                 "batch-size": batch_size,
                 "device": "cpu",
-                "output": tmpdir + f"/{batch_size}.xyz",
-                "log": tmpdir + f"/{batch_size}.log",
+                "output": f"{batch_size}.xyz",
+                "log": f"{batch_size}.log",
             }
         )
         for k, v in metrics.items():
