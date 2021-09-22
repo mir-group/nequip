@@ -66,9 +66,7 @@ def training_session(request, BENCHMARK_ROOT, conffile):
         env["PYTHONPATH"] = ":".join(
             [str(path_to_this_file.parent)] + env.get("PYTHONPATH", "").split(":")
         )
-        retcode = subprocess.run(
-            ["nequip-train", "conf.yaml"], cwd=tmpdir, env=env
-        )
+        retcode = subprocess.run(["nequip-train", "conf.yaml"], cwd=tmpdir, env=env)
         retcode.check_returncode()
 
         yield builder, true_config, tmpdir, env
