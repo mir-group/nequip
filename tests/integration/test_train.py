@@ -102,7 +102,7 @@ def test_metrics(nequip_dataset, BENCHMARK_ROOT, conffile, field, builder):
         # Save time
         run_name = "test_train_" + dtype
         true_config["run_name"] = run_name
-        true_config["root"] = "test_run"
+        true_config["root"] = "./"
         true_config["dataset_file_name"] = str(
             BENCHMARK_ROOT / "aspirin_ccsd-train.npz"
         )
@@ -120,15 +120,17 @@ def test_metrics(nequip_dataset, BENCHMARK_ROOT, conffile, field, builder):
         env["PYTHONPATH"] = ":".join(
             [str(path_to_this_file.parent)] + env.get("PYTHONPATH", "").split(":")
         )
-        screen = open(tmpdir + "/screen", "w+")
-        retcode = subprocess.run(
-            ["nequip-train", "conf.yaml"],
-            cwd=tmpdir,
-            env=env,
-            stdout=screen,
-            stderr=screen,
-        )
-        retcode.check_returncode()
+        with open(f"{tmpdir}/screen", "w+") as screen:
+            retcode = subprocess.run(
+                ["nequip-train", "conf.yaml"],
+                cwd=tmpdir,
+                env=env,
+                # stdout=subprocess.PIPE,
+                # stderr=subprocess.PIPE,
+                stdout=screen,
+                stderr=screen,
+            )
+            retcode.check_returncode()
 
         # == Load metrics ==
         outdir = f"{tmpdir}/{true_config['root']}/{true_config['run_name']}/"
