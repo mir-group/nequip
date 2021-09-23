@@ -31,7 +31,7 @@ setup(
         "ase",
         "tqdm",
         "torch>=1.8",
-        "torch_geometric>=1.7.1",
+        "torch_geometric==1.7.2",
         "e3nn>=0.3.3",
         "pyyaml",
         "contextlib2;python_version<'3.7'",  # backport of nullcontext
