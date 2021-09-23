@@ -17,7 +17,7 @@ NequIP requires:
 
 To install:
 
-* Install [PyTorch Geometric](https://github.com/rusty1s/pytorch_geometric), following [their installation instructions](https://pytorch-geometric.readthedocs.io/en/latest/notes/installation.html) and making sure to install with the correct version of CUDA. (Please note that `torch_geometric>=1.7.1)` is required.)
+* Install [PyTorch Geometric](https://github.com/rusty1s/pytorch_geometric), following [their installation instructions](https://pytorch-geometric.readthedocs.io/en/latest/notes/installation.html) and making sure to install with the correct version of CUDA. Please note that `torch_geometric==1.7.2` is required.
 
 * Install our fork of [`pytorch_ema`](https://github.com/Linux-cpp-lisp/pytorch_ema) for using an Exponential Moving Average on the weights: 
 ```bash
