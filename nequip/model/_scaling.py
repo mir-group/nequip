@@ -1,5 +1,5 @@
 import logging
-from typing import List
+from typing import List, Optional
 
 import torch
 from torch._C import Value
@@ -128,6 +128,7 @@ def PerSpeciesRescale(
     scales = config.get(module_prefix + "scales", None)
     shifts = config.get(module_prefix + "shifts", None)
     trainable = config.get(module_prefix + "trainable", False)
+    kwargs = config.get(module_prefix+"kwargs", {})
 
     if global_shift is not None:
         raise ValueError("One can only enable either global shift or per_species shift")
@@ -156,6 +157,7 @@ def PerSpeciesRescale(
             str_names=str_names,
             dataset=dataset,
             stride=config.dataset_statistics_stride,
+            kwargs=kwargs,
         )
 
         if isinstance(scales, str):
@@ -203,7 +205,7 @@ def PerSpeciesRescale(
     return model
 
 
-def compute_stats(str_names: List[str], dataset, stride: int):
+def compute_stats(str_names: List[str], dataset, stride: int, kwargs:Optional[dict] = {}):
     """return the values of statistics over dataset
     quantity name should be dataset_key_stat, where key can be any key
     that exists in the dataset, stat can be mean, std
@@ -223,6 +225,7 @@ def compute_stats(str_names: List[str], dataset, stride: int):
     ids = []
     tuple_ids = []
     tuple_id_map = {"mean": 0, "std": 1, "rms": 0}
+    input_kwargs = {}
     for name in str_names:
 
         # remove dataset prefix
@@ -255,11 +258,15 @@ def compute_stats(str_names: List[str], dataset, stride: int):
             stat_strs += [stat_str]
             stat_modes += [stat_mode]
             stat_fields += [field]
+            if stat_mode.startswith("per_species"):
+                if field in kwargs:
+                    input_kwargs[field+stat_mode] = kwargs[field]
         tuple_ids += [tuple_id_map[stat]]
 
     values = dataset.statistics(
         fields=stat_fields,
         modes=stat_modes,
         stride=stride,
+        kwargs=input_kwargs,
     )
     return [values[idx][tuple_ids[i]] for i, idx in enumerate(ids)]

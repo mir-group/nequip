@@ -225,18 +225,18 @@ lr_scheduler_factor: 0.5
 # the deafult is to scale the energies and forces by scaling them by the force standard deviation and to shift the energy by its mean
 # in certain cases, it can be useful to have a trainable shift/scale and to also have species-dependent shifts/scales for each atom
 
-# whether to apply a shift and scale, defined per-species, to the atomic energies
-PerSpeciesScaleShift_enable: false
-# if the PerSpeciesScaleShift is enabled, whether the shifts and scales are trainable
+# if the PerSpeciesScaleShift is enabled in the model builder list
+# whether the shifts and scales are trainable
 PerSpeciesScaleShift_trainable: true
 # optional initial atomic energy shift for each species. in order of type. Defaults to zeros. 
-# Another option is to use "dataset_per_species_energy_mean", which automatically compute the per atom energy mean
+# Another option is to use "dataset_per_species_total_energy_mean", which automatically compute the per atom energy mean
 # but ^ this mode is not compatible with global_shift = "dataset_energy_mean"
-PerSpeciesScaleShift_shifts: [0.0, 0.0, 0.0]
+PerSpeciesScaleShift_shifts: 0.0
 # optional initial atomic energy scale for each species. in order of type. Defaults to ones.
-# Another option is to use "dataset_per_species_energy_std", which automatically compute the per atom energy mean
+# Another option is to use "dataset_per_species_total_energy_std", which automatically compute the per atom energy mean
+# Another option is to use "dataset_per_species_forces_rms", which automatically compute the force rms for each species
 # but ^ this mode is not compatible with global_shift = "dataset_energy_mean"
-PerSpeciesScaleShift_scales: [1.0, 1.0, 1.0]
+PerSpeciesScaleShift_scales: 1.0
 
 # global energy shift. When "dataset_total_energy_mean" (the default), the mean energy of the dataset. When None, disables the global shift. When a number, used directly.
 global_rescale_shift: dataset_total_energy_mean
@@ -251,9 +251,11 @@ trainable_global_rescale_scale: false
 # # example block to do good per species shifting
 # # note, sigma needs to be tuned 4.0 works the best for aspirin dataset.
 # PerSpeciesScaleShift_trainable: true
-# PerSpeciesScaleShift_shifts: dataset_per_species_energy_mean
-# PerSpeciesScaleShift_scales: dataset_per_species_energy_std
-# PerSpeciesScaleShift_sigma: 4.0
+# PerSpeciesScaleShift_shifts: dataset_per_species_total_energy_mean
+# PerSpeciesScaleShift_scales: dataset_per_species_total_energy_std
+# PerSpeciesScaleShift_kwargs: 
+#   total_energy: 
+#     alpha: 4.0
 # global_rescale_shift: null
 # global_rescale_scale: dataset_force_rms
 # PerSpeciesScaleShift_enable: true
