@@ -2,11 +2,9 @@ import logging
 from typing import List
 
 import torch
-from torch._C import Value
 
-from nequip.nn import RescaleOutput, GraphModuleMixin, PerSpeciesScaleShift
+from nequip.nn import RescaleOutput, GraphModuleMixin
 from nequip.data import AtomicDataDict, AtomicDataset
-from ._grads import ForceOutput
 
 
 def RescaleEnergyEtc(
