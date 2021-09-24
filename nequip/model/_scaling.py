@@ -193,7 +193,7 @@ def PerSpeciesRescale(
         # Put dummy values
         scales = None
         shifts = None
-    
+
     # insert in per species shift
     model.insert_from_parameters(
         before="total_energy_sum",
