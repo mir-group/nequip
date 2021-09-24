@@ -3,7 +3,7 @@ import torch
 
 @torch.jit.script
 def _poly_cutoff(x: torch.Tensor, factor: float) -> torch.Tensor:
-    p: int = 6
+    p: float = 6.0
     x = x * factor
 
     out = 1.0
