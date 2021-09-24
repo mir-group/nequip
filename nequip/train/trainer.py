@@ -40,6 +40,7 @@ from nequip.utils import (
     save_file,
     load_file,
     atomic_write,
+    dtype_from_name,
 )
 from nequip.model import model_from_config
 
@@ -617,6 +618,7 @@ class Trainer:
         model_name = str(model_name)
 
         config = Config.from_file(traindir + "/config.yaml")
+
         if config.get("compile_model", False):
             model = torch.jit.load(traindir + "/" + model_name, map_location=device)
         else:
@@ -625,7 +627,9 @@ class Trainer:
                 initialize=False,
             )
             if model is not None:
-                model.to(device)
+                # TODO: this is not exactly equivalent to building with
+                # this set as default dtype... does it matter?
+                model.to(device=device, dtype=dtype_from_name(config.default_dtype))
                 model_state_dict = torch.load(
                     traindir + "/" + model_name, map_location=device
                 )

@@ -50,6 +50,7 @@ def trainer():
     """
     Generate a class instance with minimal configurations
     """
+    minimal_config["default_dtype"] = str(torch.get_default_dtype())[len("torch.") :]
     model = model_from_config(minimal_config)
     with tempfile.TemporaryDirectory(prefix="output") as path:
         minimal_config["root"] = path
