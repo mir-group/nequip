@@ -124,14 +124,28 @@ def PerSpeciesRescale(
         if force_training
         else f"dataset_{AtomicDataDict.TOTAL_ENERGY_KEY}_std",
     )
-    global_shift = config.get("global_rescale_shift", None)
+
+    # TODO: how to make the default consistent with rescale?
+    global_shift = config.get(
+        "global_rescale_shift", f"dataset_{AtomicDataDict.TOTAL_ENERGY_KEY}_mean"
+    )
     scales = config.get(module_prefix + "scales", None)
     shifts = config.get(module_prefix + "shifts", None)
     trainable = config.get(module_prefix + "trainable", False)
-    kwargs = config.get(module_prefix+"kwargs", {})
+    kwargs = config.get(module_prefix + "kwargs", {})
 
     if global_shift is not None:
-        raise ValueError("One can only enable either global shift or per_species shift")
+        if trainable or not (scales is None and shifts is None):
+            logging.warning(
+                f"!!!! Careful global_shift is set to {global_shift}."
+                f"This is not a good set up with per species shifts: {shifts}"
+                f"and scales: {scales} that are trainable={trainable}"
+            )
+    if not trainable:
+        if scales is None and shifts is None:
+            return model
+        elif scales == 1.0 and shifts == 0.0:
+            return model
 
     logging.info(f"Enable per species scale/shift")
 
@@ -179,12 +193,9 @@ def PerSpeciesRescale(
         # Put dummy values
         scales = None
         shifts = None
-
-    # first peel off the gradient part
-    model_func = model.func if force_training else model
-
+    
     # insert in per species shift
-    model_func.insert_from_parameters(
+    model.insert_from_parameters(
         before="total_energy_sum",
         name="per_species_scale_shift",
         shared_params=config,
@@ -205,7 +216,9 @@ def PerSpeciesRescale(
     return model
 
 
-def compute_stats(str_names: List[str], dataset, stride: int, kwargs:Optional[dict] = {}):
+def compute_stats(
+    str_names: List[str], dataset, stride: int, kwargs: Optional[dict] = {}
+):
     """return the values of statistics over dataset
     quantity name should be dataset_key_stat, where key can be any key
     that exists in the dataset, stat can be mean, std
@@ -258,9 +271,9 @@ def compute_stats(str_names: List[str], dataset, stride: int, kwargs:Optional[di
             stat_strs += [stat_str]
             stat_modes += [stat_mode]
             stat_fields += [field]
-            if stat_mode.startswith("per_species"):
+            if stat_mode.startswith("per_species_"):
                 if field in kwargs:
-                    input_kwargs[field+stat_mode] = kwargs[field]
+                    input_kwargs[field + stat_mode] = kwargs[field]
         tuple_ids += [tuple_id_map[stat]]
 
     values = dataset.statistics(
