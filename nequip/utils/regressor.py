@@ -14,6 +14,7 @@ def gp(X, y, alpha, max_iteration: int = 20):
     mean = None
     std = None
     while not_fit:
+        logging.debug("GP fitting iteration", iteration, alpha)
         try:
             kernel = DotProduct(sigma_0=0, sigma_0_bounds="fixed")
             gpr = GaussianProcessRegressor(kernel=kernel, random_state=0, alpha=alpha)
@@ -40,9 +41,14 @@ def gp(X, y, alpha, max_iteration: int = 20):
             not_fit = False
 
         except Exception as e:
-            logging.info(f"GP fitting failed for {e.args}")
+            logging.info(f"GP fitting failed for alpha={alpha} and {e.args}")
             if alpha == 0 or alpha is None:
+                logging.info(f"try a None zero alpha")
                 not_fit = False
+                raise ValueError(
+                    f"Please set the {alpha} to none zero value. \n"
+                    "The dataset energy is rank deficient to be solved with GP"
+                )
             else:
                 alpha = alpha * 2
                 iteration += 1
