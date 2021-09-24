@@ -1,9 +1,3 @@
-"""
-Dataset classes that parse array of positions, cells to AtomicData object
-
-This module requre the torch_geometric to catch up with the github main branch from Jan. 18, 2021
-
-"""
 import numpy as np
 import logging
 import tempfile

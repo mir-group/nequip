@@ -26,7 +26,6 @@ else:
 
 import numpy as np
 import e3nn
-import torch_geometric
 import torch
 from torch_ema import ExponentialMovingAverage
 
@@ -460,7 +459,7 @@ class Trainer:
             if hasattr(self, "config_save_path"):
                 dictionary["progress"]["config_save_path"] = self.config_save_path
 
-        for code in [e3nn, nequip, torch, torch_geometric]:
+        for code in [e3nn, nequip, torch]:
             dictionary[f"{code.__name__}_version"] = code.__version__
 
         return dictionary
@@ -540,7 +539,7 @@ class Trainer:
 
         d = deepcopy(dictionary)
 
-        for code in [e3nn, nequip, torch, torch_geometric]:
+        for code in [e3nn, nequip, torch]:
             version = d.get(f"{code.__name__}_version", None)
             if version is not None and version != code.__version__:
                 logging.warning(

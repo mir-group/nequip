@@ -77,8 +77,7 @@ class TypeMapper:
                 self.chemical_symbol_to_type is not None
             ), "Atomic numbers provided but there is no chemical_symbol_to_type mapping!"
             atomic_numbers = data[AtomicDataDict.ATOMIC_NUMBERS_KEY]
-            # TODO: torch_geometric data doesn't support `del` yet
-            delattr(data, AtomicDataDict.ATOMIC_NUMBERS_KEY)
+            del data[AtomicDataDict.ATOMIC_NUMBERS_KEY]
 
             data[AtomicDataDict.ATOM_TYPE_KEY] = self.transform(atomic_numbers)
         else:
