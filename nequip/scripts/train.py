@@ -21,7 +21,7 @@ from nequip.utils import load_file, dtype_from_name
 
 default_config = dict(
     root="./",
-    runname="NequIP",
+    run_name="NequIP",
     wandb=False,
     wandb_project="NequIP",
     compile_model=False,
