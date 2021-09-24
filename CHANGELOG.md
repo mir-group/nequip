@@ -18,6 +18,7 @@ Most recent change on the bottom.
 - Added `nequip-benchmark` script for benchmarking and profiling models
 - Add before option to SequentialGraphNetwork.insert
 - Normalize total energy loss by the number of atoms via PerAtomLoss
+- Model builder to initialize training from previous checkpoint
 
 ### Changed
 - Name processed datasets based on a hash of their parameters to ensure only valid cached data is used
