@@ -3,7 +3,7 @@ import copy
 
 import numpy as np
 import torch
-from torch_geometric.data import Batch
+from nequip.utils.torch_geometric import Batch
 
 import ase.build
 import ase.geometry

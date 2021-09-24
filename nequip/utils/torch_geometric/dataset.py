@@ -5,19 +5,15 @@ import copy
 import warnings
 import numpy as np
 import os.path as osp
-import os
 from collections.abc import Sequence
 
 import torch.utils.data
 from torch import Tensor
 
 from .data import Data
+from .utils import makedirs
 
 IndexType = Union[slice, Tensor, np.ndarray, Sequence]
-
-
-def makedirs(dir):
-    os.makedirs(dir, exist_ok=True)
 
 
 class Dataset(torch.utils.data.Dataset):

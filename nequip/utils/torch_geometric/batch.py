@@ -6,12 +6,8 @@ import torch
 import numpy as np
 from torch import Tensor
 
-# from torch_sparse import SparseTensor, cat
-
 from .data import Data
 from .dataset import IndexType
-
-# from torch_geometric.data.dataset import IndexType
 
 
 class Batch(Data):

@@ -3,13 +3,7 @@ import copy
 import collections
 
 import torch
-import torch_geometric
 from torch_sparse import coalesce, SparseTensor
-from torch_geometric.utils import (
-    contains_isolated_nodes,
-    contains_self_loops,
-    is_undirected,
-)
 
 # from ..utils.num_nodes import maybe_num_nodes
 
@@ -113,9 +107,6 @@ class Data(object):
                 )
             )
 
-        if torch_geometric.is_debug_enabled():
-            self.debug()
-
     @classmethod
     def from_dict(cls, dictionary):
         r"""Creates a data object from a python dictionary."""
@@ -123,9 +114,6 @@ class Data(object):
 
         for key, item in dictionary.items():
             data[key] = item
-
-        if torch_geometric.is_debug_enabled():
-            data.debug()
 
         return data
 
@@ -306,22 +294,6 @@ class Data(object):
             self.edge_index, self.edge_attr, self.num_nodes, self.num_nodes
         )
         return self
-
-    def contains_isolated_nodes(self):
-        r"""Returns :obj:`True`, if the graph contains isolated nodes."""
-        return contains_isolated_nodes(self.edge_index, self.num_nodes)
-
-    def contains_self_loops(self):
-        """Returns :obj:`True`, if the graph contains self-loops."""
-        return contains_self_loops(self.edge_index)
-
-    def is_undirected(self):
-        r"""Returns :obj:`True`, if graph edges are undirected."""
-        return is_undirected(self.edge_index, self.edge_attr, self.num_nodes)
-
-    def is_directed(self):
-        r"""Returns :obj:`True`, if graph edges are directed."""
-        return not self.is_undirected()
 
     def __apply__(self, item, func):
         if torch.is_tensor(item):
