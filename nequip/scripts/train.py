@@ -179,7 +179,7 @@ def fresh_start(config):
     # Set the trainer
     trainer.model = final_model
 
-    # Train
+    # Store any updated config information in the trainer
     trainer.update_kwargs(config)
 
     return trainer
