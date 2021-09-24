@@ -81,14 +81,6 @@ class TypeMapper:
             delattr(data, AtomicDataDict.ATOMIC_NUMBERS_KEY)
 
             data[AtomicDataDict.ATOM_TYPE_KEY] = self.transform(atomic_numbers)
-
-            if data[AtomicDataDict.ATOM_TYPE_KEY].min() < 0:
-                bad_set = (
-                    set(torch.unique(atomic_numbers).cpu().tolist()) - self._valid_set
-                )
-                raise ValueError(
-                    f"Data included atomic numbers {bad_set} that are not part of the atomic number -> type mapping!"
-                )
         else:
             raise KeyError(
                 "Data doesn't contain any atom type information (ATOM_TYPE_KEY or ATOMIC_NUMBERS_KEY)"
