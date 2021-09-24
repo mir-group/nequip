@@ -46,7 +46,7 @@ def RescaleEnergyEtc(
                 raise ValueError(f"Invalid global scale `{value}`")
 
         # = Compute shifts and scales =
-        computed_stats = compute_stats(
+        computed_stats = _compute_stats(
             str_names=str_names,
             dataset=dataset,
             stride=config.dataset_statistics_stride,
@@ -103,7 +103,7 @@ def RescaleEnergyEtc(
     )
 
 
-def compute_stats(str_names: List[str], dataset, stride: int):
+def _compute_stats(str_names: List[str], dataset, stride: int):
     """return the values of statistics over dataset
     quantity name should be dataset_key_stat, where key can be any key
     that exists in the dataset, stat can be mean, std
