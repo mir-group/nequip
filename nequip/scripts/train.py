@@ -44,7 +44,7 @@ default_config = dict(
 
 def main(args=None):
 
-    config, update_config = parse_command_line(args)
+    config = parse_command_line(args)
 
     found_restart_file = isdir(f"{config.root}/{config.run_name}")
     if found_restart_file and not config.append:
@@ -57,7 +57,7 @@ def main(args=None):
     if not found_restart_file:
         trainer = fresh_start(config)
     else:
-        trainer = restart(config, update_config)
+        trainer = restart(config)
 
     # Train
     trainer.save()
@@ -84,24 +84,13 @@ def parse_command_line(args=None):
         help="enable PyTorch autograd anomaly mode to debug NaN gradients. Do not use for production training!",
         action="store_true",
     )
-    parser.add_argument(
-        "--update_config",
-        help="overwrite the original values in the yaml file",
-        type=str,
-        default=None,
-    )
     args = parser.parse_args(args=args)
 
     config = Config.from_file(args.config, defaults=default_config)
     for flag in ("model_debug_mode", "equivariance_test", "grad_anomaly_mode"):
         config[flag] = getattr(args, flag) or config[flag]
 
-    if args.update_config is not None:
-        update_config = Config.from_file(args.update_config, defaults={})
-    else:
-        update_config = {}
-
-    return config, update_config
+    return config
 
 
 def _set_global_options(config):
@@ -148,6 +137,7 @@ def fresh_start(config):
         trainer = Trainer(model=None, **dict(config))
 
     # what is this
+    # to update wandb data?
     config.update(trainer.params)
 
     # = Load the dataset =
@@ -195,7 +185,7 @@ def fresh_start(config):
     return trainer
 
 
-def restart(config, update_config):
+def restart(config):
 
     # load the dictionary
     restart_file = f"{config.root}/{config.run_name}/trainer.pth"
@@ -204,7 +194,6 @@ def restart(config, update_config):
         filename=restart_file,
         enforced_format="torch",
     )
-    dictionary.update(update_config)
 
     # compare dictionary to config
     # recursive loop, if same type but different value

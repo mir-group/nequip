@@ -30,6 +30,7 @@ Most recent change on the bottom.
 
 ### Removed
 - Removed `allowed_species`
+- Removed `--update-config`; start a new training and load old state instead
 
 ## [0.3.3] - 2021-08-11
 ### Added
