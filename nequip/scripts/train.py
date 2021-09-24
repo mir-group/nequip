@@ -17,7 +17,7 @@ from nequip.model import model_from_config
 from nequip.utils import Config
 from nequip.data import dataset_from_config
 from nequip.utils.test import assert_AtomicData_equivariant, set_irreps_debug
-from nequip.utils import load_file
+from nequip.utils import load_file, dtype_from_name
 
 default_config = dict(
     root="./",
@@ -120,9 +120,7 @@ def _set_global_options(config):
 
     if config.model_debug_mode:
         set_irreps_debug(enabled=True)
-    torch.set_default_dtype(
-        {"float32": torch.float32, "float64": torch.float64}[config.default_dtype]
-    )
+    torch.set_default_dtype(dtype_from_name(config.default_dtype))
     if config.grad_anomaly_mode:
         torch.autograd.set_detect_anomaly(True)
 
