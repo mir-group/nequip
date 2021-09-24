@@ -10,10 +10,13 @@ import torch
 import nequip
 from nequip.data import AtomicDataDict, AtomicData
 from nequip.scripts import deploy
+from nequip.train import Trainer
 
 
-def test_deploy(nequip_dataset, BENCHMARK_ROOT):
-
+@pytest.mark.parametrize(
+    "device", ["cpu"] + (["cuda"] if torch.cuda.is_available() else [])
+)
+def test_deploy(nequip_dataset, BENCHMARK_ROOT, device):
     dtype = str(torch.get_default_dtype())[len("torch.") :]
 
     # if torch.cuda.is_available():
@@ -25,8 +28,9 @@ def test_deploy(nequip_dataset, BENCHMARK_ROOT):
     with tempfile.TemporaryDirectory() as tmpdir:
         # Save time
         run_name = "test_deploy" + dtype
+        root = "./"
         true_config["run_name"] = run_name
-        true_config["root"] = tmpdir
+        true_config["root"] = root
         true_config["dataset_file_name"] = str(
             BENCHMARK_ROOT / "aspirin_ccsd-train.npz"
         )
@@ -34,24 +38,30 @@ def test_deploy(nequip_dataset, BENCHMARK_ROOT):
         true_config["max_epochs"] = 1
         true_config["n_train"] = 1
         true_config["n_val"] = 1
-        config_path = tmpdir + "/conf.yaml"
-        with open(config_path, "w+") as fp:
+        config_path = "conf.yaml"
+        with open(f"{tmpdir}/{config_path}", "w+") as fp:
             yaml.dump(true_config, fp)
         # Train model
         retcode = subprocess.run(["nequip-train", str(config_path)], cwd=tmpdir)
         retcode.check_returncode()
         # Deploy
-        deployed_path = tmpdir / pathlib.Path(f"deployed_{dtype}.pth")
+        deployed_path = pathlib.Path(f"deployed_{dtype}.pth")
         retcode = subprocess.run(
-            ["nequip-deploy", "build", f"{tmpdir}/{run_name}/", str(deployed_path)],
+            ["nequip-deploy", "build", f"{root}/{run_name}/", str(deployed_path)],
             cwd=tmpdir,
         )
         retcode.check_returncode()
+        deployed_path = tmpdir / deployed_path
         assert deployed_path.is_file(), "Deploy didn't create file"
 
         # now test predictions the same
-        best_mod = torch.load(f"{tmpdir}/{run_name}/best_model.pth")
-        device = next(best_mod.parameters()).device
+        best_mod, _ = Trainer.load_model_from_training_session(
+            traindir=f"{tmpdir}/{root}/{run_name}/",
+            model_name="best_model.pth",
+            device=device,
+        )
+        best_mod.eval()
+
         data = AtomicData.to_AtomicDataDict(nequip_dataset[0].to(device))
         # Needed because of debug mode:
         data[AtomicDataDict.TOTAL_ENERGY_KEY] = data[

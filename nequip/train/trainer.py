@@ -14,7 +14,8 @@ import yaml
 from copy import deepcopy
 from os.path import isfile
 from time import perf_counter, gmtime, strftime
-from typing import Optional, Union
+from typing import Callable, Optional, Union, Tuple
+from pathlib import Path
 
 
 if sys.version_info[1] >= 7:
@@ -33,12 +34,15 @@ import nequip
 from nequip.data import DataLoader, AtomicData, AtomicDataDict, AtomicDataset
 from nequip.utils import (
     Output,
+    Config,
     instantiate_from_cls_name,
     instantiate,
     save_file,
     load_file,
     atomic_write,
+    dtype_from_name,
 )
+from nequip.model import model_from_config
 
 from .loss import Loss, LossStat
 from .metrics import Metrics
@@ -131,23 +135,14 @@ class Trainer:
 
         seed (int): random see number
 
-        run_name (str): run name.
-        root (str): the name of root dir to make work folders
-        timestr (optional, str): unique string to differentiate this trainer from others.
-
-        restart (bool) : If true, the init_model function will not be callsed. Default: False
-        append (bool): If true, the preexisted workfolder and files will be overwritten. And log files will be appended
-
         loss_coeffs (dict): dictionary to store coefficient and loss functions
 
         max_epochs (int): maximum number of epochs
 
-        lr_sched (optional): scheduler
         learning_rate (float): initial learning rate
         lr_scheduler_name (str): scheduler name
         lr_scheduler_kwargs (dict): parameters to initialize the scheduler
 
-        optim (): optimizer
         optimizer_name (str): name for optimizer
         optim_kwargs (dict): parameters to initialize the optimizer
 
@@ -176,10 +171,8 @@ class Trainer:
 
     Additional Attributes:
 
-        init_params (list): list of parameters needed to reconstruct this instance
+        init_keys (list): list of parameters needed to reconstruct this instance
         device : torch device
-        optim: optimizer
-        lr_sched: scheduler
         dl_train (DataLoader): training data
         dl_val (DataLoader): test data
         iepoch (int): # of epoches ran
@@ -213,29 +206,26 @@ class Trainer:
     ```
     """
 
+    stop_keys = ["max_epochs", "early_stopping", "early_stopping_kwargs"]
+    object_keys = ["lr_sched", "optim", "ema", "early_stopping_conds"]
     lr_scheduler_module = torch.optim.lr_scheduler
     optim_module = torch.optim
 
     def __init__(
         self,
         model,
-        run_name: Optional[str] = None,
-        root: Optional[str] = None,
-        timestr: Optional[str] = None,
+        model_builders: Optional[list] = [],
         seed: Optional[int] = None,
-        restart: bool = False,
-        append: bool = True,
         loss_coeffs: Union[dict, str] = AtomicDataDict.TOTAL_ENERGY_KEY,
         metrics_components: Optional[Union[dict, str]] = None,
         metrics_key: str = ABBREV.get(LOSS_KEY, LOSS_KEY),
-        early_stopping: Optional[EarlyStopping] = None,
+        early_stopping_conds: Optional[EarlyStopping] = None,
+        early_stopping: Optional[Callable] = None,
         early_stopping_kwargs: Optional[dict] = None,
         max_epochs: int = 1000000,
-        lr_sched=None,
         learning_rate: float = 1e-2,
         lr_scheduler_name: str = "none",
         lr_scheduler_kwargs: Optional[dict] = None,
-        optim=None,
         optimizer_name: str = "Adam",
         optimizer_kwargs: Optional[dict] = None,
         max_gradient_norm: float = float("inf"),
@@ -267,29 +257,23 @@ class Trainer:
         logging.debug("* Initialize Trainer")
 
         # store all init arguments
-        self.root = root
         self.model = model
-        self.optim = optim
-        self.lr_sched = lr_sched
 
         _local_kwargs = {}
-        for key in self.init_params:
+        for key in self.init_keys:
             setattr(self, key, locals()[key])
             _local_kwargs[key] = locals()[key]
 
-        if self.use_ema:
-            self.ema = None
+        self.ema = None
 
-        output = Output.get_output(timestr, dict(**_local_kwargs, **kwargs))
+        output = Output.get_output(dict(**_local_kwargs, **kwargs))
         self.output = output
 
-        # timestr run_name root workdir logfile
-        for key, value in output.updated_dict().items():
-            setattr(self, key, value)
-
-        if self.logfile is None:
-            self.logfile = output.open_logfile("log", propagate=True)
+        self.logfile = output.open_logfile("log", propagate=True)
         self.epoch_log = output.open_logfile("metrics_epoch.csv", propagate=False)
+        self.init_epoch_log = output.open_logfile(
+            "metrics_initialization.csv", propagate=False
+        )
         self.batch_log = {
             TRAIN: output.open_logfile("metrics_batch_train.csv", propagate=False),
             VALIDATION: output.open_logfile("metrics_batch_val.csv", propagate=False),
@@ -299,8 +283,9 @@ class Trainer:
         self.best_model_path = output.generate_file("best_model.pth")
         self.last_model_path = output.generate_file("last_model.pth")
         self.trainer_save_path = output.generate_file("trainer.pth")
+        self.config_path = self.output.generate_file("config.yaml")
 
-        if not (seed is None or self.restart):
+        if seed is not None:
             torch.manual_seed(seed)
             np.random.seed(seed)
 
@@ -314,36 +299,106 @@ class Trainer:
         self.lr_scheduler_kwargs = deepcopy(lr_scheduler_kwargs)
         self.early_stopping_kwargs = deepcopy(early_stopping_kwargs)
 
-        # initialize the optimizer and scheduler, the params will be updated in the function
+        # initialize training states
+        self.best_val_metrics = float("inf")
+        self.best_epoch = 0
+        self.iepoch = -1
+
         self.init()
 
-        if not (restart and append):
+    def init_objects(self):
+        # initialize optimizer
+        self.optim, self.optimizer_kwargs = instantiate_from_cls_name(
+            module=torch.optim,
+            class_name=self.optimizer_name,
+            prefix="optimizer",
+            positional_args=dict(params=self.model.parameters(), lr=self.learning_rate),
+            all_args=self.kwargs,
+            optional_args=self.optimizer_kwargs,
+        )
 
-            d = self.as_dict()
-            for key in list(d.keys()):
-                if not isinstance(d[key], (float, int, str, list, tuple)):
-                    d[key] = repr(d[key])
+        self.max_gradient_norm = (
+            float(self.max_gradient_norm)
+            if self.max_gradient_norm is not None
+            else float("inf")
+        )
 
-            d["start_time"] = strftime("%a, %d %b %Y %H:%M:%S", gmtime())
+        # initialize scheduler
+        assert (
+            self.lr_scheduler_name
+            in ["CosineAnnealingWarmRestarts", "ReduceLROnPlateau", "none"]
+        ) or (
+            (len(self.end_of_epoch_callbacks) + len(self.end_of_batch_callbacks)) > 0
+        ), f"{self.lr_scheduler_name} cannot be used unless callback functions are defined"
+        self.lr_sched = None
+        self.lr_scheduler_kwargs = {}
+        if self.lr_scheduler_name != "none":
+            self.lr_sched, self.lr_scheduler_kwargs = instantiate_from_cls_name(
+                module=torch.optim.lr_scheduler,
+                class_name=self.lr_scheduler_name,
+                prefix="lr_scheduler",
+                positional_args=dict(optimizer=self.optim),
+                optional_args=self.lr_scheduler_kwargs,
+                all_args=self.kwargs,
+            )
 
-            self.log_dictionary(d, name="Initialization")
+        # initialize early stopping conditions
+        key_mapping, kwargs = instantiate(
+            EarlyStopping,
+            prefix="early_stopping",
+            optional_args=self.early_stopping_kwargs,
+            all_args=self.kwargs,
+            return_args_only=True,
+        )
+        n_args = 0
+        for key, item in kwargs.items():
+            # prepand VALIDATION string if k is not with
+            if isinstance(item, dict):
+                new_dict = {}
+                for k, v in item.items():
+                    if (
+                        k.startswith(VALIDATION)
+                        or k.startswith(TRAIN)
+                        or k in ["LR", "wall"]
+                    ):
+                        new_dict[k] = item[k]
+                    else:
+                        new_dict[f"{VALIDATION}_{k}"] = item[k]
+                kwargs[key] = new_dict
+                n_args += len(new_dict)
+        self.early_stopping_conds = EarlyStopping(**kwargs) if n_args > 0 else None
 
-        logging.debug("! Done Initialize Trainer")
+        if self.use_ema and self.ema is None:
+            self.ema = ExponentialMovingAverage(
+                self.model.parameters(),
+                decay=self.ema_decay,
+                use_num_updates=self.ema_use_num_updates,
+            )
+
+        self.loss, _ = instantiate(
+            builder=Loss,
+            prefix="loss",
+            positional_args=dict(coeffs=self.loss_coeffs),
+            all_args=self.kwargs,
+        )
+        self.loss_stat = LossStat(self.loss)
 
     @property
-    def init_params(self):
-        d = inspect.signature(Trainer.__init__)
-        names = list(d.parameters.keys())
-        for key in [
-            "model",
-            "optim",
-            "lr_sched",
-            "self",
-            "kwargs",
-        ]:
-            if key in names:
-                names.remove(key)
-        return names
+    def init_keys(self):
+        return [
+            key
+            for key in list(inspect.signature(Trainer.__init__).parameters.keys())
+            if key not in (["self", "kwargs", "model"] + Trainer.object_keys)
+        ]
+
+    @property
+    def params(self):
+        return self.as_dict(state_dict=False, training_progress=False, kwargs=False)
+
+    def update_kwargs(self, config):
+        self.kwargs.update(
+            {key: value for key, value in config.items() if key not in self.init_keys}
+        )
 
     @property
     def logger(self):
@@ -353,7 +408,16 @@ class Trainer:
     def epoch_logger(self):
         return logging.getLogger(self.epoch_log)
 
-    def as_dict(self, state_dict: bool = False, training_progress: bool = False):
+    @property
+    def init_epoch_logger(self):
+        return logging.getLogger(self.init_epoch_log)
+
+    def as_dict(
+        self,
+        state_dict: bool = False,
+        training_progress: bool = False,
+        kwargs: bool = True,
+    ):
         """convert instance to a dictionary
         Args:
 
@@ -362,31 +426,23 @@ class Trainer:
 
         dictionary = {}
 
-        for key in self.init_params:
+        for key in self.init_keys:
             dictionary[key] = getattr(self, key, None)
-        dictionary.update(getattr(self, "kwargs", {}))
+
+        if kwargs:
+            dictionary.update(getattr(self, "kwargs", {}))
 
         if state_dict:
             dictionary["state_dict"] = {}
-            dictionary["state_dict"]["optim"] = self.optim.state_dict()
-            if self.lr_sched is not None:
-                dictionary["state_dict"]["lr_sched"] = self.lr_sched.state_dict()
+            for key in Trainer.object_keys:
+                item = getattr(self, key, None)
+                if item is not None:
+                    dictionary["state_dict"][key] = item.state_dict()
             dictionary["state_dict"]["rng_state"] = torch.get_rng_state()
             if torch.cuda.is_available():
                 dictionary["state_dict"]["cuda_rng_state"] = torch.cuda.get_rng_state(
                     device=self.device
                 )
-            if self.use_ema:
-                dictionary["state_dict"]["ema_state"] = self.ema.state_dict()
-            if self.early_stopping is not None:
-                dictionary["state_dict"][
-                    "early_stopping"
-                ] = self.early_stopping.state_dict()
-
-        if hasattr(self.model, "save") and not issubclass(
-            type(self.model), torch.jit.ScriptModule
-        ):
-            dictionary["model_class"] = type(self.model)
 
         if training_progress:
             dictionary["progress"] = {}
@@ -401,13 +457,23 @@ class Trainer:
             dictionary["progress"]["best_model_path"] = self.best_model_path
             dictionary["progress"]["last_model_path"] = self.last_model_path
             dictionary["progress"]["trainer_save_path"] = self.trainer_save_path
+            if hasattr(self, "config_save_path"):
+                dictionary["progress"]["config_save_path"] = self.config_save_path
 
         for code in [e3nn, nequip, torch, torch_geometric]:
             dictionary[f"{code.__name__}_version"] = code.__version__
 
         return dictionary
 
-    def save(self, filename, format=None):
+    def save_config(self) -> None:
+        save_file(
+            item=self.as_dict(state_dict=False, training_progress=False),
+            supported_formats=dict(yaml=["yaml"]),
+            filename=self.config_path,
+            enforced_format=None,
+        )
+
+    def save(self, filename: Optional[str] = None, format=None):
         """save the file as filename
 
         Args:
@@ -415,6 +481,9 @@ class Trainer:
         filename (str): name of the file
         format (str): format of the file. yaml and json format will not save the weights.
         """
+
+        if filename is None:
+            filename = self.trainer_save_path
 
         logger = self.logger
 
@@ -434,6 +503,7 @@ class Trainer:
         )
         logger.debug(f"Saved trainer to {filename}")
 
+        self.save_config()
         self.save_model(self.last_model_path)
         logger.debug(f"Saved last model to to {self.last_model_path}")
 
@@ -480,16 +550,11 @@ class Trainer:
                 )
 
         # update the restart and append option
-        d["restart"] = True
         if append is not None:
             d["append"] = append
 
-        # update the file and folder name
-        output = Output.from_config(d)
-        d.update(output.updated_dict())
-
         model = None
-        iepoch = 0
+        iepoch = -1
         if "model" in d:
             model = d.pop("model")
         elif "progress" in d:
@@ -498,18 +563,14 @@ class Trainer:
             # load the model from file
             iepoch = progress["iepoch"]
             if isfile(progress["last_model_path"]):
-                load_path = progress["last_model_path"]
+                load_path = Path(progress["last_model_path"])
                 iepoch = progress["iepoch"]
             else:
                 raise AttributeError("model weights & bias are not saved")
 
-            if "model_class" in d:
-                model = d["model_class"].load(load_path)
-            else:
-                if dictionary.get("compile_model", False):
-                    model = torch.jit.load(load_path)
-                else:
-                    model = torch.load(load_path)
+            model, _ = Trainer.load_model_from_training_session(
+                traindir=load_path.parent, model_name=load_path.name
+            )
             logging.debug(f"Reload the model from {load_path}")
 
             d.pop("progress")
@@ -520,20 +581,15 @@ class Trainer:
 
         if state_dict is not None and trainer.model is not None:
             logging.debug("Reload optimizer and scheduler states")
-            trainer.optim.load_state_dict(state_dict["optim"])
-
-            if trainer.lr_sched is not None:
-                trainer.lr_sched.load_state_dict(state_dict["lr_sched"])
-
-            if trainer.early_stopping is not None:
-                trainer.early_stopping.load_state_dict(state_dict["early_stopping"])
+            for key in Trainer.object_keys:
+                item = getattr(trainer, key, None)
+                if item is not None:
+                    item.load_state_dict(state_dict[key])
+            trainer._initialized = True
 
             torch.set_rng_state(state_dict["rng_state"])
             if torch.cuda.is_available():
                 torch.cuda.set_rng_state(state_dict["cuda_rng_state"])
-
-            if trainer.use_ema:
-                trainer.ema.load_state_dict(state_dict["ema_state"])
 
         if "progress" in d:
             trainer.best_val_metrics = progress["best_val_metrics"]
@@ -554,92 +610,41 @@ class Trainer:
 
         return trainer
 
+    @staticmethod
+    def load_model_from_training_session(
+        traindir, model_name="best_model.pth", device="cpu"
+    ) -> Tuple[torch.nn.Module, Config]:
+        traindir = str(traindir)
+        model_name = str(model_name)
+
+        config = Config.from_file(traindir + "/config.yaml")
+
+        if config.get("compile_model", False):
+            model = torch.jit.load(traindir + "/" + model_name, map_location=device)
+        else:
+            model = model_from_config(
+                config=config,
+                initialize=False,
+            )
+            if model is not None:
+                # TODO: this is not exactly equivalent to building with
+                # this set as default dtype... does it matter?
+                model.to(device=device, dtype=dtype_from_name(config.default_dtype))
+                model_state_dict = torch.load(
+                    traindir + "/" + model_name, map_location=device
+                )
+                model.load_state_dict(model_state_dict)
+        return model, config
+
     def init(self):
         """initialize optimizer"""
         if self.model is None:
             return
 
         self.model.to(self.device)
+        self.init_objects()
 
-        if self.optim is None:
-            self.optim, self.optimizer_kwargs = instantiate_from_cls_name(
-                module=torch.optim,
-                class_name=self.optimizer_name,
-                prefix="optimizer",
-                positional_args=dict(
-                    params=self.model.parameters(), lr=self.learning_rate
-                ),
-                all_args=self.kwargs,
-                optional_args=self.optimizer_kwargs,
-            )
-
-            self.max_gradient_norm = (
-                float(self.max_gradient_norm)
-                if self.max_gradient_norm is not None
-                else float("inf")
-            )
-
-        if self.use_ema and self.ema is None:
-            self.ema = ExponentialMovingAverage(
-                self.model.parameters(),
-                decay=self.ema_decay,
-                use_num_updates=self.ema_use_num_updates,
-            )
-
-        if self.lr_sched is None:
-            assert (
-                self.lr_scheduler_name
-                in ["CosineAnnealingWarmRestarts", "ReduceLROnPlateau", "none"]
-            ) or (
-                (len(self.end_of_epoch_callbacks) + len(self.end_of_batch_callbacks))
-                > 0
-            ), f"{self.lr_scheduler_name} cannot be used unless callback functions are defined"
-            self.lr_sched = None
-            self.lr_scheduler_kwargs = {}
-            if self.lr_scheduler_name != "none":
-                self.lr_sched, self.lr_scheduler_kwargs = instantiate_from_cls_name(
-                    module=torch.optim.lr_scheduler,
-                    class_name=self.lr_scheduler_name,
-                    prefix="lr_scheduler",
-                    positional_args=dict(optimizer=self.optim),
-                    optional_args=self.lr_scheduler_kwargs,
-                    all_args=self.kwargs,
-                )
-
-        self.loss, _ = instantiate(
-            builder=Loss,
-            prefix="loss",
-            positional_args=dict(coeffs=self.loss_coeffs),
-            all_args=self.kwargs,
-        )
-        self.loss_stat = LossStat(self.loss)
         self._initialized = True
-
-        if self.early_stopping is None:
-            key_mapping, kwargs = instantiate(
-                EarlyStopping,
-                prefix="early_stopping",
-                optional_args=self.early_stopping_kwargs,
-                all_args=self.kwargs,
-                return_args_only=True,
-            )
-            n_args = 0
-            for key, item in kwargs.items():
-                # prepand VALIDATION string if k is not with
-                if isinstance(item, dict):
-                    new_dict = {}
-                    for k, v in item.items():
-                        if (
-                            k.startswith(VALIDATION)
-                            or k.startswith(TRAIN)
-                            or k in ["LR", "wall"]
-                        ):
-                            new_dict[k] = item[k]
-                        else:
-                            new_dict[f"{VALIDATION}_{k}"] = item[k]
-                    kwargs[key] = new_dict
-                    n_args += len(new_dict)
-            self.early_stopping = EarlyStopping(**kwargs) if n_args > 0 else None
 
     def init_metrics(self):
         if self.metrics_components is None:
@@ -664,23 +669,28 @@ class Trainer:
         ):
             self.metrics_key = f"{VALIDATION}_{self.metrics_key}"
 
-    def init_model(self):
-        logger = self.logger
-        logger.info(
-            "Number of weights: {}".format(
-                sum(p.numel() for p in self.model.parameters())
-            )
-        )
-
     def train(self):
+
         """Training"""
         if getattr(self, "dl_train", None) is None:
             raise RuntimeError("You must call `set_dataset()` before calling `train()`")
         if not self._initialized:
             self.init()
+            self.logger.info(
+                "Number of weights: {}".format(
+                    sum(p.numel() for p in self.model.parameters())
+                )
+            )
 
-        if not self.restart:
-            self.init_model()
+        if self.iepoch == -1:
+            d = self.as_dict()
+            for key in list(d.keys()):
+                if not isinstance(d[key], (float, int, str, list, tuple)):
+                    d[key] = repr(d[key])
+
+            d["start_time"] = strftime("%a, %d %b %Y %H:%M:%S", gmtime())
+
+            self.log_dictionary(d, name="Initialization")
 
         for callback in self.init_callbacks:
             callback(self)
@@ -688,10 +698,8 @@ class Trainer:
         self.init_log()
         self.wall = perf_counter()
 
-        if not self.restart:
-            self.best_val_metrics = float("inf")
-            self.best_epoch = 0
-            self.iepoch = 0
+        if self.iepoch == -1:
+            self.save()
 
         self.init_metrics()
 
@@ -705,7 +713,7 @@ class Trainer:
 
         self.final_log()
 
-        self.save(self.trainer_save_path)
+        self.save()
 
     def batch_step(self, data, validation=False):
         # no need to have gradients from old steps taking up memory
@@ -788,8 +796,10 @@ class Trainer:
     def stop_cond(self):
         """kill the training early"""
 
-        if self.early_stopping is not None and hasattr(self, "mae_dict"):
-            early_stop, early_stop_args, debug_args = self.early_stopping(self.mae_dict)
+        if self.early_stopping_conds is not None and hasattr(self, "mae_dict"):
+            early_stop, early_stop_args, debug_args = self.early_stopping_conds(
+                self.mae_dict
+            )
             if debug_args is not None:
                 self.logger.debug(debug_args)
             if early_stop:
@@ -811,7 +821,7 @@ class Trainer:
     def epoch_step(self):
 
         datasets = [self.dl_train, self.dl_val]
-        categories = [TRAIN, VALIDATION]
+        categories = [TRAIN, VALIDATION] if self.iepoch >= 0 else [VALIDATION]
         self.metrics_dict = {}
         self.loss_dict = {}
 
@@ -892,14 +902,15 @@ class Trainer:
                 log_header += f" {key:>12s}"
 
         batch_logger = logging.getLogger(self.batch_log[batch_type])
-        if not self.batch_header_print[batch_type]:
-            self.batch_header_print[batch_type] = True
-            batch_logger.info(header)
 
         if self.ibatch == 0:
             self.logger.info("")
             self.logger.info(f"{batch_type}")
             self.logger.info(log_header)
+            if (self.iepoch == -1 and batch_type == VALIDATION) or (
+                self.iepoch == 0 and batch_type == TRAIN
+            ):
+                batch_logger.info(header)
 
         batch_logger.info(mat_str)
         if (self.ibatch + 1) % self.log_batch_freq == 0 or (
@@ -924,7 +935,7 @@ class Trainer:
             )
 
         if (self.iepoch + 1) % self.log_epoch_freq == 0:
-            self.save(self.trainer_save_path)
+            self.save()
 
         if (
             self.save_checkpoint_freq > 0
@@ -955,21 +966,18 @@ class Trainer:
             self.save_model(path)
 
     def save_model(self, path):
-
+        self.save_config()
         with atomic_write(path) as write_to:
-            if hasattr(self.model, "save"):
-                self.model.save(write_to)
+            if isinstance(self.model, torch.jit.ScriptModule):
+                torch.jit.save(self.model, write_to)
             else:
-                torch.save(self.model, write_to)
+                torch.save(self.model.state_dict(), write_to)
 
     def init_log(self):
-
-        if self.restart:
+        if self.iepoch > 0:
             self.logger.info("! Restarting training ...")
         else:
             self.logger.info("! Starting training ...")
-        self.epoch_header_print = False
-        self.batch_header_print = {TRAIN: False, VALIDATION: False}
 
     def final_log(self):
 
@@ -992,7 +1000,7 @@ class Trainer:
 
         header = "epoch, wall, LR"
 
-        categories = [TRAIN, VALIDATION]
+        categories = [TRAIN, VALIDATION] if self.iepoch > 0 else [VALIDATION]
         log_header = {}
         log_str = {}
 
@@ -1029,28 +1037,32 @@ class Trainer:
                     log_header[category] += f" {key:>12s}"
                 self.mae_dict[f"{category}_{key}"] = value
 
-        if not self.epoch_header_print:
+        if self.iepoch == 0:
+            self.init_epoch_logger.info(header)
+            self.init_epoch_logger.info(mat_str)
+        elif self.iepoch == 1:
             self.epoch_logger.info(header)
-            self.epoch_header_print = True
-        self.epoch_logger.info(mat_str)
 
-        self.logger.info("\n\n  Train      " + log_header[TRAIN])
-        self.logger.info("! Train      " + log_str[TRAIN])
-        self.logger.info("  Validation " + log_header[VALIDATION])
-        self.logger.info("! Validation " + log_str[VALIDATION])
+        if self.iepoch > 0:
+            self.epoch_logger.info(mat_str)
+
+        if self.iepoch > 0:
+            self.logger.info("\n\n  Train      " + log_header[TRAIN])
+            self.logger.info("! Train      " + log_str[TRAIN])
+            self.logger.info("! Validation " + log_str[VALIDATION])
+        else:
+            self.logger.info("! Initial Validation " + log_str[VALIDATION])
 
     def __del__(self):
 
-        if not self.append:
+        logger = self.logger
+        for hdl in logger.handlers:
+            hdl.flush()
+            hdl.close()
+        logger.handlers = []
 
-            logger = self.logger
-            for hdl in logger.handlers:
-                hdl.flush()
-                hdl.close()
-            logger.handlers = []
-
-            for i in range(len(logger.handlers)):
-                logger.handlers.pop()
+        for i in range(len(logger.handlers)):
+            logger.handlers.pop()
 
     def set_dataset(
         self,

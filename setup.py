@@ -20,9 +20,8 @@ setup(
         # make the scripts available as command line scripts
         "console_scripts": [
             "nequip-train = nequip.scripts.train:main",
-            "nequip-restart = nequip.scripts.restart:main",
-            "nequip-requeue = nequip.scripts.requeue:main",
             "nequip-evaluate = nequip.scripts.evaluate:main",
+            "nequip-benchmark = nequip.scripts.benchmark:main",
             "nequip-deploy = nequip.scripts.deploy:main",
         ]
     },
@@ -31,7 +30,7 @@ setup(
         "ase",
         "tqdm",
         "torch>=1.8",
-        "torch_geometric>=1.7.1",
+        "torch_geometric==1.7.2",
         "e3nn>=0.3.3",
         "pyyaml",
         "contextlib2;python_version<'3.7'",  # backport of nullcontext

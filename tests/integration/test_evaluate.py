@@ -8,6 +8,8 @@ import textwrap
 import shutil
 
 import numpy as np
+import ase.io
+
 import torch
 
 from nequip.data import AtomicDataDict
@@ -43,13 +45,13 @@ def training_session(request, BENCHMARK_ROOT, conffile):
         # Save time
         run_name = "test_train_" + dtype
         true_config["run_name"] = run_name
-        true_config["root"] = tmpdir
+        true_config["root"] = "./"
         true_config["dataset_file_name"] = str(
             BENCHMARK_ROOT / "aspirin_ccsd-train.npz"
         )
         true_config["default_dtype"] = dtype
         true_config["max_epochs"] = 2
-        true_config["model_builder"] = builder
+        true_config["model_builders"] = [builder]
 
         # to be a true identity, we can't have rescaling
         true_config["global_rescale_shift"] = None
@@ -64,9 +66,7 @@ def training_session(request, BENCHMARK_ROOT, conffile):
         env["PYTHONPATH"] = ":".join(
             [str(path_to_this_file.parent)] + env.get("PYTHONPATH", "").split(":")
         )
-        retcode = subprocess.run(
-            ["nequip-train", str(config_path)], cwd=tmpdir, env=env
-        )
+        retcode = subprocess.run(["nequip-train", "conf.yaml"], cwd=tmpdir, env=env)
         retcode.check_returncode()
 
         yield builder, true_config, tmpdir, env
@@ -75,14 +75,15 @@ def training_session(request, BENCHMARK_ROOT, conffile):
 @pytest.mark.parametrize("do_test_idcs", [True, False])
 @pytest.mark.parametrize("do_metrics", [True, False])
 def test_metrics(training_session, do_test_idcs, do_metrics):
+
     builder, true_config, tmpdir, env = training_session
     # == Run test error ==
     outdir = f"{true_config['root']}/{true_config['run_name']}/"
 
     default_params = {
         "train-dir": outdir,
-        "output": tmpdir + "/out.xyz",
-        "log": tmpdir + "/out.log",
+        "output": "out.xyz",
+        "log": "out.log",
     }
 
     def runit(params: dict):
@@ -99,6 +100,7 @@ def test_metrics(training_session, do_test_idcs, do_metrics):
             cwd=tmpdir,
             env=env,
             stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
         )
         retcode.check_returncode()
 
@@ -117,8 +119,8 @@ def test_metrics(training_session, do_test_idcs, do_metrics):
         # The Aspirin dataset is 1000 frames long
         # Pick some arbitrary number of frames
         test_idcs_arr = torch.randperm(1000)[:257]
-        test_idcs = tmpdir + "/some-test-idcs.pth"
-        torch.save(test_idcs_arr, test_idcs)
+        test_idcs = "some-test-idcs.pth"
+        torch.save(test_idcs_arr, f"{tmpdir}/{test_idcs}")
     else:
         test_idcs = None  # ignore and use default
     default_params["test-indexes"] = test_idcs
@@ -126,8 +128,8 @@ def test_metrics(training_session, do_test_idcs, do_metrics):
     # Metrics
     if do_metrics:
         # Write an explicit metrics file
-        metrics_yaml = tmpdir + "/my-metrics.yaml"
-        with open(metrics_yaml, "w") as f:
+        metrics_yaml = "my-metrics.yaml"
+        with open(f"{tmpdir}/{metrics_yaml}", "w") as f:
             # Write out a fancier metrics file
             # We don't use PerSpecies here since the simple models don't fill ATOM_TYPE_KEY right now
             # ^ TODO!
@@ -152,6 +154,8 @@ def test_metrics(training_session, do_test_idcs, do_metrics):
     metrics = runit({"train-dir": outdir, "batch-size": 200, "device": "cpu"})
     # move out.xyz to out-orig.xyz
     shutil.move(tmpdir + "/out.xyz", tmpdir + "/out-orig.xyz")
+    # Load it
+    orig_atoms = ase.io.read(tmpdir + "/out-orig.xyz", index=":", format="extxyz")
 
     assert set(metrics.keys()) == expect_metrics
 
@@ -169,27 +173,22 @@ def test_metrics(training_session, do_test_idcs, do_metrics):
                 "train-dir": outdir,
                 "batch-size": batch_size,
                 "device": "cpu",
-                "output": tmpdir + f"/{batch_size}.xyz",
-                "log": tmpdir + f"/{batch_size}.log",
+                "output": f"{batch_size}.xyz",
+                "log": f"{batch_size}.log",
             }
         )
         for k, v in metrics.items():
             assert np.all(np.abs(v - metrics2[k]) < 1e-5)
-        # Diff the output XYZ, which shouldn't change at all
-        # Use `cmp`, which is UNIX standard, to make efficient
-        # See https://stackoverflow.com/questions/12900538/fastest-way-to-tell-if-two-files-have-the-same-contents-in-unix-linux
-        cmp_retval = subprocess.run(
-            ["cmp", "--silent", tmpdir + "/out-orig.xyz", tmpdir + f"/{batch_size}.xyz"]
-        )
-        if cmp_retval.returncode == 0:
-            # same
-            pass
-        if cmp_retval.returncode == 1:
-            raise AssertionError(
-                f"Changing batch size to {batch_size} changed out.xyz!"
+
+        # Check the output XYZ
+        batch_atoms = ase.io.read(tmpdir + "/out-orig.xyz", index=":", format="extxyz")
+        for origframe, newframe in zip(orig_atoms, batch_atoms):
+            assert np.allclose(origframe.get_positions(), newframe.get_positions())
+            assert np.array_equal(
+                origframe.get_atomic_numbers(), newframe.get_atomic_numbers()
             )
-        else:
-            cmp_retval.check_returncode()  # error out for subprocess problem
+            assert np.array_equal(origframe.get_pbc(), newframe.get_pbc())
+            assert np.array_equal(origframe.get_cell(), newframe.get_cell())
 
     # Check GPU
     if torch.cuda.is_available():

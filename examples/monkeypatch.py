@@ -9,8 +9,8 @@ from typing import Optional
 
 import torch
 
-from nequip.utils import Config, dataset_from_config
-from nequip.data import AtomicDataDict, AtomicData
+from nequip.utils import Config, find_first_of_type
+from nequip.data import AtomicDataDict, AtomicData, dataset_from_config
 from nequip.nn import SequentialGraphNetwork, SaveForOutput
 
 # The path to the original training session
@@ -18,19 +18,6 @@ path = "../results/aspirin/minimal"
 
 # Load the model
 model = torch.load(path + "/best_model.pth")
-
-
-# Define helper function:
-def find_first_of_type(m: torch.nn.Module, kls) -> Optional[torch.nn.Module]:
-    """Find the first module of a given type in a module tree."""
-    if isinstance(m, kls):
-        return m
-    else:
-        for child in m.children():
-            tmp = find_first_of_type(child, kls)
-            if tmp is not None:
-                return tmp
-    return None
 
 
 # Find the SequentialGraphNetwork, which contains the
@@ -57,7 +44,7 @@ sgn.insert_from_parameters(
 
 # Now, we can test our patched model:
 # Load the original config file --- this could be a new one too:
-config = Config.from_file(path + "/config_final.yaml")
+config = Config.from_file(path + "/config.yaml")
 # Load the dataset:
 # (Note that this loads the training dataset if there are separate training and validation datasets defined.)
 dataset = dataset_from_config(config)

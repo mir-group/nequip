@@ -20,7 +20,7 @@ configs_to_test = [dict(), minimal_config]
 
 class TestInit:
     def test_empty_init(self, root):
-        output = Output(root=root)
+        output = Output(root=root, run_name="test")
         print(output.root)
         print(output.workdir)
         assert isdir(output.root)
@@ -36,9 +36,8 @@ class TestProject:
 
 
 class TestReload:
-    @pytest.mark.parametrize("restart", [True, False])
     @pytest.mark.parametrize("append", [True, False])
-    def test_restart(self, restart, append):
+    def test_restart(self, append):
         pass
 
 

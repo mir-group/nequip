@@ -4,7 +4,8 @@ run_name: minimal_eng
 seed: 0
 
 # network
-model_builder: nequip.models.EnergyModel
+model_builders:
+  - nequip.models.EnergyModel
 num_basis: 8
 r_max: 4.0
 irreps_edge_sh: 0e + 1o

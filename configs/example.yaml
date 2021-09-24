@@ -8,7 +8,6 @@
 root: results/aspirin
 run_name: example-run
 seed: 0                                                                           # random number seed for numpy and torch
-restart: false                                                                    # set True for a restarted run
 append: false                                                                     # set True if a restarted run should append to the previous log file
 default_dtype: float32                                                            # type of float to use, e.g. float32 and float64
 

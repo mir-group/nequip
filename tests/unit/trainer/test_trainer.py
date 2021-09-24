@@ -10,16 +10,23 @@ from os.path import isfile
 import torch
 from torch.nn import Linear
 
+from nequip.model import model_from_config
 from nequip.data import AtomicDataDict
 from nequip.train.trainer import Trainer
 from nequip.utils.savenload import load_file
 from nequip.nn import GraphModuleMixin
+
+
+def dummy_builder():
+    return DummyNet(3)
+
 
 # set up two config to test
 DEBUG = False
 NATOMS = 3
 NFRAMES = 10
 minimal_config = dict(
+    run_name="test",
     n_train=4,
     n_val=4,
     exclude_keys=["sth"],
@@ -28,29 +35,26 @@ minimal_config = dict(
     learning_rate=1e-2,
     optimizer="Adam",
     seed=0,
-    restart=False,
+    append=False,
     T_0=50,
     T_mult=2,
     loss_coeffs={"forces": 2},
     early_stopping_patiences={"loss": 50},
     early_stopping_lower_bounds={"LR": 1e-10},
+    model_builders=[dummy_builder],
 )
-configs_to_test = [dict(), minimal_config]
-loop_config = pytest.mark.parametrize("trainer", configs_to_test, indirect=True)
-one_config_test = pytest.mark.parametrize("trainer", [minimal_config], indirect=True)
 
 
 @pytest.fixture(scope="class")
-def trainer(request):
+def trainer():
     """
     Generate a class instance with minimal configurations
     """
-    params = request.param
-
-    model = DummyNet(3)
+    minimal_config["default_dtype"] = str(torch.get_default_dtype())[len("torch.") :]
+    model = model_from_config(minimal_config)
     with tempfile.TemporaryDirectory(prefix="output") as path:
-        params["root"] = path
-        c = Trainer(model=model, **params)
+        minimal_config["root"] = path
+        c = Trainer(model=model, **minimal_config)
         yield c
 
 
@@ -59,37 +63,27 @@ class TestTrainerSetUp:
     test initialization
     """
 
-    @one_config_test
     def test_init(self, trainer):
         assert isinstance(trainer, Trainer)
 
 
 class TestDuplicateError:
     def test_duplicate_id_2(self, temp_data):
+        """
+        check whether the Output class can automatically
+        insert timestr when a workdir has pre-existed
+        """
 
         minimal_config["root"] = temp_data
 
         model = DummyNet(3)
         c1 = Trainer(model=model, **minimal_config)
-        logfile1 = c1.logfile
 
-        c2 = Trainer(model=model, **minimal_config)
-        logfile2 = c2.logfile
-
-        assert c1.root == c2.root
-        assert c1.workdir != c2.workdir
-        assert c1.logfile.endswith("log")
-        assert c2.logfile.endswith("log")
-
-
-class TestInit:
-    @one_config_test
-    def test_init_model(self, trainer):
-        trainer.init_model()
+        with pytest.raises(RuntimeError):
+            c2 = Trainer(model=model, **minimal_config)
 
 
 class TestSaveLoad:
-    @loop_config
     @pytest.mark.parametrize("state_dict", [True, False])
     @pytest.mark.parametrize("training_progress", [True, False])
     def test_as_dict(self, trainer, state_dict, training_progress):
@@ -103,7 +97,6 @@ class TestSaveLoad:
         assert training_progress == ("progress" in dictionary)
         assert len(dictionary["optimizer_kwargs"]) > 1
 
-    @loop_config
     @pytest.mark.parametrize("format, suffix", [("torch", "pth"), ("yaml", "yaml")])
     def test_save(self, trainer, format, suffix):
 
@@ -113,8 +106,7 @@ class TestSaveLoad:
             assert isfile(file_name), "fail to save to file"
             assert suffix in file_name
 
-    @loop_config
-    @pytest.mark.parametrize("append", [True, False])
+    @pytest.mark.parametrize("append", [True])  # , False])
     def test_from_dict(self, trainer, append):
 
         # torch.save(trainer.model, trainer.best_model_path)
@@ -132,11 +124,9 @@ class TestSaveLoad:
         ]:
             v1 = getattr(trainer, key, None)
             v2 = getattr(trainer1, key, None)
-            print(key, v1, v2)
             assert append == (v1 == v2)
 
-    @loop_config
-    @pytest.mark.parametrize("append", [True, False])
+    @pytest.mark.parametrize("append", [True])  # , False])
     def test_from_file(self, trainer, append):
 
         format = "torch"
@@ -160,7 +150,6 @@ class TestSaveLoad:
             ]:
                 v1 = getattr(trainer, key, None)
                 v2 = getattr(trainer1, key, None)
-                print(key, v1, v2)
                 assert append == (v1 == v2)
 
             for iparam, group1 in enumerate(trainer.optim.param_groups):
@@ -174,7 +163,6 @@ class TestSaveLoad:
 
 
 class TestData:
-    @one_config_test
     @pytest.mark.parametrize("mode", ["random", "sequential"])
     def test_split(self, trainer, nequip_dataset, mode):
 
@@ -185,7 +173,6 @@ class TestData:
 
 
 class TestTrain:
-    @one_config_test
     def test_train(self, trainer, nequip_dataset):
 
         v0 = get_param(trainer.model)
@@ -196,7 +183,6 @@ class TestTrain:
         assert not np.allclose(v0, v1), "fail to train parameters"
         assert isfile(trainer.last_model_path), "fail to save best model"
 
-    @one_config_test
     def test_load_w_revision(self, trainer):
 
         with tempfile.TemporaryDirectory() as folder:
@@ -216,7 +202,6 @@ class TestTrain:
             assert trainer1.iepoch == trainer.iepoch
             assert trainer1.max_epochs == minimal_config["max_epochs"] * 2
 
-    @one_config_test
     def test_restart_training(self, trainer, nequip_dataset):
 
         model = trainer.model
@@ -360,6 +345,7 @@ def scale_train(nequip_dataset):
             batch_size=2,
             loss_coeffs=AtomicDataDict.FORCE_KEY,
             root=path,
+            run_name="test_scale",
         )
         trainer.set_dataset(nequip_dataset)
         trainer.train()

@@ -9,7 +9,6 @@
 root: results/aspirin
 run_name: example-run-full
 seed: 0                                                                           # random number seed for numpy and torch
-restart: false                                                                    # set True for a restarted run
 append: false                                                                     # set True if a restarted run should append to the previous log file
 default_dtype: float32                                                            # type of float to use, e.g. float32 and float64
 allow_tf32: True                                                                  # whether to use TensorFloat32 if it is available
@@ -234,10 +233,10 @@ PerSpeciesScaleShift_shifts: [0.0, 0.0, 0.0]
 # optional initial atomic energy scale for each species. in order of type. Defaults to ones.
 PerSpeciesScaleShift_scales: [1.0, 1.0, 1.0]
 
-# global energy shift. When "dataset_energy_mean" (the default), the mean energy of the dataset. When None, disables the global shift. When a number, used directly.
-global_rescale_shift: dataset_energy_mean
-# global energy scale. When "dataset_force_rms", the RMS of force components in the dataset. When "dataset_energy_std", the stdev of energies in the dataset. When None, disables the global scale. When a number, used directly.
-# If not provided, defaults to either dataset_force_rms or dataset_energy_std, depending on whether forces are being trained.
+# global energy shift. When "dataset_total_energy_mean" (the default), the mean energy of the dataset. When None, disables the global shift. When a number, used directly.
+global_rescale_shift: dataset_total_energy_mean
+# global energy scale. When "dataset_force_rms", the RMS of force components in the dataset. When "dataset_total_energy_std", the stdev of energies in the dataset. When None, disables the global scale. When a number, used directly.
+# If not provided, defaults to either dataset_force_rms or dataset_total_energy_std, depending on whether forces are being trained.
 global_rescale_scale: dataset_force_rms
 # whether the shift of the final global energy rescaling should be trainable
 trainable_global_rescale_shift: false

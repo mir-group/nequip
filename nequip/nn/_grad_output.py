@@ -97,21 +97,3 @@ class GradientOutput(GraphModuleMixin, torch.nn.Module):
             data[k].requires_grad_(req_grad)
 
         return data
-
-
-def ForceOutput(energy_model: GraphModuleMixin) -> GradientOutput:
-    r"""Convinience constructor for ``GradientOutput`` with settings for forces.
-
-    Args:
-        energy_model: the model to wrap. Must have ``AtomicDataDict.TOTAL_ENERGY_KEY`` as an output.
-
-    Returns:
-        A ``GradientOutput`` wrapping ``energy_model``.
-    """
-    return GradientOutput(
-        func=energy_model,
-        of=AtomicDataDict.TOTAL_ENERGY_KEY,
-        wrt=AtomicDataDict.POSITIONS_KEY,
-        out_field=AtomicDataDict.FORCE_KEY,
-        sign=-1,  # force is the negative gradient
-    )

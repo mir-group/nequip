@@ -22,7 +22,7 @@ import ase.data
 from e3nn.util.jit import script
 
 import nequip
-from nequip.nn import GraphModuleMixin
+from nequip.train import Trainer
 
 CONFIG_KEY: Final[str] = "config"
 NEQUIP_VERSION_KEY: Final[str] = "nequip_version"
@@ -37,6 +37,15 @@ _ALL_METADATA_KEYS = [
     N_SPECIES_KEY,
     TYPE_NAMES_KEY,
 ]
+
+
+def _compile_for_deploy(model):
+    model.eval()
+
+    if not isinstance(model, torch.jit.ScriptModule):
+        model = script(model)
+
+    return torch.jit.freeze(model)
 
 
 def load_deployed_model(
@@ -126,35 +135,16 @@ def main(args=None):
                 f"{args.out_dir} is a directory, but a path to a file for the deployed model must be given"
             )
         # -- load model --
-        model_is_jit = False
-        model_path = args.train_dir / "best_model.pth"
-        try:
-            model = torch.jit.load(model_path, map_location=torch.device("cpu"))
-            model_is_jit = True
-            logging.info("Loaded TorchScript model")
-        except RuntimeError:
-            # ^ jit.load throws this when it can't find TorchScript files
-            model = torch.load(model_path, map_location=torch.device("cpu"))
-            if not isinstance(model, GraphModuleMixin):
-                raise TypeError(
-                    "Model contained object that wasn't a NequIP model (nequip.nn.GraphModuleMixin)"
-                )
-            logging.info("Loaded pickled model")
-        model = model.to(device=torch.device("cpu"))
+        model, _ = Trainer.load_model_from_training_session(
+            args.train_dir, model_name="best_model.pth", device="cpu"
+        )
 
         # -- compile --
-        if not model_is_jit:
-            model = script(model)
-            logging.info("Compiled model to TorchScript")
-
-        model.eval()  # just to be sure
-
-        model = torch.jit.freeze(model)
-        logging.info("Froze TorchScript model")
+        model = _compile_for_deploy(model)
+        logging.info("Compiled & optimized model.")
 
         # load config
-        # TODO: walk module tree if config does not exist to find params?
-        config_str = (args.train_dir / "config_final.yaml").read_text()
+        config_str = (args.train_dir / "config.yaml").read_text()
         config = yaml.load(config_str, Loader=yaml.Loader)
 
         # Deploy

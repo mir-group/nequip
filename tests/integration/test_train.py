@@ -19,7 +19,7 @@ class IdentityModel(GraphModuleMixin, torch.nn.Module):
             irreps_in={
                 AtomicDataDict.TOTAL_ENERGY_KEY: "0e",
                 AtomicDataDict.FORCE_KEY: "1o",
-            }
+            },
         )
         self.one = torch.nn.Parameter(torch.as_tensor(1.0))
 
@@ -38,7 +38,7 @@ class ConstFactorModel(GraphModuleMixin, torch.nn.Module):
             irreps_in={
                 AtomicDataDict.TOTAL_ENERGY_KEY: "0e",
                 AtomicDataDict.FORCE_KEY: "1o",
-            }
+            },
         )
         # to keep the optimizer happy:
         self.dummy = torch.nn.Parameter(torch.zeros(1))
@@ -61,7 +61,7 @@ class LearningFactorModel(GraphModuleMixin, torch.nn.Module):
             irreps_in={
                 AtomicDataDict.TOTAL_ENERGY_KEY: "0e",
                 AtomicDataDict.FORCE_KEY: "1o",
-            }
+            },
         )
         # By using a big factor, we keep it in a nice descending part
         # of the optimization without too much oscilation in loss at
@@ -97,21 +97,19 @@ def test_metrics(nequip_dataset, BENCHMARK_ROOT, conffile, field, builder):
     path_to_this_file = pathlib.Path(__file__)
     config_path = path_to_this_file.parents[2] / f"configs/{conffile}"
     true_config = yaml.load(config_path.read_text(), Loader=yaml.Loader)
+
     with tempfile.TemporaryDirectory() as tmpdir:
         # Save time
         run_name = "test_train_" + dtype
         true_config["run_name"] = run_name
-        true_config["root"] = tmpdir
+        true_config["root"] = "./"
         true_config["dataset_file_name"] = str(
             BENCHMARK_ROOT / "aspirin_ccsd-train.npz"
         )
         true_config["default_dtype"] = dtype
         true_config["max_epochs"] = 2
-        true_config["model_builder"] = builder
-
-        # to be a true identity, we can't have rescaling
-        true_config["global_rescale_shift"] = None
-        true_config["global_rescale_scale"] = None
+        # We just don't add rescaling:
+        true_config["model_builders"] = [builder]
 
         config_path = tmpdir + "/conf.yaml"
         with open(config_path, "w+") as fp:
@@ -122,16 +120,24 @@ def test_metrics(nequip_dataset, BENCHMARK_ROOT, conffile, field, builder):
         env["PYTHONPATH"] = ":".join(
             [str(path_to_this_file.parent)] + env.get("PYTHONPATH", "").split(":")
         )
-        retcode = subprocess.run(
-            ["nequip-train", str(config_path)], cwd=tmpdir, env=env
-        )
-        retcode.check_returncode()
+        with open(f"{tmpdir}/screen", "w+") as screen:
+            retcode = subprocess.run(
+                ["nequip-train", "conf.yaml"],
+                cwd=tmpdir,
+                env=env,
+                # stdout=subprocess.PIPE,
+                # stderr=subprocess.PIPE,
+                stdout=screen,
+                stderr=screen,
+            )
+            retcode.check_returncode()
 
         # == Load metrics ==
-        outdir = f"{true_config['root']}/{true_config['run_name']}/"
+        outdir = f"{tmpdir}/{true_config['root']}/{true_config['run_name']}/"
 
         if builder == IdentityModel or builder == LearningFactorModel:
             for which in ("train", "val"):
+
                 dat = np.genfromtxt(
                     f"{outdir}/metrics_batch_{which}.csv",
                     delimiter=",",
@@ -161,10 +167,11 @@ def test_metrics(nequip_dataset, BENCHMARK_ROOT, conffile, field, builder):
         for field in dat.dtype.names:
             if field == "epoch" or field == "wall" or field == "LR":
                 continue
+
             # Everything else should be a loss or a metric
             if builder == IdentityModel:
                 assert np.allclose(
-                    dat[field], 0.0
+                    dat[field][1:], 0.0
                 ), f"Loss/metric `{field}` wasn't all equal to zero for epoch"
             elif builder == ConstFactorModel:
                 # otherwise just check its constant.
@@ -179,12 +186,9 @@ def test_metrics(nequip_dataset, BENCHMARK_ROOT, conffile, field, builder):
 
         # == Check model ==
         model = torch.load(outdir + "/last_model.pth")
-        assert isinstance(
-            model, RescaleOutput
-        )  # make sure trainer and this test aren't out of sync
 
         if builder == IdentityModel:
-            one = model.model.one
+            one = model["one"]
             # Since the loss is always zero, even though the constant
             # 1 was trainable, it shouldn't have changed
             assert torch.allclose(
