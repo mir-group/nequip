@@ -51,9 +51,9 @@ def main(args=None):
     )
     parser.add_argument(
         "--timestep",
-        help="MD timestep for ns/day esimation, in fs. Defauts to 2fs.",
+        help="MD timestep for ns/day esimation, in fs. Defauts to 1fs.",
         type=float,
-        default=2,
+        default=1,
     )
 
     # TODO: option to profile
@@ -170,7 +170,7 @@ def main(args=None):
             f"    \\_ this comes out to {per_atom_time/time_scale_per:g} {time_unit_per}/atom/call"
         )
         ns_day = (86400.0 / trim_time) * args.timestep * 1e-6
-        #     day in s^   step/s^       ^ 2fs / step      ^ fs / ns
+        #     day in s^   s/step^         ^ fs / step      ^ ns / fs
         print(
             f"For this system, at a {args.timestep:.2f}fs timestep, this comes out to {ns_day:.2f} ns/day"
         )

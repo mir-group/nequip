@@ -2,11 +2,9 @@ import logging
 from typing import List, Optional
 
 import torch
-from torch._C import Value
 
-from nequip.nn import RescaleOutput, GraphModuleMixin, PerSpeciesScaleShift
+from nequip.nn import RescaleOutput, GraphModuleMixin
 from nequip.data import AtomicDataDict, AtomicDataset
-from ._grads import ForceOutput
 
 
 def RescaleEnergyEtc(
@@ -48,7 +46,7 @@ def RescaleEnergyEtc(
                 raise ValueError(f"Invalid global scale `{value}`")
 
         # = Compute shifts and scales =
-        computed_stats = compute_stats(
+        computed_stats = _compute_stats(
             str_names=str_names,
             dataset=dataset,
             stride=config.dataset_statistics_stride,
@@ -167,7 +165,7 @@ def PerSpeciesRescale(
                 raise ValueError(f"Invalid value `{value}`")
 
         # = Compute shifts and scales =
-        computed_stats = compute_stats(
+        computed_stats = _compute_stats(
             str_names=str_names,
             dataset=dataset,
             stride=config.dataset_statistics_stride,
@@ -216,7 +214,7 @@ def PerSpeciesRescale(
     return model
 
 
-def compute_stats(
+def _compute_stats(
     str_names: List[str], dataset, stride: int, kwargs: Optional[dict] = {}
 ):
     """return the values of statistics over dataset

@@ -23,12 +23,14 @@ Most recent change on the bottom.
 - Name processed datasets based on a hash of their parameters to ensure only valid cached data is used
 - Do not use TensorFloat32 by default on Ampere GPUs until we understand it better
 - No atomic numbers in networks
+- `dataset_energy_std`/`dataset_energy_mean` to `dataset_total_energy_*`
 
 ### Fixed
 - The first 20 epochs/calls of inference are no longer painfully slow for recompilation
 
 ### Removed
 - Removed `allowed_species`
+- Removed `--update-config`; start a new training and load old state instead
 
 ## [0.3.3] - 2021-08-11
 ### Added
