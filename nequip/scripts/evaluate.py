@@ -189,10 +189,11 @@ def main(args=None, running_as_script: bool = True):
     # set global options
     if model_from_training:
         # Use the model config, regardless of dataset config
-        global_config = Config.from_file(str(args.model.parent / "config.yaml"))
+        global_config = args.model.parent / "config.yaml"
     else:
         # use dataset config
-        global_config = config
+        global_config = args.dataset_config
+    global_config = Config.from_file(str(global_config), defaults=default_config)
     _set_global_options(global_config)
     del global_config
 
