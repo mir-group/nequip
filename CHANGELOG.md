@@ -28,6 +28,7 @@ Most recent change on the bottom.
 
 ### Fixed
 - The first 20 epochs/calls of inference are no longer painfully slow for recompilation
+- Set global options like TF32, dtype in `nequip-evaluate`
 
 ### Removed
 - Removed `allowed_species`

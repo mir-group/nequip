@@ -14,6 +14,7 @@ from nequip.utils import Config
 from nequip.data import AtomicData, Collater, dataset_from_config
 from nequip.train import Trainer
 from nequip.scripts.deploy import load_deployed_model
+from nequip.scripts.train import default_config, _set_global_options
 from nequip.utils import load_file, instantiate
 from nequip.train.loss import Loss
 from nequip.train.metrics import Metrics
@@ -26,6 +27,10 @@ def main(args=None, running_as_script: bool = True):
             """Compute the error of a model on a test set using various metrics.
 
             The model, metrics, dataset, etc. can specified individually, or a training session can be indicated with `--train-dir`.
+            In order of priority, the global settings (dtype, TensorFloat32, etc.) are taken from:
+              1. The model config (for a training session)
+              2. The dataset config (for a deployed model)
+              3. The defaults
 
             Prints only the final result in `name = num` format to stdout; all other information is logging.debuged to stderr.
 
@@ -162,6 +167,7 @@ def main(args=None, running_as_script: bool = True):
 
     # Load model:
     logger.info("Loading model... ")
+    model_from_training: bool = False
     try:
         model, _ = load_deployed_model(args.model, device=device)
         logger.info("loaded deployed model.")
@@ -169,6 +175,7 @@ def main(args=None, running_as_script: bool = True):
         model, _ = Trainer.load_model_from_training_session(
             traindir=args.model.parent, model_name=args.model.name
         )
+        model_from_training = True
         model = model.to(device)
         logger.info("loaded model from training session")
     model.eval()
@@ -178,6 +185,16 @@ def main(args=None, running_as_script: bool = True):
         f"Loading {'original ' if dataset_is_from_training else ''}dataset...",
     )
     config = Config.from_file(str(args.dataset_config))
+
+    # set global options
+    if model_from_training:
+        # Use the model config, regardless of dataset config
+        global_config = Config.from_file(str(args.model.parent / "config.yaml"))
+    else:
+        # use dataset config
+        global_config = config
+    _set_global_options(global_config)
+    del global_config
 
     dataset_is_validation: bool = False
     # Currently, pytorch_geometric prints some status messages to stdout while loading the dataset
