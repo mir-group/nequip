@@ -249,6 +249,7 @@ class Trainer:
         log_epoch_freq: int = 1,
         save_checkpoint_freq: int = -1,
         save_ema_checkpoint_freq: int = -1,
+        report_init_validation: bool = False,
         verbose="INFO",
         **kwargs,
     ):
@@ -301,7 +302,7 @@ class Trainer:
         # initialize training states
         self.best_val_metrics = float("inf")
         self.best_epoch = 0
-        self.iepoch = -1
+        self.iepoch = -1 if self.report_init_validation else 0
 
         self.init()
 
@@ -681,7 +682,7 @@ class Trainer:
                 )
             )
 
-        if self.iepoch == -1:
+        if self.iepoch == (-1 if self.report_init_validation else 0):
             d = self.as_dict()
             for key in list(d.keys()):
                 if not isinstance(d[key], (float, int, str, list, tuple)):
@@ -906,7 +907,8 @@ class Trainer:
             self.logger.info("")
             self.logger.info(f"{batch_type}")
             self.logger.info(log_header)
-            if (self.iepoch == -1 and batch_type == VALIDATION) or (
+            init_step = -1 if self.report_init_validation else 0
+            if (self.iepoch == init_step and batch_type == VALIDATION) or (
                 self.iepoch == 0 and batch_type == TRAIN
             ):
                 batch_logger.info(header)
