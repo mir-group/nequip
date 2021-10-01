@@ -172,7 +172,7 @@ class Metrics:
                     params = {"accumulate_by": pred[AtomicDataDict.ATOM_TYPE_KEY]}
                 if per_atom:
                     if N is None:
-                        N = torch.bincount(ref[AtomicDataDict.BATCH_KEY])
+                        N = torch.bincount(ref[AtomicDataDict.BATCH_KEY]).unsqueeze(-1)
                     error_N = error / N
                 else:
                     error_N = error
