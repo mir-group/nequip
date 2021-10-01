@@ -19,6 +19,8 @@ To install:
 
 * Install [pytorch_scatter](https://github.com/rusty1s/pytorch_scatter)
 
+* Run `pip install packaging` (temporary)
+
 * Install our fork of [`pytorch_ema`](https://github.com/Linux-cpp-lisp/pytorch_ema) for using an Exponential Moving Average on the weights: 
 ```bash
 $ pip install "git+https://github.com/Linux-cpp-lisp/pytorch_ema@context_manager#egg=torch_ema"
