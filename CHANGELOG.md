@@ -26,6 +26,7 @@ Most recent change on the bottom.
 - Do not use TensorFloat32 by default on Ampere GPUs until we understand it better
 - No atomic numbers in networks
 - `dataset_energy_std`/`dataset_energy_mean` to `dataset_total_energy_*`
+- `nequip.dynamics` -> `nequip.ase`
 
 ### Fixed
 - The first 20 epochs/calls of inference are no longer painfully slow for recompilation
