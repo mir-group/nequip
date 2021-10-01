@@ -59,6 +59,8 @@ class TypeMapper:
             raise ValueError(
                 "Neither chemical_symbol_to_type nor type_names was provided; one or the other is required"
             )
+        # validate type names
+        assert all(n.isalnum() for n in type_names), "Type names must contain only alphanumeric characters"
         # Set to however many maps specified -- we already checked contiguous
         self.num_types = len(type_names)
         # Check type_names
