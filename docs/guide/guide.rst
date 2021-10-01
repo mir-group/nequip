@@ -5,3 +5,4 @@ NequIP User Guide
 
     intro
     conventions
+    FAQ
