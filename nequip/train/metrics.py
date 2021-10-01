@@ -173,7 +173,7 @@ class Metrics:
                 if per_atom:
                     if N is None:
                         N = torch.bincount(ref[AtomicDataDict.BATCH_KEY])
-                    error_N = error / N
+                    error_N = error / N.unsqueeze(-1)
                 else:
                     error_N = error
 
