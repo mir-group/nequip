@@ -682,16 +682,6 @@ class Trainer:
                 )
             )
 
-        if self.iepoch == (-1 if self.report_init_validation else 0):
-            d = self.as_dict()
-            for key in list(d.keys()):
-                if not isinstance(d[key], (float, int, str, list, tuple)):
-                    d[key] = repr(d[key])
-
-            d["start_time"] = strftime("%a, %d %b %Y %H:%M:%S", gmtime())
-
-            self.log_dictionary(d, name="Initialization")
-
         for callback in self.init_callbacks:
             callback(self)
 
@@ -858,15 +848,6 @@ class Trainer:
 
         for callback in self.end_of_epoch_callbacks:
             callback(self)
-
-    def log_dictionary(self, dictionary: dict, name: str = ""):
-        """
-        dump the keys and values of a dictionary
-        """
-
-        logger = self.logger
-        logger.info(f"* {name}")
-        logger.info(yaml.dump(dictionary))
 
     def end_of_batch_log(self, batch_type: str):
         """
