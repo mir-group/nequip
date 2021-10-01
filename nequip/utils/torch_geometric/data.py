@@ -3,7 +3,6 @@ import copy
 import collections
 
 import torch
-from torch_sparse import coalesce, SparseTensor
 
 # from ..utils.num_nodes import maybe_num_nodes
 
@@ -22,8 +21,6 @@ def size_repr(key, item, indent=0):
         out = item.item()
     elif torch.is_tensor(item):
         out = str(list(item.size()))
-    elif isinstance(item, SparseTensor):
-        out = str(item.sizes())[:-1] + f", nnz={item.nnz()}]"
     elif isinstance(item, list) or isinstance(item, tuple):
         out = str([len(item)])
     elif isinstance(item, dict):
@@ -178,11 +175,7 @@ class Data(object):
             if the batch concatenation process is corrupted for a specific data
             attribute.
         """
-        # By default, concatenate sparse matrices diagonally.
-        if isinstance(value, SparseTensor):
-            return (0, 1)
-        # Concatenate `*index*` and `*face*` attributes in the last dimension.
-        elif bool(re.search("(index|face)", key)):
+        if bool(re.search("(index|face)", key)):
             return -1
         return 0
 
@@ -220,10 +213,7 @@ class Data(object):
         if hasattr(self, "__num_nodes__"):
             return self.__num_nodes__
         for key, item in self("x", "pos", "normal", "batch"):
-            if isinstance(item, SparseTensor):
-                return item.size(0)
-            else:
-                return item.size(self.__cat_dim__(key, item))
+            return item.size(self.__cat_dim__(key, item))
         if hasattr(self, "adj"):
             return self.adj.size(0)
         if hasattr(self, "adj_t"):
@@ -279,32 +269,9 @@ class Data(object):
             return 0
         return 1 if self.edge_attr.dim() == 1 else self.edge_attr.size(1)
 
-    def is_coalesced(self):
-        r"""Returns :obj:`True`, if edge indices are ordered and do not contain
-        duplicate entries."""
-        edge_index, _ = coalesce(self.edge_index, None, self.num_nodes, self.num_nodes)
-        return (
-            self.edge_index.numel() == edge_index.numel()
-            and (self.edge_index != edge_index).sum().item() == 0
-        )
-
-    def coalesce(self):
-        r""" "Orders and removes duplicated entries from edge indices."""
-        self.edge_index, self.edge_attr = coalesce(
-            self.edge_index, self.edge_attr, self.num_nodes, self.num_nodes
-        )
-        return self
-
     def __apply__(self, item, func):
         if torch.is_tensor(item):
             return func(item)
-        elif isinstance(item, SparseTensor):
-            # Not all apply methods are supported for `SparseTensor`, e.g.,
-            # `contiguous()`. We can get around it by capturing the exception.
-            try:
-                return func(item)
-            except AttributeError:
-                return item
         elif isinstance(item, (tuple, list)):
             return [self.__apply__(v, func) for v in item]
         elif isinstance(item, dict):
