@@ -4,6 +4,11 @@ General
 Basic
 -----
 
+root
+^^^^
+    | Type:
+    | Default: n/a
+
 run_name
 ^^^^^^^^
     | Type: path

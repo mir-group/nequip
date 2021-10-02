@@ -1,2 +1,8 @@
 Training
 ========
+
+Basic
+-----
+
+Advanced
+--------

@@ -1,2 +1,8 @@
 Logging
 =======
+
+Basic
+-----
+
+Advanced
+--------
