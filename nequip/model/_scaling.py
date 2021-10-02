@@ -63,16 +63,15 @@ def RescaleEnergyEtc(
                 f"Global energy scaling was very low: {global_scale}. If dataset values were used, does the dataset contain insufficient variation? Maybe try disabling global scaling with global_scale=None."
             )
 
+        logging.debug(
+            f"Initially outputs are globally scaled by: {global_scale}, total_energy are globally shifted by {global_shift}."
+        )
     else:
         # Put dummy values
         if global_shift is not None:
             global_shift = 0.0  # it has some kind of value
         if global_scale is not None:
             global_scale = 1.0  # same,
-
-    logging.debug(
-        f"Initially outputs are globally scaled by: {global_scale}, total_energy are globally shifted by {global_shift}."
-    )
 
     # == Build the model ==
     return RescaleOutput(

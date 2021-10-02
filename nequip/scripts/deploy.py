@@ -29,6 +29,8 @@ NEQUIP_VERSION_KEY: Final[str] = "nequip_version"
 R_MAX_KEY: Final[str] = "r_max"
 N_SPECIES_KEY: Final[str] = "n_species"
 TYPE_NAMES_KEY: Final[str] = "type_names"
+JIT_BAILOUT_KEY: Final[str] = "_jit_bailout_depth"
+TF32_KEY: Final[str] = "allow_tf32"
 
 _ALL_METADATA_KEYS = [
     CONFIG_KEY,
@@ -36,6 +38,8 @@ _ALL_METADATA_KEYS = [
     R_MAX_KEY,
     N_SPECIES_KEY,
     TYPE_NAMES_KEY,
+    JIT_BAILOUT_KEY,
+    TF32_KEY,
 ]
 
 
@@ -164,7 +168,10 @@ def main(args=None):
         metadata[N_SPECIES_KEY] = str(n_species)
         metadata[TYPE_NAMES_KEY] = " ".join(type_names)
 
+        metadata[JIT_BAILOUT_KEY] = str(config["_jit_bailout_depth"])
+        metadata[TF32_KEY] = str(int(config["allow_tf32"]))
         metadata[CONFIG_KEY] = config_str
+
         metadata = {k: v.encode("ascii") for k, v in metadata.items()}
         torch.jit.save(model, args.out_file, _extra_files=metadata)
     else:

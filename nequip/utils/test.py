@@ -298,7 +298,7 @@ def set_irreps_debug(enabled: bool = False) -> None:
         pass
 
     import torch.nn.modules
-    from torch_geometric.data import Data
+    from nequip.utils.torch_geometric import Data
 
     def pre_hook(mod: GraphModuleMixin, inp):
         # __tracebackhide__ = True

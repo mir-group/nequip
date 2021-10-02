@@ -2,7 +2,7 @@ from typing import List
 
 import torch
 
-from torch_geometric.data import Batch, Data
+from nequip.utils.torch_geometric import Batch, Data
 
 
 class Collater(object):

@@ -14,11 +14,11 @@ import ase
 from ase.calculators.singlepoint import SinglePointCalculator, SinglePointDFTCalculator
 
 import torch
-from torch_geometric.data import Data
 import e3nn.o3
 
 from . import AtomicDataDict
 from ._util import _TORCH_INTEGER_DTYPES
+from nequip.utils.torch_geometric import Data
 
 # A type representing ASE-style periodic boundary condtions, which can be partial (the tuple case)
 PBC = Union[bool, Tuple[bool, bool, bool]]
@@ -154,8 +154,7 @@ class AtomicData(Data):
             strict_self_interaction (bool): Whether to include *any* self interaction edges in the graph, even if the
             two instances of the atom are in different periodic images. Defaults to True, should be True for most
             applications.
-            **kwargs (optional): other information to pass to the ``torch_geometric.data.Data`` constructor for
-            inclusion in the object. Keys listed in ``AtomicDataDict.*_KEY` will be treated specially.
+            **kwargs (optional): other fields to add. Keys listed in ``AtomicDataDict.*_KEY` will be treated specially.
         """
         if pos is None or r_max is None:
             raise ValueError("pos and r_max must be given.")
