@@ -37,6 +37,7 @@ Most recent change on the bottom.
 - Removed `--update-config`; start a new training and load old state instead
 - Removed dependency on `pytorch_geometric`
 - `nequip-train` no longer prints the full config, which can be found in the training dir as `config.yaml`.
+- `nequip.datasets.AspirinDataset` & `nequip.datasets.WaterDataset`
 
 ## [0.3.3] - 2021-08-11
 ### Added

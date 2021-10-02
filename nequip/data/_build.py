@@ -1,7 +1,7 @@
 import inspect
 from importlib import import_module
 
-from nequip import data, datasets
+from nequip import data
 from nequip.data.transforms import TypeMapper
 from nequip.data import AtomicDataset
 from nequip.utils import instantiate
@@ -44,9 +44,7 @@ def dataset_from_config(config, prefix: str = "dataset") -> AtomicDataset:
             dataset_name = config_dataset.lower()
 
             class_name = None
-            for k, v in inspect.getmembers(data, inspect.isclass) + inspect.getmembers(
-                datasets, inspect.isclass
-            ):
+            for k, v in inspect.getmembers(data, inspect.isclass):
                 if k.endswith("Dataset"):
                     if k.lower() == dataset_name:
                         class_name = v
