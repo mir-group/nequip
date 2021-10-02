@@ -27,6 +27,8 @@ Most recent change on the bottom.
 - No atomic numbers in networks
 - `dataset_energy_std`/`dataset_energy_mean` to `dataset_total_energy_*`
 - `nequip.dynamics` -> `nequip.ase`
+- update example.yaml and full.yaml with better defaults, new loss function, and switched to toluene-ccsd(t) as example 
+data
 
 ### Fixed
 - The first 20 epochs/calls of inference are no longer painfully slow for recompilation
