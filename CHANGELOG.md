@@ -29,6 +29,7 @@ Most recent change on the bottom.
 - `nequip.dynamics` -> `nequip.ase`
 - update example.yaml and full.yaml with better defaults, new loss function, and switched to toluene-ccsd(t) as example 
 data
+- `use_sc` defaults to `True`
 
 ### Fixed
 - The first 20 epochs/calls of inference are no longer painfully slow for recompilation
@@ -39,6 +40,7 @@ data
 - Removed `--update-config`; start a new training and load old state instead
 - Removed dependency on `pytorch_geometric`
 - `nequip-train` no longer prints the full config, which can be found in the training dir as `config.yaml`.
+- `nequip.datasets.AspirinDataset` & `nequip.datasets.WaterDataset`
 
 ## [0.3.3] - 2021-08-11
 ### Added

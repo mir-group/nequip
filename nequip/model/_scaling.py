@@ -73,10 +73,6 @@ def RescaleEnergyEtc(
         if global_scale is not None:
             global_scale = 1.0  # same,
 
-    logging.info(
-        f"Initially outputs are scaled by: {global_scale}, eneriges are shifted by {global_shift}."
-    )
-
     # == Build the model ==
     return RescaleOutput(
         model=model,
