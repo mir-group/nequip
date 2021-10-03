@@ -108,7 +108,8 @@ class TestStatistics:
     def test_statistics(self, npz_dataset, npz):
 
         (eng_mean, eng_std), (Z_unique, Z_count) = npz_dataset.statistics(
-            [AtomicDataDict.TOTAL_ENERGY_KEY, AtomicDataDict.ATOMIC_NUMBERS_KEY]
+            fields=[AtomicDataDict.TOTAL_ENERGY_KEY, AtomicDataDict.ATOMIC_NUMBERS_KEY],
+            modes=["mean_std", "count"],
         )
 
         eng = npz["energy"]
@@ -146,9 +147,8 @@ class TestPerSpeciesStatistics:
     @pytest.mark.parametrize("fixed_field", [True, False])
     @pytest.mark.parametrize("mode", ["mean_std", "rms"])
     def test_per_node_field(self, npz_dataset, fixed_field, mode):
-
         # set up the transformer
-        npz.dataset = set_up_transformer(npz_dataset, not fixed_field, fixed_field)
+        npz_dataset = set_up_transformer(npz_dataset, not fixed_field, fixed_field)
 
         (result,) = npz_dataset.statistics(
             [AtomicDataDict.BATCH_KEY],
@@ -165,8 +165,16 @@ class TestPerSpeciesStatistics:
         if npz_dataset is None:
             return
 
-        N = npz_dataset.species_count_per_graph()
-        N = N.type(torch.get_default_dtype())
+        # get species count per graph
+        Ns = []
+        for i in range(npz_dataset.len()):
+            Ns.append(torch.bincount(npz_dataset[i][AtomicDataDict.ATOM_TYPE_KEY]))
+        n_spec = max(len(e) for e in Ns)
+        N = torch.zeros(len(Ns), n_spec)
+        for i in range(len(Ns)):
+            N[i, : len(Ns[i])] = Ns[i]
+        del n_spec
+        del Ns
 
         if alpha == 1e-10:
             ref_mean, ref_std, E = generate_E(N, 100, 0.0)
@@ -321,7 +329,10 @@ def set_up_transformer(npz_dataset, full_rank, fixed_field):
         # let all atoms to be the same type distribution
         num_nodes = npz_dataset.data[AtomicDataDict.BATCH_KEY].shape[0]
         if fixed_field:
-            npz_dataset.data[AtomicDataDict.ATOMIC_NUMBERS_KEY] = None
+            del npz_dataset.data[AtomicDataDict.ATOMIC_NUMBERS_KEY]
+            del npz_dataset.data.__slices__[
+                AtomicDataDict.ATOMIC_NUMBERS_KEY
+            ]  # remove batch metadata for the key
             new_n = torch.ones(NATOMS, dtype=torch.int64)
             new_n[0] += ntype
             npz_dataset.fixed_fields[AtomicDataDict.ATOMIC_NUMBERS_KEY] = new_n

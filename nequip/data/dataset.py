@@ -17,7 +17,13 @@ from nequip.utils.torch_geometric import Batch, Dataset
 from nequip.utils.torch_geometric.utils import download_url, extract_zip
 
 import nequip
-from nequip.data import AtomicData, AtomicDataDict
+from nequip.data import (
+    AtomicData,
+    AtomicDataDict,
+    _NODE_FIELDS,
+    _EDGE_FIELDS,
+    _GRAPH_FIELDS,
+)
 from nequip.utils.batch_ops import bincount
 from nequip.utils.regressor import gp
 from ._util import _TORCH_INTEGER_DTYPES
@@ -31,27 +37,13 @@ class AtomicDataset(Dataset):
     root: str
 
     def statistics(
-        self, fields: List[Union[str, Callable]], stride: int = 1, unbiased: bool = True
+        self,
+        fields: List[Union[str, Callable]],
+        modes: List[str],
+        stride: int = 1,
+        unbiased: bool = True,
+        kwargs: Optional[Dict[str, dict]] = {},
     ) -> List[tuple]:
-        """Compute the statistics of ``fields`` in the dataset.
-
-        If the values at the fields are vectors/multidimensional, they must be of fixed shape and elementwise statistics will be computed.
-
-        Args:
-            fields: the names of the fields to compute statistics for.
-                Instead of a field name, a callable can also be given that reuturns a quantity to compute the statisics for.
-
-                If a callable is given, it will be called with a (possibly batched) ``Data`` object and must return a sequence of points to add to the set over which the statistics will be computed.
-
-                For example, to compute the overall statistics of the x,y, and z components of a per-node vector ``force`` field:
-
-                    data.statistics([lambda data: data.force.flatten()])
-
-                The above computes the statistics over a set of size 3N, where N is the total number of nodes in the dataset.
-
-        Returns:
-            List of statistics. For fields of floating dtype the statistics are the two-tuple (mean, std); for fields of integer dtype the statistics are a one-tuple (bincounts,)
-        """
         # TODO: If needed, this can eventually be implimented for general AtomicDataset by computing an online running mean and using Welford's method for a stable running standard deviation: https://jonisalonen.com/2013/deriving-welfords-method-for-computing-variance/
         # That would be needed if we have lazy loading datasets.
         # TODO: When lazy-loading datasets are implimented, how to deal with statistics, sampling, and subsets?
@@ -319,169 +311,240 @@ class AtomicInMemoryDataset(AtomicDataset):
     def statistics(
         self,
         fields: List[Union[str, Callable]],
+        modes: List[str],
         stride: int = 1,
         unbiased: bool = True,
-        modes: Optional[List[Union[str]]] = None,
         kwargs: Optional[Dict[str, dict]] = {},
     ) -> List[tuple]:
+        """Compute the statistics of ``fields`` in the dataset.
+
+        If the values at the fields are vectors/multidimensional, they must be of fixed shape and elementwise statistics will be computed.
+
+        Args:
+            fields: the names of the fields to compute statistics for.
+                Instead of a field name, a callable can also be given that reuturns a quantity to compute the statisics for.
+
+                If a callable is given, it will be called with a (possibly batched) ``Data``-like object and must return a sequence of points to add to the set over which the statistics will be computed.
+                The callable must also return a string, one of ``"node"`` or ``"graph"``, indicating whether the value it returns is a per-node or per-graph quantity.
+                PLEASE NOTE: the argument to the callable may be "batched", and it may not be batched "contiguously": ``batch`` and ``edge_index`` may have "gaps" in their values.
+
+                For example, to compute the overall statistics of the x,y, and z components of a per-node vector ``force`` field:
+
+                    data.statistics([lambda data: (data.force.flatten(), "node")])
+
+                The above computes the statistics over a set of size 3N, where N is the total number of nodes in the dataset.
+
+            modes: the statistic to compute for each field. Valid options are TODO.
+
+            stride: the stride over the dataset while computing statistcs.
+
+            unbiased: whether to use unbiased for standard deviations.
+
+            kwargs: other options for individual statistics modes.
+
+        Returns:
+            List of statistics. For fields of floating dtype the statistics are the two-tuple (mean, std); for fields of integer dtype the statistics are a one-tuple (bincounts,)
+        """
 
         # Short circut:
-        if modes is not None:
-            assert len(modes) == len(fields)
+        assert len(modes) == len(fields)
         if len(fields) == 0:
             return []
 
         if self._indices is not None:
-            selector = torch.as_tensor(self._indices)[::stride]
+            graph_selector = torch.as_tensor(self._indices)[::stride]
         else:
-            selector = torch.arange(0, self.len(), stride)
-
-        graph_selector = torch.arange(0, self.len(), stride)
+            graph_selector = torch.arange(0, self.len(), stride)
+        num_graphs = len(graph_selector)
 
         node_selector = torch.as_tensor(
-            np.in1d(self.data.batch.numpy(), selector.numpy())
+            np.in1d(self.data.batch.numpy(), graph_selector.numpy())
         )
-        # the pure PyTorch alternative to ^ is:
-        # hack for in1d: https://github.com/pytorch/pytorch/issues/3025#issuecomment-392601780
-        # node_selector = (self.data.batch[..., None] == selector).any(-1)
-        # but this is unnecessary because no backward is done through statistics
+        num_nodes = node_selector.sum()
 
-        out = []
+        if self.transform is not None:
+            # pre-transform the fixed fields and data so that statistics process transformed data
+            ff_transformed = self.transform(self.fixed_fields, types_required=False)
+            data_transformed = self.transform(self.data.to_dict(), types_required=False)
+        else:
+            ff_transformed = self.fixed_fields
+            data_transformed = self.data.to_dict()
+        # pre-select arrays
+        # this ensures that all following computations use the right data
+        selectors = {}
+        for k in list(ff_transformed.keys()) + list(data_transformed.keys()):
+            if k in _NODE_FIELDS:
+                selectors[k] = node_selector
+            elif k in _GRAPH_FIELDS:
+                selectors[k] = graph_selector
+            # TODO: edges?
+        # TODO: do the batch indexes, edge_indexes, etc. after selection need to be
+        # "compacted" to subtract out their offsets? For now, we just punt this
+        # onto the writer of the callable field.
+        # do not actually select on fixed fields, since they are constant
+        # but still only select fields that are correctly registered
+        ff_transformed = {k: v for k, v in ff_transformed.items() if k in selectors}
+        # apply selector to actual data
+        data_transformed = {
+            k: data_transformed[k][selectors[k]]
+            for k in data_transformed.keys()
+            if k in selectors
+        }
+
+        atom_types: Optional[torch.Tensor] = None
+        out: list = []
         for ifield, field in enumerate(fields):
-
             if field in self.fixed_fields:
-                obj = self.fixed_fields
+                obj = ff_transformed
             else:
-                obj = self.data
+                obj = data_transformed
 
             if callable(field):
-                arr = field(obj)
+                arr, arr_is_per = field(obj)
+                assert arr_is_per in ("node", "graph")
             else:
+                # Give a better error
+                if field not in selectors:
+                    # this means field is not selected and so not available
+                    raise RuntimeError(
+                        f"Only per-node and per-graph fields can have statistics computed; `{field}` has not been registered as either. If it is per-node or per-graph, please register it as such using `nequip.data.register_fields`"
+                    )
                 arr = obj[field]
+                if field in _NODE_FIELDS:
+                    arr_is_per = "node"
+                elif field in _GRAPH_FIELDS:
+                    arr_is_per = "graph"
+                else:
+                    raise RuntimeError
 
+            # Check arr
             if arr is None:
                 raise ValueError(
                     f"Cannot compute statistics over field `{field}` whose value is None!"
                 )
-
-            # Apply selector
-            # TODO: this might be quite expensive if the dataset is large.
-            # Better to impliment the general running average case in AtomicDataset,
-            # and just call super here in AtomicInMemoryDataset?
-            #
-            # TODO: !!! this is a terrible shape-based hack that needs to be fixed !!!
-            if len(self.data.batch) == self.data.num_graphs:
-                raise NotImplementedError(
-                    "AtomicDataset.statistics cannot currently handle datasets whose number of examples is the same as their number of nodes"
-                )
-
-            if obj is self.fixed_fields:
-                # arr is fixed, nothing to select.
-                pass
-            elif len(arr) == self.data.num_graphs:
-                # arr is per example (probably)
-                arr = arr[graph_selector]
-            elif len(arr) == len(self.data.batch):
-                # arr is per-node (probably)
-                arr = arr[node_selector]
-            else:
-                raise NotImplementedError(
-                    "Statistics of properties that are not per-graph or per-node are not yet implimented"
-                )
-
-            ana_mode = None if modes is None else modes[ifield]
             if not isinstance(arr, torch.Tensor):
                 if np.issubdtype(arr.dtype, np.floating):
                     arr = torch.as_tensor(arr, dtype=torch.get_default_dtype())
                 else:
                     arr = torch.as_tensor(arr)
-            if ana_mode is None:
-                ana_mode = "count" if arr.dtype in _TORCH_INTEGER_DTYPES else "mean_std"
+            if arr_is_per == "node":
+                arr = arr.view(num_nodes, -1)
+            elif arr_is_per == "graph":
+                arr = arr.view(num_graphs, -1)
 
+            ana_mode = modes[ifield]
+            # compute statistics
             if ana_mode == "count":
+                # count integers
                 uniq, counts = torch.unique(
                     torch.flatten(arr), return_counts=True, sorted=True
                 )
                 out.append((uniq, counts))
             elif ana_mode == "rms":
-
+                # root-mean-square
                 out.append((torch.sqrt(torch.mean(arr * arr)),))
 
             elif ana_mode == "mean_std":
-
+                # mean and std
                 mean = torch.mean(arr, dim=0)
                 std = torch.std(arr, dim=0, unbiased=unbiased)
                 out.append((mean, std))
 
             elif ana_mode.startswith("per_species_"):
-
+                # per-species
                 algorithm_kwargs = kwargs.pop(field + ana_mode, {})
 
                 ana_mode = ana_mode[len("per_species_") :]
 
-                results = self.per_species_statistics(
+                if atom_types is None:
+                    if AtomicDataDict.ATOM_TYPE_KEY in data_transformed:
+                        atom_types = data_transformed[AtomicDataDict.ATOM_TYPE_KEY]
+                    elif AtomicDataDict.ATOM_TYPE_KEY in ff_transformed:
+                        atom_types = ff_transformed[AtomicDataDict.ATOM_TYPE_KEY]
+                        atom_types = (
+                            atom_types.unsqueeze(0)
+                            .expand((num_graphs,) + atom_types.shape)
+                            .reshape(-1)
+                        )
+
+                results = self._per_species_statistics(
                     ana_mode,
-                    node_selector,
-                    graph_selector,
                     arr,
-                    unbiased,
+                    arr_is_per=arr_is_per,
+                    batch=data_transformed[AtomicDataDict.BATCH_KEY],
+                    atom_types=atom_types,
+                    unbiased=unbiased,
                     **algorithm_kwargs,
                 )
                 out.append(results)
 
             elif ana_mode.startswith("per_atom_"):
-
+                # per-atom
+                # only makes sense for a per-graph quantity
+                if arr_is_per != "graph":
+                    raise ValueError(
+                        f"It doesn't make sense to ask for `{ana_mode}` since `{field}` is not per-graph"
+                    )
                 ana_mode = ana_mode[len("per_atom_") :]
-                results = self.per_atom_statistics(ana_mode, arr, unbiased)
+                results = self._per_atom_statistics(
+                    ana_mode=ana_mode,
+                    arr=arr,
+                    batch=data_transformed[AtomicDataDict.BATCH_KEY],
+                    unbiased=unbiased,
+                )
                 out.append(results)
 
             else:
-                raise NotImplementedError(f"Cannot handle this {ana_mode}")
+                raise NotImplementedError(f"Cannot handle statistics mode {ana_mode}")
 
         return out
 
-    def per_atom_statistics(
-        self, ana_mode: str, arr: torch.Tensor, unbiased: bool = True
+    @staticmethod
+    def _per_atom_statistics(
+        ana_mode: str,
+        arr: torch.Tensor,
+        batch: torch.Tensor,
+        unbiased: bool = True,
     ):
+        """Compute "per-atom" statistics that are normalized by the number of atoms in the system.
 
-        if len(arr.shape) == 1 and arr.shape[0] == N.shape[0]:
-            pass
-        elif len(arr.shape) == 2 and arr.shape[1] == 1:
-            pass
-        else:
-            raise ValueError(
-                f"per atom analysis cannot handle the shape of {arr.shape}"
-            )
-
+        Only makes sense for a graph-level quantity (checked by .statistics).
+        """
+        # using unique_consecutive handles the non-contiguous selected batch index
+        _, N = torch.unique_consecutive(batch, return_counts=True)
         if ana_mode == "mean_std":
-            N = torch.bincount(self.data[AtomicDataDict.BATCH_KEY])
             arr = arr / N
             mean = torch.mean(arr)
             std = torch.std(arr, unbiased=unbiased)
             return mean, std
         elif ana_mode == "rms":
-            N = torch.bincount(self.data[AtomicDataDict.BATCH_KEY])
             arr = arr / N
-            return (torch.sqrt(torch.mean(arr * arr)),)
+            return (torch.sqrt(torch.mean(arr.square())),)
         else:
             raise NotImplementedError(
-                f"{ana_mode} for per atom analysis is not implemented"
+                f"{ana_mode} for per-atom analysis is not implemented"
             )
 
-    def per_species_statistics(
-        self,
+    @staticmethod
+    def _per_species_statistics(
         ana_mode: str,
-        node_selector,
-        graph_selector,
         arr: torch.Tensor,
+        arr_is_per: str,
+        atom_types: torch.Tensor,
+        batch: torch.Tensor,
         unbiased: bool = True,
         alpha: Optional[float] = 0.1,
     ):
-        N, spe_idx = self.species_count_per_graph(
-            node_selector, graph_selector, return_spe_idx=True
-        )
+        """Compute "per-species" statistics.
 
-        if len(arr.reshape(-1)) == N.shape[0]:
+        For a graph-level quantity, models it as a linear combintation of the number of atoms of different types in the graph.
+
+        For a per-node quantity, computes the expected statistic but for each type instead of over all nodes.
+        """
+        N = bincount(atom_types, batch)
+        N = N[(N > 0).any(dim=1)]  # deal with non-contiguous batch indexes
+
+        if arr_is_per == "graph":
 
             if ana_mode != "mean_std":
                 raise NotImplementedError(
@@ -492,55 +555,22 @@ class AtomicInMemoryDataset(AtomicDataset):
 
             return gp(N, arr, alpha=alpha)
 
-        else:
+        elif arr_is_per == "node":
             arr = arr.type(torch.get_default_dtype())
-            if len(arr.shape) == 1:
-                arr = arr.reshape([spe_idx.shape[0], -1])
 
             if ana_mode == "mean_std":
-                mean = scatter(arr, spe_idx, reduce="mean", dim=0)
-                std = scatter_std(arr, spe_idx, dim=0, unbiased=unbiased)
+                mean = scatter(arr, atom_types, reduce="mean", dim=0)
+                std = scatter_std(arr, atom_types, dim=0, unbiased=unbiased)
                 return mean, std
             elif ana_mode == "rms":
-                square = scatter(arr * arr, spe_idx, reduce="mean", dim=0)
+                square = scatter(arr.square(), atom_types, reduce="mean", dim=0)
                 dims = len(square.shape) - 1
                 for i in range(dims):
                     square = square.mean(axis=-1)
                 return (torch.sqrt(square),)
 
-    def species_count_per_graph(
-        self, node_selector=None, graph_selector=None, return_spe_idx: bool = False
-    ):
-        if AtomicDataDict.ATOMIC_NUMBERS_KEY in self.fixed_fields:
-            spe_idx = self.transform.transform(
-                self.fixed_fields[AtomicDataDict.ATOMIC_NUMBERS_KEY]
-            )
-            N = torch.bincount(spe_idx)
-            N = N.reshape([1, -1])
-            N = torch.ones((self.data.num_graphs, 1)) * N.reshape([1, -1])
-            if return_spe_idx:
-                spe_idx = torch.ones(
-                    (self.data.num_graphs, 1), dtype=torch.long
-                ) * spe_idx.reshape([1, -1])
         else:
-            spe_idx = self.transform.transform(
-                self.data[AtomicDataDict.ATOMIC_NUMBERS_KEY]
-            )
-            N = bincount(
-                spe_idx,
-                self.data[AtomicDataDict.BATCH_KEY],
-            )
-        if graph_selector is not None:
-            N = N[graph_selector]
-        if return_spe_idx:
-            if node_selector is not None:
-                spe_idx = spe_idx.reshape([-1, 1])
-                spe_idx = spe_idx[node_selector]
-            elif graph_selector is not None:
-                spe_idx = spe_idx[graph_selector]
-            return N, spe_idx
-        else:
-            return N
+            raise NotImplementedError
 
 
 # TODO: document fixed field mapped key behavior more clearly

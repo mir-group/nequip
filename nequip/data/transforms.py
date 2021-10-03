@@ -60,14 +60,16 @@ class TypeMapper:
                 "Neither chemical_symbol_to_type nor type_names was provided; one or the other is required"
             )
         # validate type names
-        assert all(n.isalnum() for n in type_names), "Type names must contain only alphanumeric characters"
+        assert all(
+            n.isalnum() for n in type_names
+        ), "Type names must contain only alphanumeric characters"
         # Set to however many maps specified -- we already checked contiguous
         self.num_types = len(type_names)
         # Check type_names
         self.type_names = type_names
 
     def __call__(
-        self, data: Union[AtomicDataDict.Type, AtomicData]
+        self, data: Union[AtomicDataDict.Type, AtomicData], types_required: bool = True
     ) -> Union[AtomicDataDict.Type, AtomicData]:
         if AtomicDataDict.ATOM_TYPE_KEY in data:
             if AtomicDataDict.ATOMIC_NUMBERS_KEY in data:
@@ -83,9 +85,10 @@ class TypeMapper:
 
             data[AtomicDataDict.ATOM_TYPE_KEY] = self.transform(atomic_numbers)
         else:
-            raise KeyError(
-                "Data doesn't contain any atom type information (ATOM_TYPE_KEY or ATOMIC_NUMBERS_KEY)"
-            )
+            if types_required:
+                raise KeyError(
+                    "Data doesn't contain any atom type information (ATOM_TYPE_KEY or ATOMIC_NUMBERS_KEY)"
+                )
         return data
 
     def transform(self, atomic_numbers):
