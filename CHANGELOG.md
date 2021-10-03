@@ -27,6 +27,8 @@ Most recent change on the bottom.
 - No atomic numbers in networks
 - `dataset_energy_std`/`dataset_energy_mean` to `dataset_total_energy_*`
 - `nequip.dynamics` -> `nequip.ase`
+- update example.yaml and full.yaml with better defaults, new loss function, and switched to toluene-ccsd(t) as example 
+data
 - `use_sc` defaults to `True`
 
 ### Fixed
