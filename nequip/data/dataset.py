@@ -362,6 +362,11 @@ class AtomicInMemoryDataset(AtomicDataset):
         )
         num_nodes = node_selector.sum()
 
+        edge_index = self.data[AtomicDataDict.EDGE_INDEX_KEY]
+        edge_selector = node_selector[edge_index[0]] & node_selector[edge_index[1]]
+        num_edges = edge_selector.sum()
+        del edge_index
+
         if self.transform is not None:
             # pre-transform the fixed fields and data so that statistics process transformed data
             ff_transformed = self.transform(self.fixed_fields, types_required=False)
@@ -377,7 +382,10 @@ class AtomicInMemoryDataset(AtomicDataset):
                 selectors[k] = node_selector
             elif k in _GRAPH_FIELDS:
                 selectors[k] = graph_selector
-            # TODO: edges?
+            elif k == AtomicDataDict.EDGE_INDEX_KEY:
+                selectors[k] = (slice(None, None, None), edge_selector)
+            elif k in _EDGE_FIELDS:
+                selectors[k] = edge_selector
         # TODO: do the batch indexes, edge_indexes, etc. after selection need to be
         # "compacted" to subtract out their offsets? For now, we just punt this
         # onto the writer of the callable field.
@@ -394,14 +402,13 @@ class AtomicInMemoryDataset(AtomicDataset):
         atom_types: Optional[torch.Tensor] = None
         out: list = []
         for ifield, field in enumerate(fields):
-            if field in self.fixed_fields:
-                obj = ff_transformed
-            else:
-                obj = data_transformed
-
             if callable(field):
-                arr, arr_is_per = field(obj)
-                assert arr_is_per in ("node", "graph")
+                # make a joined thing? so it includes fixed fields
+                arr, arr_is_per = field(data_transformed)
+                arr = arr.to(
+                    torch.get_default_dtype()
+                )  # all statistics must be on floating
+                assert arr_is_per in ("node", "graph", "edge")
             else:
                 # Give a better error
                 if field not in selectors:
@@ -409,11 +416,16 @@ class AtomicInMemoryDataset(AtomicDataset):
                     raise RuntimeError(
                         f"Only per-node and per-graph fields can have statistics computed; `{field}` has not been registered as either. If it is per-node or per-graph, please register it as such using `nequip.data.register_fields`"
                     )
-                arr = obj[field]
+                if field in ff_transformed:
+                    arr = ff_transformed[field]
+                else:
+                    arr = data_transformed[field]
                 if field in _NODE_FIELDS:
                     arr_is_per = "node"
                 elif field in _GRAPH_FIELDS:
                     arr_is_per = "graph"
+                elif field in _EDGE_FIELDS:
+                    arr_is_per = "edge"
                 else:
                     raise RuntimeError
 
@@ -431,6 +443,8 @@ class AtomicInMemoryDataset(AtomicDataset):
                 arr = arr.view(num_nodes, -1)
             elif arr_is_per == "graph":
                 arr = arr.view(num_graphs, -1)
+            elif arr_is_per == "edge":
+                arr = arr.view(num_edges, -1)
 
             ana_mode = modes[ifield]
             # compute statistics

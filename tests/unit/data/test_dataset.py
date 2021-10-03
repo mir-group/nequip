@@ -1,3 +1,4 @@
+from attr import fields
 import numpy as np
 import pytest
 import tempfile
@@ -7,6 +8,7 @@ from os.path import isdir, isfile
 
 from ase.data import chemical_symbols
 from ase.io import write
+from torch.functional import _return_counts
 
 from nequip.data import (
     AtomicDataDict,
@@ -141,6 +143,43 @@ class TestStatistics:
         assert np.allclose(
             force_rms.numpy(), np.sqrt(np.mean(np.square(npz["force"][0])))
         )
+
+    def test_atom_types(self, npz_dataset):
+        ((avg_num_neigh, _),) = npz_dataset.statistics(
+            fields=[
+                lambda data: (
+                    torch.unique(
+                        data[AtomicDataDict.EDGE_INDEX_KEY][0], return_counts=True
+                    )[1],
+                    "node",
+                )
+            ],
+            modes=["mean_std"],
+        )
+        # They are all homogenous in this dataset:
+        assert (
+            avg_num_neigh
+            == torch.bincount(npz_dataset[0][AtomicDataDict.EDGE_INDEX_KEY][0])[0]
+        )
+
+    def test_edgewise_stats(self, npz_dataset):
+        ((avg_edge_length, std_edge_len),) = npz_dataset.statistics(
+            fields=[
+                lambda data: (
+                    (
+                        data[AtomicDataDict.POSITIONS_KEY][
+                            data[AtomicDataDict.EDGE_INDEX_KEY][1]
+                        ]
+                        - data[AtomicDataDict.POSITIONS_KEY][
+                            data[AtomicDataDict.EDGE_INDEX_KEY][0]
+                        ]
+                    ).norm(dim=-1),
+                    "edge",
+                )
+            ],
+            modes=["mean_std"],
+        )
+        # TODO: check correct
 
 
 class TestPerSpeciesStatistics:
