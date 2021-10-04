@@ -1,55 +1,56 @@
-# a full yaml file with all nequip options
-# this is primarily intested to serve as documentation/reference for all options
-# for a simpler yaml file containing all necessary feature to get you started check out example.yaml
+# IMPORTANT: READ THIS
+
+# This is a full yaml file with all nequip options.
+# It is primarily intented to serve as documentation/reference for all options
+# For a simpler yaml file containing all necessary feature to get you started check out configs/example.yaml
 
 # Two folders will be used during the training: 'root'/process and 'root'/'run_name'
 # run_name contains logfiles and saved models
 # process contains processed data sets
 # if 'root'/'run_name' exists, 'root'/'run_name'_'year'-'month'-'day'-'hour'-'min'-'s' will be used instead.
-root: results/aspirin
-run_name: example-run-full
+root: results/toluene
+run_name: example-run-toluene
 seed: 0                                                                           # random number seed for numpy and torch
-append: false                                                                     # set True if a restarted run should append to the previous log file
+append: true                                                                      # set true if a restarted run should append to the previous log file
 default_dtype: float32                                                            # type of float to use, e.g. float32 and float64
-allow_tf32: True                                                                  # whether to use TensorFloat32 if it is available
+allow_tf32: false                                                                 # whether to use TensorFloat32 if it is available
 
 # network
-r_max: 4.0                                                                        # cutoff radius in length units
-
-num_layers: 6                                                                     # number of interaction blocks, we found 5-6 to work best
+r_max: 4.0                                                                        # cutoff radius in length units, here Angstrom, this is an important hyperparamter to scan
+num_layers: 4                                                                     # number of interaction blocks, we find 4-6 to work best
 chemical_embedding_irreps_out: 32x0e                                              # irreps for the chemical embedding of species
-feature_irreps_hidden: 32x0o + 32x0e + 16x1o + 16x1e + 8x2o + 8x2e                # irreps used for hidden features, here we go up to lmax=2, with even and odd parities
-irreps_edge_sh: 0e + 1o + 2e                                                      # irreps of the spherical harmonics used for edges. If a single integer, indicates the full SH up to L_max=that_integer
+feature_irreps_hidden: 32x0o + 32x0e + 32x1o + 32x1e                              # irreps used for hidden features, here we go up to lmax=1, with even and odd parities; for more accurate but slower networks, use l=2 or higher, smaller number of features is faster
+irreps_edge_sh: 0e + 1o                                                           # irreps of the spherical harmonics used for edges. If a single integer, indicates the full SH up to L_max=that_integer
 conv_to_output_hidden_irreps_out: 16x0e                                           # irreps used in hidden layer of output block
-
 nonlinearity_type: gate                                                           # may be 'gate' or 'norm', 'gate' is recommended
+resnet: false                                                                     # set true to make interaction block a resnet-style update
 
 # scalar nonlinearities to use — available options are silu, ssp (shifted softplus), tanh, and abs.
 # Different nonlinearities are specified for e (even) and o (odd) parity;
 # note that only tanh and abs are correct for o (odd parity).
 nonlinearity_scalars:
-  e: ssp
+  e: silu
   o: tanh
+
 nonlinearity_gates:
-  e: ssp
-  o: abs
+  e: silu
+  o: tanh
 
-resnet: false                                                                     # set true to make interaction block a resnet-style update
-
+# radial network basis
 num_basis: 8                                                                      # number of basis functions used in the radial basis
 BesselBasis_trainable: true                                                       # set true to train the bessel weights
 PolynomialCutoff_p: 6                                                             # p-exponent used in polynomial cutoff function
 
 # radial network
-invariant_layers: 2                                                               # number of radial layers, we found it important to keep this small, 1 or 2
+invariant_layers: 2                                                               # number of radial layers, usually 1-3 works best, smaller is faster
 invariant_neurons: 64                                                             # number of hidden neurons in radial function, smaller is faster
-avg_num_neighbors: null                                                           # number of neighbors to divide by, None => no normalization.
+avg_num_neighbors: null                                                           # number of neighbors to divide by, null => no normalization.
 use_sc: true                                                                      # use self-connection or not, usually gives big improvement
 compile_model: false                                                              # whether to compile the constructed model to TorchScript
 
 # to specify different parameters for each convolutional layer, try examples below
 # layer1_use_sc: true                                                             # use "layer{i}_" prefix to specify parameters for only one of the layer,
-# priority for different definition:
+# priority for different definitions:
 #   invariant_neurons < InteractionBlock_invariant_neurons < layer{i}_invariant_neurons
 
 # data set
@@ -58,8 +59,8 @@ compile_model: false                                                            
 # all arrays are expected to have the shape of (nframe, natom, ?) except the fixed fields
 # note that if your data set uses pbc, you need to also pass an array that maps to the nequip "pbc" key
 dataset: npz                                                                       # type of data set, can be npz or ase
-dataset_url: http://quantum-machine.org/gdml/data/npz/aspirin_ccsd.zip             # url to download the npz. optional
-dataset_file_name: ./benchmark_data/aspirin_ccsd-train.npz                         # path to data set file
+dataset_url: http://quantum-machine.org/gdml/data/npz/toluene_ccsd_t.zip           # url to download the npz. optional
+dataset_file_name: ./benchmark_data/toluene_ccsd_t-train.npz                       # path to data set file
 key_mapping:
   z: atomic_numbers                                                                # atomic species, integers
   E: total_energy                                                                  # total potential eneriges to train to
@@ -67,12 +68,13 @@ key_mapping:
   R: pos                                                                           # raw atomic positions
 npz_fixed_field_keys:                                                              # fields that are repeated across different examples
   - atomic_numbers
+
 # A mapping of chemical species to type indexes is necessary if the dataset is provided with atomic numbers instead of type indexes.
 chemical_symbol_to_type:
   H: 0
   C: 1
-  O: 2
-# Alternatively, if the dataset has type indexes, the total number of types is all that is required:
+
+# Alternatively, if the dataset has type indicess, the total number of types is all that is required:
 # type_names:
 #   0: my_type
 #   1: atom
@@ -89,11 +91,11 @@ chemical_symbol_to_type:
 # If you want to use a different dataset for validation, you can specify
 # the same types of options using a `validation_` prefix:
 # validation_dataset: ase
-# validation_dataset_file_name: xxx.xyz                                                       # need to be a format accepted by ase.io.read
+# validation_dataset_file_name: xxx.xyz                                            # need to be a format accepted by ase.io.read
 
 # logging
-wandb: false                                                                        # we recommend using wandb for logging, we'll turn it off here as it's optional
-wandb_project: aspirin                                                             # project name used in wandb
+wandb: false                                                                       # we recommend using wandb for logging, we'll turn it off here as it's optional
+wandb_project: toluene-example                                                     # project name used in wandb
 wandb_resume: true                                                                 # if true and restart is true, wandb run data will be restarted and updated.
                                                                                    # if false, a new wandb run will be generated
 verbose: info                                                                      # the same as python logging, e.g. warning, info, debug, error. case insensitive
@@ -105,35 +107,39 @@ save_ema_checkpoint_freq: -1                                                    
 # training
 n_train: 100                                                                       # number of training data
 n_val: 50                                                                          # number of validation data
-learning_rate: 0.01                                                                # learning rate, we found values between 0.01 and 0.005 to work best - this is often one of the most important hyperparameters to tune
-batch_size: 5                                                                      # batch size, we found it important to keep this small for most applications (1-5)
-max_epochs: 1000000                                                                # stop training after _ number of epochs
+learning_rate: 0.005                                                               # learning rate, we found values between 0.01 and 0.005 to work best - this is often one of the most important hyperparameters to tune
+batch_size: 5                                                                      # batch size, we found it important to keep this small for most applications including forces (1-5); for energy-only training, higher batch sizes work better
+max_epochs: 100000                                                                      # stop training after _ number of epochs, we set a very large number here, it won't take this long in practice and we will use early stopping instead
 train_val_split: random                                                            # can be random or sequential. if sequential, first n_train elements are training, next n_val are val, else random, usually random is the right choice
 shuffle: true                                                                      # If true, the data loader will shuffle the data, usually a good idea
 metrics_key: loss                                                                  # metrics used for scheduling and saving best model. Options: loss, or anything that appears in the validation batch step header, such as f_mae, f_rmse, e_mae, e_rmse
-use_ema: false                                                                     # if true, use exponential moving average on weights for val/test, usually helps a lot with training, in particular for energy errors
-ema_decay: 0.999                                                                   # ema weight, commonly set to 0.999
+use_ema: true                                                                      # if true, use exponential moving average on weights for val/test, usually helps a lot with training, in particular for energy errors
+ema_decay: 0.99                                                                    # ema weight, typically set to 0.99 or 0.999
 ema_use_num_updates: true                                                          # whether to use number of updates when computing averages
 
 # early stopping based on metrics values. 
 # LR, wall and any keys printed in the log file can be used. 
 # The key can start with Training or Validation. If not defined, the validation value will be used.
 early_stopping_patiences:                                                          # stop early if a metric value stopped decreasing for n epochs
-  Validation_loss: 50                                                              # 
-  Training_loss: 100                                                               # 
-  e_mae: 100                                                                         # 
-early_stopping_delta:                                                              # If delta is defined, a tiny decrease smaller than delta will not be considered as a decrease
-  Training_loss: 0.005                                                             # 
+  Validation_loss: 50
+
+early_stopping_delta:                                                              # If delta is defined, a decrease smaller than delta will not be considered as a decrease
+  Validation_loss: 0.005
+
 early_stopping_cumulative_delta: false                                             # If True, the minimum value recorded will not be updated when the decrease is smaller than delta
+
 early_stopping_lower_bounds:                                                       # stop early if a metric value is lower than the bound
-  LR: 1.0e-10                                                                        # 
+  LR: 1.0e-6
+
 early_stopping_upper_bounds:                                                       # stop early if a metric value is higher than the bound
-  wall: 1.0e+100                                                                      # 
+  wall: 1.0e+100
 
 # loss function
 loss_coeffs:                                                                       # different weights to use in a weighted loss functions
-  forces: 100                                                                      # for MD applications, we recommed a force weight of 100 and an energy weight of 1
-  total_energy: 1                                                                  # alternatively, if energies are not of importance, a force weight 1 and an energy weight of 0 also works.
+  forces: 1                                                                        # for MD applications, we recommed a force weight of 100 and an energy weight of 1
+  total_energy:                                                                    # alternatively, if energies are not of importance, a force weight 1 and an energy weight of 0 also works.
+    - 1
+    - PerAtomMSELoss
 
 # # default loss function is MSELoss, the name has to be exactly the same as those in torch.nn.
 # the only supprted targets are forces and total_energy
@@ -194,25 +200,13 @@ optimizer_weight_decay: 0
 # setting to inf or null disables it
 max_gradient_norm: null
 
-# weight initialization
-# this can be the importable name of any function that can be `model.apply`ed to initialize some weights in the model. NequIP provides a number of useful initializers:
-# For more details please see the docstrings of the individual initializers
-#model_initializers:
-#  - nequip.utils.initialization.uniform_initialize_fcs
-#  - nequip.utils.initialization.uniform_initialize_equivariant_linears
-#  - nequip.utils.initialization.uniform_initialize_tp_internal_weights
-#  - nequip.utils.initialization.xavier_initialize_fcs
-#  - nequip.utils.initialization.(unit_)orthogonal_initialize_equivariant_linears
-#  - nequip.utils.initialization.(unit_)orthogonal_initialize_fcs
-#  - nequip.utils.initialization.(unit_)orthogonal_initialize_e3nn_fcs
-
 # lr scheduler, currently only supports the two options listed below, if you need more please file an issue
 # first: on-plateau, reduce lr by factory of lr_scheduler_factor if metrics_key hasn't improved for lr_scheduler_patience epoch
 lr_scheduler_name: ReduceLROnPlateau
 lr_scheduler_patience: 100
 lr_scheduler_factor: 0.5
 
-# second, consine annealing with warm restart
+# second, cosine annealing with warm restart
 # lr_scheduler_name: CosineAnnealingWarmRestarts
 # lr_scheduler_T_0: 10000
 # lr_scheduler_T_mult: 2
@@ -221,7 +215,7 @@ lr_scheduler_factor: 0.5
 
 # we provide a series of options to shift and scale the data
 # these are for advanced use and usually the defaults work very well
-# the deafult is to scale the energies and forces by scaling them by the force standard deviation and to shift the energy by its mean
+# the default is to scale the energies and forces by scaling them by the force standard deviation and to shift the energy by its mean
 # in certain cases, it can be useful to have a trainable shift/scale and to also have species-dependent shifts/scales for each atom
 
 # if the PerSpeciesScaleShift is enabled in the model builder list
@@ -237,16 +231,6 @@ PerSpeciesScaleShift_shifts: 0.0
 # but ^ this mode is not compatible with global_shift = "dataset_energy_mean"
 PerSpeciesScaleShift_scales: 1.0
 
-# global energy shift. When "dataset_total_energy_mean" (the default), the mean energy of the dataset. When None, disables the global shift. When a number, used directly.
-global_rescale_shift: dataset_total_energy_mean
-# global energy scale. When "dataset_force_rms", the RMS of force components in the dataset. When "dataset_total_energy_std", the stdev of energies in the dataset. When None, disables the global scale. When a number, used directly.
-# If not provided, defaults to either dataset_force_rms or dataset_total_energy_std, depending on whether forces are being trained.
-global_rescale_scale: dataset_force_rms
-# whether the shift of the final global energy rescaling should be trainable
-trainable_global_rescale_shift: false
-# whether the scale of the final global energy rescaling should be trainable
-trainable_global_rescale_scale: false
-
 # # example block to do good per species shifting
 # # note, sigma needs to be tuned 4.0 works the best for aspirin dataset.
 # global_rescale_shift: null
@@ -258,6 +242,21 @@ trainable_global_rescale_scale: false
 #   total_energy: 
 #     alpha: 0.1
 
+# global energy shift. When "dataset_total_energy_mean" (the default), the mean energy of the dataset. When None, disables the global shift. When a number, used directly.
+global_rescale_shift: dataset_total_energy_mean
+
+# global energy scale. When "dataset_force_rms", the RMS of force components in the dataset. When "dataset_total_energy_std", the stdev of energies in the dataset. When null, disables the global scale. When a number, used directly.
+# If not provided, defaults to either dataset_force_rms or dataset_total_energy_std, depending on whether forces are being trained.
+global_rescale_scale: dataset_forces_rms
+
+# whether the shift of the final global energy rescaling should be trainable
+trainable_global_rescale_shift: false
+
+# whether the scale of the final global energy rescaling should be trainable
+trainable_global_rescale_scale: false
+
+
 # Options for e3nn's set_optimization_defaults. A dict:
 # e3nn_optimization_defaults:
 #   explicit_backward: True
+
