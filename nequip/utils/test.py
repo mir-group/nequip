@@ -1,4 +1,4 @@
-from typing import Union, Sequence, Set
+from typing import Union
 
 import torch
 from e3nn import o3
@@ -10,7 +10,6 @@ from nequip.data import (
     AtomicDataDict,
     _NODE_FIELDS,
     _EDGE_FIELDS,
-    _GRAPH_FIELDS,
 )
 
 
@@ -29,16 +28,13 @@ def assert_permutation_equivariant(
 ):
     r"""Test the permutation equivariance of ``func``.
 
-    Standard fields are assumed to be equivariant to node or edge permutations according to their standard interpretions; all other fields are assumed to be invariant to all permutations. Non-standard fields can be registered as node/edge permutation equivariant using ``register_fields``, or can be provided directly in the
-    ``extra_node_permute_fields`` and ``extra_edge_permute_fields`` arguments.
+    Standard fields are assumed to be equivariant to node or edge permutations according to their standard interpretions; all other fields are assumed to be invariant to all permutations. Non-standard fields can be registered as node/edge permutation equivariant using ``register_fields``.
 
     Raises ``AssertionError`` if issues are found.
 
     Args:
         func: the module or model to test
         data_in: the example input data to test with
-        extra_node_permute_fields: names of non-standard fields that should be equivariant to permutations of the *node* ordering
-        extra_edge_permute_fields: names of non-standard fields that should be equivariant to permutations of the *edge* ordering
     """
     # Prevent pytest from showing this function in the traceback
     # __tracebackhide__ = True
@@ -124,8 +120,6 @@ def assert_permutation_equivariant(
 def assert_AtomicData_equivariant(
     func: GraphModuleMixin,
     data_in: Union[AtomicData, AtomicDataDict.Type],
-    extra_node_permute_fields: Sequence[str] = [],
-    extra_edge_permute_fields: Sequence[str] = [],
     **kwargs,
 ):
     r"""Test the rotation, translation, parity, and permutation equivariance of ``func``.
@@ -138,8 +132,6 @@ def assert_AtomicData_equivariant(
     Args:
         func: the module or model to test
         data_in: the example input data to test with
-        extra_node_permute_fields: see ``assert_permutation_equivariant``
-        extra_edge_permute_fields: see ``assert_permutation_equivariant``
         **kwargs: passed to ``e3nn.util.test.assert_equivariant``
 
     Returns:
@@ -155,8 +147,6 @@ def assert_AtomicData_equivariant(
     assert_permutation_equivariant(
         func,
         data_in,
-        extra_node_permute_fields=extra_node_permute_fields,
-        extra_edge_permute_fields=extra_edge_permute_fields,
     )
 
     # == Test rotation, parity, and translation using e3nn ==

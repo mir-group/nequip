@@ -151,8 +151,6 @@ def test_permute_register():
     with pytest.raises(AssertionError):
         # Fails because thinks "my_edge" is invariant
         assert_permutation_equivariant(mod, data_in=dict(inp))
-    assert_permutation_equivariant(
-        mod, data_in=dict(inp), extra_edge_permute_fields=["my_edge"]
-    )
-    register_fields(edge_permute_fields=["my_edge"])
+
+    register_fields(edge_fields=["my_edge"])
     assert_permutation_equivariant(mod, data_in=dict(inp))

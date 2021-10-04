@@ -63,7 +63,7 @@ def register_fields(
     node_fields: set = set(node_fields)
     edge_fields: set = set(edge_fields)
     graph_fields: set = set(graph_fields)
-    allfields = node_fields + edge_fields + graph_fields
+    allfields = node_fields.union(edge_fields, graph_fields)
     assert len(allfields) == len(node_fields) + len(edge_fields) + len(graph_fields)
     assert (_NODE_FIELDS.union(_EDGE_FIELDS, _GRAPH_FIELDS)).isdisjoint(
         allfields
