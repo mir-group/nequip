@@ -226,6 +226,11 @@ def instantiate(
     logging.debug(f"...   optional_args = {final_optional_args},")
     logging.debug(f"...   positional_args = {positional_args})")
 
-    instance = builder(**positional_args, **final_optional_args)
+    try:
+        instance = builder(**positional_args, **final_optional_args)
+    except Exception as e:
+        raise RuntimeError(
+            f"Failed to build object with prefix `{prefix}` using builder `{builder.__name__}`"
+        ) from e
 
     return instance, final_optional_args

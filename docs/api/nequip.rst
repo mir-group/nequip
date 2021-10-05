@@ -1,4 +1,4 @@
-nequip API
+Python API
 ==========
 
  .. toctree::

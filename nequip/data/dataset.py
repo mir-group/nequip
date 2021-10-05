@@ -1,9 +1,3 @@
-"""
-Dataset classes that parse array of positions, cells to AtomicData object
-
-This module requre the torch_geometric to catch up with the github main branch from Jan. 18, 2021
-
-"""
 import numpy as np
 import logging
 import tempfile
@@ -17,8 +11,9 @@ from typing import Tuple, Dict, Any, List, Callable, Union, Optional, Sequence
 import ase
 
 import torch
-from torch_geometric.data import Batch, Dataset, download_url, extract_zip
 from torch_scatter import scatter, scatter_std
+from nequip.utils.torch_geometric import Batch, Dataset
+from nequip.utils.torch_geometric.utils import download_url, extract_zip
 
 import nequip
 from nequip.data import AtomicData, AtomicDataDict

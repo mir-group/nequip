@@ -11,7 +11,7 @@ from nequip.nn import (
 from nequip.nn.embedding import (
     OneHotAtomEncoding,
 )
-from torch_geometric.data import Batch
+from nequip.utils.torch_geometric import Batch
 
 
 @pytest.fixture(scope="class", params=[0, 1, 2])

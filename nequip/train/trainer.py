@@ -26,7 +26,6 @@ else:
 
 import numpy as np
 import e3nn
-import torch_geometric
 import torch
 from torch_ema import ExponentialMovingAverage
 
@@ -250,6 +249,7 @@ class Trainer:
         log_epoch_freq: int = 1,
         save_checkpoint_freq: int = -1,
         save_ema_checkpoint_freq: int = -1,
+        report_init_validation: bool = False,
         verbose="INFO",
         **kwargs,
     ):
@@ -302,7 +302,7 @@ class Trainer:
         # initialize training states
         self.best_val_metrics = float("inf")
         self.best_epoch = 0
-        self.iepoch = -1
+        self.iepoch = -1 if self.report_init_validation else 0
 
         self.init()
 
@@ -460,7 +460,7 @@ class Trainer:
             if hasattr(self, "config_save_path"):
                 dictionary["progress"]["config_save_path"] = self.config_save_path
 
-        for code in [e3nn, nequip, torch, torch_geometric]:
+        for code in [e3nn, nequip, torch]:
             dictionary[f"{code.__name__}_version"] = code.__version__
 
         return dictionary
@@ -540,7 +540,7 @@ class Trainer:
 
         d = deepcopy(dictionary)
 
-        for code in [e3nn, nequip, torch, torch_geometric]:
+        for code in [e3nn, nequip, torch]:
             version = d.get(f"{code.__name__}_version", None)
             if version is not None and version != code.__version__:
                 logging.warning(
@@ -681,16 +681,6 @@ class Trainer:
                     sum(p.numel() for p in self.model.parameters())
                 )
             )
-
-        if self.iepoch == -1:
-            d = self.as_dict()
-            for key in list(d.keys()):
-                if not isinstance(d[key], (float, int, str, list, tuple)):
-                    d[key] = repr(d[key])
-
-            d["start_time"] = strftime("%a, %d %b %Y %H:%M:%S", gmtime())
-
-            self.log_dictionary(d, name="Initialization")
 
         for callback in self.init_callbacks:
             callback(self)
@@ -859,15 +849,6 @@ class Trainer:
         for callback in self.end_of_epoch_callbacks:
             callback(self)
 
-    def log_dictionary(self, dictionary: dict, name: str = ""):
-        """
-        dump the keys and values of a dictionary
-        """
-
-        logger = self.logger
-        logger.info(f"* {name}")
-        logger.info(yaml.dump(dictionary))
-
     def end_of_batch_log(self, batch_type: str):
         """
         store all the loss/mae of each batch
@@ -908,7 +889,8 @@ class Trainer:
             self.logger.info("")
             self.logger.info(f"{batch_type}")
             self.logger.info(log_header)
-            if (self.iepoch == -1 and batch_type == VALIDATION) or (
+            init_step = -1 if self.report_init_validation else 0
+            if (self.iepoch == init_step and batch_type == VALIDATION) or (
                 self.iepoch == 0 and batch_type == TRAIN
             ):
                 batch_logger.info(header)

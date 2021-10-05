@@ -6,6 +6,22 @@ import e3nn.o3
 import e3nn.nn
 
 from nequip.nn import GraphModuleMixin
+from nequip.utils import Config
+
+
+# == Load old state ==
+def initialize_from_state(config: Config, model: GraphModuleMixin, initialize: bool):
+    """Initialize the model from the state dict file given by the config options `initial_model_state`."""
+    if not initialize:
+        return model  # do nothing
+    key = "initial_model_state"
+    if key not in config:
+        raise KeyError(
+            f"initialize_from_state requires the `{key}` option specifying the state to initialize from"
+        )
+    state = torch.load(config[key])
+    model.load_state_dict(state)
+    return model
 
 
 # == Init functions ==
