@@ -1,5 +1,5 @@
 import logging
-from typing import List
+from typing import List, Optional
 
 import torch
 
@@ -36,7 +36,7 @@ def RescaleEnergyEtc(
             if isinstance(value, str):
                 str_names += [value]
             elif (
-                global_scale is None
+                value is None
                 or isinstance(value, float)
                 or isinstance(value, torch.Tensor)
             ):
@@ -64,7 +64,7 @@ def RescaleEnergyEtc(
             )
 
         logging.debug(
-            f"Initially outputs are scaled by: {global_scale}, eneriges are shifted by {global_shift}."
+            f"Initially outputs are globally scaled by: {global_scale}, total_energy are globally shifted by {global_shift}."
         )
     else:
         # Put dummy values
@@ -99,7 +99,123 @@ def RescaleEnergyEtc(
     )
 
 
-def _compute_stats(str_names: List[str], dataset, stride: int):
+def PerSpeciesRescale(
+    model: GraphModuleMixin,
+    config,
+    dataset: AtomicDataset,
+    initialize: bool,
+):
+    """Add global rescaling for energy(-based quantities).
+
+    If ``initialize`` is false, doesn't compute statistics.
+    """
+    module_prefix = "PerSpeciesScaleShift_"
+
+    force_training = AtomicDataDict.FORCE_KEY in model.irreps_out
+
+    # = Determine energy rescale type =
+    # TO DO, how to make the default consistent with the global scale function?
+    global_scale = config.get(
+        "global_rescale_scale",
+        f"dataset_{AtomicDataDict.FORCE_KEY}_rms"
+        if force_training
+        else f"dataset_{AtomicDataDict.TOTAL_ENERGY_KEY}_std",
+    )
+
+    # TODO: how to make the default consistent with rescale?
+    global_shift = config.get(
+        "global_rescale_shift", f"dataset_{AtomicDataDict.TOTAL_ENERGY_KEY}_mean"
+    )
+    scales = config.get(module_prefix + "scales", None)
+    shifts = config.get(module_prefix + "shifts", None)
+    trainable = config.get(module_prefix + "trainable", False)
+    kwargs = config.get(module_prefix + "kwargs", {})
+
+    if global_shift is not None:
+        if trainable or not (scales is None and shifts is None):
+            logging.warning(
+                f"!!!! Careful global_shift is set to {global_shift}."
+                f"This is not a good set up with per species shifts: {shifts}"
+                f"and scales: {scales} that are trainable={trainable}"
+            )
+    if not trainable:
+        if scales is None and shifts is None:
+            return model
+        elif scales == 1.0 and shifts == 0.0:
+            return model
+
+    logging.info(f"Enable per species scale/shift")
+
+    # = Determine what statistics need to be compute =
+    if initialize:
+        str_names = []
+        for value in [scales, shifts, global_scale]:
+            if isinstance(value, str):
+                str_names += [value]
+            elif (
+                value is None
+                or isinstance(value, float)
+                or isinstance(value, list)
+                or isinstance(value, torch.Tensor)
+            ):
+                # valid values
+                pass
+            else:
+                raise ValueError(f"Invalid value `{value}`")
+
+        # = Compute shifts and scales =
+        computed_stats = _compute_stats(
+            str_names=str_names,
+            dataset=dataset,
+            stride=config.dataset_statistics_stride,
+            kwargs=kwargs,
+        )
+
+        if isinstance(scales, str):
+            scales = computed_stats[str_names.index(scales)]
+
+        if isinstance(shifts, str):
+            shifts = computed_stats[str_names.index(shifts)]
+
+        if isinstance(global_scale, str):
+            global_scale = computed_stats[str_names.index(global_scale)]
+
+        if global_scale is not None:
+            if scales is not None:
+                scales = scales / global_scale
+            if shifts is not None:
+                shifts = shifts / global_scale
+
+    else:
+        # Put dummy values
+        scales = None
+        shifts = None
+
+    # insert in per species shift
+    model.insert_from_parameters(
+        before="total_energy_sum",
+        name="per_species_scale_shift",
+        shared_params=config,
+        builder=PerSpeciesScaleShift,
+        params=dict(
+            field=AtomicDataDict.PER_ATOM_ENERGY_KEY,
+            out_field=AtomicDataDict.PER_ATOM_ENERGY_KEY,
+            num_types=config.num_types,
+            shifts=shifts,
+            scales=scales,
+            trainable=trainable,
+        ),
+    )
+
+    logging.debug(f"Atomic outputs are scaled by: {scales}, shifted by {shifts}.")
+
+    # == Build the model ==
+    return model
+
+
+def _compute_stats(
+    str_names: List[str], dataset, stride: int, kwargs: Optional[dict] = {}
+):
     """return the values of statistics over dataset
     quantity name should be dataset_key_stat, where key can be any key
     that exists in the dataset, stat can be mean, std
@@ -119,6 +235,7 @@ def _compute_stats(str_names: List[str], dataset, stride: int):
     ids = []
     tuple_ids = []
     tuple_id_map = {"mean": 0, "std": 1, "rms": 0}
+    input_kwargs = {}
     for name in str_names:
 
         # remove dataset prefix
@@ -151,11 +268,15 @@ def _compute_stats(str_names: List[str], dataset, stride: int):
             stat_strs += [stat_str]
             stat_modes += [stat_mode]
             stat_fields += [field]
+            if stat_mode.startswith("per_species_"):
+                if field in kwargs:
+                    input_kwargs[field + stat_mode] = kwargs[field]
         tuple_ids += [tuple_id_map[stat]]
 
     values = dataset.statistics(
         fields=stat_fields,
         modes=stat_modes,
         stride=stride,
+        kwargs=input_kwargs,
     )
     return [values[idx][tuple_ids[i]] for i, idx in enumerate(ids)]
