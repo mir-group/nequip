@@ -263,7 +263,7 @@ class TestEquivariance:
 
 class TestCutoff:
     def test_large_separation(self, model, config, molecules):
-        atol = {torch.float32: 1e-6, torch.float64: 1e-10}[torch.get_default_dtype()]
+        atol = {torch.float32: 1e-4, torch.float64: 1e-10}[torch.get_default_dtype()]
         instance, _ = model
         r_max = config["r_max"]
         atoms1 = molecules[0].copy()

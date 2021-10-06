@@ -4,13 +4,11 @@ import torch
 
 from e3nn import o3
 
-from nequip.data import AtomicDataDict
+from nequip.data import AtomicDataDict, register_fields, deregister_fields
 from nequip.nn import GraphModuleMixin
 from nequip.utils.test import (
     assert_AtomicData_equivariant,
     assert_permutation_equivariant,
-    register_fields,
-    deregister_fields,
 )
 
 
@@ -153,8 +151,6 @@ def test_permute_register():
     with pytest.raises(AssertionError):
         # Fails because thinks "my_edge" is invariant
         assert_permutation_equivariant(mod, data_in=dict(inp))
-    assert_permutation_equivariant(
-        mod, data_in=dict(inp), extra_edge_permute_fields=["my_edge"]
-    )
-    register_fields(edge_permute_fields=["my_edge"])
+
+    register_fields(edge_fields=["my_edge"])
     assert_permutation_equivariant(mod, data_in=dict(inp))

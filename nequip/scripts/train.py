@@ -27,6 +27,7 @@ default_config = dict(
     compile_model=False,
     model_builders=[
         "EnergyModel",
+        "PerSpeciesRescale",
         "ForceOutput",
         "RescaleEnergyEtc",
     ],

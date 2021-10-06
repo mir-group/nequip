@@ -23,7 +23,6 @@ def EnergyModel(config) -> SequentialGraphNetwork:
     logging.debug("Start building the network model")
 
     num_layers = config.get("num_layers", 3)
-    add_per_species_shift = config.get("PerSpeciesScaleShift_enable", False)
 
     layers = {
         # -- Encode --
@@ -51,15 +50,6 @@ def EnergyModel(config) -> SequentialGraphNetwork:
             ),
         }
     )
-
-    if add_per_species_shift:
-        layers["per_species_scale_shift"] = (
-            PerSpeciesScaleShift,
-            dict(
-                field=AtomicDataDict.PER_ATOM_ENERGY_KEY,
-                out_field=AtomicDataDict.PER_ATOM_ENERGY_KEY,
-            ),
-        )
 
     layers["total_energy_sum"] = (
         AtomwiseReduce,

@@ -30,6 +30,7 @@ Most recent change on the bottom.
 - update example.yaml and full.yaml with better defaults, new loss function, and switched to toluene-ccsd(t) as example 
 data
 - `use_sc` defaults to `True`
+- `register_fields` is now in `nequip.data`
 
 ### Fixed
 - The first 20 epochs/calls of inference are no longer painfully slow for recompilation
