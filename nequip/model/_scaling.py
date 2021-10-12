@@ -3,7 +3,7 @@ from typing import List, Optional
 
 import torch
 
-from nequip.nn import RescaleOutput, GraphModuleMixin
+from nequip.nn import RescaleOutput, GraphModuleMixin, PerSpeciesScaleShift
 from nequip.data import AtomicDataDict, AtomicDataset
 
 
