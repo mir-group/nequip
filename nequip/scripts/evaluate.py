@@ -217,7 +217,11 @@ def main(args=None, running_as_script: bool = True):
 
     # Determine the test set
     # this makes no sense if a dataset is given seperately
-    if train_idcs is not None and dataset_is_from_training:
+    if (
+        args.test_indexes is None
+        and train_idcs is not None
+        and dataset_is_from_training
+    ):
         # we know the train and val, get the rest
         all_idcs = set(range(len(dataset)))
         # set operations
@@ -238,6 +242,12 @@ def main(args=None, running_as_script: bool = True):
             logger.info(
                 "WARNING: using the automatic test set ^^^ but not computing metrics, is this really what you wanted to do?",
             )
+    elif args.test_indexes is None:
+        # Default to all frames
+        test_idcs = torch.arange(dataset.len())
+        logger.info(
+            f"Using all frames from the specified test dataset, yielding a test set size of {len(test_idcs)} frames.",
+        )
     else:
         # load from file
         test_idcs = load_file(
