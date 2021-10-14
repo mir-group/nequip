@@ -24,10 +24,7 @@ def RescaleEnergyEtc(
         if AtomicDataDict.FORCE_KEY in model.irreps_out
         else f"dataset_{AtomicDataDict.TOTAL_ENERGY_KEY}_std",
     )
-    # TODO: change this default?
-    global_shift = config.get(
-        "global_rescale_shift", f"dataset_{AtomicDataDict.TOTAL_ENERGY_KEY}_mean"
-    )
+    global_shift = config.get("global_rescale_shift", None)
 
     # = Get statistics of training dataset =
     if initialize:
@@ -115,19 +112,25 @@ def PerSpeciesRescale(
 
     # = Determine energy rescale type =
     # TO DO, how to make the default consistent with the global scale function?
-    global_scale = config.get(
-        "global_rescale_scale",
+    default_global_scale = (
         f"dataset_{AtomicDataDict.FORCE_KEY}_rms"
         if force_training
         else f"dataset_{AtomicDataDict.TOTAL_ENERGY_KEY}_std",
     )
+    global_scale = config.get("global_rescale_scale", default_global_scale)
 
     # TODO: how to make the default consistent with rescale?
-    global_shift = config.get(
-        "global_rescale_shift", f"dataset_{AtomicDataDict.TOTAL_ENERGY_KEY}_mean"
+    global_shift = config.get("global_rescale_shift", None)
+    default_scale = (
+        f"dataset_{AtomicDataDict.FORCE_KEY}_rms"
+        if force_training
+        else f"dataset_per_atom_{AtomicDataDict.TOTAL_ENERGY_KEY}_std",
     )
-    scales = config.get(module_prefix + "scales", None)
-    shifts = config.get(module_prefix + "shifts", None)
+    scales = config.get(module_prefix + "scales", default_scale)
+    shifts = config.get(
+        module_prefix + "shifts",
+        f"dataset_per_atom_{AtomicDataDict.TOTAL_ENERGY_KEY}_mean",
+    )
     trainable = config.get(module_prefix + "trainable", False)
     kwargs = config.get(module_prefix + "kwargs", {})
 
