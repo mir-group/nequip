@@ -116,6 +116,7 @@ metrics_key: loss                                                               
 use_ema: true                                                                      # if true, use exponential moving average on weights for val/test, usually helps a lot with training, in particular for energy errors
 ema_decay: 0.99                                                                    # ema weight, typically set to 0.99 or 0.999
 ema_use_num_updates: true                                                          # whether to use number of updates when computing averages
+report_init_validation: false                                                      # if True, report the validation error for just initialized model
 
 # early stopping based on metrics values. 
 # LR, wall and any keys printed in the log file can be used. 

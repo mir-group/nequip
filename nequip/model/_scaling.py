@@ -7,6 +7,23 @@ from nequip.nn import RescaleOutput, GraphModuleMixin, PerSpeciesScaleShift
 from nequip.data import AtomicDataDict, AtomicDataset
 
 
+def default_rescale_value(value_name: str, force_training: Optional[bool] = True):
+    values = dict(
+        global_scale=f"dataset_{AtomicDataDict.FORCE_KEY}_rms"
+        if force_training
+        else f"dataset_{AtomicDataDict.TOTAL_ENERGY_KEY}_std",
+        global_shift=None,
+        scales=f"dataset_{AtomicDataDict.FORCE_KEY}_rms"
+        if force_training
+        else f"dataset_per_atom_{AtomicDataDict.TOTAL_ENERGY_KEY}_std",
+        shifts=f"dataset_per_atom_{AtomicDataDict.TOTAL_ENERGY_KEY}_mean",
+        trainable_per_species_scales_shifts=False,
+        trainable_global_rescale_shift=False,
+        trainable_global_rescale_scale=False,
+    )
+    return values[value_name]
+
+
 def RescaleEnergyEtc(
     model: GraphModuleMixin,
     config,
@@ -18,13 +35,13 @@ def RescaleEnergyEtc(
     If ``initialize`` is false, doesn't compute statistics.
     """
 
+    force_training = AtomicDataDict.FORCE_KEY in model.irreps_out
     global_scale = config.get(
-        "global_rescale_scale",
-        f"dataset_{AtomicDataDict.FORCE_KEY}_rms"
-        if AtomicDataDict.FORCE_KEY in model.irreps_out
-        else f"dataset_{AtomicDataDict.TOTAL_ENERGY_KEY}_std",
+        "global_rescale_scale", default_rescale_value("global_scale", force_training)
     )
-    global_shift = config.get("global_rescale_shift", None)
+    global_shift = config.get(
+        "global_rescale_shift", default_rescale_value("global_shift")
+    )
 
     # = Get statistics of training dataset =
     if initialize:
@@ -88,10 +105,12 @@ def RescaleEnergyEtc(
         ],
         shift_by=global_shift,
         trainable_global_rescale_shift=config.get(
-            "trainable_global_rescale_shift", False
+            "trainable_global_rescale_shift",
+            default_rescale_value("trainable_global_rescale_shift"),
         ),
         trainable_global_rescale_scale=config.get(
-            "trainable_global_rescale_scale", False
+            "trainable_global_rescale_scale",
+            default_rescale_value("trainable_global_rescale_scale"),
         ),
     )
 
@@ -113,25 +132,21 @@ def PerSpeciesRescale(
         "force_training", "ForceOutput" in config["model_builders"]
     )
 
-    default_global_scale = (
-        f"dataset_{AtomicDataDict.FORCE_KEY}_rms"
-        if force_training
-        else f"dataset_{AtomicDataDict.TOTAL_ENERGY_KEY}_std"
-    )
-    default_global_shift = None
-    default_scale = (
-        f"dataset_{AtomicDataDict.FORCE_KEY}_rms"
-        if force_training
-        else f"dataset_per_atom_{AtomicDataDict.TOTAL_ENERGY_KEY}_std"
-    )
-    default_shifts = f"dataset_per_atom_{AtomicDataDict.TOTAL_ENERGY_KEY}_mean"
-
     # = Determine energy rescale type =
-    global_scale = config.get("global_rescale_scale", default_global_scale)
-    global_shift = config.get("global_rescale_shift", default_global_shift)
-    scales = config.get(module_prefix + "scales", default_scale)
-    shifts = config.get(module_prefix + "shifts", default_shifts)
-    trainable = config.get(module_prefix + "trainable", False)
+    global_scale = config.get(
+        "global_rescale_scale", default_rescale_value("global_scale", force_training)
+    )
+    global_shift = config.get(
+        "global_rescale_shift", default_rescale_value("global_shift")
+    )
+    scales = config.get(
+        module_prefix + "scales", default_rescale_value("scales", force_training)
+    )
+    shifts = config.get(module_prefix + "shifts", default_rescale_value("shifts"))
+    trainable = config.get(
+        module_prefix + "trainable",
+        default_rescale_value("trainable_per_species_scales_shifts"),
+    )
     kwargs = config.get(module_prefix + "kwargs", {})
 
     if global_shift is not None:
