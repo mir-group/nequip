@@ -108,29 +108,29 @@ def PerSpeciesRescale(
     """
     module_prefix = "PerSpeciesScaleShift_"
 
-    force_training = AtomicDataDict.FORCE_KEY in model.irreps_out
-
-    # = Determine energy rescale type =
     # TO DO, how to make the default consistent with the global scale function?
+    force_training = config.get(
+        "force_training", "ForceOutput" in config["model_builders"]
+    )
+
     default_global_scale = (
         f"dataset_{AtomicDataDict.FORCE_KEY}_rms"
         if force_training
-        else f"dataset_{AtomicDataDict.TOTAL_ENERGY_KEY}_std",
+        else f"dataset_{AtomicDataDict.TOTAL_ENERGY_KEY}_std"
     )
-    global_scale = config.get("global_rescale_scale", default_global_scale)
-
-    # TODO: how to make the default consistent with rescale?
-    global_shift = config.get("global_rescale_shift", None)
+    default_global_shift = None
     default_scale = (
         f"dataset_{AtomicDataDict.FORCE_KEY}_rms"
         if force_training
-        else f"dataset_per_atom_{AtomicDataDict.TOTAL_ENERGY_KEY}_std",
+        else f"dataset_per_atom_{AtomicDataDict.TOTAL_ENERGY_KEY}_std"
     )
+    default_shifts = f"dataset_per_atom_{AtomicDataDict.TOTAL_ENERGY_KEY}_mean"
+
+    # = Determine energy rescale type =
+    global_scale = config.get("global_rescale_scale", default_global_scale)
+    global_shift = config.get("global_rescale_shift", default_global_shift)
     scales = config.get(module_prefix + "scales", default_scale)
-    shifts = config.get(
-        module_prefix + "shifts",
-        f"dataset_per_atom_{AtomicDataDict.TOTAL_ENERGY_KEY}_mean",
-    )
+    shifts = config.get(module_prefix + "shifts", default_shifts)
     trainable = config.get(module_prefix + "trainable", False)
     kwargs = config.get(module_prefix + "kwargs", {})
 
@@ -164,7 +164,7 @@ def PerSpeciesRescale(
                 # valid values
                 pass
             else:
-                raise ValueError(f"Invalid value `{value}`")
+                raise ValueError(f"Invalid value `{value}` of type {type(value)}")
 
         # = Compute shifts and scales =
         computed_stats = _compute_stats(
