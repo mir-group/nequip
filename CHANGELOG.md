@@ -20,6 +20,7 @@ Most recent change on the bottom.
 - Normalize total energy loss by the number of atoms via PerAtomLoss
 - Model builder to initialize training from previous checkpoint
 - Better error when instantiation fails
+- Default total energy scaling is changed from global mode to per atom mode.
 
 ### Changed
 - Name processed datasets based on a hash of their parameters to ensure only valid cached data is used
