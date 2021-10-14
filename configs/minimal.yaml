@@ -51,4 +51,3 @@ loss_coeffs: forces
 
 # optimizer
 optimizer_name: Adam
-verbose: debug
