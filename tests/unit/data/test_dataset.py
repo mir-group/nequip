@@ -183,18 +183,17 @@ class TestStatistics:
 
 
 class TestPerSpeciesStatistics:
+    @pytest.mark.parametrize("fixed_field", [True, False])
+    @pytest.mark.parametrize("mode", ["mean_std", "rms"])
+    def test_per_node_field(self, npz_dataset, fixed_field, mode):
+        # set up the transformer
+        npz_dataset = set_up_transformer(npz_dataset, not fixed_field, fixed_field)
 
-    # @pytest.mark.parametrize("fixed_field", [True, False])
-    # @pytest.mark.parametrize("mode", ["mean_std", "rms"])
-    # def test_per_node_field(self, npz_dataset, fixed_field, mode):
-    #     # set up the transformer
-    #     npz_dataset = set_up_transformer(npz_dataset, not fixed_field, fixed_field)
-
-    #     (result,) = npz_dataset.statistics(
-    #         [AtomicDataDict.BATCH_KEY],
-    #         modes=[f"per_species_{mode}"],
-    #     )
-    #     print(result)
+        (result,) = npz_dataset.statistics(
+            [AtomicDataDict.BATCH_KEY],
+            modes=[f"per_species_{mode}"],
+        )
+        print(result)
 
     @pytest.mark.parametrize("alpha", [1e-10, 1e-6, 0.1, 0.5, 1])
     @pytest.mark.parametrize("fixed_field", [True, False])
