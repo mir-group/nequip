@@ -1,8 +1,10 @@
 import logging
+from numpy.core.fromnumeric import diagonal
 import torch
+import numpy as np
 from typing import Optional
 from sklearn.gaussian_process import GaussianProcessRegressor
-from sklearn.gaussian_process.kernels import DotProduct
+from sklearn.gaussian_process.kernels import DotProduct, Kernel, Hyperparameter
 
 
 def solver(
@@ -10,15 +12,43 @@ def solver(
     y,
     alpha=0.1,
     max_iteration: Optional[int] = 20,
-    regressor: Optional[str] = "GaussianProcess",
+    regressor: Optional[str] = "NormalizedGaussianProcess",
 ):
 
     if regressor == "GaussianProcess":
-
         return gp(X, y, alpha, max_iteration)
+    elif regressor == "NormalizedGaussianProcess":
+        return normalized_gp(X, y, alpha, max_iteration)
+    else:
+        raise NotImplementedError(f"{regressor} is not implemented")
+
+
+def normalized_gp(X, y, alpha, max_iteration: int = 20):
+    print(np.sqrt(np.average(X ** 2, axis=0)))
+    feature_rms = 1.0 / np.sqrt(np.average(X ** 2, axis=0))
+    feature_rms = np.nan_to_num(feature_rms, 0)
+    return base_gp(
+        X,
+        y,
+        NormalizedDotProduct,
+        {"diagonal_elements": feature_rms},
+        alpha,
+        max_iteration,
+    )
 
 
 def gp(X, y, alpha, max_iteration: int = 20):
+    return base_gp(
+        X,
+        y,
+        DotProduct,
+        {"sigma_0": 0, "sigma_0_bounds": "fixed"},
+        alpha,
+        max_iteration,
+    )
+
+
+def base_gp(X, y, kernel, kernel_kwargs, alpha, max_iteration: int = 20):
 
     if len(y.shape) == 1:
         y = y.reshape([-1, 1])
@@ -30,8 +60,8 @@ def gp(X, y, alpha, max_iteration: int = 20):
     while not_fit:
         logging.debug("GP fitting iteration", iteration, alpha)
         try:
-            kernel = DotProduct(sigma_0=0, sigma_0_bounds="fixed")
-            gpr = GaussianProcessRegressor(kernel=kernel, random_state=0, alpha=alpha)
+            _kernel = kernel(**kernel_kwargs)
+            gpr = GaussianProcessRegressor(kernel=_kernel, random_state=0, alpha=alpha)
             gpr = gpr.fit(X, y)
 
             vec = torch.diag(torch.ones(X.shape[1]))
@@ -75,3 +105,80 @@ def gp(X, y, alpha, max_iteration: int = 20):
                 )
 
     return mean, std
+
+
+class NormalizedDotProduct(Kernel):
+    r"""Dot-Product kernel.
+    .. math::
+        k(x_i, x_j) = x_i \cdot A \cdot x_j
+    The DotProduct kernel is commonly combined with exponentiation.
+
+    """
+
+    def __init__(self, diagonal_elements):
+        # TO DO: check shape
+        self.diagonal_elements = diagonal_elements
+        self.A = np.diag(diagonal_elements)
+
+    def __call__(self, X, Y=None, eval_gradient=False):
+        """Return the kernel k(X, Y) and optionally its gradient.
+        Parameters
+        ----------
+        X : ndarray of shape (n_samples_X, n_features)
+            Left argument of the returned kernel k(X, Y)
+        Y : ndarray of shape (n_samples_Y, n_features), default=None
+            Right argument of the returned kernel k(X, Y). If None, k(X, X)
+            if evaluated instead.
+        eval_gradient : bool, default=False
+            Determines whether the gradient with respect to the log of
+            the kernel hyperparameter is computed.
+            Only supported when Y is None.
+        Returns
+        -------
+        K : ndarray of shape (n_samples_X, n_samples_Y)
+            Kernel k(X, Y)
+        K_gradient : ndarray of shape (n_samples_X, n_samples_X, n_dims),\
+                optional
+            The gradient of the kernel k(X, X) with respect to the log of the
+            hyperparameter of the kernel. Only returned when `eval_gradient`
+            is True.
+        """
+        X = np.atleast_2d(X)
+        if Y is None:
+            K = (X.dot(self.A)).dot(X.T)
+        else:
+            if eval_gradient:
+                raise ValueError("Gradient can only be evaluated when Y is None.")
+            K = (X.dot(self.A)).dot(Y.T)
+
+        if eval_gradient:
+            return K, np.empty((X.shape[0], X.shape[0], 0))
+        else:
+            return K
+
+    def diag(self, X):
+        """Returns the diagonal of the kernel k(X, X).
+        The result of this method is identical to np.diag(self(X)); however,
+        it can be evaluated more efficiently since only the diagonal is
+        evaluated.
+        Parameters
+        ----------
+        X : ndarray of shape (n_samples_X, n_features)
+            Left argument of the returned kernel k(X, Y).
+        Returns
+        -------
+        K_diag : ndarray of shape (n_samples_X,)
+            Diagonal of kernel k(X, X).
+        """
+        return np.einsum("ij,ij,jj->i", X, X, self.A)
+
+    def __repr__(self):
+        return ""
+
+    def is_stationary(self):
+        """Returns whether the kernel is stationary."""
+        return False
+
+    @property
+    def hyperparameter_diagonal_elements(self):
+        return Hyperparameter("diagonal_elements", "numeric", "fixed")

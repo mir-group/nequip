@@ -183,22 +183,28 @@ class TestStatistics:
 
 
 class TestPerSpeciesStatistics:
-    @pytest.mark.parametrize("fixed_field", [True, False])
-    @pytest.mark.parametrize("mode", ["mean_std", "rms"])
-    def test_per_node_field(self, npz_dataset, fixed_field, mode):
-        # set up the transformer
-        npz_dataset = set_up_transformer(npz_dataset, not fixed_field, fixed_field)
 
-        (result,) = npz_dataset.statistics(
-            [AtomicDataDict.BATCH_KEY],
-            modes=[f"per_species_{mode}"],
-        )
-        print(result)
+    # @pytest.mark.parametrize("fixed_field", [True, False])
+    # @pytest.mark.parametrize("mode", ["mean_std", "rms"])
+    # def test_per_node_field(self, npz_dataset, fixed_field, mode):
+    #     # set up the transformer
+    #     npz_dataset = set_up_transformer(npz_dataset, not fixed_field, fixed_field)
+
+    #     (result,) = npz_dataset.statistics(
+    #         [AtomicDataDict.BATCH_KEY],
+    #         modes=[f"per_species_{mode}"],
+    #     )
+    #     print(result)
 
     @pytest.mark.parametrize("alpha", [1e-10, 1e-6, 0.1, 0.5, 1])
     @pytest.mark.parametrize("fixed_field", [True, False])
     @pytest.mark.parametrize("full_rank", [True, False])
-    def test_per_graph_field(self, npz_dataset, alpha, fixed_field, full_rank):
+    @pytest.mark.parametrize(
+        "regressor", ["NormalizedGaussianProcess", "GaussianProcess"]
+    )
+    def test_per_graph_field(
+        self, npz_dataset, alpha, fixed_field, full_rank, regressor
+    ):
 
         npz_dataset = set_up_transformer(npz_dataset, full_rank, fixed_field)
         if npz_dataset is None:
@@ -231,7 +237,7 @@ class TestPerSpeciesStatistics:
             modes=["per_species_mean_std"],
             kwargs={
                 AtomicDataDict.TOTAL_ENERGY_KEY
-                + "per_species_mean_std": {"alpha": alpha}
+                + "per_species_mean_std": {"alpha": alpha, "regressor": regressor}
             },
         )
 
