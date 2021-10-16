@@ -7,6 +7,9 @@ from nequip.nn import RescaleOutput, GraphModuleMixin, PerSpeciesScaleShift
 from nequip.data import AtomicDataDict, AtomicDataset
 
 
+RESCALE_THRESHOLD = 1e-6
+
+
 def default_rescale_value(value_name: str, force_training: Optional[bool] = True):
     values = dict(
         global_scale=f"dataset_{AtomicDataDict.FORCE_KEY}_rms"
@@ -71,7 +74,6 @@ def RescaleEnergyEtc(
         if isinstance(global_shift, str):
             global_shift = computed_stats[str_names.index(global_shift)]
 
-        RESCALE_THRESHOLD = 1e-6
         if isinstance(global_scale, float) and global_scale < RESCALE_THRESHOLD:
             raise ValueError(
                 f"Global energy scaling was very low: {global_scale}. If dataset values were used, does the dataset contain insufficient variation? Maybe try disabling global scaling with global_scale=None."
@@ -191,9 +193,13 @@ def PerSpeciesRescale(
 
         if isinstance(scales, str):
             scales = computed_stats[str_names.index(scales)]
+        elif isinstance(scales, list):
+            scales = torch.as_tensor(scales)
 
         if isinstance(shifts, str):
             shifts = computed_stats[str_names.index(shifts)]
+        elif isinstance(shifts, list):
+            shifts = torch.as_tensor(shifts)
 
         if isinstance(global_scale, str):
             global_scale = computed_stats[str_names.index(global_scale)]
@@ -208,6 +214,11 @@ def PerSpeciesRescale(
         # Put dummy values
         scales = None
         shifts = None
+
+    if scales.min() < RESCALE_THRESHOLD:
+        raise ValueError(
+            f"Per species energy scaling was very low: {scales}. Maybe try setting {module_prefix}scales = 1."
+        )
 
     # insert in per species shift
     model.insert_from_parameters(

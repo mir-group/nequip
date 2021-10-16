@@ -10,7 +10,7 @@ from sklearn.gaussian_process.kernels import DotProduct, Kernel, Hyperparameter
 def solver(
     X,
     y,
-    alpha=0.1,
+    alpha: Optional[float] = 0.1,
     max_iteration: Optional[int] = 20,
     regressor: Optional[str] = "NormalizedGaussianProcess",
 ):
@@ -23,7 +23,7 @@ def solver(
         raise NotImplementedError(f"{regressor} is not implemented")
 
 
-def normalized_gp(X, y, alpha, max_iteration: int = 20):
+def normalized_gp(X, y, alpha, max_iteration):
     print(np.sqrt(np.average(X ** 2, axis=0)))
     feature_rms = 1.0 / np.sqrt(np.average(X ** 2, axis=0))
     feature_rms = np.nan_to_num(feature_rms, 0)
@@ -37,7 +37,7 @@ def normalized_gp(X, y, alpha, max_iteration: int = 20):
     )
 
 
-def gp(X, y, alpha, max_iteration: int = 20):
+def gp(X, y, alpha, max_iteration):
     return base_gp(
         X,
         y,
@@ -48,7 +48,7 @@ def gp(X, y, alpha, max_iteration: int = 20):
     )
 
 
-def base_gp(X, y, kernel, kernel_kwargs, alpha, max_iteration: int = 20):
+def base_gp(X, y, kernel, kernel_kwargs, alpha, max_iteration):
 
     if len(y.shape) == 1:
         y = y.reshape([-1, 1])
