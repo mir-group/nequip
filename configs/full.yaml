@@ -234,7 +234,7 @@ PerSpeciesScaleShift_scales: dataset_forces_rms
 # *  "dataset_per_atom_total_energy_std", which computes the per atom energy std
 # *  "dataset_per_species_total_energy_std", which uses the GP model uncertainty
 # *  "dataset_per_species_forces_rms", which compute the force rms for each species
-# If not provided, defaults to dataset_force_rms or dataset_per_atom_total_energy_std, depending on whether forces are being trained.
+# If not provided, defaults to dataset_per_species_force_rms or dataset_per_atom_total_energy_std, depending on whether forces are being trained.
 PerSpeciesScaleShift_kwargs: 
   total_energy: 
     alpha: 0.1

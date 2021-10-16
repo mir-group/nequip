@@ -13,7 +13,7 @@ def default_rescale_value(value_name: str, force_training: Optional[bool] = True
         if force_training
         else f"dataset_{AtomicDataDict.TOTAL_ENERGY_KEY}_std",
         global_shift=None,
-        scales=f"dataset_{AtomicDataDict.FORCE_KEY}_rms"
+        scales=f"dataset_per_species_{AtomicDataDict.FORCE_KEY}_rms"
         if force_training
         else f"dataset_per_atom_{AtomicDataDict.TOTAL_ENERGY_KEY}_std",
         shifts=f"dataset_per_atom_{AtomicDataDict.TOTAL_ENERGY_KEY}_mean",
