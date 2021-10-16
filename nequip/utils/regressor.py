@@ -1,7 +1,21 @@
 import logging
 import torch
+from typing import Optional
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import DotProduct
+
+
+def solver(
+    X,
+    y,
+    alpha=0.1,
+    max_iteration: Optional[int] = 20,
+    regressor: Optional[str] = "GaussianProcess",
+):
+
+    if regressor == "GaussianProcess":
+
+        return gp(X, y, alpha, max_iteration)
 
 
 def gp(X, y, alpha, max_iteration: int = 20):
