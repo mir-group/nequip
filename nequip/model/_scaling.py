@@ -193,20 +193,21 @@ def PerSpeciesRescale(
             if shifts is not None:
                 shifts = shifts / global_scale
 
+        if scales.min() < RESCALE_THRESHOLD:
+            raise ValueError(
+                f"Per species energy scaling was very low: {scales}. Maybe try setting {module_prefix}scales = 1."
+            )
+
     else:
+
         # Put dummy values
         scales = None
         shifts = None
 
-    if scales.min() < RESCALE_THRESHOLD:
-        raise ValueError(
-            f"Per species energy scaling was very low: {scales}. Maybe try setting {module_prefix}scales = 1."
-        )
-
     # insert in per species shift
     model.insert_from_parameters(
         before="total_energy_sum",
-        name="per_species_scale_shift",
+        name="per_species_rescale",
         shared_params=config,
         builder=PerSpeciesScaleShift,
         params=dict(
