@@ -1,3 +1,4 @@
+import logging
 from typing import Optional, List
 
 import torch
@@ -144,5 +145,10 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
 
     def update_for_rescale(self, rescale_module):
         if not self.fixed_numerics and rescale_module._has_scale:
+            logging.debug(
+                f"PerSpeciesScaleShift is rescaled\n"
+                f"Original scales {self.scales} shifts: {self.shifts}"
+            )
             self.scales = self.scales / rescale_module.scale_by
             self.shifts = self.shifts / rescale_module.scale_by
+            logging.debug(f"New scales {self.scales} shifts: {self.shifts}")
