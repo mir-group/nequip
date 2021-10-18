@@ -181,17 +181,14 @@ def PerSpeciesRescale(
     # insert in per species shift
     model.insert_from_parameters(
         before="total_energy_sum",
-        name="per_species_rescale",
+        name=module_prefix,
         shared_params=config,
         builder=PerSpeciesScaleShift,
         params=dict(
             field=AtomicDataDict.PER_ATOM_ENERGY_KEY,
             out_field=AtomicDataDict.PER_ATOM_ENERGY_KEY,
-            num_types=config.num_types,
             shifts=shifts,
             scales=scales,
-            trainable=config.get(module_prefix + "_trainable", False),
-            fixed_numerics=config.get(module_prefix + "_fixed_numerics", False),
         ),
     )
 
