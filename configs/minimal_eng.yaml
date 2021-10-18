@@ -5,7 +5,9 @@ seed: 0
 
 # network
 model_builders:
-  - nequip.models.EnergyModel
+  - EnergyModel
+  - PerSpeciesRescale
+  - RescaleEnergyEtc
 num_basis: 8
 r_max: 4.0
 irreps_edge_sh: 0e + 1o
