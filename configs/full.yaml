@@ -243,7 +243,7 @@ per_species_rescale_scales: dataset_forces_rms
 
 # global energy shift and scale
 # When "dataset_total_energy_mean", the mean energy of the dataset. When None, disables the global shift. When a number, used directly.
-# Warning: if this value is not None, the model is no longer extensive
+# Warning: if this value is not None, the model is no longer size extensive
 global_rescale_shift: null
 
 # global energy scale. When "dataset_force_rms", the RMS of force components in the dataset. When "dataset_total_energy_std", the stdev of energies in the dataset. When null, disables the global scale. When a number, used directly.
