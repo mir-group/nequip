@@ -10,21 +10,21 @@ from nequip.data import AtomicDataDict, AtomicDataset
 RESCALE_THRESHOLD = 1e-6
 
 
-def default_rescale_value(value_name: str, force_training: Optional[bool] = True):
+def get_rescale_value(config, value_name: str, force_training: Optional[bool] = True):
     values = dict(
-        global_scale=f"dataset_{AtomicDataDict.FORCE_KEY}_rms"
+        global_rescale_scale=f"dataset_{AtomicDataDict.FORCE_KEY}_rms"
         if force_training
         else f"dataset_{AtomicDataDict.TOTAL_ENERGY_KEY}_std",
-        global_shift=None,
-        scales=f"dataset_per_species_{AtomicDataDict.FORCE_KEY}_rms"
+        global_rescale_shift=None,
+        global_rescale_shift_trainable=False,
+        global_rescale_scale_trainable=False,
+        per_species_rescale_scales=f"dataset_{AtomicDataDict.FORCE_KEY}_rms"
         if force_training
         else f"dataset_per_atom_{AtomicDataDict.TOTAL_ENERGY_KEY}_std",
-        shifts=f"dataset_per_atom_{AtomicDataDict.TOTAL_ENERGY_KEY}_mean",
-        trainable_per_species_scales_shifts=False,
-        trainable_global_rescale_shift=False,
-        trainable_global_rescale_scale=False,
+        per_species_rescale_shifts=f"dataset_per_atom_{AtomicDataDict.TOTAL_ENERGY_KEY}_mean",
+        per_species_rescale_trainable=False,
     )
-    return values[value_name]
+    return config.get(value_name, values[value_name])
 
 
 def RescaleEnergyEtc(
@@ -38,13 +38,11 @@ def RescaleEnergyEtc(
     If ``initialize`` is false, doesn't compute statistics.
     """
 
+    prefix = "global_rescale"
+
     force_training = AtomicDataDict.FORCE_KEY in model.irreps_out
-    global_scale = config.get(
-        "global_rescale_scale", default_rescale_value("global_scale", force_training)
-    )
-    global_shift = config.get(
-        "global_rescale_shift", default_rescale_value("global_shift")
-    )
+    global_scale = get_rescale_value(config, f"{prefix}_scale", force_training)
+    global_shift = get_rescale_value(config, f"{prefix}_shift")
 
     # = Get statistics of training dataset =
     if initialize:
@@ -106,14 +104,8 @@ def RescaleEnergyEtc(
             k for k in (AtomicDataDict.TOTAL_ENERGY_KEY,) if k in model.irreps_out
         ],
         shift_by=global_shift,
-        trainable_global_rescale_shift=config.get(
-            "trainable_global_rescale_shift",
-            default_rescale_value("trainable_global_rescale_shift"),
-        ),
-        trainable_global_rescale_scale=config.get(
-            "trainable_global_rescale_scale",
-            default_rescale_value("trainable_global_rescale_scale"),
-        ),
+        shift_trainable=get_rescale_value(config, f"{prefix}_shift_trainable"),
+        scale_trainable=get_rescale_value(config, f"{prefix}_scale_trainable"),
     )
 
 
@@ -127,7 +119,7 @@ def PerSpeciesRescale(
 
     If ``initialize`` is false, doesn't compute statistics.
     """
-    module_prefix = "PerSpeciesScaleShift_"
+    module_prefix = "per_species_rescale"
 
     # TO DO, how to make the default consistent with the global scale function?
     force_training = config.get(
@@ -135,21 +127,12 @@ def PerSpeciesRescale(
     )
 
     # = Determine energy rescale type =
-    global_scale = config.get(
-        "global_rescale_scale", default_rescale_value("global_scale", force_training)
-    )
-    global_shift = config.get(
-        "global_rescale_shift", default_rescale_value("global_shift")
-    )
-    scales = config.get(
-        module_prefix + "scales", default_rescale_value("scales", force_training)
-    )
-    shifts = config.get(module_prefix + "shifts", default_rescale_value("shifts"))
-    trainable = config.get(
-        module_prefix + "trainable",
-        default_rescale_value("trainable_per_species_scales_shifts"),
-    )
-    kwargs = config.get(module_prefix + "kwargs", {})
+    global_scale = get_rescale_value(config, "global_rescale_scale", force_training)
+    global_shift = get_rescale_value(config, "global_rescale_shift")
+    scales = get_rescale_value(config, module_prefix + "_scales", force_training)
+    shifts = get_rescale_value(config, module_prefix + "_shifts")
+    trainable = get_rescale_value(config, module_prefix + "_trainable")
+    kwargs = config.get(module_prefix + "_kwargs", {})
 
     if global_shift is not None:
         if trainable or not (scales is None and shifts is None):

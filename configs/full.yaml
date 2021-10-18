@@ -219,15 +219,15 @@ lr_scheduler_factor: 0.5
 # the default is to scale the energies and forces by scaling them by the force standard deviation and to shift the energy by its mean
 # in certain cases, it can be useful to have a trainable shift/scale and to also have species-dependent shifts/scales for each atom
 
-PerSpeciesScaleShift_trainable: false
+per_species_rescale_trainable: false
 # whether the shifts and scales are trainable. Defaults to False. Optional
-PerSpeciesScaleShift_shifts: dataset_per_atom_total_energy_mean
+per_species_rescale_shifts: dataset_per_atom_total_energy_mean
 # initial atomic energy shift for each species. default to the mean of per atom energy. Optional
 # the value can be a constant float value, an array for each species, or a string
 # string option include: 
 # *  "dataset_per_atom_total_energy_mean", which computes the per atom average
 # *  "dataset_per_species_total_energy_mean", which automatically compute the per atom energy mean using a GP model
-PerSpeciesScaleShift_scales: dataset_forces_rms
+per_species_rescale_scales: dataset_forces_rms
 # initial atomic energy scale for each species. Optional.
 # the value can be a constant float value, an array for each species, or a string
 # string option include: 
@@ -235,9 +235,10 @@ PerSpeciesScaleShift_scales: dataset_forces_rms
 # *  "dataset_per_species_total_energy_std", which uses the GP model uncertainty
 # *  "dataset_per_species_forces_rms", which compute the force rms for each species
 # If not provided, defaults to dataset_per_species_force_rms or dataset_per_atom_total_energy_std, depending on whether forces are being trained.
-PerSpeciesScaleShift_kwargs: 
-  total_energy: 
-    alpha: 0.1
+# per_species_rescale_kwargs: 
+#   total_energy: 
+#     alpha: 0.1
+#     max_iteration: 20
 # keywords for GP decomposition of per specie energy. Optional. Defaults to 0.1
 
 # global energy shift and scale
@@ -250,25 +251,29 @@ global_rescale_shift: null
 global_rescale_scale: dataset_forces_rms
 
 # whether the shift of the final global energy rescaling should be trainable
-trainable_global_rescale_shift: false
+global_rescale_shift_trainable: false
 
 # whether the scale of the final global energy rescaling should be trainable
-trainable_global_rescale_scale: false
+global_rescale_scale_trainable: false
 
-# # example block to do good per species shifting
-# # note, sigma needs to be tuned 4.0 works the best for aspirin dataset.
+# # full block needed for per specie rescale
 # global_rescale_shift: null
+# global_rescale_shift_trainable: false
 # global_rescale_scale: dataset_forces_rms
-# PerSpeciesScaleShift_trainable: true
-# PerSpeciesScaleShift_shifts: dataset_per_atom_total_energy_mean
-# PerSpeciesScaleShift_scales: dataset_per_atom_total_energy_std
-# PerSpeciesScaleShift_kwargs: 
-#   total_energy: 
-#     alpha: 0.1
+# global_rescale_scale_trainable: false
+# per_species_rescale_trainable: true
+# per_species_rescale_shifts: dataset_per_atom_total_energy_mean
+# per_species_rescale_scales: dataset_per_atom_total_energy_std
 
-
+# # full block needed for global rescale
+# global_rescale_shift: dataset_total_energy_mean
+# global_rescale_shift_trainable: false
+# global_rescale_scale: dataset_forces_rms
+# global_rescale_scale_trainable: false
+# per_species_rescale_trainable: false
+# per_species_rescale_shifts: null
+# per_species_rescale_scales: null
 
 # Options for e3nn's set_optimization_defaults. A dict:
 # e3nn_optimization_defaults:
 #   explicit_backward: True
-
