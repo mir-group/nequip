@@ -23,14 +23,19 @@ def RescaleEnergyEtc(
 
     module_prefix = "global_rescale"
 
-    force_training = AtomicDataDict.FORCE_KEY in model.irreps_out
     global_scale = config.get(
         f"{module_prefix}_scale",
         f"dataset_{AtomicDataDict.FORCE_KEY}_rms"
-        if force_training
+        if AtomicDataDict.FORCE_KEY in model.irreps_out
         else f"dataset_{AtomicDataDict.TOTAL_ENERGY_KEY}_std",
     )
     global_shift = config.get(f"{module_prefix}_shift", None)
+
+    if global_shift is not None:
+        logging.warning(
+            f"!!!! Careful global_shift is set to {global_shift}."
+            f"The energy model will no longer be extensive"
+        )
 
     # = Get statistics of training dataset =
     if initialize:
@@ -68,13 +73,6 @@ def RescaleEnergyEtc(
         logging.debug(
             f"Initially outputs are globally scaled by: {global_scale}, total_energy are globally shifted by {global_shift}."
         )
-
-        if global_shift is not None:
-            logging.warning(
-                f"!!!! Careful global_shift is set to {global_shift}."
-                f"This is not a good set up with per species shifts: {shifts}"
-                f"and scales: {scales} that are trainable={trainable}"
-            )
 
     else:
         # Put dummy values
