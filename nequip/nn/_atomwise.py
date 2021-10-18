@@ -92,6 +92,7 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
         shifts: Optional[list] = None,
         scales: Optional[list] = None,
         trainable: bool = False,
+        fixed_numerics: bool = False,
         irreps_in={},
     ):
         super().__init__()
@@ -127,6 +128,7 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
         else:
             self.register_buffer("shifts", shifts)
             self.register_buffer("scales", scales)
+        self.fixed_numerics = fixed_numerics
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
         species_idx = data[AtomicDataDict.ATOM_TYPE_KEY]
@@ -139,3 +141,8 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
             + self.scales[species_idx].view(-1, 1) * in_field
         )
         return data
+
+    def update_for_rescale(self, rescale_module):
+        if not self.fixed_numerics and rescale_module._has_scale:
+            self.scales = self.scales / rescale_module.scale_by
+            self.shifts = self.shifts / rescale_module.scale_by
