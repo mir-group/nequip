@@ -34,6 +34,7 @@ from nequip.data import DataLoader, AtomicData, AtomicDataDict, AtomicDataset
 from nequip.utils import (
     Output,
     Config,
+    config,
     instantiate_from_cls_name,
     instantiate,
     save_file,
@@ -213,7 +214,6 @@ class Trainer:
     def __init__(
         self,
         model,
-        model_builders: Optional[list] = [],
         seed: Optional[int] = None,
         loss_coeffs: Union[dict, str] = AtomicDataDict.TOTAL_ENERGY_KEY,
         metrics_components: Optional[Union[dict, str]] = None,
@@ -251,6 +251,7 @@ class Trainer:
         save_ema_checkpoint_freq: int = -1,
         report_init_validation: bool = False,
         verbose="INFO",
+        config=None,
         **kwargs,
     ):
         self._initialized = False
@@ -266,7 +267,7 @@ class Trainer:
 
         self.ema = None
 
-        output = Output.get_output(dict(**_local_kwargs, **kwargs))
+        output = Output.get_output(config)
         self.output = output
 
         self.logfile = output.open_logfile("log", propagate=True)
@@ -294,7 +295,7 @@ class Trainer:
 
         # sort out all the other parameters
         # for samplers, optimizer and scheduler
-        self.kwargs = deepcopy(kwargs)
+        self.config = config
         self.optimizer_kwargs = deepcopy(optimizer_kwargs)
         self.lr_scheduler_kwargs = deepcopy(lr_scheduler_kwargs)
         self.early_stopping_kwargs = deepcopy(early_stopping_kwargs)
@@ -306,6 +307,14 @@ class Trainer:
 
         self.init()
 
+    @classmethod
+    def from_config(kls, model, config):
+        params = {}
+        for k in inspect.signature(kls).parameters:
+            if k in config:
+                params[k] = config[k]
+        return kls(**params, model=model, config=config)
+
     def init_objects(self):
         # initialize optimizer
         self.optim, self.optimizer_kwargs = instantiate_from_cls_name(
@@ -313,7 +322,7 @@ class Trainer:
             class_name=self.optimizer_name,
             prefix="optimizer",
             positional_args=dict(params=self.model.parameters(), lr=self.learning_rate),
-            all_args=self.kwargs,
+            all_args=self.config,
             optional_args=self.optimizer_kwargs,
         )
 
@@ -339,7 +348,7 @@ class Trainer:
                 prefix="lr_scheduler",
                 positional_args=dict(optimizer=self.optim),
                 optional_args=self.lr_scheduler_kwargs,
-                all_args=self.kwargs,
+                all_args=self.config,
             )
 
         # initialize early stopping conditions
@@ -347,7 +356,7 @@ class Trainer:
             EarlyStopping,
             prefix="early_stopping",
             optional_args=self.early_stopping_kwargs,
-            all_args=self.kwargs,
+            all_args=self.config,
             return_args_only=True,
         )
         n_args = 0
@@ -379,7 +388,7 @@ class Trainer:
             builder=Loss,
             prefix="loss",
             positional_args=dict(coeffs=self.loss_coeffs),
-            all_args=self.kwargs,
+            all_args=self.config,
         )
         self.loss_stat = LossStat(self.loss)
 
@@ -388,7 +397,7 @@ class Trainer:
         return [
             key
             for key in list(inspect.signature(Trainer.__init__).parameters.keys())
-            if key not in (["self", "kwargs", "model"] + Trainer.object_keys)
+            if key not in (["self", "kwargs", "model", "config"] + Trainer.object_keys)
         ]
 
     @property
@@ -396,7 +405,7 @@ class Trainer:
         return self.as_dict(state_dict=False, training_progress=False, kwargs=False)
 
     def update_kwargs(self, config):
-        self.kwargs.update(
+        self.config.update(
             {key: value for key, value in config.items() if key not in self.init_keys}
         )
 
@@ -622,10 +631,7 @@ class Trainer:
         if config.get("compile_model", False):
             model = torch.jit.load(traindir + "/" + model_name, map_location=device)
         else:
-            model = model_from_config(
-                config=config,
-                initialize=False,
-            )
+            model = model_from_config(config=config, initialize=False,)
             if model is not None:
                 # TODO: this is not exactly equivalent to building with
                 # this set as default dtype... does it matter?
@@ -660,7 +666,7 @@ class Trainer:
             builder=Metrics,
             prefix="metrics",
             positional_args=dict(components=self.metrics_components),
-            all_args=self.kwargs,
+            all_args=self.config,
         )
 
         if not (
@@ -826,8 +832,7 @@ class Trainer:
                 self.n_batches = len(dataset)
                 for self.ibatch, batch in enumerate(dataset):
                     self.batch_step(
-                        data=batch,
-                        validation=(category == VALIDATION),
+                        data=batch, validation=(category == VALIDATION),
                     )
                     self.end_of_batch_log(batch_type=category)
                     for callback in self.end_of_batch_callbacks:
@@ -975,11 +980,7 @@ class Trainer:
 
         lr = self.optim.param_groups[0]["lr"]
         wall = perf_counter() - self.wall
-        self.mae_dict = dict(
-            LR=lr,
-            epoch=self.iepoch,
-            wall=wall,
-        )
+        self.mae_dict = dict(LR=lr, epoch=self.iepoch, wall=wall,)
 
         header = "epoch, wall, LR"
 

@@ -48,12 +48,14 @@ class Config(object):
         config: Optional[dict] = None,
         allow_list: Optional[list] = None,
         exclude_keys: Optional[list] = None,
+        defaults: Optional[dict] = None,
     ):
 
         object.__setattr__(self, "_items", dict())
         object.__setattr__(self, "_item_types", dict())
         object.__setattr__(self, "_allow_list", list())
         object.__setattr__(self, "_allow_all", True)
+        object.__setattr__(self, "_accessed_keys", set())
 
         if allow_list is not None:
             self.add_allow_list(allow_list, default_values={})
@@ -62,6 +64,12 @@ class Config(object):
             config = {
                 key: value for key, value in config.items() if key not in exclude_keys
             }
+        if defaults is not None:
+            tmp = config
+            config = defaults.copy()
+            if tmp is not None:
+                config.update(tmp)
+            del tmp
         if config is not None:
             self.update(config)
 
@@ -80,6 +88,7 @@ class Config(object):
         return dict(self)
 
     def __getitem__(self, key):
+        self._accessed_keys.add(key)
         return self._items[key]
 
     def get_type(self, key):
@@ -151,19 +160,18 @@ class Config(object):
     __setattr__ = __setitem__
 
     def __getattr__(self, key):
+        self._accessed_keys.add(key)
         return self.__getitem__(key)
 
     def __contains__(self, key):
         return key in self._items
 
     def pop(self, *args):
+        self._accessed_keys.add(args[0])
         return self._items.pop(*args)
 
     def update_w_prefix(
-        self,
-        dictionary: dict,
-        prefix: str,
-        allow_val_change=None,
+        self, dictionary: dict, prefix: str, allow_val_change=None,
     ):
         """Mock of wandb.config function
 
@@ -190,8 +198,7 @@ class Config(object):
         for suffix in ["params", "kwargs"]:
             if f"{prefix}_{suffix}" in dictionary:
                 key3 = self.update(
-                    dictionary[f"{prefix}_{suffix}"],
-                    allow_val_change=allow_val_change,
+                    dictionary[f"{prefix}_{suffix}"], allow_val_change=allow_val_change,
                 )
                 keys.update({k: f"{prefix}_{suffix}.{k}" for k in key3})
         return keys
@@ -211,6 +218,8 @@ class Config(object):
             keys (set): set of keys being udpated
 
         """
+        if dictionary is None:
+            dictionary = {}
 
         keys = []
 
@@ -227,6 +236,7 @@ class Config(object):
         return set(keys) - set([None])
 
     def get(self, *args):
+        self._accessed_keys.add(args[0])
         return self._items.get(*args)
 
     def persist(self):
@@ -262,8 +272,7 @@ class Config(object):
             filename=filename,
             enforced_format=format,
         )
-        c = Config(defaults)
-        c.update(dictionary)
+        c = Config(dictionary, defaults=defaults)
         return c
 
     @staticmethod
@@ -334,3 +343,6 @@ class Config(object):
             return Config(config=default_params, allow_list=param_keys)
 
     load = from_file
+
+    def unused_keys(self) -> set:
+        return set(self.keys()) - self._accessed_keys

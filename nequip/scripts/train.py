@@ -131,11 +131,11 @@ def fresh_start(config):
 
         config = init_n_update(config)
 
-        trainer = TrainerWandB(model=None, **dict(config))
+        trainer = TrainerWandB.from_config(model=None, config=config)
     else:
         from nequip.train.trainer import Trainer
 
-        trainer = Trainer(model=None, **dict(config))
+        trainer = Trainer.from_config(model=None, config=config)
 
     # what is this
     # to update wandb data?
@@ -182,6 +182,13 @@ def fresh_start(config):
 
     # Store any updated config information in the trainer
     trainer.update_kwargs(config)
+
+    # = Warn about unused keys =
+    breakpoint()
+    if len(config.unused_keys()) > 0:
+        logging.warn(
+            f"Keys {', '.join('`%s`' % k for k in config.unused_keys())} appeared in the config but were not used. Please check if any of them have a typo or should have been used!!!"
+        )
 
     return trainer
 
