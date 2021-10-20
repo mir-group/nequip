@@ -18,6 +18,7 @@ from nequip.scripts.train import default_config, _set_global_options
 from nequip.utils import load_file, instantiate
 from nequip.train.loss import Loss
 from nequip.train.metrics import Metrics
+from nequip.scripts.logger import set_up_script_logger
 
 
 def main(args=None, running_as_script: bool = True):
@@ -144,18 +145,7 @@ def main(args=None, running_as_script: bool = True):
         device = torch.device(args.device)
 
     if running_as_script:
-        # Configure the root logger so stuff gets printed
-        root_logger = logging.getLogger()
-        root_logger.setLevel(logging.CRITICAL)
-        root_logger.handlers = [
-            logging.StreamHandler(sys.stderr),
-            logging.StreamHandler(sys.stdout),
-        ]
-        root_logger.handlers[0].setLevel(logging.INFO)
-        root_logger.handlers[1].setLevel(logging.CRITICAL)
-        if args.log is not None:
-            root_logger.addHandler(logging.FileHandler(args.log, mode="w"))
-            root_logger.handlers[-1].setLevel(logging.INFO)
+        set_up_script_logger(args.log)
     logger = logging.getLogger("nequip-evaluate")
     logger.setLevel(logging.INFO)
 
