@@ -1,7 +1,8 @@
 import logging
 import sys
 
-def set_up_script_logger(logfile:str):
+
+def set_up_script_logger(logfile: str):
     # Configure the root logger so stuff gets printed
     root_logger = logging.getLogger()
     root_logger.setLevel(logging.CRITICAL)

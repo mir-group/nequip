@@ -45,7 +45,7 @@ default_config = dict(
 )
 
 
-def main(args=None, running_as_script:bool =True):
+def main(args=None, running_as_script: bool = True):
 
     config = parse_command_line(args)
 
@@ -212,12 +212,14 @@ def restart(config):
         if config[k] != dictionary.get(k, ""):
             if k == "max_epochs":
                 dictionary[k] = config[k]
-                logging.info(f"Update \"{k}\" to {dictionary[k]}")
+                logging.info(f'Update "{k}" to {dictionary[k]}')
             elif k.startswith("early_stop"):
                 dictionary[k] = config[k]
-                logging.info(f"Update \"{k}\" to {dictionary[k]}")
+                logging.info(f'Update "{k}" to {dictionary[k]}')
             elif type(config[k]) == type(dictionary.get(k, "")):
-                raise ValueError(f"Key \"{k}\" is different in config and the result trainer.pth file. Please double check")
+                raise ValueError(
+                    f'Key "{k}" is different in config and the result trainer.pth file. Please double check'
+                )
 
     # recursive loop, if same type but different value
     # raise error
