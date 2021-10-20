@@ -27,6 +27,4 @@ class TrainerWandB(Trainer):
 
         Trainer.init_model(self)
 
-        # TO DO, this will trigger pickel failure
-        # we may need to go back to state_dict method for saving
-        # wandb.watch(self.model)
+        wandb.watch(self.model)
