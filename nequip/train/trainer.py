@@ -965,7 +965,7 @@ class Trainer:
 
     def final_log(self):
 
-        self.logger.info(f"! Stop training for eaching {self.stop_arg}")
+        self.logger.info(f"! Stop training: {self.stop_arg}")
         wall = perf_counter() - self.wall
         self.logger.info(f"Wall time: {wall}")
 
