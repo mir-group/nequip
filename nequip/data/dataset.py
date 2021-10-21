@@ -643,13 +643,18 @@ class NpzDataset(AtomicInMemoryDataset):
 
     # TODO: fixed fields?
     def get_data(self):
+
         data = np.load(self.raw_dir + "/" + self.raw_file_names[0], allow_pickle=True)
 
+        # only the keys explicitly mentioned in the yaml file will be parsed
         keys = set(list(self.key_mapping.keys()))
         keys.update(self.npz_fixed_field_keys)
         keys.update(self.npz_keys)
+        keys.update(list(self.extra_fixed_fields.keys()))
         keys = keys.intersection(set(list(data.keys())))
+
         mapped = {self.key_mapping.get(k, k): data[k] for k in keys}
+
         # TODO: generalize this?
         for intkey in (
             AtomicDataDict.ATOMIC_NUMBERS_KEY,
@@ -682,11 +687,16 @@ class ASEDataset(AtomicInMemoryDataset):
         extra_fixed_fields: Dict[str, Any] = {},
         include_frames: Optional[List[int]] = None,
         type_mapper: TypeMapper = None,
+        array_keys: Optional[List[str]] = [],
+        info_keys: Optional[List[str]] = [],
     ):
 
         self.ase_args = dict(index=":")
         self.ase_args.update(getattr(type(self), "ASE_ARGS", dict()))
         self.ase_args.update(ase_args)
+
+        self.array_keys = array_keys
+        self.info_keys = info_keys
 
         super().__init__(
             file_name=file_name,
@@ -752,14 +762,24 @@ class ASEDataset(AtomicInMemoryDataset):
         if self.include_frames is None:
             return (
                 [
-                    AtomicData.from_ase(atoms=atoms, **self.extra_fixed_fields)
+                    AtomicData.from_ase(
+                        atoms=atoms,
+                        array_keys=self.array_keys,
+                        info_keys=self.info_keys,
+                        **self.extra_fixed_fields,
+                    )
                     for atoms in atoms_list
                 ],
             )
         else:
             return (
                 [
-                    AtomicData.from_ase(atoms=atoms_list[i], **self.extra_fixed_fields)
+                    AtomicData.from_ase(
+                        atoms=atoms_list[i],
+                        array_keys=self.array_keys,
+                        info_keys=self.info_keys,
+                        **self.extra_fixed_fields,
+                    )
                     for i in self.include_frames
                 ],
             )
