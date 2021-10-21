@@ -281,6 +281,9 @@ class AtomicData(Data):
         Returns:
             A ``AtomicData``.
         """
+
+        assert "pos" not in kwargs
+
         add_fields = {}
         if atoms.calc is not None:
             if isinstance(
@@ -302,7 +305,11 @@ class AtomicData(Data):
 
         default_args = list(
             set(
-                ["numbers", "positions", "pbc", "cell", "pos", "r_max"]
+                [
+                    "numbers",
+                    "positions",
+                ]  # ase internal names for position and atomic_numbers
+                + ["pbc", "cell", "pos", "r_max"]  # arguments for from_points method
                 + list(kwargs.keys())
             )
         )
@@ -336,11 +343,14 @@ class AtomicData(Data):
 
         add_fields[AtomicDataDict.ATOMIC_NUMBERS_KEY] = atoms.get_atomic_numbers()
 
+        cell = kwargs.pop("cell", atoms.get_cell())
+        pbc = kwargs.pop("pbc", atoms.pbc)
+
         return cls.from_points(
             pos=atoms.positions,
             r_max=r_max,
-            cell=atoms.get_cell(),
-            pbc=atoms.pbc,
+            cell=cell,
+            pbc=pbc,
             **kwargs,
             **add_fields,
         )

@@ -76,6 +76,7 @@ class AtomicInMemoryDataset(AtomicDataset):
         force_fixed_keys (list, optional): keys to move from AtomicData to fixed_fields dictionary
         extra_fixed_fields (dict, optional): extra key that are not stored in data but needed for AtomicData initialization
         include_frames (list, optional): the frames to process with the constructor.
+        type_mapper (TypeMapper): the transformation to map atomic information to species index. Optional
     """
 
     def __init__(
@@ -591,12 +592,41 @@ class AtomicInMemoryDataset(AtomicDataset):
 class NpzDataset(AtomicInMemoryDataset):
     """Load data from an npz file.
 
-    To avoid loading unneeded data, keys are ignored by default unless they are in ``key_mapping``, ``npz_keys``, or ``npz_fixed_fields``.
+    To avoid loading unneeded data, keys are ignored by default unless they are in ``key_mapping``, ``npz_keys``,
+    ``npz_fixed_fields`` or ``extra_fixed_fields``.
 
     Args:
-        file_name (str): file name of the npz file
-        key_mapping (Dict[str, str]): mapping of npz keys to ``AtomicData`` keys
-        force_fixed_keys (list): keys in the npz to treat as fixed quantities that don't change across examples. For example: cell, atomic_numbers
+        key_mapping (Dict[str, str]): mapping of npz keys to ``AtomicData`` keys. Optional
+        npz_keys (list): the attributes to be processed and stored. Optional
+        npz_fixed_field_keys: the attributes that only have one instance but apply to all frames. Optional
+
+    Example: Given a npz file with 10 configurations, each with 14 atoms.
+
+        position: (10, 14, 3)
+        force: (10, 14, 3)
+        energy: (10,)
+        Z: (14)
+        user_label1: (10)        # per config
+        user_label2: (10, 14, 3) # per atom
+
+    The input yaml should be
+
+    ```yaml
+    dataset: npz
+    dataset_file_name: example.npz
+    npz_keys:
+      - user_label1
+      - user_label2
+    npz_fixed_field_keys:
+      - cell
+      - atomic_numbers
+    key_mapping:
+      position: pos
+      force: forces
+      energy: total_energy
+      Z: atomic_numbers
+    ```
+
     """
 
     def __init__(
@@ -672,9 +702,37 @@ class NpzDataset(AtomicInMemoryDataset):
 
 
 class ASEDataset(AtomicInMemoryDataset):
-    """TODO
+    """
 
-    r_max and an override PBC can be specified in extra_fixed_fields
+    Args:
+        ase_args (dict): arguments for ase.io.read
+        array_keys (list): the keys that needs to be parsed into dataset for
+             those stored in ase.atoms.Atoms.array. Optional
+        info_keys (list): the keys that needs to be parsed into dataset for
+             those stored in ase.atoms.Atoms.info. Optional
+
+    Example: Given an atomic data stored in "H2.extxyz" that looks like below:
+
+    ```H2.extxyz
+    2
+    Properties=species:S:1:pos:R:3 energy=-10 user_label=2.0 pbc="F F F"
+     H       0.00000000       0.00000000       0.00000000
+     H       0.00000000       0.00000000       1.02000000
+    ```
+
+    The yaml input should be
+
+    ```yaml
+    dataset: ase
+    dataset_file_name: H2.extxyz
+    ase_args:
+      format: extxyz
+    info_keys:
+      - user_label
+    chemical_symbol_to_type:
+      H: 0
+    ```
+
     """
 
     def __init__(
