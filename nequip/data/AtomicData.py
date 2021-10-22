@@ -261,7 +261,19 @@ class AtomicData(Data):
         return cls(edge_index=edge_index, pos=torch.as_tensor(pos), **kwargs)
 
     @classmethod
-    def from_ase(cls, atoms, r_max, array_keys=[], info_keys=[], **kwargs):
+    def from_ase(
+        cls,
+        atoms,
+        r_max,
+        key_mapping: dict = {
+            "forces": AtomicDataDict.FORCE_KEY,
+            "force": AtomicDataDict.FORCE_KEY,
+            "energies": AtomicDataDict.TOTAL_ENERGY_KEY,
+            "energy": AtomicDataDict.TOTAL_ENERGY_KEY,
+        },
+        include_keys=["force", "forces", "energies", "energy"],
+        **kwargs,
+    ):
         """Build a ``AtomicData`` from an ``ase.Atoms`` object.
 
         Respects ``atoms``'s ``pbc`` and ``cell``.
@@ -284,25 +296,6 @@ class AtomicData(Data):
 
         assert "pos" not in kwargs
 
-        add_fields = {}
-        if atoms.calc is not None:
-            if isinstance(
-                atoms.calc, (SinglePointCalculator, SinglePointDFTCalculator)
-            ):
-                add_fields = deepcopy(atoms.calc.results)
-                if "forces" in add_fields:
-                    add_fields.pop("forces")
-                    add_fields[AtomicDataDict.FORCE_KEY] = atoms.get_forces()
-
-                if "free_energy" in add_fields and "energy" not in add_fields:
-                    add_fields[AtomicDataDict.TOTAL_ENERGY_KEY] = add_fields.pop(
-                        "free_energy"
-                    )
-                elif "energy" in add_fields:
-                    add_fields[AtomicDataDict.TOTAL_ENERGY_KEY] = add_fields.pop(
-                        "energy"
-                    )
-
         default_args = list(
             set(
                 [
@@ -314,35 +307,40 @@ class AtomicData(Data):
             )
         )
 
-        # Get info from atoms.arrays
-        for k, v in atoms.arrays.items():
-            if k in default_args:
-                pass
-            elif k in add_fields:
-                pass
-            elif k in ("force", "forces"):
-                if AtomicDataDict.FORCE_KEY not in add_fields:
-                    add_fields[AtomicDataDict.FORCE_KEY] = v
-            elif k in ("energy", "energies"):
-                if AtomicDataDict.TOTAL_ENERGY_KEY not in add_fields:
-                    add_fields[AtomicDataDict.TOTAL_ENERGY_KEY] = v
-            elif k in array_keys:
-                add_fields[k] = v
+        add_fields = {}
 
-        # Get info from atoms.info
-        for k, v in atoms.info.items():
-            if k in default_args:
-                pass
-            elif k in add_fields:
-                pass
-            elif k in ("energy", "energies", "free_energy"):
-                if AtomicDataDict.TOTAL_ENERGY_KEY not in add_fields:
-                    add_fields[AtomicDataDict.TOTAL_ENERGY_KEY] = v
-            elif k in info_keys:
-                add_fields[k] = v
+        # Get info from atoms.arrays; lowest priority. copy first
+        add_fields = {
+            key_mapping.get(k, k): v
+            for k, v in atoms.arrays.items()
+            if k in include_keys
+        }
+
+        # Get info from atoms.info; second lowest priority.
+        add_fields.update(
+            {
+                key_mapping.get(k, k): v
+                for k, v in atoms.info.items()
+                if k in include_keys
+            }
+        )
+
+        if atoms.calc is not None:
+
+            if isinstance(
+                atoms.calc, (SinglePointCalculator, SinglePointDFTCalculator)
+            ):
+                add_fields.update(
+                    {
+                        key_mapping.get(k, k): deepcopy(v)
+                        for k, v in atoms.calc.results.items()
+                        if k in include_keys
+                    }
+                )
 
         add_fields[AtomicDataDict.ATOMIC_NUMBERS_KEY] = atoms.get_atomic_numbers()
 
+        # cell and pbc in kwargs can override the ones stored in atoms
         cell = kwargs.pop("cell", atoms.get_cell())
         pbc = kwargs.pop("pbc", atoms.pbc)
 

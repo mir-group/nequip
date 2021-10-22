@@ -706,10 +706,10 @@ class ASEDataset(AtomicInMemoryDataset):
 
     Args:
         ase_args (dict): arguments for ase.io.read
-        array_keys (list): the keys that needs to be parsed into dataset for
-             those stored in ase.atoms.Atoms.array. Optional
-        info_keys (list): the keys that needs to be parsed into dataset for
-             those stored in ase.atoms.Atoms.info. Optional
+        include_keys (list): the keys that needs to be parsed into dataset for
+             those stored in ase.atoms.Atoms.array (lowest priority), ase.atoms.Atoms.info and
+             ase.atoms.Atoms.calc.results. Optional
+        key_mapping (dict): rename some of the keys to the value str. Optional
 
     Example: Given an atomic data stored in "H2.extxyz" that looks like below:
 
@@ -722,13 +722,27 @@ class ASEDataset(AtomicInMemoryDataset):
 
     The yaml input should be
 
-    ```yaml
+    ```
     dataset: ase
     dataset_file_name: H2.extxyz
     ase_args:
       format: extxyz
-    info_keys:
+    include_keys:
       - user_label
+    chemical_symbol_to_type:
+      H: 0
+    ```
+
+    for VASP parser, the yaml input should be
+    ```
+    dataset: ase
+    dataset_file_name: OUTCAR
+    ase_args:
+      format: vasp-out
+    include_keys:
+      - free_energy
+    key_mapping:
+      free_energy: total_energy
     chemical_symbol_to_type:
       H: 0
     ```
@@ -745,16 +759,16 @@ class ASEDataset(AtomicInMemoryDataset):
         extra_fixed_fields: Dict[str, Any] = {},
         include_frames: Optional[List[int]] = None,
         type_mapper: TypeMapper = None,
-        array_keys: Optional[List[str]] = [],
-        info_keys: Optional[List[str]] = [],
+        key_mapping: Optional[dict] = None,
+        include_keys: Optional[List[str]] = None,
     ):
 
         self.ase_args = dict(index=":")
         self.ase_args.update(getattr(type(self), "ASE_ARGS", dict()))
         self.ase_args.update(ase_args)
 
-        self.array_keys = array_keys
-        self.info_keys = info_keys
+        self.include_keys = include_keys
+        self.key_mapping = key_mapping
 
         super().__init__(
             file_name=file_name,
@@ -815,29 +829,26 @@ class ASEDataset(AtomicInMemoryDataset):
         return aseread(self.raw_dir + "/" + self.raw_file_names[0], **self.ase_args)
 
     def get_data(self):
+
         # Get our data
         atoms_list = self.get_atoms()
+
+        # skip the None arguments
+        kwargs = dict(
+            include_keys=self.include_keys,
+            key_mapping=self.key_mapping,
+        )
+        kwargs = {k: v for k, v in kwargs.items() if v is not None}
+        kwargs.update(self.extra_fixed_fields)
+
         if self.include_frames is None:
             return (
-                [
-                    AtomicData.from_ase(
-                        atoms=atoms,
-                        array_keys=self.array_keys,
-                        info_keys=self.info_keys,
-                        **self.extra_fixed_fields,
-                    )
-                    for atoms in atoms_list
-                ],
+                [AtomicData.from_ase(atoms=atoms, **kwargs) for atoms in atoms_list],
             )
         else:
             return (
                 [
-                    AtomicData.from_ase(
-                        atoms=atoms_list[i],
-                        array_keys=self.array_keys,
-                        info_keys=self.info_keys,
-                        **self.extra_fixed_fields,
-                    )
+                    AtomicData.from_ase(atoms=atoms_list[i], **kwargs)
                     for i in self.include_frames
                 ],
             )
