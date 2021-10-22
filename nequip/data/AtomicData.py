@@ -12,6 +12,7 @@ import numpy as np
 import ase.neighborlist
 import ase
 from ase.calculators.singlepoint import SinglePointCalculator, SinglePointDFTCalculator
+from ase.calculators.calculator import all_properties as ase_all_properties
 
 import torch
 import e3nn.o3
@@ -265,13 +266,11 @@ class AtomicData(Data):
         cls,
         atoms,
         r_max,
-        key_mapping: dict = {
+        key_mapping: Optional[Dict[str, str]] = {
             "forces": AtomicDataDict.FORCE_KEY,
-            "force": AtomicDataDict.FORCE_KEY,
-            "energies": AtomicDataDict.TOTAL_ENERGY_KEY,
             "energy": AtomicDataDict.TOTAL_ENERGY_KEY,
         },
-        include_keys=["force", "forces", "energies", "energy"],
+        include_keys: Optional[list] = [],
         **kwargs,
     ):
         """Build a ``AtomicData`` from an ``ase.Atoms`` object.
@@ -288,6 +287,9 @@ class AtomicData(Data):
             r_max (float): neighbor cutoff radius.
             features (torch.Tensor shape [N, M], optional): per-atom M-dimensional feature vectors. If ``None`` (the
              default), uses a one-hot encoding of the species present in ``atoms``.
+            include_keys (list): list of additional keys to include in AtomicData aside from the ones defined in
+                 ase.calculators.calculator.all_properties. Optional
+            key_mapping (dict): rename ase property name to a new string name. Optional
             **kwargs (optional): other arguments for the ``AtomicData`` constructor.
 
         Returns:
@@ -306,6 +308,7 @@ class AtomicData(Data):
                 + list(kwargs.keys())
             )
         )
+        include_keys = list(set(include_keys + ase_all_properties))
 
         add_fields = {}
 

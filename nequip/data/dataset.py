@@ -739,8 +739,6 @@ class ASEDataset(AtomicInMemoryDataset):
     dataset_file_name: OUTCAR
     ase_args:
       format: vasp-out
-    include_keys:
-      - free_energy
     key_mapping:
       free_energy: total_energy
     chemical_symbol_to_type:
