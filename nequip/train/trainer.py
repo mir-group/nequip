@@ -1037,6 +1037,9 @@ class Trainer:
         else:
             self.logger.info("! Initial Validation " + log_str[VALIDATION])
 
+        wall = perf_counter() - self.wall
+        self.logger.info(f"Wall time: {wall}")
+
     def __del__(self):
 
         logger = self.logger

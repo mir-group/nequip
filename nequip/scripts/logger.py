@@ -7,8 +7,8 @@ def set_up_script_logger(logfile: str):
     root_logger = logging.getLogger()
     root_logger.setLevel(logging.CRITICAL)
     root_logger.handlers = [
-        logging.StreamHandler(sys.stdout),
         logging.StreamHandler(sys.stderr),
+        logging.StreamHandler(sys.stdout),
     ]
     root_logger.handlers[0].setLevel(logging.INFO)
     root_logger.handlers[1].setLevel(logging.CRITICAL)
