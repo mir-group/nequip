@@ -305,7 +305,6 @@ class AtomicData(Data):
                 + list(kwargs.keys())
             )
         )
-
         include_keys = list(set(include_keys + ase_all_properties))
 
         km = {
