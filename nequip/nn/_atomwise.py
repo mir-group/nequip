@@ -81,6 +81,23 @@ class AtomwiseReduce(GraphModuleMixin, torch.nn.Module):
 
 
 class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
+    """Scale and/or shift a predicted per-atom property based on (learnable) per-species/type parameters.
+
+    Args:
+        field: the per-atom field to scale/shift.
+        num_types: the number of types in the model.
+        shifts: the initial shifts to use, one per atom type.
+        scales: the initial scales to use, one per atom type.
+        arguments_in_dataset_units: if ``True``, says that the provided shifts/scales are in dataset
+            units (in which case they will be rescaled appropriately by any global rescaling later
+            applied to the model); if ``False``, the provided shifts/scales will be used without modification.
+
+            For example, if identity shifts/scales of zeros and ones are provided, this should be ``False``.
+            But if scales/shifts computed from the training data are used, and are thus in dataset units,
+            this should be ``True``.
+        out_field: the output field; defaults to ``field``.
+    """
+
     field: str
     out_field: str
     trainable: bool
@@ -89,11 +106,11 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
         self,
         field: str,
         num_types: int,
+        shifts: List[float],
+        scales: List[float],
+        arguments_in_dataset_units: bool,
         out_field: Optional[str] = None,
-        shifts: Optional[list] = None,
-        scales: Optional[list] = None,
         trainable: bool = False,
-        fixed_numerics: bool = False,
         irreps_in={},
     ):
         super().__init__()
@@ -105,19 +122,12 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
             irreps_out={self.out_field: irreps_in[self.field]},
         )
 
-        shifts = (
-            torch.zeros(num_types)
-            if shifts is None
-            else torch.as_tensor(shifts, dtype=torch.get_default_dtype())
-        )
+        shifts = torch.as_tensor(shifts, dtype=torch.get_default_dtype())
         if len(shifts.reshape([-1])) == 1:
             shifts = torch.ones(num_types) * shifts
         assert shifts.shape == (num_types,), f"Invalid shape of shifts {shifts}"
-        scales = (
-            torch.ones(num_types)
-            if scales is None
-            else torch.as_tensor(scales, dtype=torch.get_default_dtype())
-        )
+
+        scales = torch.as_tensor(scales, dtype=torch.get_default_dtype())
         if len(scales.reshape([-1])) == 1:
             scales = torch.ones(num_types) * scales
         assert scales.shape == (num_types,), f"Invalid shape of scales {scales}"
@@ -129,7 +139,7 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
         else:
             self.register_buffer("shifts", shifts)
             self.register_buffer("scales", scales)
-        self.fixed_numerics = fixed_numerics
+        self.arguments_in_dataset_units = arguments_in_dataset_units
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
         species_idx = data[AtomicDataDict.ATOM_TYPE_KEY]
@@ -144,11 +154,12 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
         return data
 
     def update_for_rescale(self, rescale_module):
-        if not self.fixed_numerics and rescale_module._has_scale:
+        if self.arguments_in_dataset_units and rescale_module.has_scale:
             logging.debug(
-                f"PerSpeciesScaleShift is rescaled\n"
+                f"PerSpeciesScaleShift's arguments were in dataset units; rescaling:\n"
                 f"Original scales {self.scales} shifts: {self.shifts}"
             )
-            self.scales = self.scales / rescale_module.scale_by
-            self.shifts = self.shifts / rescale_module.scale_by
+            with torch.no_grad():
+                self.scales.div_(rescale_module.scale_by)
+                self.shifts.div_(rescale_module.scale_by)
             logging.debug(f"New scales {self.scales} shifts: {self.shifts}")

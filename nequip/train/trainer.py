@@ -311,6 +311,7 @@ class Trainer:
             all_args=self.kwargs,
         )
         self.loss_stat = LossStat(self.loss)
+        assert len(train_on_keys) == 0
         self.train_on_keys = self.loss.keys
 
         self.init()

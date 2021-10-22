@@ -178,8 +178,11 @@ def PerSpeciesRescale(
     else:
 
         # Put dummy values
-        scales = None
-        shifts = None
+        # the real ones will be loaded from the state dict later
+        # note that the state dict includes buffers,
+        # so this is fine regardless of whether its trainable.
+        scales = 1.0
+        shifts = 0.0
 
     # insert in per species shift
     model.insert_from_parameters(
@@ -192,6 +195,9 @@ def PerSpeciesRescale(
             out_field=AtomicDataDict.PER_ATOM_ENERGY_KEY,
             shifts=shifts,
             scales=scales,
+            # The shifts and scales we computed above are always
+            # computed from the dataset, so they are in dataset units.
+            arguments_in_dataset_units=True,
         ),
     )
 

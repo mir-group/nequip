@@ -5,7 +5,6 @@ from nequip.nn import (
     SequentialGraphNetwork,
     AtomwiseLinear,
     AtomwiseReduce,
-    PerSpeciesScaleShift,
     ConvNetLayer,
 )
 from nequip.nn.embedding import (
