@@ -343,6 +343,10 @@ class AtomicData(Data):
                         if k in include_keys
                     }
                 )
+            else:
+                raise NotImplementedError(
+                    f"`from_ase` does not support calculator {atoms.calc}"
+                )
 
         add_fields[AtomicDataDict.ATOMIC_NUMBERS_KEY] = atoms.get_atomic_numbers()
 
