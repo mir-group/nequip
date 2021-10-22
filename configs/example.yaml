@@ -132,3 +132,5 @@ per_species_rescale_shifts: dataset_per_atom_total_energy_mean
 per_species_rescale_scales: dataset_forces_rms
 # initial atomic energy scale for each species. Optional.
 # the value can be a constant float value, an array for each species, or a string
+# per_species_rescale_arguments_in_dataset_units: True
+# if explicit numbers are given for the shifts/scales, this parameter must specify whether the given numbers are unitless shifts/scales or are in the units of the dataset. If ``True``, any global rescalings will correctly be applied to the per-species values.
