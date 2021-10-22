@@ -131,7 +131,8 @@ def PerSpeciesRescale(
         f"dataset_per_atom_{AtomicDataDict.TOTAL_ENERGY_KEY}_mean",
     )
 
-    # = Determine what statistics need to be compute =
+    # = Determine what statistics need to be compute =\
+    arguments_in_dataset_units = None
     if initialize:
         str_names = []
         for value in [scales, shifts]:
@@ -147,6 +148,14 @@ def PerSpeciesRescale(
                 pass
             else:
                 raise ValueError(f"Invalid value `{value}` of type {type(value)}")
+
+        if len(str_names) == 2:
+            # Both computed from dataset
+            arguments_in_dataset_units = True
+        elif len(str_names) == 1:
+            assert config[
+                module_prefix + "arguments_in_dataset_units"
+            ], "Requested to set either the shifts or scales of the per_species_rescale using dataset values, but chose to provide the other in non-dataset units. Please give the explictly specified shifts/scales in dataset units and set per_species_rescale_arguments_in_dataset_units"
 
         # = Compute shifts and scales =
         computed_stats = _compute_stats(
@@ -185,20 +194,20 @@ def PerSpeciesRescale(
         shifts = 0.0
 
     # insert in per species shift
+    params = dict(
+        field=AtomicDataDict.PER_ATOM_ENERGY_KEY,
+        out_field=AtomicDataDict.PER_ATOM_ENERGY_KEY,
+        shifts=shifts,
+        scales=scales,
+    )
+    if arguments_in_dataset_units:
+        params["arguments_in_dataset_units"] = True
     model.insert_from_parameters(
         before="total_energy_sum",
         name=module_prefix,
         shared_params=config,
         builder=PerSpeciesScaleShift,
-        params=dict(
-            field=AtomicDataDict.PER_ATOM_ENERGY_KEY,
-            out_field=AtomicDataDict.PER_ATOM_ENERGY_KEY,
-            shifts=shifts,
-            scales=scales,
-            # The shifts and scales we computed above are always
-            # computed from the dataset, so they are in dataset units.
-            arguments_in_dataset_units=True,
-        ),
+        params=params,
     )
 
     logging.debug(f"Atomic outputs are scaled by: {scales}, shifted by {shifts}.")
