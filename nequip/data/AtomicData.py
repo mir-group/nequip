@@ -295,17 +295,16 @@ class AtomicData(Data):
 
         assert "pos" not in kwargs
 
-        default_args = list(
-            set(
-                [
-                    "numbers",
-                    "positions",
-                ]  # ase internal names for position and atomic_numbers
-                + ["pbc", "cell", "pos", "r_max"]  # arguments for from_points method
-                + list(kwargs.keys())
-            )
+        default_args = set(
+            [
+                "numbers",
+                "positions",
+            ]  # ase internal names for position and atomic_numbers
+            + ["pbc", "cell", "pos", "r_max"]  # arguments for from_points method
+            + list(kwargs.keys())
         )
-        include_keys = list(set(include_keys + ase_all_properties))
+        # the keys that are duplicated in kwargs are removed from the include_keys
+        include_keys = list(set(include_keys + ase_all_properties) - default_args)
 
         km = {
             "forces": AtomicDataDict.FORCE_KEY,
