@@ -592,12 +592,12 @@ class AtomicInMemoryDataset(AtomicDataset):
 class NpzDataset(AtomicInMemoryDataset):
     """Load data from an npz file.
 
-    To avoid loading unneeded data, keys are ignored by default unless they are in ``key_mapping``, ``npz_keys``,
+    To avoid loading unneeded data, keys are ignored by default unless they are in ``key_mapping``, ``include_keys``,
     ``npz_fixed_fields`` or ``extra_fixed_fields``.
 
     Args:
         key_mapping (Dict[str, str]): mapping of npz keys to ``AtomicData`` keys. Optional
-        npz_keys (list): the attributes to be processed and stored. Optional
+        include_keys (list): the attributes to be processed and stored. Optional
         npz_fixed_field_keys: the attributes that only have one instance but apply to all frames. Optional
 
     Example: Given a npz file with 10 configurations, each with 14 atoms.
@@ -614,7 +614,7 @@ class NpzDataset(AtomicInMemoryDataset):
     ```yaml
     dataset: npz
     dataset_file_name: example.npz
-    npz_keys:
+    include_keys:
       - user_label1
       - user_label2
     npz_fixed_field_keys:
@@ -640,7 +640,7 @@ class NpzDataset(AtomicInMemoryDataset):
             "Z": AtomicDataDict.ATOMIC_NUMBERS_KEY,
             "atomic_number": AtomicDataDict.ATOMIC_NUMBERS_KEY,
         },
-        npz_keys: List[str] = [],
+        include_keys: List[str] = [],
         npz_fixed_field_keys: List[str] = [],
         file_name: Optional[str] = None,
         url: Optional[str] = None,
@@ -651,7 +651,7 @@ class NpzDataset(AtomicInMemoryDataset):
     ):
         self.key_mapping = key_mapping
         self.npz_fixed_field_keys = npz_fixed_field_keys
-        self.npz_keys = npz_keys
+        self.include_keys = include_keys
 
         super().__init__(
             file_name=file_name,
@@ -679,7 +679,7 @@ class NpzDataset(AtomicInMemoryDataset):
         # only the keys explicitly mentioned in the yaml file will be parsed
         keys = set(list(self.key_mapping.keys()))
         keys.update(self.npz_fixed_field_keys)
-        keys.update(self.npz_keys)
+        keys.update(self.include_keys)
         keys.update(list(self.extra_fixed_fields.keys()))
         keys = keys.intersection(set(list(data.keys())))
 
@@ -706,9 +706,11 @@ class ASEDataset(AtomicInMemoryDataset):
 
     Args:
         ase_args (dict): arguments for ase.io.read
-        include_keys (list): the keys that needs to be parsed into dataset for
-             those stored in ase.atoms.Atoms.array (lowest priority), ase.atoms.Atoms.info and
-             ase.atoms.Atoms.calc.results. Optional
+        include_keys (list): in addition to forces and energy, the keys that needs to
+             be parsed into dataset
+             The data stored in ase.atoms.Atoms.array has the lowest priority,
+             and it will be overrided by data in ase.atoms.Atoms.info
+             and ase.atoms.Atoms.calc.results. Optional
         key_mapping (dict): rename some of the keys to the value str. Optional
 
     Example: Given an atomic data stored in "H2.extxyz" that looks like below:
@@ -729,6 +731,8 @@ class ASEDataset(AtomicInMemoryDataset):
       format: extxyz
     include_keys:
       - user_label
+    key_mapping:
+      user_label: label0
     chemical_symbol_to_type:
       H: 0
     ```
