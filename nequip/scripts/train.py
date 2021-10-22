@@ -50,7 +50,7 @@ def main(args=None, running_as_script: bool = True):
     config = parse_command_line(args)
 
     if running_as_script:
-        set_up_script_logger(config.get("log", None))
+        set_up_script_logger(config.get("log", None), config.verbose)
 
     found_restart_file = isdir(f"{config.root}/{config.run_name}")
     if found_restart_file and not config.append:
