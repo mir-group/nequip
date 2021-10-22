@@ -258,6 +258,8 @@ per_species_rescale_scales: dataset_forces_rms
 #     alpha: 0.1
 #     max_iteration: 20
 # keywords for GP decomposition of per specie energy. Optional. Defaults to 0.1
+# per_species_rescale_arguments_in_dataset_units: True
+# if explicit numbers are given for the shifts/scales, this parameter must specify whether the given numbers are unitless shifts/scales or are in the units of the dataset. If ``True``, any global rescalings will correctly be applied to the per-species values.
 
 # global energy shift and scale
 # When "dataset_total_energy_mean", the mean energy of the dataset. When None, disables the global shift. When a number, used directly.
