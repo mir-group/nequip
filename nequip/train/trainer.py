@@ -215,7 +215,7 @@ class Trainer:
         model_builders: Optional[list] = [],
         seed: Optional[int] = None,
         loss_coeffs: Union[dict, str] = AtomicDataDict.TOTAL_ENERGY_KEY,
-        train_on_keys: Optional[List[str]] = [],
+        train_on_keys: Optional[List[str]] = None,
         metrics_components: Optional[Union[dict, str]] = None,
         metrics_key: str = ABBREV.get(LOSS_KEY, LOSS_KEY),
         early_stopping_conds: Optional[EarlyStopping] = None,
@@ -311,8 +311,9 @@ class Trainer:
             all_args=self.kwargs,
         )
         self.loss_stat = LossStat(self.loss)
-        assert len(train_on_keys) == 0
         self.train_on_keys = self.loss.keys
+        if train_on_keys is not None:
+            assert set(train_on_keys) == set(self.train_on_keys)
 
         self.init()
 
