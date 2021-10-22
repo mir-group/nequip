@@ -292,6 +292,7 @@ class AtomicData(Data):
         Returns:
             A ``AtomicData``.
         """
+        from nequip.ase import NequIPCalculator
 
         assert "pos" not in kwargs
 
@@ -343,6 +344,8 @@ class AtomicData(Data):
                         if k in include_keys
                     }
                 )
+            elif isinstance(atoms.calc, NequIPCalculator):
+                pass  # otherwise the calculator breaks
             else:
                 raise NotImplementedError(
                     f"`from_ase` does not support calculator {atoms.calc}"
