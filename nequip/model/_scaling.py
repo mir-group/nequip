@@ -192,6 +192,10 @@ def PerSpeciesRescale(
         # so this is fine regardless of whether its trainable.
         scales = 1.0
         shifts = 0.0
+        # values correctly scaled according to where the come from
+        # will be brought from the state dict later,
+        # so what you set this to doesnt matter:
+        arguments_in_dataset_units = False
 
     # insert in per species shift
     params = dict(
@@ -200,8 +204,8 @@ def PerSpeciesRescale(
         shifts=shifts,
         scales=scales,
     )
-    if arguments_in_dataset_units:
-        params["arguments_in_dataset_units"] = True
+    if arguments_in_dataset_units is not None:
+        params["arguments_in_dataset_units"] = arguments_in_dataset_units
     model.insert_from_parameters(
         before="total_energy_sum",
         name=module_prefix,
