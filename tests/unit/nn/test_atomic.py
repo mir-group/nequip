@@ -34,7 +34,13 @@ def model(float_tolerance, request):
             ),
             "shift": (
                 PerSpeciesScaleShift,
-                dict(field="e", out_field="shifted"),
+                dict(
+                    field="e",
+                    out_field="shifted",
+                    scales=1.0,
+                    shifts=0.0,
+                    arguments_in_dataset_units=False,
+                ),
             ),
             "sum": (
                 AtomwiseReduce,
