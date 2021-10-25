@@ -27,4 +27,5 @@ class TrainerWandB(Trainer):
 
         Trainer.init_model(self)
 
-        wandb.watch(self.model)
+        # TODO: test and re-enable this
+        # wandb.watch(self.model)
