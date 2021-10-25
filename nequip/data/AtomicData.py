@@ -155,6 +155,11 @@ class AtomicData(Data):
                 # a data dimension to play nice with irreps
                 kwargs[k] = v
 
+        if AtomicDataDict.BATCH_KEY in kwargs:
+            num_frames = kwargs[AtomicDataDict.BATCH_KEY].max() + 1
+        else:
+            num_frames = 1
+
         for k, v in kwargs.items():
 
             if len(kwargs[k].shape) == 0:
@@ -168,9 +173,18 @@ class AtomicData(Data):
                 raise ValueError(
                     f"{k} is a node field but has the wrong dimension {v.shape}"
                 )
+            elif (
+                k in _EDGE_FIELDS
+                and v.shape[0] != kwargs[AtomicDataDict.EDGE_INDEX_KEY].shape[1]
+            ):
+                raise ValueError(
+                    f"{k} is a edge field but has the wrong dimension {v.shape}"
+                )
             elif k in _GRAPH_FIELDS:
-                if v.shape[0] != 1:
+                if num_frames == 1 and v.shape[0] != 1:
                     kwargs[k] = v.unsqueeze(0)
+                elif v.shape[0] != num_frames:
+                    raise ValueError(f"Wrong shape for graph property {k}")
 
         super().__init__(num_nodes=len(kwargs["pos"]), **kwargs)
 
