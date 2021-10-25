@@ -25,7 +25,7 @@ from nequip.data import (
     _GRAPH_FIELDS,
 )
 from nequip.utils.batch_ops import bincount
-from nequip.utils.regressor import gp
+from nequip.utils.regressor import solver
 from ._util import _TORCH_INTEGER_DTYPES
 from .transforms import TypeMapper
 
@@ -488,7 +488,7 @@ class AtomicInMemoryDataset(AtomicDataset):
                     batch=data_transformed[AtomicDataDict.BATCH_KEY],
                     atom_types=atom_types,
                     unbiased=unbiased,
-                    **algorithm_kwargs,
+                    algorithm_kwargs=algorithm_kwargs,
                 )
                 out.append(results)
 
@@ -547,7 +547,7 @@ class AtomicInMemoryDataset(AtomicDataset):
         atom_types: torch.Tensor,
         batch: torch.Tensor,
         unbiased: bool = True,
-        alpha: Optional[float] = 0.1,
+        algorithm_kwargs: Optional[dict] = {},
     ):
         """Compute "per-species" statistics.
 
@@ -567,7 +567,7 @@ class AtomicInMemoryDataset(AtomicDataset):
 
             N = N.type(torch.get_default_dtype())
 
-            return gp(N, arr, alpha=alpha)
+            return solver(N, arr, **algorithm_kwargs)
 
         elif arr_is_per == "node":
             arr = arr.type(torch.get_default_dtype())

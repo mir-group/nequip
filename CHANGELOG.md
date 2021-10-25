@@ -31,6 +31,10 @@ Most recent change on the bottom.
 data
 - `use_sc` defaults to `True`
 - `register_fields` is now in `nequip.data`
+- Default total energy scaling is changed from global mode to per species mode.
+- Renamed `trainable_global_rescale_scale` to `global_rescale_scale_trainble`
+- Renamed `trainable_global_rescale_shift` to `global_rescale_shift_trainble`
+- Renamed `PerSpeciesScaleShift_` to `per_species_rescale`
 
 ### Fixed
 - The first 20 epochs/calls of inference are no longer painfully slow for recompilation
