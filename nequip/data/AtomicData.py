@@ -156,6 +156,11 @@ class AtomicData(Data):
                 kwargs[k] = v
 
         for k, v in kwargs.items():
+
+            if len(kwargs[k].shape) == 0:
+                kwargs[k] = v.unsqueeze(-1)
+                v = kwargs[k]
+
             if (
                 k in _NODE_FIELDS
                 and v.shape[0] != kwargs[AtomicDataDict.POSITIONS_KEY].shape[0]
@@ -164,9 +169,7 @@ class AtomicData(Data):
                     f"{k} is a node field but has the wrong dimension {v.shape}"
                 )
             elif k in _GRAPH_FIELDS:
-                if len(v.shape) < 1:
-                    kwargs[k] = v.unsqueeze(-1)
-                elif v.shape[0] != 1:
+                if v.shape[0] != 1:
                     kwargs[k] = v.unsqueeze(0)
 
         super().__init__(num_nodes=len(kwargs["pos"]), **kwargs)
