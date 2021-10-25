@@ -23,7 +23,6 @@ from nequip.data import (
     _NODE_FIELDS,
     _EDGE_FIELDS,
     _GRAPH_FIELDS,
-    register_fields,
 )
 from nequip.utils.batch_ops import bincount
 from nequip.utils.regressor import solver
@@ -89,15 +88,7 @@ class AtomicInMemoryDataset(AtomicDataset):
         extra_fixed_fields: Dict[str, Any] = {},
         include_frames: Optional[List[int]] = None,
         type_mapper: TypeMapper = None,
-        node_fields: Optional[List[str]] = [],
-        edge_fields: Optional[List[str]] = [],
-        graph_fields: Optional[List[str]] = [],
     ):
-        register_fields(
-            node_fields=node_fields,
-            edge_fields=edge_fields,
-            graph_fields=graph_fields,
-        )
         # TO DO, this may be simplified
         # See if a subclass defines some inputs
         self.file_name = (
@@ -657,9 +648,6 @@ class NpzDataset(AtomicInMemoryDataset):
         extra_fixed_fields: Dict[str, Any] = {},
         include_frames: Optional[List[int]] = None,
         type_mapper: TypeMapper = None,
-        node_fields: Optional[List[str]] = [],
-        edge_fields: Optional[List[str]] = [],
-        graph_fields: Optional[List[str]] = [],
     ):
         self.key_mapping = key_mapping
         self.npz_fixed_field_keys = npz_fixed_field_keys
@@ -673,9 +661,6 @@ class NpzDataset(AtomicInMemoryDataset):
             extra_fixed_fields=extra_fixed_fields,
             include_frames=include_frames,
             type_mapper=type_mapper,
-            node_fields=node_fields,
-            edge_fields=edge_fields,
-            graph_fields=graph_fields,
         )
 
     @property
@@ -778,9 +763,6 @@ class ASEDataset(AtomicInMemoryDataset):
         type_mapper: TypeMapper = None,
         key_mapping: Optional[dict] = None,
         include_keys: Optional[List[str]] = None,
-        node_fields: Optional[List[str]] = [],
-        edge_fields: Optional[List[str]] = [],
-        graph_fields: Optional[List[str]] = [],
     ):
 
         self.ase_args = dict(index=":")
@@ -798,9 +780,6 @@ class ASEDataset(AtomicInMemoryDataset):
             extra_fixed_fields=extra_fixed_fields,
             include_frames=include_frames,
             type_mapper=type_mapper,
-            node_fields=node_fields,
-            edge_fields=edge_fields,
-            graph_fields=graph_fields,
         )
 
     @classmethod

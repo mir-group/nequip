@@ -3,7 +3,7 @@ from importlib import import_module
 
 from nequip import data
 from nequip.data.transforms import TypeMapper
-from nequip.data import AtomicDataset
+from nequip.data import AtomicDataset, register_fields
 from nequip.utils import instantiate
 
 
@@ -68,6 +68,13 @@ def dataset_from_config(config, prefix: str = "dataset") -> AtomicDataset:
 
     # Build a TypeMapper from the config
     type_mapper, _ = instantiate(TypeMapper, prefix=prefix, optional_args=config)
+
+    # Register fields:
+    register_fields(
+        node_fields=config.get(f"{prefix}_node_fields", []),
+        edge_fields=config.get(f"{prefix}_edge_fields", []),
+        graph_fields=config.get(f"{prefix}_graph_fields", []),
+    )
 
     instance, _ = instantiate(
         class_name,
