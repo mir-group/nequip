@@ -858,7 +858,7 @@ class Trainer:
         """
 
         mat_str = f"{self.iepoch+1:5d}, {self.ibatch+1:5d}"
-        log_str = f"{self.iepoch+1:5d} {self.ibatch+1:5d}"
+        log_str = f"  {self.iepoch+1:5d} {self.ibatch+1:5d}"
 
         header = "epoch, batch"
         log_header = "# Epoch batch"
@@ -868,7 +868,7 @@ class Trainer:
             mat_str += f", {value:16.5g}"
             header += f", {name}"
             log_str += f" {value:12.3g}"
-            log_header += f" {name:>12s}"
+            log_header += f" {name:>12.12}"
 
         # append details from metrics
         metrics, skip_keys = self.metrics.flatten_metrics(
@@ -884,7 +884,7 @@ class Trainer:
             header += f", {key}"
             if key not in skip_keys:
                 log_str += f" {value:12.3g}"
-                log_header += f" {key:>12s}"
+                log_header += f" {key:>12.12}"
 
         batch_logger = logging.getLogger(self.batch_log[batch_type])
 
@@ -1011,7 +1011,7 @@ class Trainer:
                 mat_str += f", {value:16.5g}"
                 header += f", {category}_{key}"
                 log_str[category] += f" {value:12.3g}"
-                log_header[category] += f" {key:>12s}"
+                log_header[category] += f" {key:>12.12}"
                 self.mae_dict[f"{category}_{key}"] = value
 
             # append details from metrics
@@ -1020,7 +1020,7 @@ class Trainer:
                 header += f", {category}_{key}"
                 if key not in skip_keys:
                     log_str[category] += f" {value:12.3g}"
-                    log_header[category] += f" {key:>12s}"
+                    log_header[category] += f" {key:>12.12}"
                 self.mae_dict[f"{category}_{key}"] = value
 
         if self.iepoch == 0:
@@ -1037,6 +1037,7 @@ class Trainer:
             self.logger.info("! Train      " + log_str[TRAIN])
             self.logger.info("! Validation " + log_str[VALIDATION])
         else:
+            self.logger.info("\n\n  Initialization     " + log_header[VALIDATION])
             self.logger.info("! Initial Validation " + log_str[VALIDATION])
 
         wall = perf_counter() - self.wall

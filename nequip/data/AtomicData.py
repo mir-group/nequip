@@ -149,13 +149,28 @@ class AtomicData(Data):
             elif np.issubdtype(type(v), np.floating):
                 # Force scalars to be tensors with a data dimension
                 # This makes them play well with irreps
-                kwargs[k] = torch.as_tensor(
-                    v, dtype=torch.get_default_dtype()
-                ).unsqueeze(-1)
+                kwargs[k] = torch.as_tensor(v, dtype=torch.get_default_dtype())
             elif isinstance(v, torch.Tensor) and len(v.shape) == 0:
                 # ^ this tensor is a scalar; we need to give it
                 # a data dimension to play nice with irreps
+                kwargs[k] = v
+
+        for k, v in kwargs.items():
+
+            if len(kwargs[k].shape) == 0:
                 kwargs[k] = v.unsqueeze(-1)
+                v = kwargs[k]
+
+            if (
+                k in _NODE_FIELDS
+                and v.shape[0] != kwargs[AtomicDataDict.POSITIONS_KEY].shape[0]
+            ):
+                raise ValueError(
+                    f"{k} is a node field but has the wrong dimension {v.shape}"
+                )
+            elif k in _GRAPH_FIELDS:
+                if v.shape[0] != 1:
+                    kwargs[k] = v.unsqueeze(0)
 
         super().__init__(num_nodes=len(kwargs["pos"]), **kwargs)
 
