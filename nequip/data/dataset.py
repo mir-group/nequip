@@ -76,6 +76,7 @@ class AtomicInMemoryDataset(AtomicDataset):
         force_fixed_keys (list, optional): keys to move from AtomicData to fixed_fields dictionary
         extra_fixed_fields (dict, optional): extra key that are not stored in data but needed for AtomicData initialization
         include_frames (list, optional): the frames to process with the constructor.
+        type_mapper (TypeMapper): the transformation to map atomic information to species index. Optional
     """
 
     def __init__(
@@ -591,12 +592,41 @@ class AtomicInMemoryDataset(AtomicDataset):
 class NpzDataset(AtomicInMemoryDataset):
     """Load data from an npz file.
 
-    To avoid loading unneeded data, keys are ignored by default unless they are in ``key_mapping``, ``npz_keys``, or ``npz_fixed_fields``.
+    To avoid loading unneeded data, keys are ignored by default unless they are in ``key_mapping``, ``include_keys``,
+    ``npz_fixed_fields`` or ``extra_fixed_fields``.
 
     Args:
-        file_name (str): file name of the npz file
-        key_mapping (Dict[str, str]): mapping of npz keys to ``AtomicData`` keys
-        force_fixed_keys (list): keys in the npz to treat as fixed quantities that don't change across examples. For example: cell, atomic_numbers
+        key_mapping (Dict[str, str]): mapping of npz keys to ``AtomicData`` keys. Optional
+        include_keys (list): the attributes to be processed and stored. Optional
+        npz_fixed_field_keys: the attributes that only have one instance but apply to all frames. Optional
+
+    Example: Given a npz file with 10 configurations, each with 14 atoms.
+
+        position: (10, 14, 3)
+        force: (10, 14, 3)
+        energy: (10,)
+        Z: (14)
+        user_label1: (10)        # per config
+        user_label2: (10, 14, 3) # per atom
+
+    The input yaml should be
+
+    ```yaml
+    dataset: npz
+    dataset_file_name: example.npz
+    include_keys:
+      - user_label1
+      - user_label2
+    npz_fixed_field_keys:
+      - cell
+      - atomic_numbers
+    key_mapping:
+      position: pos
+      force: forces
+      energy: total_energy
+      Z: atomic_numbers
+    ```
+
     """
 
     def __init__(
@@ -610,7 +640,7 @@ class NpzDataset(AtomicInMemoryDataset):
             "Z": AtomicDataDict.ATOMIC_NUMBERS_KEY,
             "atomic_number": AtomicDataDict.ATOMIC_NUMBERS_KEY,
         },
-        npz_keys: List[str] = [],
+        include_keys: List[str] = [],
         npz_fixed_field_keys: List[str] = [],
         file_name: Optional[str] = None,
         url: Optional[str] = None,
@@ -621,7 +651,7 @@ class NpzDataset(AtomicInMemoryDataset):
     ):
         self.key_mapping = key_mapping
         self.npz_fixed_field_keys = npz_fixed_field_keys
-        self.npz_keys = npz_keys
+        self.include_keys = include_keys
 
         super().__init__(
             file_name=file_name,
@@ -643,13 +673,18 @@ class NpzDataset(AtomicInMemoryDataset):
 
     # TODO: fixed fields?
     def get_data(self):
+
         data = np.load(self.raw_dir + "/" + self.raw_file_names[0], allow_pickle=True)
 
+        # only the keys explicitly mentioned in the yaml file will be parsed
         keys = set(list(self.key_mapping.keys()))
         keys.update(self.npz_fixed_field_keys)
-        keys.update(self.npz_keys)
+        keys.update(self.include_keys)
+        keys.update(list(self.extra_fixed_fields.keys()))
         keys = keys.intersection(set(list(data.keys())))
+
         mapped = {self.key_mapping.get(k, k): data[k] for k in keys}
+
         # TODO: generalize this?
         for intkey in (
             AtomicDataDict.ATOMIC_NUMBERS_KEY,
@@ -667,9 +702,53 @@ class NpzDataset(AtomicInMemoryDataset):
 
 
 class ASEDataset(AtomicInMemoryDataset):
-    """TODO
+    """
 
-    r_max and an override PBC can be specified in extra_fixed_fields
+    Args:
+        ase_args (dict): arguments for ase.io.read
+        include_keys (list): in addition to forces and energy, the keys that needs to
+             be parsed into dataset
+             The data stored in ase.atoms.Atoms.array has the lowest priority,
+             and it will be overrided by data in ase.atoms.Atoms.info
+             and ase.atoms.Atoms.calc.results. Optional
+        key_mapping (dict): rename some of the keys to the value str. Optional
+
+    Example: Given an atomic data stored in "H2.extxyz" that looks like below:
+
+    ```H2.extxyz
+    2
+    Properties=species:S:1:pos:R:3 energy=-10 user_label=2.0 pbc="F F F"
+     H       0.00000000       0.00000000       0.00000000
+     H       0.00000000       0.00000000       1.02000000
+    ```
+
+    The yaml input should be
+
+    ```
+    dataset: ase
+    dataset_file_name: H2.extxyz
+    ase_args:
+      format: extxyz
+    include_keys:
+      - user_label
+    key_mapping:
+      user_label: label0
+    chemical_symbol_to_type:
+      H: 0
+    ```
+
+    for VASP parser, the yaml input should be
+    ```
+    dataset: ase
+    dataset_file_name: OUTCAR
+    ase_args:
+      format: vasp-out
+    key_mapping:
+      free_energy: total_energy
+    chemical_symbol_to_type:
+      H: 0
+    ```
+
     """
 
     def __init__(
@@ -682,11 +761,16 @@ class ASEDataset(AtomicInMemoryDataset):
         extra_fixed_fields: Dict[str, Any] = {},
         include_frames: Optional[List[int]] = None,
         type_mapper: TypeMapper = None,
+        key_mapping: Optional[dict] = None,
+        include_keys: Optional[List[str]] = None,
     ):
 
         self.ase_args = dict(index=":")
         self.ase_args.update(getattr(type(self), "ASE_ARGS", dict()))
         self.ase_args.update(ase_args)
+
+        self.include_keys = include_keys
+        self.key_mapping = key_mapping
 
         super().__init__(
             file_name=file_name,
@@ -747,19 +831,26 @@ class ASEDataset(AtomicInMemoryDataset):
         return aseread(self.raw_dir + "/" + self.raw_file_names[0], **self.ase_args)
 
     def get_data(self):
+
         # Get our data
         atoms_list = self.get_atoms()
+
+        # skip the None arguments
+        kwargs = dict(
+            include_keys=self.include_keys,
+            key_mapping=self.key_mapping,
+        )
+        kwargs = {k: v for k, v in kwargs.items() if v is not None}
+        kwargs.update(self.extra_fixed_fields)
+
         if self.include_frames is None:
             return (
-                [
-                    AtomicData.from_ase(atoms=atoms, **self.extra_fixed_fields)
-                    for atoms in atoms_list
-                ],
+                [AtomicData.from_ase(atoms=atoms, **kwargs) for atoms in atoms_list],
             )
         else:
             return (
                 [
-                    AtomicData.from_ase(atoms=atoms_list[i], **self.extra_fixed_fields)
+                    AtomicData.from_ase(atoms=atoms_list[i], **kwargs)
                     for i in self.include_frames
                 ],
             )

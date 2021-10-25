@@ -12,6 +12,7 @@ import numpy as np
 import ase.neighborlist
 import ase
 from ase.calculators.singlepoint import SinglePointCalculator, SinglePointDFTCalculator
+from ase.calculators.calculator import all_properties as ase_all_properties
 
 import torch
 import e3nn.o3
@@ -261,7 +262,14 @@ class AtomicData(Data):
         return cls(edge_index=edge_index, pos=torch.as_tensor(pos), **kwargs)
 
     @classmethod
-    def from_ase(cls, atoms, r_max, **kwargs):
+    def from_ase(
+        cls,
+        atoms,
+        r_max,
+        key_mapping: Optional[Dict[str, str]] = {},
+        include_keys: Optional[list] = [],
+        **kwargs,
+    ):
         """Build a ``AtomicData`` from an ``ase.Atoms`` object.
 
         Respects ``atoms``'s ``pbc`` and ``cell``.
@@ -276,51 +284,84 @@ class AtomicData(Data):
             r_max (float): neighbor cutoff radius.
             features (torch.Tensor shape [N, M], optional): per-atom M-dimensional feature vectors. If ``None`` (the
              default), uses a one-hot encoding of the species present in ``atoms``.
+            include_keys (list): list of additional keys to include in AtomicData aside from the ones defined in
+                 ase.calculators.calculator.all_properties. Optional
+            key_mapping (dict): rename ase property name to a new string name. Optional
             **kwargs (optional): other arguments for the ``AtomicData`` constructor.
 
         Returns:
             A ``AtomicData``.
         """
+        from nequip.ase import NequIPCalculator
+
+        assert "pos" not in kwargs
+
+        default_args = set(
+            [
+                "numbers",
+                "positions",
+            ]  # ase internal names for position and atomic_numbers
+            + ["pbc", "cell", "pos", "r_max"]  # arguments for from_points method
+            + list(kwargs.keys())
+        )
+        # the keys that are duplicated in kwargs are removed from the include_keys
+        include_keys = list(set(include_keys + ase_all_properties) - default_args)
+
+        km = {
+            "forces": AtomicDataDict.FORCE_KEY,
+            "energy": AtomicDataDict.TOTAL_ENERGY_KEY,
+        }
+        km.update(key_mapping)
+        key_mapping = km
+
         add_fields = {}
+
+        # Get info from atoms.arrays; lowest priority. copy first
+        add_fields = {
+            key_mapping.get(k, k): v
+            for k, v in atoms.arrays.items()
+            if k in include_keys
+        }
+
+        # Get info from atoms.info; second lowest priority.
+        add_fields.update(
+            {
+                key_mapping.get(k, k): v
+                for k, v in atoms.info.items()
+                if k in include_keys
+            }
+        )
+
         if atoms.calc is not None:
+
             if isinstance(
                 atoms.calc, (SinglePointCalculator, SinglePointDFTCalculator)
             ):
-                add_fields = deepcopy(atoms.calc.results)
-                if "forces" in add_fields:
-                    add_fields.pop("forces")
-                    add_fields[AtomicDataDict.FORCE_KEY] = atoms.get_forces()
-
-                if "free_energy" in add_fields and "energy" not in add_fields:
-                    add_fields[AtomicDataDict.TOTAL_ENERGY_KEY] = add_fields.pop(
-                        "free_energy"
-                    )
-                elif "energy" in add_fields:
-                    add_fields[AtomicDataDict.TOTAL_ENERGY_KEY] = add_fields.pop(
-                        "energy"
-                    )
-
-        if AtomicDataDict.FORCE_KEY not in add_fields:
-            # Get it from arrays
-            for k in ("force", "forces"):
-                if k in atoms.arrays:
-                    add_fields[AtomicDataDict.FORCE_KEY] = atoms.arrays[k]
-                    break
-
-        if AtomicDataDict.TOTAL_ENERGY_KEY not in add_fields:
-            # Get it from arrays
-            for k in ("energy", "energies"):
-                if k in atoms.arrays:
-                    add_fields[AtomicDataDict.TOTAL_ENERGY_KEY] = atoms.arrays[k]
-                    break
+                add_fields.update(
+                    {
+                        key_mapping.get(k, k): deepcopy(v)
+                        for k, v in atoms.calc.results.items()
+                        if k in include_keys
+                    }
+                )
+            elif isinstance(atoms.calc, NequIPCalculator):
+                pass  # otherwise the calculator breaks
+            else:
+                raise NotImplementedError(
+                    f"`from_ase` does not support calculator {atoms.calc}"
+                )
 
         add_fields[AtomicDataDict.ATOMIC_NUMBERS_KEY] = atoms.get_atomic_numbers()
+
+        # cell and pbc in kwargs can override the ones stored in atoms
+        cell = kwargs.pop("cell", atoms.get_cell())
+        pbc = kwargs.pop("pbc", atoms.pbc)
 
         return cls.from_points(
             pos=atoms.positions,
             r_max=r_max,
-            cell=atoms.get_cell(),
-            pbc=atoms.pbc,
+            cell=cell,
+            pbc=pbc,
             **kwargs,
             **add_fields,
         )
