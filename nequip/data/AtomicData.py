@@ -307,6 +307,7 @@ class AtomicData(Data):
         Returns:
             A ``AtomicData``.
         """
+        from nequip.ase import NequIPCalculator
 
         assert "pos" not in kwargs
 
@@ -357,6 +358,12 @@ class AtomicData(Data):
                         for k, v in atoms.calc.results.items()
                         if k in include_keys
                     }
+                )
+            elif isinstance(atoms.calc, NequIPCalculator):
+                pass  # otherwise the calculator breaks
+            else:
+                raise NotImplementedError(
+                    f"`from_ase` does not support calculator {atoms.calc}"
                 )
 
         add_fields[AtomicDataDict.ATOMIC_NUMBERS_KEY] = atoms.get_atomic_numbers()
