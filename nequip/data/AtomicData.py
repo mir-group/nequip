@@ -16,7 +16,6 @@ from ase.calculators.calculator import all_properties as ase_all_properties
 
 import torch
 import e3nn.o3
-from torch._C import Value
 
 from . import AtomicDataDict
 from ._util import _TORCH_INTEGER_DTYPES
@@ -157,13 +156,6 @@ class AtomicData(Data):
                 kwargs[k] = v
 
         for k, v in kwargs.items():
-            if len(v.shape) < 1:
-                kwargs[k] = v.unsqueeze(-1)
-            elif k in _GRAPH_FIELDS and v.shape[0] != 1:
-                kwargs[k] = v.reshape((-1,) + v.shape)
-
-            v = kwargs[k]
-
             if (
                 k in _NODE_FIELDS
                 and v.shape[0] != kwargs[AtomicDataDict.POSITIONS_KEY].shape[0]
@@ -171,6 +163,11 @@ class AtomicData(Data):
                 raise ValueError(
                     f"{k} is a node field but has the wrong dimension {v.shape}"
                 )
+            elif k in _GRAPH_FIELDS:
+                if len(v.shape) < 1:
+                    kwargs[k] = v.unsqueeze(-1)
+                elif v.shape[0] != 1:
+                    kwargs[k] = v.unsqueeze(0)
 
         super().__init__(num_nodes=len(kwargs["pos"]), **kwargs)
 
