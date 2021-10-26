@@ -259,20 +259,23 @@ def get_w_prefix(
     else:
         raise ValueError(f"prefix is with a wrong type {type(prefix)}")
 
+    if not isinstance(arg_dicts, list):
+        arg_dicts = [arg_dicts]
+
     # extract all the parameters that has the pattern prefix_variable
     # debug container to record all the variable name transformation
     key_mapping = {}
     for idx, arg_dict in enumerate(arg_dicts[::-1]):
         # fetch paratemeters that directly match the name
         _keys = config.update(arg_dict)
-        key_mapping[f"{idx}"] = {k: k for k in _keys}
+        key_mapping[idx] = {k: k for k in _keys}
         # fetch paratemeters that match prefix + "_" + name
         for idx, prefix_str in enumerate(prefix_list):
             _keys = config.update_w_prefix(
                 arg_dict,
                 prefix=prefix_str,
             )
-            key_mapping[f"{idx}"].update(_keys)
+            key_mapping[idx].update(_keys)
 
     # for logging only, remove the overlapped keys
     num_dicts = len(arg_dicts)
@@ -280,8 +283,8 @@ def get_w_prefix(
         for id_dict in range(num_dicts - 1):
             higher_priority_keys = []
             for id_higher in range(id_dict + 1, num_dicts):
-                higher_priority_keys += list(key_mapping[f"{id_higher}"].keys())
-            key_mapping[f"{id_dict}"] = {
+                higher_priority_keys += list(key_mapping[id_higher].keys())
+            key_mapping[id_dict] = {
                 k: v
                 for k, v in key_mapping[id_dict].items()
                 if k not in higher_priority_keys
@@ -291,7 +294,7 @@ def get_w_prefix(
     logging.debug(f"search for {key} with prefix {prefix}")
     for t in key_mapping:
         for k, v in key_mapping[t].items():
-            string = f" {t:>10.10}_args :  {k:>50s}"
+            string = f" {str(t):>10.10}_args :  {k:>50s}"
             if k != v:
                 string += f" <- {v:>50s}"
             logging.debug(string)
