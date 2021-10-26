@@ -12,7 +12,7 @@ from e3nn.util.jit import script
 
 from nequip.data import AtomicDataDict, AtomicData, Collater
 from nequip.data.transforms import TypeMapper
-from nequip.model import model_from_config, xavier_initialize_FCs
+from nequip.model import model_from_config, uniform_initialize_FCs
 from nequip.nn import GraphModuleMixin, AtomwiseLinear
 from nequip.utils.test import assert_AtomicData_equivariant
 
@@ -127,7 +127,7 @@ class TestWorkflow:
 
         out_orig = instance(data)[out_field]
 
-        instance = xavier_initialize_FCs(instance, initialize=True)
+        instance = uniform_initialize_FCs(instance, initialize=True)
 
         out_unif = instance(data)[out_field]
         assert not torch.allclose(out_orig, out_unif)

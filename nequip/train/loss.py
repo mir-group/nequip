@@ -46,6 +46,7 @@ class Loss:
         self.coeff_schedule = coeff_schedule
         self.coeffs = {}
         self.funcs = {}
+        self.keys = []
 
         mseloss = find_loss_function("MSELoss", {})
         if isinstance(coeffs, str):
@@ -94,6 +95,7 @@ class Loss:
 
         for key, coeff in self.coeffs.items():
             self.coeffs[key] = torch.as_tensor(coeff, dtype=torch.get_default_dtype())
+            self.keys += [key]
 
     def __call__(self, pred: dict, ref: dict):
 

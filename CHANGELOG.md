@@ -20,6 +20,7 @@ Most recent change on the bottom.
 - Normalize total energy loss by the number of atoms via PerAtomLoss
 - Model builder to initialize training from previous checkpoint
 - Better error when instantiation fails
+- Rename `npz_keys` to `include_keys`
 
 ### Changed
 - Name processed datasets based on a hash of their parameters to ensure only valid cached data is used
@@ -31,6 +32,10 @@ Most recent change on the bottom.
 data
 - `use_sc` defaults to `True`
 - `register_fields` is now in `nequip.data`
+- Default total energy scaling is changed from global mode to per species mode.
+- Renamed `trainable_global_rescale_scale` to `global_rescale_scale_trainble`
+- Renamed `trainable_global_rescale_shift` to `global_rescale_shift_trainble`
+- Renamed `PerSpeciesScaleShift_` to `per_species_rescale`
 
 ### Fixed
 - The first 20 epochs/calls of inference are no longer painfully slow for recompilation

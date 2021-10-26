@@ -14,9 +14,8 @@ import yaml
 from copy import deepcopy
 from os.path import isfile
 from time import perf_counter, gmtime, strftime
-from typing import Callable, Optional, Union, Tuple
+from typing import Callable, Optional, Union, Tuple, List
 from pathlib import Path
-
 
 if sys.version_info[1] >= 7:
     import contextlib
@@ -216,6 +215,7 @@ class Trainer:
         model_builders: Optional[list] = [],
         seed: Optional[int] = None,
         loss_coeffs: Union[dict, str] = AtomicDataDict.TOTAL_ENERGY_KEY,
+        train_on_keys: Optional[List[str]] = None,
         metrics_components: Optional[Union[dict, str]] = None,
         metrics_key: str = ABBREV.get(LOSS_KEY, LOSS_KEY),
         early_stopping_conds: Optional[EarlyStopping] = None,
@@ -304,6 +304,17 @@ class Trainer:
         self.best_epoch = 0
         self.iepoch = -1 if self.report_init_validation else 0
 
+        self.loss, _ = instantiate(
+            builder=Loss,
+            prefix="loss",
+            positional_args=dict(coeffs=self.loss_coeffs),
+            all_args=self.kwargs,
+        )
+        self.loss_stat = LossStat(self.loss)
+        self.train_on_keys = self.loss.keys
+        if train_on_keys is not None:
+            assert set(train_on_keys) == set(self.train_on_keys)
+
         self.init()
 
     def init_objects(self):
@@ -374,14 +385,6 @@ class Trainer:
                 decay=self.ema_decay,
                 use_num_updates=self.ema_use_num_updates,
             )
-
-        self.loss, _ = instantiate(
-            builder=Loss,
-            prefix="loss",
-            positional_args=dict(coeffs=self.loss_coeffs),
-            all_args=self.kwargs,
-        )
-        self.loss_stat = LossStat(self.loss)
 
     @property
     def init_keys(self):
@@ -855,7 +858,7 @@ class Trainer:
         """
 
         mat_str = f"{self.iepoch+1:5d}, {self.ibatch+1:5d}"
-        log_str = f"{self.iepoch+1:5d} {self.ibatch+1:5d}"
+        log_str = f"  {self.iepoch+1:5d} {self.ibatch+1:5d}"
 
         header = "epoch, batch"
         log_header = "# Epoch batch"
@@ -865,7 +868,7 @@ class Trainer:
             mat_str += f", {value:16.5g}"
             header += f", {name}"
             log_str += f" {value:12.3g}"
-            log_header += f" {name:>12s}"
+            log_header += f" {name:>12.12}"
 
         # append details from metrics
         metrics, skip_keys = self.metrics.flatten_metrics(
@@ -881,7 +884,7 @@ class Trainer:
             header += f", {key}"
             if key not in skip_keys:
                 log_str += f" {value:12.3g}"
-                log_header += f" {key:>12s}"
+                log_header += f" {key:>12.12}"
 
         batch_logger = logging.getLogger(self.batch_log[batch_type])
 
@@ -964,7 +967,7 @@ class Trainer:
 
     def final_log(self):
 
-        self.logger.info(f"! Stop training for eaching {self.stop_arg}")
+        self.logger.info(f"! Stop training: {self.stop_arg}")
         wall = perf_counter() - self.wall
         self.logger.info(f"Wall time: {wall}")
 
@@ -1008,7 +1011,7 @@ class Trainer:
                 mat_str += f", {value:16.5g}"
                 header += f", {category}_{key}"
                 log_str[category] += f" {value:12.3g}"
-                log_header[category] += f" {key:>12s}"
+                log_header[category] += f" {key:>12.12}"
                 self.mae_dict[f"{category}_{key}"] = value
 
             # append details from metrics
@@ -1017,7 +1020,7 @@ class Trainer:
                 header += f", {category}_{key}"
                 if key not in skip_keys:
                     log_str[category] += f" {value:12.3g}"
-                    log_header[category] += f" {key:>12s}"
+                    log_header[category] += f" {key:>12.12}"
                 self.mae_dict[f"{category}_{key}"] = value
 
         if self.iepoch == 0:
@@ -1034,7 +1037,11 @@ class Trainer:
             self.logger.info("! Train      " + log_str[TRAIN])
             self.logger.info("! Validation " + log_str[VALIDATION])
         else:
+            self.logger.info("\n\n  Initialization     " + log_header[VALIDATION])
             self.logger.info("! Initial Validation " + log_str[VALIDATION])
+
+        wall = perf_counter() - self.wall
+        self.logger.info(f"Wall time: {wall}")
 
     def __del__(self):
 

@@ -54,7 +54,7 @@ compile_model: false                                                            
 #   invariant_neurons < InteractionBlock_invariant_neurons < layer{i}_invariant_neurons
 
 # data set
-# the keys used need to be stated at least once in key_mapping, npz_fixed_field_keys or npz_keys
+# the keys used need to be stated at least once in key_mapping, npz_fixed_field_keys or include_keys
 # key_mapping is used to map the key in the npz file to the NequIP default values (see data/_key.py)
 # all arrays are expected to have the shape of (nframe, natom, ?) except the fixed fields
 # note that if your data set uses pbc, you need to also pass an array that maps to the nequip "pbc" key
@@ -68,6 +68,24 @@ key_mapping:
   R: pos                                                                           # raw atomic positions
 npz_fixed_field_keys:                                                              # fields that are repeated across different examples
   - atomic_numbers
+
+# # for extxyz file
+# dataset: ase
+# dataset_file_name: H2.extxyz
+# ase_args:
+#   format: extxyz
+# include_keys:
+#   - user_label
+# key_mapping:
+#   user_label: label0
+# 
+# # for VASP OUTCAR, the yaml input should be
+# dataset: ase
+# dataset_file_name: OUTCAR
+# ase_args:
+#   format: vasp-out
+# key_mapping:
+#   free_energy: total_energy
 
 # A mapping of chemical species to type indexes is necessary if the dataset is provided with atomic numbers instead of type indexes.
 chemical_symbol_to_type:
@@ -116,6 +134,7 @@ metrics_key: loss                                                               
 use_ema: true                                                                      # if true, use exponential moving average on weights for val/test, usually helps a lot with training, in particular for energy errors
 ema_decay: 0.99                                                                    # ema weight, typically set to 0.99 or 0.999
 ema_use_num_updates: true                                                          # whether to use number of updates when computing averages
+report_init_validation: false                                                      # if True, report the validation error for just initialized model
 
 # early stopping based on metrics values. 
 # LR, wall and any keys printed in the log file can be used. 
@@ -218,45 +237,63 @@ lr_scheduler_factor: 0.5
 # the default is to scale the energies and forces by scaling them by the force standard deviation and to shift the energy by its mean
 # in certain cases, it can be useful to have a trainable shift/scale and to also have species-dependent shifts/scales for each atom
 
-# if the PerSpeciesScaleShift is enabled in the model builder list
-# whether the shifts and scales are trainable
-PerSpeciesScaleShift_trainable: false
-# optional initial atomic energy shift for each species. in order of type. Defaults to zeros. 
-# Another option is to use "dataset_per_species_total_energy_mean", which automatically compute the per atom energy mean
-# but ^ this mode is not compatible with global_shift = "dataset_energy_mean"
-PerSpeciesScaleShift_shifts: 0.0
-# optional initial atomic energy scale for each species. in order of type. Defaults to ones.
-# Another option is to use "dataset_per_species_total_energy_std", which automatically compute the per atom energy mean
-# Another option is to use "dataset_per_species_forces_rms", which automatically compute the force rms for each species
-# but ^ this mode is not compatible with global_shift = "dataset_energy_mean"
-PerSpeciesScaleShift_scales: 1.0
-
-# # example block to do good per species shifting
-# # note, sigma needs to be tuned 4.0 works the best for aspirin dataset.
-# global_rescale_shift: null
-# global_rescale_scale: dataset_forces_rms
-# PerSpeciesScaleShift_trainable: true
-# PerSpeciesScaleShift_shifts: dataset_per_atom_total_energy_mean
-# PerSpeciesScaleShift_scales: dataset_per_atom_total_energy_std
-# PerSpeciesScaleShift_kwargs: 
+per_species_rescale_trainable: false
+# whether the shifts and scales are trainable. Defaults to False. Optional
+per_species_rescale_shifts: dataset_per_atom_total_energy_mean
+# initial atomic energy shift for each species. default to the mean of per atom energy. Optional
+# the value can be a constant float value, an array for each species, or a string
+# string option include: 
+# *  "dataset_per_atom_total_energy_mean", which computes the per atom average
+# *  "dataset_per_species_total_energy_mean", which automatically compute the per atom energy mean using a GP model
+per_species_rescale_scales: dataset_forces_rms
+# initial atomic energy scale for each species. Optional.
+# the value can be a constant float value, an array for each species, or a string
+# string option include: 
+# *  "dataset_per_atom_total_energy_std", which computes the per atom energy std
+# *  "dataset_per_species_total_energy_std", which uses the GP model uncertainty
+# *  "dataset_per_species_forces_rms", which compute the force rms for each species
+# If not provided, defaults to dataset_per_species_force_rms or dataset_per_atom_total_energy_std, depending on whether forces are being trained.
+# per_species_rescale_kwargs: 
 #   total_energy: 
 #     alpha: 0.1
+#     max_iteration: 20
+# keywords for GP decomposition of per specie energy. Optional. Defaults to 0.1
+# per_species_rescale_arguments_in_dataset_units: True
+# if explicit numbers are given for the shifts/scales, this parameter must specify whether the given numbers are unitless shifts/scales or are in the units of the dataset. If ``True``, any global rescalings will correctly be applied to the per-species values.
 
-# global energy shift. When "dataset_total_energy_mean" (the default), the mean energy of the dataset. When None, disables the global shift. When a number, used directly.
-global_rescale_shift: dataset_total_energy_mean
+# global energy shift and scale
+# When "dataset_total_energy_mean", the mean energy of the dataset. When None, disables the global shift. When a number, used directly.
+# Warning: if this value is not None, the model is no longer size extensive
+global_rescale_shift: null
 
 # global energy scale. When "dataset_force_rms", the RMS of force components in the dataset. When "dataset_total_energy_std", the stdev of energies in the dataset. When null, disables the global scale. When a number, used directly.
 # If not provided, defaults to either dataset_force_rms or dataset_total_energy_std, depending on whether forces are being trained.
 global_rescale_scale: dataset_forces_rms
 
 # whether the shift of the final global energy rescaling should be trainable
-trainable_global_rescale_shift: false
+global_rescale_shift_trainable: false
 
 # whether the scale of the final global energy rescaling should be trainable
-trainable_global_rescale_scale: false
+global_rescale_scale_trainable: false
 
+# # full block needed for per specie rescale
+# global_rescale_shift: null
+# global_rescale_shift_trainable: false
+# global_rescale_scale: dataset_forces_rms
+# global_rescale_scale_trainable: false
+# per_species_rescale_trainable: true
+# per_species_rescale_shifts: dataset_per_atom_total_energy_mean
+# per_species_rescale_scales: dataset_per_atom_total_energy_std
+
+# # full block needed for global rescale
+# global_rescale_shift: dataset_total_energy_mean
+# global_rescale_shift_trainable: false
+# global_rescale_scale: dataset_forces_rms
+# global_rescale_scale_trainable: false
+# per_species_rescale_trainable: false
+# per_species_rescale_shifts: null
+# per_species_rescale_scales: null
 
 # Options for e3nn's set_optimization_defaults. A dict:
 # e3nn_optimization_defaults:
 #   explicit_backward: True
-
