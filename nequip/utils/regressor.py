@@ -25,7 +25,7 @@ def solver(
 
 def normalized_gp(X, y, alpha, max_iteration):
     feature_rms = 1.0 / np.sqrt(np.average(X ** 2, axis=0))
-    feature_rms = np.nan_to_num(feature_rms, 0)
+    feature_rms = np.nan_to_num(feature_rms, 1)
     return base_gp(
         X,
         y,
