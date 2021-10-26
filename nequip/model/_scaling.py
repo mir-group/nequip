@@ -5,6 +5,7 @@ import torch
 
 from nequip.nn import RescaleOutput, GraphModuleMixin, PerSpeciesScaleShift
 from nequip.data import AtomicDataDict, AtomicDataset
+from nequip.utils import get_w_prefix
 
 
 RESCALE_THRESHOLD = 1e-6
@@ -31,7 +32,7 @@ def RescaleEnergyEtc(
         prefix=module_prefix,
         arg_dicts=config,
     )
-    global_shift = get_w_prefx(
+    global_shift = get_w_prefix(
         f"{module_prefix}_shift", None, prefix=module_prefix, arg_dicts=config
     )
 
