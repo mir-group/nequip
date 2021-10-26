@@ -1,6 +1,7 @@
 from .auto_init import (
     instantiate_from_cls_name,
     instantiate,
+    get_w_prefix,
 )
 from .savenload import save_file, load_file, atomic_write
 from .config import Config

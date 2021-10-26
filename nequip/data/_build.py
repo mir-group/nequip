@@ -4,7 +4,7 @@ from importlib import import_module
 from nequip import data
 from nequip.data.transforms import TypeMapper
 from nequip.data import AtomicDataset, register_fields
-from nequip.utils import instantiate
+from nequip.utils import instantiate, get_w_prefix
 
 
 def dataset_from_config(config, prefix: str = "dataset") -> AtomicDataset:
@@ -71,9 +71,15 @@ def dataset_from_config(config, prefix: str = "dataset") -> AtomicDataset:
 
     # Register fields:
     register_fields(
-        node_fields=config.get(f"{prefix}_node_fields", []),
-        edge_fields=config.get(f"{prefix}_edge_fields", []),
-        graph_fields=config.get(f"{prefix}_graph_fields", []),
+        node_fields=get_w_prefix(
+            "node_fields", [], prefix=[prefix], arg_dicts=[config]
+        ),
+        edge_fields=get_w_prefix(
+            "edge_fields", [], prefix=[prefix], arg_dicts=[config]
+        ),
+        graph_fields=get_w_prefix(
+            "graph_fields", [], prefix=[prefix], arg_dicts=[config]
+        ),
     )
 
     instance, _ = instantiate(
