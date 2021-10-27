@@ -10,7 +10,7 @@ import nequip.scripts.deploy
 class NequIPCalculator(Calculator):
     """NequIP ASE Calculator."""
 
-    implemented_properties = ["energy", "forces","stress"]
+    implemented_properties = ["energy", "forces", "stress", "free_energy"]
 
     def __init__(
         self,
@@ -69,6 +69,7 @@ class NequIPCalculator(Calculator):
             # force has units eng / len:
             "forces": forces * (self.energy_units_to_eV / self.length_units_to_A),
         }
+        self.results['free_energy'] = self.results['energy']
         if "stress" in properties:
             stress = out[AtomicDataDict.STRESS_KEY].detach().cpu().numpy()
             stress=stress.reshape(3,3)*(self.energy_units_to_eV/self.length_units_to_A**3)
