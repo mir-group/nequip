@@ -38,6 +38,7 @@ data
 - Renamed `trainable_global_rescale_shift` to `global_rescale_shift_trainble`
 - Renamed `PerSpeciesScaleShift_` to `per_species_rescale`
 - Change default and allowed values of `metrics_key` from `loss` to `validation_loss`. The old default `loss` will no longer be accepted.
+- Renamed `per_species_rescale_trainable` to `per_species_rescale_scales_trainable` and `per_species_rescale_shifts_trainable`
 
 ### Fixed
 - The first 20 epochs/calls of inference are no longer painfully slow for recompilation
