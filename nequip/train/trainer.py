@@ -177,7 +177,7 @@ class Trainer:
         stop_arg (str): reason why the training stops
         batch_mae (float): the mae of the latest batch
         mae_dict (dict): all loss, mae of the latest validation
-        best_val_metrics (float): current best validation mae
+        best_metrics (float): current best validation mae
         best_epoch (float): current best epoch
         best_model_path (str): path to save the best model
         last_model_path (str): path to save the latest model
@@ -217,7 +217,7 @@ class Trainer:
         loss_coeffs: Union[dict, str] = AtomicDataDict.TOTAL_ENERGY_KEY,
         train_on_keys: Optional[List[str]] = None,
         metrics_components: Optional[Union[dict, str]] = None,
-        metrics_key: str = ABBREV.get(LOSS_KEY, LOSS_KEY),
+        metrics_key: str = f"{VALIDATION}_" + ABBREV.get(LOSS_KEY, LOSS_KEY),
         early_stopping_conds: Optional[EarlyStopping] = None,
         early_stopping: Optional[Callable] = None,
         early_stopping_kwargs: Optional[dict] = None,
@@ -275,8 +275,12 @@ class Trainer:
             "metrics_initialization.csv", propagate=False
         )
         self.batch_log = {
-            TRAIN: output.open_logfile("metrics_batch_train.csv", propagate=False),
-            VALIDATION: output.open_logfile("metrics_batch_val.csv", propagate=False),
+            TRAIN: output.open_logfile(
+                f"metrics_batch_{ABBREV[TRAIN]}.csv", propagate=False
+            ),
+            VALIDATION: output.open_logfile(
+                f"metrics_batch_{ABBREV[VALIDATION]}.csv", propagate=False
+            ),
         }
 
         # add filenames if not defined
@@ -300,7 +304,7 @@ class Trainer:
         self.early_stopping_kwargs = deepcopy(early_stopping_kwargs)
 
         # initialize training states
-        self.best_val_metrics = float("inf")
+        self.best_metrics = float("inf")
         self.best_epoch = 0
         self.iepoch = -1 if self.report_init_validation else 0
 
@@ -368,9 +372,9 @@ class Trainer:
                 new_dict = {}
                 for k, v in item.items():
                     if (
-                        k.startswith(VALIDATION)
-                        or k.startswith(TRAIN)
-                        or k in ["LR", "wall"]
+                        k.lower().startswith(VALIDATION)
+                        or k.lower().startswith(TRAIN)
+                        or k.lower() in ["lr", "wall"]
                     ):
                         new_dict[k] = item[k]
                     else:
@@ -451,8 +455,8 @@ class Trainer:
             dictionary["progress"] = {}
             for key in ["iepoch", "best_epoch"]:
                 dictionary["progress"][key] = self.__dict__.get(key, -1)
-            dictionary["progress"]["best_val_metrics"] = self.__dict__.get(
-                "best_val_metrics", float("inf")
+            dictionary["progress"]["best_metrics"] = self.__dict__.get(
+                "best_metrics", float("inf")
             )
             dictionary["progress"]["stop_arg"] = self.__dict__.get("stop_arg", None)
 
@@ -595,11 +599,11 @@ class Trainer:
                 torch.cuda.set_rng_state(state_dict["cuda_rng_state"])
 
         if "progress" in d:
-            trainer.best_val_metrics = progress["best_val_metrics"]
+            trainer.best_metrics = progress["best_metrics"]
             trainer.best_epoch = progress["best_epoch"]
             stop_arg = progress.pop("stop_arg", None)
         else:
-            trainer.best_val_metrics = float("inf")
+            trainer.best_metrics = float("inf")
             trainer.best_epoch = 0
             stop_arg = None
         trainer.iepoch = iepoch
@@ -654,7 +658,7 @@ class Trainer:
             self.metrics_components = []
             for key, func in self.loss.funcs.items():
                 params = {
-                    "PerSpecies": type(func).__name__.startswith("PerSpecies"),
+                    "PerSpecies": type(func).__name__.lower().startswith("perspecies"),
                 }
                 self.metrics_components.append((key, "mae", params))
                 self.metrics_components.append((key, "rmse", params))
@@ -667,10 +671,12 @@ class Trainer:
         )
 
         if not (
-            self.metrics_key.startswith(VALIDATION)
-            or self.metrics_key.startswith(TRAIN)
+            self.metrics_key.lower().startswith(VALIDATION)
+            or self.metrics_key.lower().startswith(TRAIN)
         ):
-            self.metrics_key = f"{VALIDATION}_{self.metrics_key}"
+            raise RuntimeError(
+                f"metrics key should start with either {VALIDATION} or {TRAIN}"
+            )
 
     def train(self):
 
@@ -909,15 +915,15 @@ class Trainer:
         save model and trainer details
         """
 
-        val_metrics = self.mae_dict[self.metrics_key]
-        if val_metrics < self.best_val_metrics:
-            self.best_val_metrics = val_metrics
+        current_metrics = self.mae_dict[self.metrics_key]
+        if current_metrics < self.best_metrics:
+            self.best_metrics = current_metrics
             self.best_epoch = self.iepoch
 
             self.save_ema_model(self.best_model_path)
 
             self.logger.info(
-                f"! Best model {self.best_epoch:8d} {self.best_val_metrics:8.3f}"
+                f"! Best model {self.best_epoch:8d} {self.best_metrics:8.3f}"
             )
 
         if (self.iepoch + 1) % self.log_epoch_freq == 0:

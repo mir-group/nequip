@@ -164,13 +164,13 @@ def find_loss_function(name: str, params):
     """
 
     wrapper_list = dict(
-        PerSpecies=PerSpeciesLoss,
-        PerAtom=PerAtomLoss,
+        perspecies=PerSpeciesLoss,
+        peratom=PerAtomLoss,
     )
 
     if isinstance(name, str):
         for key in wrapper_list:
-            if name.startswith(key):
+            if name.lower().startswith(key):
                 logging.debug(f"create loss instance {wrapper_list[key]}")
                 return wrapper_list[key](name[len(key) :], params)
         return SimpleLoss(name, params)
