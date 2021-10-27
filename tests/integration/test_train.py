@@ -77,16 +77,16 @@ class LearningFactorModel(GraphModuleMixin, torch.nn.Module):
 
 
 @pytest.mark.parametrize(
-    "conffile,field",
+    "conffile",
     [
-        ("minimal.yaml", AtomicDataDict.FORCE_KEY),
-        ("minimal_eng.yaml", AtomicDataDict.TOTAL_ENERGY_KEY),
+        "minimal.yaml",
+        "minimal_eng.yaml",
     ],
 )
 @pytest.mark.parametrize(
     "builder", [IdentityModel, ConstFactorModel, LearningFactorModel]
 )
-def test_metrics(nequip_dataset, BENCHMARK_ROOT, conffile, field, builder):
+def test_metrics(nequip_dataset, BENCHMARK_ROOT, conffile, builder):
 
     dtype = str(torch.get_default_dtype())[len("torch.") :]
 
@@ -120,15 +120,15 @@ def test_metrics(nequip_dataset, BENCHMARK_ROOT, conffile, field, builder):
         env["PYTHONPATH"] = ":".join(
             [str(path_to_this_file.parent)] + env.get("PYTHONPATH", "").split(":")
         )
-        with open(f"{tmpdir}/screen", "w+") as screen:
-            retcode = subprocess.run(
-                ["nequip-train", "conf.yaml"],
-                cwd=tmpdir,
-                env=env,
-                stdout=screen,
-                stderr=screen,
-            )
-            retcode.check_returncode()
+
+        retcode = subprocess.run(
+            ["nequip-train", "conf.yaml"],
+            cwd=tmpdir,
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        retcode.check_returncode()
 
         # == Load metrics ==
         outdir = f"{tmpdir}/{true_config['root']}/{run_name}/"
@@ -195,13 +195,13 @@ def test_metrics(nequip_dataset, BENCHMARK_ROOT, conffile, field, builder):
 
 
 @pytest.mark.parametrize(
-    "conffile,field",
+    "conffile",
     [
-        ("minimal.yaml", AtomicDataDict.FORCE_KEY),
-        ("example.yaml", AtomicDataDict.TOTAL_ENERGY_KEY),
+        "minimal.yaml",
+        "minimal_eng.yaml",
     ],
 )
-def test_requeue(nequip_dataset, BENCHMARK_ROOT, conffile, field):
+def test_requeue(nequip_dataset, BENCHMARK_ROOT, conffile):
 
     builder = IdentityModel
     dtype = str(torch.get_default_dtype())[len("torch.") :]
@@ -240,15 +240,15 @@ def test_requeue(nequip_dataset, BENCHMARK_ROOT, conffile, field):
             env["PYTHONPATH"] = ":".join(
                 [str(path_to_this_file.parent)] + env.get("PYTHONPATH", "").split(":")
             )
-            with open(f"{tmpdir}/screen", "w+") as screen:
-                retcode = subprocess.run(
-                    ["nequip-train", "conf.yaml"],
-                    cwd=tmpdir,
-                    env=env,
-                    stdout=screen,
-                    stderr=screen,
-                )
-                retcode.check_returncode()
+
+            retcode = subprocess.run(
+                ["nequip-train", "conf.yaml"],
+                cwd=tmpdir,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            retcode.check_returncode()
 
             # == Load metrics ==
             dat = np.genfromtxt(
