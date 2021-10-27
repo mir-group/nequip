@@ -21,6 +21,7 @@ Most recent change on the bottom.
 - Model builder to initialize training from previous checkpoint
 - Better error when instantiation fails
 - Rename `npz_keys` to `include_keys`
+- Allow user to register `graph_fields`, `node_fields`, and `edge_fields` via yaml
 
 ### Changed
 - Name processed datasets based on a hash of their parameters to ensure only valid cached data is used
@@ -36,6 +37,7 @@ data
 - Renamed `trainable_global_rescale_scale` to `global_rescale_scale_trainble`
 - Renamed `trainable_global_rescale_shift` to `global_rescale_shift_trainble`
 - Renamed `PerSpeciesScaleShift_` to `per_species_rescale`
+- Change default and allowed values of `metrics_key` from `loss` to `validation_loss`. The old default `loss` will no longer be accepted.
 
 ### Fixed
 - The first 20 epochs/calls of inference are no longer painfully slow for recompilation
