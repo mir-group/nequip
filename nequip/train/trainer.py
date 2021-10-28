@@ -170,7 +170,6 @@ class Trainer:
     Additional Attributes:
 
         init_keys (list): list of parameters needed to reconstruct this instance
-        device : torch device
         dl_train (DataLoader): training data
         dl_val (DataLoader): test data
         iepoch (int): # of epoches ran
@@ -213,6 +212,9 @@ class Trainer:
         self,
         model,
         model_builders: Optional[list] = [],
+        device: Optional[str] = torch.device(
+            "cuda" if torch.cuda.is_available() else "cpu"
+        ),
         seed: Optional[int] = None,
         loss_coeffs: Union[dict, str] = AtomicDataDict.TOTAL_ENERGY_KEY,
         train_on_keys: Optional[List[str]] = None,
@@ -293,7 +295,6 @@ class Trainer:
             torch.manual_seed(seed)
             np.random.seed(seed)
 
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.logger.info(f"Torch device: {self.device}")
 
         # sort out all the other parameters
@@ -389,6 +390,13 @@ class Trainer:
                 decay=self.ema_decay,
                 use_num_updates=self.ema_use_num_updates,
             )
+
+        if hasattr(self.model, "irreps_out"):
+            for key in self.train_on_keys:
+                if key not in self.model.irreps_out:
+                    raise RuntimeError(
+                        "Loss function include fields that are not predicted by the model"
+                    )
 
     @property
     def init_keys(self):
