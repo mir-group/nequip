@@ -73,9 +73,9 @@ def dataset_from_config(config, prefix: str = "dataset") -> AtomicDataset:
 
     # Register fields:
     register_fields(
-        node_fields=get_w_prefix("node_fields", [], prefix=prefix, arg_dicts=config),
-        edge_fields=get_w_prefix("edge_fields", [], prefix=prefix, arg_dicts=config),
-        graph_fields=get_w_prefix("graph_fields", [], prefix=prefix, arg_dicts=config),
+        node_fields=config.get("node_fields", []),
+        edge_fields=config.get("edge_fields", []),
+        graph_fields=config.get("graph_fields", []),
     )
 
     instance, _ = instantiate(
