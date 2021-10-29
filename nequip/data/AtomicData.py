@@ -69,10 +69,11 @@ def register_fields(
     _NODE_FIELDS.update(node_fields)
     _EDGE_FIELDS.update(edge_fields)
     _GRAPH_FIELDS.update(graph_fields)
-    multiregistered = _NODE_FIELDS.intersection(_EDGE_FIELDS, _GRAPH_FIELDS)
-    if len(multiregistered) > 0:
+    if len(set.union(_NODE_FIELDS, _EDGE_FIELDS, _GRAPH_FIELDS)) < (
+        len(_NODE_FIELDS) + len(_EDGE_FIELDS) + len(_GRAPH_FIELDS)
+    ):
         raise ValueError(
-            f"Tried to register keys `{multiregistered}` as more than one of node, edge, or graph!"
+            "At least one key was registered as more than one of node, edge, or graph!"
         )
 
 
