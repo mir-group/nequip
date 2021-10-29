@@ -4,7 +4,7 @@ from importlib import import_module
 from nequip import data
 from nequip.data.transforms import TypeMapper
 from nequip.data import AtomicDataset, register_fields
-from nequip.utils import instantiate
+from nequip.utils import instantiate, get_w_prefix
 
 
 def dataset_from_config(config, prefix: str = "dataset") -> AtomicDataset:
@@ -57,23 +57,25 @@ def dataset_from_config(config, prefix: str = "dataset") -> AtomicDataset:
         raise NameError(f"dataset type {dataset_name} does not exists")
 
     # if dataset r_max is not found, use the universal r_max
-    extra_fixed_fields_key = prefix + "_extra_fixed_fields"
-    if extra_fixed_fields_key not in config:
-        config[extra_fixed_fields_key] = {}
-        if "extra_fixed_fields" in config:
-            config[extra_fixed_fields_key].update(config.extra_fixed_fields)
-
-    if "r_max" in config and "r_max" not in config[extra_fixed_fields_key]:
-        config[extra_fixed_fields_key]["r_max"] = config.r_max
+    eff_key = "extra_fixed_fields"
+    prefixed_eff_key = f"{prefix}_{eff_key}"
+    config[prefixed_eff_key] = get_w_prefix(
+        eff_key, {}, prefix=prefix, arg_dicts=config
+    )
+    config[prefixed_eff_key]["r_max"] = get_w_prefix(
+        "r_max",
+        prefix=prefix,
+        arg_dicts=[config[prefixed_eff_key], config],
+    )
 
     # Build a TypeMapper from the config
     type_mapper, _ = instantiate(TypeMapper, prefix=prefix, optional_args=config)
 
     # Register fields:
     register_fields(
-        node_fields=config.get(f"{prefix}_node_fields", []),
-        edge_fields=config.get(f"{prefix}_edge_fields", []),
-        graph_fields=config.get(f"{prefix}_graph_fields", []),
+        node_fields=config.get("node_fields", []),
+        edge_fields=config.get("edge_fields", []),
+        graph_fields=config.get("graph_fields", []),
     )
 
     instance, _ = instantiate(

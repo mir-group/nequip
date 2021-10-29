@@ -66,12 +66,15 @@ def register_fields(
     graph_fields: set = set(graph_fields)
     allfields = node_fields.union(edge_fields, graph_fields)
     assert len(allfields) == len(node_fields) + len(edge_fields) + len(graph_fields)
-    assert (_NODE_FIELDS.union(_EDGE_FIELDS, _GRAPH_FIELDS)).isdisjoint(
-        allfields
-    ), "Cannot reregister a field that has already been registered"
     _NODE_FIELDS.update(node_fields)
     _EDGE_FIELDS.update(edge_fields)
     _GRAPH_FIELDS.update(graph_fields)
+    if len(set.union(_NODE_FIELDS, _EDGE_FIELDS, _GRAPH_FIELDS)) < (
+        len(_NODE_FIELDS) + len(_EDGE_FIELDS) + len(_GRAPH_FIELDS)
+    ):
+        raise ValueError(
+            "At least one key was registered as more than one of node, edge, or graph!"
+        )
 
 
 def deregister_fields(*fields: Sequence[str]) -> None:
