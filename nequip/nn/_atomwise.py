@@ -100,7 +100,8 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
 
     field: str
     out_field: str
-    trainable: bool
+    scales_trainble: bool
+    shifts_trainable: bool
 
     def __init__(
         self,
@@ -110,7 +111,8 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
         scales: List[float],
         arguments_in_dataset_units: bool,
         out_field: Optional[str] = None,
-        trainable: bool = False,
+        scales_trainable: bool = False,
+        shifts_trainable: bool = False,
         irreps_in={},
     ):
         super().__init__()
@@ -132,13 +134,18 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
             scales = torch.ones(num_types) * scales
         assert scales.shape == (num_types,), f"Invalid shape of scales {scales}"
 
-        self.trainable = trainable
-        if trainable:
-            self.shifts = torch.nn.Parameter(shifts)
+        self.scales_trainable = scales_trainable
+        self.shifts_trainable = shifts_trainable
+
+        if scales_trainable:
             self.scales = torch.nn.Parameter(scales)
         else:
-            self.register_buffer("shifts", shifts)
             self.register_buffer("scales", scales)
+
+        if shifts_trainable:
+            self.shifts = torch.nn.Parameter(shifts)
+        else:
+            self.register_buffer("shifts", shifts)
         self.arguments_in_dataset_units = arguments_in_dataset_units
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:

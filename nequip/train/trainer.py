@@ -1051,6 +1051,9 @@ class Trainer:
 
     def __del__(self):
 
+        if not self._initialized:
+            return
+
         logger = self.logger
         for hdl in logger.handlers:
             hdl.flush()
