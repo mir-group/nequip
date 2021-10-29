@@ -5,7 +5,6 @@ import torch
 
 from nequip.nn import RescaleOutput, GraphModuleMixin, PerSpeciesScaleShift
 from nequip.data import AtomicDataDict, AtomicDataset
-from nequip.utils import get_w_prefix
 
 
 RESCALE_THRESHOLD = 1e-6
@@ -24,17 +23,13 @@ def RescaleEnergyEtc(
 
     module_prefix = "global_rescale"
 
-    global_scale = get_w_prefix(
-        "scale",
+    global_scale = config.get(
+        f"{module_prefix}_scale",
         f"dataset_{AtomicDataDict.FORCE_KEY}_rms"
         if AtomicDataDict.FORCE_KEY in model.irreps_out
         else f"dataset_{AtomicDataDict.TOTAL_ENERGY_KEY}_std",
-        prefix=module_prefix,
-        arg_dicts=config,
     )
-    global_shift = get_w_prefix(
-        f"{module_prefix}_shift", None, prefix=module_prefix, arg_dicts=config
-    )
+    global_shift = config.get(f"{module_prefix}_shift", None)
 
     if global_shift is not None:
         logging.warning(
@@ -107,12 +102,8 @@ def RescaleEnergyEtc(
             k for k in (AtomicDataDict.TOTAL_ENERGY_KEY,) if k in model.irreps_out
         ],
         shift_by=global_shift,
-        shift_trainable=get_w_prefix(
-            "shift_trainable", False, prefix=module_prefix, arg_dicts=config
-        ),
-        scale_trainable=get_w_prefix(
-            "scale_trainable", False, prefix=module_prefix, arg_dicts=config
-        ),
+        shift_trainable=config.get(f"{module_prefix}_shift_trainable", False),
+        scale_trainable=config.get(f"{module_prefix}_scale_trainable", False),
     )
 
 
@@ -129,19 +120,15 @@ def PerSpeciesRescale(
     module_prefix = "per_species_rescale"
 
     # = Determine energy rescale type =
-    scales = get_w_prefix(
-        "scales",
+    scales = config.get(
+        module_prefix + "_scales",
         f"dataset_{AtomicDataDict.FORCE_KEY}_rms"
         if AtomicDataDict.FORCE_KEY in config["train_on_keys"]
         else f"dataset_per_atom_{AtomicDataDict.TOTAL_ENERGY_KEY}_std",
-        prefix=module_prefix,
-        arg_dicts=config,
     )
-    shifts = get_w_prefix(
-        "shifts",
+    shifts = config.get(
+        module_prefix + "_shifts",
         f"dataset_per_atom_{AtomicDataDict.TOTAL_ENERGY_KEY}_mean",
-        prefix=module_prefix,
-        arg_dicts=config,
     )
 
     # = Determine what statistics need to be compute =\
