@@ -26,14 +26,16 @@ def solver(
 def normalized_gp(X, y, alpha, max_iteration):
     feature_rms = 1.0 / np.sqrt(np.average(X ** 2, axis=0))
     feature_rms = np.nan_to_num(feature_rms, 1)
-    return base_gp(
+    y_mean = torch.sum(y)/torch.sum(X)
+    mean, std = base_gp(
         X,
-        y,
+        y-(torch.sum(X, axis=1)*y_mean).reshape(y.shape),
         NormalizedDotProduct,
         {"diagonal_elements": feature_rms},
         alpha,
         max_iteration,
     )
+    return mean+y_mean, std
 
 
 def gp(X, y, alpha, max_iteration):
