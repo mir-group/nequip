@@ -32,7 +32,7 @@ setup(
         "tqdm",
         "torch>=1.8",
         "torch_geometric==1.7.2",
-        "e3nn>=0.3.3",
+        "e3nn==0.3.5",
         "pyyaml",
         "contextlib2;python_version<'3.7'",  # backport of nullcontext
         "typing_extensions;python_version<'3.8'",
