@@ -53,7 +53,6 @@ def EnergyModel(config) -> SequentialGraphNetwork:
     layers["total_energy_sum"] = (
         AtomwiseReduce,
         dict(
-            reduce="sum",
             field=AtomicDataDict.PER_ATOM_ENERGY_KEY,
             out_field=AtomicDataDict.TOTAL_ENERGY_KEY,
         ),

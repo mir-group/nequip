@@ -61,7 +61,7 @@ class AtomwiseReduce(GraphModuleMixin, torch.nn.Module):
         self, field: str, out_field: Optional[str] = None, reduce="sum", irreps_in={}
     ):
         super().__init__()
-        assert reduce in ("sum", "mean", "min", "max")
+        assert reduce in ("sum")
         self.reduce = reduce
         self.field = field
         self.out_field = f"{reduce}_{field}" if out_field is None else out_field
@@ -75,7 +75,7 @@ class AtomwiseReduce(GraphModuleMixin, torch.nn.Module):
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
         data = AtomicDataDict.with_batch(data)
         data[self.out_field] = scatter(
-            data[self.field], data[AtomicDataDict.BATCH_KEY], dim=0, reduce=self.reduce
+            data[self.field], data[AtomicDataDict.BATCH_KEY], dim=0
         )
         return data
 

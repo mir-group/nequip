@@ -44,7 +44,7 @@ def model(float_tolerance, request):
             ),
             "sum": (
                 AtomwiseReduce,
-                dict(reduce="sum", field="shifted", out_field="sum"),
+                dict(field="shifted", out_field="sum"),
             ),
         },
     )
