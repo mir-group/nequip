@@ -19,11 +19,4 @@ def get_commit(module: str):
     if retcode.returncode == 0:
         return retcode.stdout.decode().splitlines()[0].split()[0]
     else:
-        err_info = retcode.stderr.decode()
-        logging.info(err_info)
-        logging.info(
-            f"Fail to retrieve {module} commit version."
-            "It is installe dat {path} but no git is found;"
-            "Try `pip install -e ./` for installation."
-        )
         return "NaN"
