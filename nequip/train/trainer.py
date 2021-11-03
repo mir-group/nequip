@@ -40,6 +40,7 @@ from nequip.utils import (
     atomic_write,
     dtype_from_name,
 )
+from nequip.utils.git import get_commit
 from nequip.model import model_from_config
 
 from .loss import Loss, LossStat
@@ -477,6 +478,8 @@ class Trainer:
 
         for code in [e3nn, nequip, torch]:
             dictionary[f"{code.__name__}_version"] = code.__version__
+        for code in ["e3nn", "nequip"]:
+            dictionary[f"{code}_commit"] = get_commit(code)
 
         return dictionary
 
