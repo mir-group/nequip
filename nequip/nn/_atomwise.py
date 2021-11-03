@@ -3,7 +3,7 @@ from typing import Optional, List
 
 import torch
 import torch.nn.functional
-from torch_scatter import scatter
+from torch_runstats.scatter import scatter
 
 from e3nn.o3 import Linear
 
@@ -61,7 +61,7 @@ class AtomwiseReduce(GraphModuleMixin, torch.nn.Module):
         self, field: str, out_field: Optional[str] = None, reduce="sum", irreps_in={}
     ):
         super().__init__()
-        assert reduce in ("sum", "mean", "min", "max")
+        assert reduce in ("sum", "mean")
         self.reduce = reduce
         self.field = field
         self.out_field = f"{reduce}_{field}" if out_field is None else out_field

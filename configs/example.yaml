@@ -64,12 +64,12 @@ chemical_symbol_to_type:
   C: 1
 
 # logging
-wandb: false                                                                       # we recommend using wandb for logging, we'll turn it off here as it's optional
+wandb: true                                                                       # we recommend using wandb for logging, we'll turn it off here as it's optional
 wandb_project: toluene-example                                                     # project name used in wandb
 wandb_resume: true                                                                 # if true and restart is true, wandb run data will be restarted and updated.
                                                                                    # if false, a new wandb run will be generated
 verbose: info                                                                      # the same as python logging, e.g. warning, info, debug, error. case insensitive
-log_batch_freq: 1                                                                  # batch frequency, how often to print training errors withinin the same epoch
+log_batch_freq: 1000000                                                                  # batch frequency, how often to print training errors withinin the same epoch
 log_epoch_freq: 1                                                                  # epoch frequency, how often to print and save the model
 save_checkpoint_freq: -1                                                           # frequency to save the intermediate checkpoint. no saving when the value is not positive.
 save_ema_checkpoint_freq: -1                                                       # frequency to save the intermediate ema checkpoint. no saving when the value is not positive.
@@ -79,7 +79,7 @@ n_train: 100                                                                    
 n_val: 50                                                                          # number of validation data
 learning_rate: 0.005                                                               # learning rate, we found values between 0.01 and 0.005 to work best - this is often one of the most important hyperparameters to tune
 batch_size: 5                                                                      # batch size, we found it important to keep this small for most applications including forces (1-5); for energy-only training, higher batch sizes work better
-max_epochs: 100000                                                                 # stop training after _ number of epochs, we set a very large number here, it won't take this long in practice and we will use early stopping instead
+max_epochs: 100                                                                 # stop training after _ number of epochs, we set a very large number here, it won't take this long in practice and we will use early stopping instead
 train_val_split: random                                                            # can be random or sequential. if sequential, first n_train elements are training, next n_val are val, else random, usually random is the right choice
 shuffle: true                                                                      # If true, the data loader will shuffle the data, usually a good idea
 metrics_key: validation_loss                                                       # metrics used for scheduling and saving best model. Options: `set`_`quantity`, set can be either "train" or "validation, "quantity" can be loss or anything that appears in the validation batch step header, such as f_mae, f_rmse, e_mae, e_rmse
@@ -89,7 +89,7 @@ ema_use_num_updates: true                                                       
 
 # early stopping based on metrics values.
 early_stopping_patiences:                                                          # stop early if a metric value stopped decreasing for n epochs
-  Validation_loss: 50
+  validation_loss: 50
 
 # loss function
 loss_coeffs:                                                                       # different weights to use in a weighted loss functions
@@ -126,6 +126,7 @@ lr_scheduler_factor: 0.5
 
 per_species_rescale_shifts_trainable: false
 per_species_rescale_scales_trainable: false
+
 # whether the shifts and scales are trainable. Defaults to False. Optional
 per_species_rescale_shifts: dataset_per_atom_total_energy_mean
 # initial atomic energy shift for each species. default to the mean of per atom energy. Optional

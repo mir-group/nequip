@@ -29,8 +29,7 @@ setup(
         "numpy",
         "ase",
         "tqdm",
-        "torch>=1.8",  # torch.fx added in 1.8
-        "torch_scatter",
+        "torch>=1.8,<1.10",  # torch.fx added in 1.8
         "e3nn==0.3.5",
         "pyyaml",
         "contextlib2;python_version<'3.7'",  # backport of nullcontext

@@ -24,6 +24,7 @@ Most recent change on the bottom.
 - Allow user to register `graph_fields`, `node_fields`, and `edge_fields` via yaml
 
 ### Changed
+- Update example.yaml to use wandb by default, to only use 100 epochs of training, to set a very large batch logging frequency and to change Validation_loss to validation_loss
 - Name processed datasets based on a hash of their parameters to ensure only valid cached data is used
 - Do not use TensorFloat32 by default on Ampere GPUs until we understand it better
 - No atomic numbers in networks
@@ -50,6 +51,7 @@ data
 - Removed dependency on `pytorch_geometric`
 - `nequip-train` no longer prints the full config, which can be found in the training dir as `config.yaml`.
 - `nequip.datasets.AspirinDataset` & `nequip.datasets.WaterDataset`
+- Dependency on `pytorch_scatter`
 
 ## [0.3.3] - 2021-08-11
 ### Added

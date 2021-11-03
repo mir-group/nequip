@@ -2,7 +2,7 @@ import inspect
 import logging
 
 import torch.nn
-from torch_scatter import scatter
+from torch_runstats.scatter import scatter, scatter_mean
 
 from nequip.data import AtomicDataDict
 from nequip.utils import instantiate_from_cls_name
@@ -131,9 +131,9 @@ class PerSpeciesLoss(SimpleLoss):
                 per_atom_loss = per_atom_loss.sum(dim=reduce_dims)
 
             spe_idx = pred[AtomicDataDict.ATOM_TYPE_KEY]
-            per_species_loss = scatter(per_atom_loss, spe_idx, reduce="sum", dim=0)
+            per_species_loss = scatter(per_atom_loss, spe_idx, dim=0)
 
-            N = scatter(not_nan, spe_idx, reduce="sum", dim=0)
+            N = scatter(not_nan, spe_idx, dim=0)
             N = N.sum(reduce_dims)
             N = 1.0 / N
             N_species = ((N == N).int()).sum()
@@ -149,9 +149,7 @@ class PerSpeciesLoss(SimpleLoss):
             spe_idx = pred[AtomicDataDict.ATOM_TYPE_KEY]
             _, inverse_species_index = torch.unique(spe_idx, return_inverse=True)
 
-            per_species_loss = scatter(
-                per_atom_loss, inverse_species_index, reduce="mean", dim=0
-            )
+            per_species_loss = scatter_mean(per_atom_loss, inverse_species_index, dim=0)
 
             return per_species_loss.mean()
 

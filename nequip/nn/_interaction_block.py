@@ -3,7 +3,7 @@ from typing import Optional, Dict, Callable
 
 import torch
 
-from torch_scatter import scatter
+from torch_runstats.scatter import scatter
 
 from e3nn import o3
 from e3nn.nn import FullyConnectedNet
