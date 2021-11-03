@@ -2,7 +2,7 @@ import inspect
 import logging
 
 import torch.nn
-from torch_scatter import scatter
+from torch_runstats.scatter import scatter
 
 from nequip.data import AtomicDataDict
 from nequip.utils import instantiate_from_cls_name

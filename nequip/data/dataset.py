@@ -2,7 +2,6 @@ import numpy as np
 import logging
 import tempfile
 import inspect
-from torch._C import Value
 import yaml
 import hashlib
 from os.path import dirname, basename, abspath
@@ -12,7 +11,8 @@ import ase
 
 import torch
 
-from torch_scatter import scatter, scatter_std
+from torch_runstats.scatter import scatter, scatter_std
+
 from nequip.utils.torch_geometric import Batch, Dataset
 from nequip.utils.torch_geometric.utils import download_url, extract_zip
 

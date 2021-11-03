@@ -3,7 +3,7 @@ from typing import Optional, List
 
 import torch
 import torch.nn.functional
-from torch_scatter import scatter
+from torch_runstats.scatter import scatter
 
 from e3nn.o3 import Linear
 
