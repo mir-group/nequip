@@ -213,7 +213,7 @@ class Trainer:
         self,
         model,
         model_builders: Optional[list] = [],
-        device: Optional[str] = "cuda" if torch.cuda.is_available() else "cpu",
+        device: str = "cuda" if torch.cuda.is_available() else "cpu",
         seed: Optional[int] = None,
         loss_coeffs: Union[dict, str] = AtomicDataDict.TOTAL_ENERGY_KEY,
         train_on_keys: Optional[List[str]] = None,
