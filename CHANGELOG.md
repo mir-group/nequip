@@ -24,6 +24,7 @@ Most recent change on the bottom.
 - Allow user to register `graph_fields`, `node_fields`, and `edge_fields` via yaml
 
 ### Changed
+- Update example.yaml to use wandb by default, to only use 100 epochs of training, to set a very large batch logging frequency and to change Validation_loss to validation_loss
 - Name processed datasets based on a hash of their parameters to ensure only valid cached data is used
 - Do not use TensorFloat32 by default on Ampere GPUs until we understand it better
 - No atomic numbers in networks
