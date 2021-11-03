@@ -14,6 +14,7 @@ seed: 0                                                                         
 append: true                                                                      # set true if a restarted run should append to the previous log file
 default_dtype: float32                                                            # type of float to use, e.g. float32 and float64
 allow_tf32: false                                                                 # whether to use TensorFloat32 if it is available
+device:  cuda                                                                     # which device to use. Default: automatically detected cuda or "cpu"
 
 # network
 r_max: 4.0                                                                        # cutoff radius in length units, here Angstrom, this is an important hyperparamter to scan

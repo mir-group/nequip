@@ -213,9 +213,7 @@ class Trainer:
         self,
         model,
         model_builders: Optional[list] = [],
-        device: Optional[str] = torch.device(
-            "cuda" if torch.cuda.is_available() else "cpu"
-        ),
+        device: Optional[str] = "cuda" if torch.cuda.is_available() else "cpu",
         seed: Optional[int] = None,
         loss_coeffs: Union[dict, str] = AtomicDataDict.TOTAL_ENERGY_KEY,
         train_on_keys: Optional[List[str]] = None,
@@ -297,6 +295,7 @@ class Trainer:
             np.random.seed(seed)
 
         self.logger.info(f"Torch device: {self.device}")
+        self.torch_device = torch.device(self.device)
 
         # sort out all the other parameters
         # for samplers, optimizer and scheduler
@@ -457,7 +456,7 @@ class Trainer:
             dictionary["state_dict"]["rng_state"] = torch.get_rng_state()
             if torch.cuda.is_available():
                 dictionary["state_dict"]["cuda_rng_state"] = torch.cuda.get_rng_state(
-                    device=self.device
+                    device=self.torch_device
                 )
 
         if training_progress:
@@ -647,7 +646,10 @@ class Trainer:
             if model is not None:
                 # TODO: this is not exactly equivalent to building with
                 # this set as default dtype... does it matter?
-                model.to(device=device, dtype=dtype_from_name(config.default_dtype))
+                model.to(
+                    device=torch.device(device),
+                    dtype=dtype_from_name(config.default_dtype),
+                )
                 model_state_dict = torch.load(
                     traindir + "/" + model_name, map_location=device
                 )
@@ -659,7 +661,7 @@ class Trainer:
         if self.model is None:
             return
 
-        self.model.to(self.device)
+        self.model.to(self.torch_device)
         self.init_objects()
 
         self._initialized = True
@@ -735,7 +737,7 @@ class Trainer:
             self.model.train()
 
         # Do any target rescaling
-        data = data.to(self.device)
+        data = data.to(self.torch_device)
         data = AtomicData.to_AtomicDataDict(data)
 
         if hasattr(self.model, "unscale"):
@@ -824,9 +826,9 @@ class Trainer:
 
     def reset_metrics(self):
         self.loss_stat.reset()
-        self.loss_stat.to(self.device)
+        self.loss_stat.to(self.torch_device)
         self.metrics.reset()
-        self.metrics.to(self.device)
+        self.metrics.to(self.torch_device)
 
     def epoch_step(self):
 
@@ -1146,7 +1148,7 @@ class Trainer:
                 self.dataloader_num_workers > 0 and self.max_epochs > 1
             ),
             # PyTorch recommends this for GPU since it makes copies much faster
-            pin_memory=(self.device != torch.device("cpu")),
+            pin_memory=(self.torch_device != torch.device("cpu")),
             # avoid getting stuck
             timeout=(10 if self.dataloader_num_workers > 0 else 0),
         )
