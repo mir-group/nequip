@@ -302,7 +302,7 @@ class SequentialGraphNetwork(GraphModuleMixin, torch.nn.Sequential):
 
         # insert the new irreps_out to the later modules
         for module_id, next_module in enumerate(module_list[idx + 1 :]):
-            next_module.add_independent_irreps(module.irreps_out)
+            next_module._add_independent_irreps(module.irreps_out)
 
         # update the final wrapper irreps_out
         self.irreps_out = dict(module_list[-1].irreps_out)
