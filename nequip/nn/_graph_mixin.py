@@ -78,7 +78,7 @@ class GraphModuleMixin:
         new_out.update(irreps_out)
         self.irreps_out = new_out
 
-    def add_independent_irreps(self, irreps: Dict[str, Any]):
+    def _add_independent_irreps(self, irreps: Dict[str, Any]):
         """
         Insert some independent irreps that need to be exposed to the self.irreps_in and self.irreps_out.
         The terms that have already appeared in the irreps_in will be removed.
