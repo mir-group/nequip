@@ -327,7 +327,7 @@ def main(args=None, running_as_script: bool = True):
                     metrics(out, batch)
                     display_bar.set_description_str(
                         " | ".join(
-                            f"{k} = {v:4.2f}"
+                            f"{k} = {v:4.4f}"
                             for k, v in metrics.flatten_metrics(
                                 metrics.current_result()
                             )[0].items()
