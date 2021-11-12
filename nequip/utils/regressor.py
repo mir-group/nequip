@@ -12,18 +12,19 @@ def solver(
     y,
     alpha: Optional[float] = 0.1,
     max_iteration: Optional[int] = 20,
+    stride: Optional[int] = None,
     regressor: Optional[str] = "NormalizedGaussianProcess",
 ):
 
     if regressor == "GaussianProcess":
-        return gp(X, y, alpha, max_iteration)
+        return gp(X, y, alpha, max_iteration, stride)
     elif regressor == "NormalizedGaussianProcess":
-        return normalized_gp(X, y, alpha, max_iteration)
+        return normalized_gp(X, y, alpha, max_iteration, stride)
     else:
         raise NotImplementedError(f"{regressor} is not implemented")
 
 
-def normalized_gp(X, y, alpha, max_iteration):
+def normalized_gp(X, y, alpha, max_iteration, stride):
     feature_rms = 1.0 / np.sqrt(np.average(X ** 2, axis=0))
     feature_rms = np.nan_to_num(feature_rms, 1)
     y_mean = torch.sum(y) / torch.sum(X)
@@ -34,11 +35,12 @@ def normalized_gp(X, y, alpha, max_iteration):
         {"diagonal_elements": feature_rms},
         alpha,
         max_iteration,
+        stride,
     )
     return mean + y_mean, std
 
 
-def gp(X, y, alpha, max_iteration):
+def gp(X, y, alpha, max_iteration, stride):
     return base_gp(
         X,
         y,
@@ -46,13 +48,18 @@ def gp(X, y, alpha, max_iteration):
         {"sigma_0": 0, "sigma_0_bounds": "fixed"},
         alpha,
         max_iteration,
+        stride,
     )
 
 
-def base_gp(X, y, kernel, kernel_kwargs, alpha, max_iteration:int):
+def base_gp(X, y, kernel, kernel_kwargs, alpha, max_iteration: int, stride):
 
     if len(y.shape) == 1:
         y = y.reshape([-1, 1])
+
+    if stride is not None:
+        X = X[::stride]
+        y = y[::stride]
 
     not_fit = True
     iteration = 0
