@@ -49,7 +49,7 @@ def gp(X, y, alpha, max_iteration):
     )
 
 
-def base_gp(X, y, kernel, kernel_kwargs, alpha, max_iteration):
+def base_gp(X, y, kernel, kernel_kwargs, alpha, max_iteration:int):
 
     if len(y.shape) == 1:
         y = y.reshape([-1, 1])
@@ -59,7 +59,7 @@ def base_gp(X, y, kernel, kernel_kwargs, alpha, max_iteration):
     mean = None
     std = None
     while not_fit:
-        logging.debug("GP fitting iteration", iteration, alpha)
+        logging.debug(f"GP fitting iteration {iteration} {alpha}")
         try:
             _kernel = kernel(**kernel_kwargs)
             gpr = GaussianProcessRegressor(kernel=_kernel, random_state=0, alpha=alpha)
