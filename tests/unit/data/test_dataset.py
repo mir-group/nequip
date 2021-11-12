@@ -236,7 +236,11 @@ class TestPerSpeciesStatistics:
             modes=["per_species_mean_std"],
             kwargs={
                 AtomicDataDict.TOTAL_ENERGY_KEY
-                + "per_species_mean_std": {"alpha": alpha, "regressor": regressor}
+                + "per_species_mean_std": {
+                    "alpha": alpha,
+                    "regressor": regressor,
+                    "stride": 1,
+                }
             },
         )
 
