@@ -15,7 +15,6 @@ def solver(
     stride: Optional[int] = None,
     regressor: Optional[str] = "NormalizedGaussianProcess",
 ):
-
     if regressor == "GaussianProcess":
         return gp(X, y, alpha, max_iteration, stride)
     elif regressor == "NormalizedGaussianProcess":
