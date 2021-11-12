@@ -78,6 +78,25 @@ class GraphModuleMixin:
         new_out.update(irreps_out)
         self.irreps_out = new_out
 
+    def _add_independent_irreps(self, irreps: Dict[str, Any]):
+        """
+        Insert some independent irreps that need to be exposed to the self.irreps_in and self.irreps_out.
+        The terms that have already appeared in the irreps_in will be removed.
+
+        Args:
+            irreps (dict): maps names of all new fields
+        """
+
+        irreps = {
+            key: irrep for key, irrep in irreps.items() if key not in self.irreps_in
+        }
+        irreps_in = AtomicDataDict._fix_irreps_dict(irreps)
+        irreps_out = AtomicDataDict._fix_irreps_dict(
+            {key: irrep for key, irrep in irreps.items() if key not in self.irreps_out}
+        )
+        self.irreps_in.update(irreps_in)
+        self.irreps_out.update(irreps_out)
+
     def _make_tracing_inputs(self, n):
         # We impliment this to be able to trace graph modules
         out = []
@@ -266,8 +285,28 @@ class SequentialGraphNetwork(GraphModuleMixin, torch.nn.Sequential):
             idx += 1
         names.insert(idx, name)
         modules.insert(idx, module)
+
         self._modules = OrderedDict(zip(names, modules))
-        # TODO: handle irreps
+
+        module_list = list(self._modules.values())
+
+        # sanity check the compatibility
+        if idx > 0:
+            assert AtomicDataDict._irreps_compatible(
+                module_list[idx - 1].irreps_out, module.irreps_in
+            )
+        if len(module_list) > idx:
+            assert AtomicDataDict._irreps_compatible(
+                module_list[idx + 1].irreps_in, module.irreps_out
+            )
+
+        # insert the new irreps_out to the later modules
+        for module_id, next_module in enumerate(module_list[idx + 1 :]):
+            next_module._add_independent_irreps(module.irreps_out)
+
+        # update the final wrapper irreps_out
+        self.irreps_out = dict(module_list[-1].irreps_out)
+
         return
 
     def insert_from_parameters(
