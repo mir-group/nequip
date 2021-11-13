@@ -76,6 +76,7 @@ def dataset_from_config(config, prefix: str = "dataset") -> AtomicDataset:
         node_fields=config.get("node_fields", []),
         edge_fields=config.get("edge_fields", []),
         graph_fields=config.get("graph_fields", []),
+        scalar_fields=config.get("scalar_fields", []),
     )
 
     instance, _ = instantiate(

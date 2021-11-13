@@ -24,6 +24,11 @@ from nequip.utils.torch_geometric import Data
 # A type representing ASE-style periodic boundary condtions, which can be partial (the tuple case)
 PBC = Union[bool, Tuple[bool, bool, bool]]
 
+_DEFAULT_SCALAR_FIELDS: Set[str] = {
+    AtomicDataDict.ATOMIC_NUMBERS_KEY,
+    AtomicDataDict.ATOM_TYPE_KEY,
+    AtomicDataDict.BATCH_KEY,
+}
 _DEFAULT_NODE_FIELDS: Set[str] = {
     AtomicDataDict.POSITIONS_KEY,
     AtomicDataDict.WEIGHTS_KEY,
@@ -48,12 +53,14 @@ _DEFAULT_GRAPH_FIELDS: Set[str] = {
 _NODE_FIELDS: Set[str] = set(_DEFAULT_NODE_FIELDS)
 _EDGE_FIELDS: Set[str] = set(_DEFAULT_EDGE_FIELDS)
 _GRAPH_FIELDS: Set[str] = set(_DEFAULT_GRAPH_FIELDS)
+_SCALAR_FIELDS: Set[str] = set(_DEFAULT_SCALAR_FIELDS)
 
 
 def register_fields(
     node_fields: Sequence[str] = [],
     edge_fields: Sequence[str] = [],
     graph_fields: Sequence[str] = [],
+    scalar_fields: Sequence[str] = [],
 ) -> None:
     r"""Register fields as being per-atom, per-edge, or per-frame.
 
@@ -64,11 +71,13 @@ def register_fields(
     node_fields: set = set(node_fields)
     edge_fields: set = set(edge_fields)
     graph_fields: set = set(graph_fields)
+    scalar_fields: set = set(scalar_fields)
     allfields = node_fields.union(edge_fields, graph_fields)
     assert len(allfields) == len(node_fields) + len(edge_fields) + len(graph_fields)
     _NODE_FIELDS.update(node_fields)
     _EDGE_FIELDS.update(edge_fields)
     _GRAPH_FIELDS.update(graph_fields)
+    _SCALAR_FIELDS.update(scalar_fields)
     if len(set.union(_NODE_FIELDS, _EDGE_FIELDS, _GRAPH_FIELDS)) < (
         len(_NODE_FIELDS) + len(_EDGE_FIELDS) + len(_GRAPH_FIELDS)
     ):
@@ -166,6 +175,14 @@ class AtomicData(Data):
         for k, v in kwargs.items():
 
             if len(kwargs[k].shape) == 0:
+                kwargs[k] = v.unsqueeze(-1)
+                v = kwargs[k]
+
+            if (
+                k in set.union(_NODE_FIELDS, _EDGE_FIELDS)
+                and k not in _SCALAR_FIELDS
+                and len(v.shape) == 1
+            ):
                 kwargs[k] = v.unsqueeze(-1)
                 v = kwargs[k]
 
@@ -425,6 +442,7 @@ class AtomicData(Data):
         cell = getattr(self, AtomicDataDict.CELL_KEY, None)
         batch = getattr(self, AtomicDataDict.BATCH_KEY, None)
         energy = getattr(self, AtomicDataDict.TOTAL_ENERGY_KEY, None)
+        energies = getattr(self, AtomicDataDict.PER_ATOM_ENERGY_KEY, None)
         force = getattr(self, AtomicDataDict.FORCE_KEY, None)
         do_calc = energy is not None or force is not None
 
@@ -456,6 +474,8 @@ class AtomicData(Data):
 
             if do_calc:
                 fields = {}
+                if energies is not None:
+                    fields["energies"] = energies[mask].cpu().numpy()
                 if energy is not None:
                     fields["energy"] = energy[batch_idx].cpu().numpy()
                 if force is not None:
