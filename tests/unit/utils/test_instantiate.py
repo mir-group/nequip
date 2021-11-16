@@ -155,8 +155,8 @@ class B:
 
 
 class C:
-    def __init__(self, cls_c, cls_c_kwargs):
-        self.c_obj = c_cls(**c_cls_kwargs)
+    def __init__(self, cls_c, cls_c_kwargs):  # noqa
+        self.c_obj = c_cls(**c_cls_kwargs)  # noqa
 
 
 def test_deep_nests():

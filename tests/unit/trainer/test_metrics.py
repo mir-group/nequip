@@ -1,10 +1,8 @@
-import inspect
 import pytest
 import torch
 from nequip.data import AtomicDataDict
 from nequip.train import Metrics
 
-from .test_loss import data
 
 # all the config to test init
 # only the last one will be used to test the loss and mae
@@ -96,7 +94,7 @@ class TestWeight:
 @pytest.fixture(scope="class", params=metrics_tests)
 def metrics(request):
     """"""
-    coeffs = request.param
+    coeffs = request.param  # noqa
     instance = Metrics(components=request.param)
     yield instance
 
