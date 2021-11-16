@@ -1,8 +1,10 @@
+# flake8: noqa
 import pytest
 import torch
 from nequip.data import AtomicDataDict
 from nequip.train import Metrics
 
+from .test_loss import data
 
 # all the config to test init
 # only the last one will be used to test the loss and mae
