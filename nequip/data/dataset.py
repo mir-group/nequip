@@ -26,7 +26,7 @@ from nequip.data import (
 )
 from nequip.utils.batch_ops import bincount
 from nequip.utils.regressor import solver
-from ._util import _TORCH_INTEGER_DTYPES
+from nequip.utils.savenload import atomic_write
 from .transforms import TypeMapper
 
 
@@ -295,9 +295,19 @@ class AtomicInMemoryDataset(AtomicDataset):
 
         logging.info(f"Loaded data: {data}")
 
-        torch.save((data, fixed_fields, self.include_frames), self.processed_paths[0])
-        with open(self.processed_paths[1], "w") as f:
-            yaml.dump(self._get_parameters(), f)
+        # use atomic writes to avoid race conditions between
+        # different trainings that use the same dataset
+        # since those separate trainings should all produce the same results,
+        # it doesn't matter if they overwrite each others cached'
+        # datasets. It only matters that they don't simultaneously try
+        # to write the _same_ file, corrupting it.
+        with atomic_write(self.processed_paths[0]) as tmppth:
+            torch.save((data, fixed_fields, self.include_frames), tmppth)
+        with atomic_write(self.processed_paths[1]) as tmppth:
+            with open(tmppth, "w") as f:
+                yaml.dump(self._get_parameters(), f)
+
+        logging.info(f"Cached processed data to disk")
 
         self.data = data
         self.fixed_fields = fixed_fields
