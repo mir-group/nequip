@@ -307,7 +307,7 @@ class AtomicInMemoryDataset(AtomicDataset):
             with open(tmppth, "w") as f:
                 yaml.dump(self._get_parameters(), f)
 
-        logging.info(f"Cached processed data to disk")
+        logging.info("Cached processed data to disk")
 
         self.data = data
         self.fixed_fields = fixed_fields
