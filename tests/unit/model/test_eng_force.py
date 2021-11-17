@@ -223,6 +223,34 @@ class TestGradient:
                 numeric, analytical, rtol=5e-2
             )
 
+    def test_partial_forces(self, atomic_batch, device):
+        config = minimal_config1.copy()
+        config["model_builders"] = [
+            "EnergyModel",
+            "ForceOutput",
+        ]
+        partial_config = config.copy()
+        partial_config["model_builders"] = [
+            "EnergyModel",
+            "PartialForceOutput",
+        ]
+        model = model_from_config(config=config, initialize=True)
+        partial_model = model_from_config(config=partial_config, initialize=True)
+        model.to(device)
+        partial_model.to(device)
+        partial_model.load_state_dict(model.state_dict())
+        data = atomic_batch.to(device)
+        output = model(AtomicData.to_AtomicDataDict(data))
+        output_partial = partial_model(AtomicData.to_AtomicDataDict(data))
+        assert torch.allclose(
+            output[AtomicDataDict.FORCE_KEY],
+            output_partial[AtomicDataDict.FORCE_KEY],
+            atol=1e-6,
+        )
+        n_at = data[AtomicDataDict.POSITIONS_KEY].shape[0]
+        assert output_partial[AtomicDataDict.PARTIAL_FORCE_KEY].shape == (n_at, n_at, 3)
+        # TODO check sparsity
+
 
 class TestAutoGradient:
     def test_cross_frame_grad(self, config, nequip_dataset):
