@@ -6,23 +6,16 @@ from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import DotProduct, Kernel, Hyperparameter
 
 
-def solver(
-    X,
-    y,
-    alpha: Optional[float] = 0.1,
-    max_iteration: Optional[int] = 20,
-    regressor: Optional[str] = "NormalizedGaussianProcess",
-):
-
+def solver(X, y, regressor: Optional[str] = "NormalizedGaussianProcess", **kwargs):
     if regressor == "GaussianProcess":
-        return gp(X, y, alpha, max_iteration)
+        return gp(X, y, **kwargs)
     elif regressor == "NormalizedGaussianProcess":
-        return normalized_gp(X, y, alpha, max_iteration)
+        return normalized_gp(X, y, **kwargs)
     else:
         raise NotImplementedError(f"{regressor} is not implemented")
 
 
-def normalized_gp(X, y, alpha, max_iteration):
+def normalized_gp(X, y, **kwargs):
     feature_rms = 1.0 / np.sqrt(np.average(X ** 2, axis=0))
     feature_rms = np.nan_to_num(feature_rms, 1)
     y_mean = torch.sum(y) / torch.sum(X)
@@ -31,27 +24,32 @@ def normalized_gp(X, y, alpha, max_iteration):
         y - (torch.sum(X, axis=1) * y_mean).reshape(y.shape),
         NormalizedDotProduct,
         {"diagonal_elements": feature_rms},
-        alpha,
-        max_iteration,
+        **kwargs,
     )
     return mean + y_mean, std
 
 
-def gp(X, y, alpha, max_iteration):
+def gp(X, y, **kwargs):
     return base_gp(
-        X,
-        y,
-        DotProduct,
-        {"sigma_0": 0, "sigma_0_bounds": "fixed"},
-        alpha,
-        max_iteration,
+        X, y, DotProduct, {"sigma_0": 0, "sigma_0_bounds": "fixed"}, **kwargs
     )
-
-
-def base_gp(X, y, kernel, kernel_kwargs, alpha, max_iteration: int):
+  
+def base_gp(
+    X,
+    y,
+    kernel,
+    kernel_kwargs,
+    alpha: Optional[float] = 0.1,
+    max_iteration: int = 20,
+    stride: Optional[int] = None,
+):
 
     if len(y.shape) == 1:
         y = y.reshape([-1, 1])
+
+    if stride is not None:
+        X = X[::stride]
+        y = y[::stride]
 
     not_fit = True
     iteration = 0
@@ -111,8 +109,6 @@ class NormalizedDotProduct(Kernel):
     r"""Dot-Product kernel.
     .. math::
         k(x_i, x_j) = x_i \cdot A \cdot x_j
-    The DotProduct kernel is commonly combined with exponentiation.
-
     """
 
     def __init__(self, diagonal_elements):
