@@ -77,10 +77,10 @@ class TestDuplicateError:
         minimal_config["root"] = temp_data
 
         model = DummyNet(3)
-        c1 = Trainer(model=model, **minimal_config)
+        Trainer(model=model, **minimal_config)
 
         with pytest.raises(RuntimeError):
-            c2 = Trainer(model=model, **minimal_config)
+            Trainer(model=model, **minimal_config)
 
 
 class TestSaveLoad:
@@ -203,10 +203,9 @@ class TestTrain:
             assert trainer1.max_epochs == minimal_config["max_epochs"] * 2
 
     def test_restart_training(self, trainer, nequip_dataset):
-
-        model = trainer.model
-        device = trainer.device
-        optimizer = trainer.optim
+        _ = trainer.model
+        _ = trainer.device
+        _ = trainer.optim
         trainer.set_dataset(nequip_dataset)
         trainer.train()
 

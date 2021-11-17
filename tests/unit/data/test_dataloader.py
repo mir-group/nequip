@@ -9,12 +9,10 @@ from nequip.data import NpzDataset, DataLoader
 
 class TestInit:
     def test_init(self, npz_dataset):
-        dl = DataLoader(
-            npz_dataset, batch_size=2, shuffle=True, exclude_keys=["energy"]
-        )
+        DataLoader(npz_dataset, batch_size=2, shuffle=True, exclude_keys=["energy"])
 
     def test_subset(self, npz_dataset):
-        subset = npz_dataset[[1, 3]]
+        npz_dataset[[1, 3]]
 
 
 class TestLoop:

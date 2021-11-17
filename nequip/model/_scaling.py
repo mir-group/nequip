@@ -123,7 +123,10 @@ def PerSpeciesRescale(
     scales = config.get(
         module_prefix + "_scales",
         f"dataset_{AtomicDataDict.FORCE_KEY}_rms"
-        if AtomicDataDict.FORCE_KEY in config["train_on_keys"]
+        # if `train_on_keys` isn't provided, assume conservatively
+        # that we aren't "training" on anything (i.e. take the
+        # most general defaults)
+        if AtomicDataDict.FORCE_KEY in config.get("train_on_keys", [])
         else f"dataset_per_atom_{AtomicDataDict.TOTAL_ENERGY_KEY}_std",
     )
     shifts = config.get(

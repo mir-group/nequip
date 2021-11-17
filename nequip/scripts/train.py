@@ -216,7 +216,7 @@ def restart(config):
             elif k.startswith("early_stop"):
                 dictionary[k] = config[k]
                 logging.info(f'Update "{k}" to {dictionary[k]}')
-            elif type(config[k]) == type(dictionary.get(k, "")):
+            elif isinstance(config[k], type(dictionary.get(k, ""))):
                 raise ValueError(
                     f'Key "{k}" is different in config and the result trainer.pth file. Please double check'
                 )

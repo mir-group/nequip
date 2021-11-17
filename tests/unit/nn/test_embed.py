@@ -1,8 +1,5 @@
-import torch
-
 from e3nn.util.test import assert_auto_jitable
 
-from nequip.data import AtomicDataDict
 from nequip.utils.test import assert_AtomicData_equivariant
 from nequip.nn.radial_basis import BesselBasis
 from nequip.nn.cutoffs import PolynomialCutoff

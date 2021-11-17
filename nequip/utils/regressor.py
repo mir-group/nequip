@@ -1,5 +1,4 @@
 import logging
-from numpy.core.fromnumeric import diagonal
 import torch
 import numpy as np
 from typing import Optional
@@ -34,8 +33,7 @@ def gp(X, y, **kwargs):
     return base_gp(
         X, y, DotProduct, {"sigma_0": 0, "sigma_0_bounds": "fixed"}, **kwargs
     )
-
-
+  
 def base_gp(
     X,
     y,
@@ -87,10 +85,10 @@ def base_gp(
         except Exception as e:
             logging.info(f"GP fitting failed for alpha={alpha} and {e.args}")
             if alpha == 0 or alpha is None:
-                logging.info(f"try a None zero alpha")
+                logging.info("try a non-zero alpha")
                 not_fit = False
                 raise ValueError(
-                    f"Please set the {alpha} to none zero value. \n"
+                    f"Please set the {alpha} to non-zero value. \n"
                     "The dataset energy is rank deficient to be solved with GP"
                 )
             else:
@@ -98,9 +96,9 @@ def base_gp(
                 iteration += 1
                 logging.debug(f"           increase alpha to {alpha}")
 
-            if iteration >= max_iteration or not_fit == False:
+            if iteration >= max_iteration or not_fit is False:
                 raise ValueError(
-                    f"Please set the per species shift and scale to zeros and ones. \n"
+                    "Please set the per species shift and scale to zeros and ones. \n"
                     "The dataset energy is to diverge to be solved with GP"
                 )
 

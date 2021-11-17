@@ -1,0 +1,50 @@
+name: Check Syntax and Run Tests
+
+on:
+  push:
+    branches:
+    - develop
+
+  pull_request:
+    branches:
+    - develop
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.9]
+        torch-version: [1.10.0]
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install flake8
+      run: |
+        pip install flake8
+    - name: Lint with flake8
+      run: |
+        flake8 . --count --show-source --statistics
+    - name: Install dependencies
+      env:
+        TORCH: "${{ matrix.torch-version }}"
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        python -m pip install --upgrade pip
+        pip install wheel
+        pip install torch==${TORCH} -f https://download.pytorch.org/whl/cpu/torch_stable.html
+        pip install --no-deps "https://github.com/Linux-cpp-lisp/pytorch_ema/archive/context_manager.zip"
+        # this is temporary for latest version that has scatter stuff
+        pip install --no-deps "https://github.com/mir-group/pytorch_runstats/archive/main.zip"
+        pip install .
+    - name: Install pytest
+      run: |
+        pip install pytest
+    - name: Test with pytest
+      run: |
+        pytest --ignore=docs/ .

@@ -38,7 +38,7 @@ def dataset_from_config(config, prefix: str = "dataset") -> AtomicDataset:
             module_name = ".".join(config_dataset.split(".")[:-1])
             class_name = ".".join(config_dataset.split(".")[-1:])
             class_name = getattr(import_module(module_name), class_name)
-        except Exception as e:
+        except Exception:
             # ^ TODO: don't catch all Exception
             # default class defined in nequip.data or nequip.dataset
             dataset_name = config_dataset.lower()

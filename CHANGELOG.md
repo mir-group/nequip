@@ -44,6 +44,7 @@ data
 ### Fixed
 - The first 20 epochs/calls of inference are no longer painfully slow for recompilation
 - Set global options like TF32, dtype in `nequip-evaluate`
+- Avoid possilbe race condition in caching of processed datasets across multiple training runs
 
 ### Removed
 - Removed `allowed_species`

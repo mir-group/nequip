@@ -3,7 +3,6 @@ import pytest
 import logging
 import tempfile
 import torch
-from os.path import isfile
 
 import numpy as np
 
