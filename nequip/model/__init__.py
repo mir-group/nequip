@@ -11,5 +11,6 @@ __all__ = [
     "RescaleEnergyEtc",
     "PerSpeciesRescale",
     "uniform_initialize_FCs",
+    "initialize_from_state",
     "model_from_config",
 ]
