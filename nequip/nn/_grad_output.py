@@ -101,19 +101,26 @@ class GradientOutput(GraphModuleMixin, torch.nn.Module):
 
 @compile_mode("unsupported")
 class PartialForceOutput(GraphModuleMixin, torch.nn.Module):
-    r"""Wrap a model and include as an output its gradient."""
+    r"""Generate partial and total forces from an energy model.
+
+    Args:
+        func: the energy model
+        vectorize: the vectorize option to ``torch.autograd.functional.jacobian``,
+            false by default since it doesn't work well.
+    """
     vectorize: bool
 
     def __init__(
         self,
         func: GraphModuleMixin,
         vectorize: bool = False,
+        vectorize_warnings: bool = False,
     ):
         super().__init__()
         # TODO wrap:
         self.func = func
         self.vectorize = vectorize
-        if vectorize:
+        if vectorize_warnings:
             # See https://pytorch.org/docs/stable/generated/torch.autograd.functional.jacobian.html
             torch._C._debug_only_display_vmap_fallback_warnings(True)
 
