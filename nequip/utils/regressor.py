@@ -33,7 +33,8 @@ def gp(X, y, **kwargs):
     return base_gp(
         X, y, DotProduct, {"sigma_0": 0, "sigma_0_bounds": "fixed"}, **kwargs
     )
-  
+
+
 def base_gp(
     X,
     y,
