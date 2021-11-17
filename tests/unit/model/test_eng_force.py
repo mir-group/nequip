@@ -242,14 +242,23 @@ class TestGradient:
         data = atomic_batch.to(device)
         output = model(AtomicData.to_AtomicDataDict(data))
         output_partial = partial_model(AtomicData.to_AtomicDataDict(data))
-        assert torch.allclose(
-            output[AtomicDataDict.FORCE_KEY],
-            output_partial[AtomicDataDict.FORCE_KEY],
-            atol=1e-6,
-        )
+        # everything should be the same
+        # including the
+        for k in output:
+            assert k != AtomicDataDict.PARTIAL_FORCE_KEY
+            assert k in output_partial
+            if output[k].is_floating_point():
+                assert torch.allclose(
+                    output[k],
+                    output_partial[k],
+                    atol=1e-6 if k == AtomicDataDict.FORCE_KEY else 1e-8,
+                )
+            else:
+                assert torch.equal(output[k], output_partial[k])
         n_at = data[AtomicDataDict.POSITIONS_KEY].shape[0]
-        assert output_partial[AtomicDataDict.PARTIAL_FORCE_KEY].shape == (n_at, n_at, 3)
-        # TODO check sparsity
+        partial_forces = output_partial[AtomicDataDict.PARTIAL_FORCE_KEY]
+        assert partial_forces.shape == (n_at, n_at, 3)
+        # TODO check sparsity?
 
 
 class TestAutoGradient:
