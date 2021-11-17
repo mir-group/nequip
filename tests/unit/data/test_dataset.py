@@ -1,4 +1,3 @@
-from attr import fields
 import numpy as np
 import pytest
 import tempfile
@@ -8,7 +7,6 @@ from os.path import isdir, isfile
 
 from ase.data import chemical_symbols
 from ase.io import write
-from torch.functional import _return_counts
 
 from nequip.data import (
     AtomicDataDict,

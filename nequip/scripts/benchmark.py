@@ -96,13 +96,17 @@ def main(args=None):
     # "Deploy" it
     model.eval()
     model = script(model)
+
+    # OLD ---- OLD ---- OLD
     # TODO!!: for now we just compile, but when
     # https://github.com/pytorch/pytorch/issues/64957#issuecomment-918632252
     # is resolved, then should be deploying again
-    print(
-        "WARNING: this is currently not using deployed model, just scripted, because of PyTorch bugs"
-    )
-    # model = _compile_for_deploy(model)  # TODO make this an option
+    # print(
+    #    "WARNING: this is currently not using deployed model, just scripted, because of PyTorch bugs"
+    # )
+    # OLD ---- OLD ---- OLD
+
+    model = _compile_for_deploy(model)  # TODO make this an option
     # save and reload to avoid bugs
     with tempfile.NamedTemporaryFile() as f:
         torch.jit.save(model, f.name)

@@ -10,10 +10,9 @@ make an interface with ray
 import sys
 import inspect
 import logging
-import yaml
 from copy import deepcopy
 from os.path import isfile
-from time import perf_counter, gmtime, strftime
+from time import perf_counter
 from typing import Callable, Optional, Union, Tuple, List
 from pathlib import Path
 
