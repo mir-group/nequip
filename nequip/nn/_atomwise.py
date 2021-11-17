@@ -149,7 +149,7 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
                 self.scales = torch.nn.Parameter(scales)
             else:
                 self.register_buffer("scales", scales)
-        
+
         self.arguments_in_dataset_units = arguments_in_dataset_units
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
