@@ -11,7 +11,8 @@ VALIDATION = "validation"
 TRAIN = "training"
 
 ABBREV = {
-    AtomicDataDict.TOTAL_ENERGY_KEY: "e",
+    AtomicDataDict.TOTAL_ENERGY_KEY: "E",
+    AtomicDataDict.PER_ATOM_ENERGY_KEY: "e",
     AtomicDataDict.FORCE_KEY: "f",
     LOSS_KEY: "loss",
     VALIDATION: "val",
