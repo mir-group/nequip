@@ -6,7 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Most recent change on the bottom.
 
-## [Unreleased]
+## [Unreleased] - 0.5.0
+### Changed
+- Allow e3nn 0.4.*, which changes the default normalization of `TensorProduct`s; this change _should_ not affect typical NequIP networks
+
+## [Unreleased] - 0.4.0
 ### Added
 - Support for `e3nn`'s `soft_one_hot_linspace` as radial bases
 - Support for parallel dataloader workers with `dataloader_num_workers`
@@ -22,6 +26,7 @@ Most recent change on the bottom.
 - Better error when instantiation fails
 - Rename `npz_keys` to `include_keys`
 - Allow user to register `graph_fields`, `node_fields`, and `edge_fields` via yaml
+- Deployed models save the e3nn and torch versions they were created with
 
 ### Changed
 - Update example.yaml to use wandb by default, to only use 100 epochs of training, to set a very large batch logging frequency and to change Validation_loss to validation_loss
