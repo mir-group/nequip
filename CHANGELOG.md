@@ -6,7 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Most recent change on the bottom.
 
-## [Unreleased]
+## [Unreleased] - 0.5.0
+### Changed
+- Allow e3nn 0.4.*, which changes the default normalization of `TensorProduct`s; this change _should_ not affect typical NequIP networks
+
+## [Unreleased] - 0.4.0
 ### Added
 - Support for `e3nn`'s `soft_one_hot_linspace` as radial bases
 - Support for parallel dataloader workers with `dataloader_num_workers`
@@ -41,7 +45,6 @@ data
 - Renamed `PerSpeciesScaleShift_` to `per_species_rescale`
 - Change default and allowed values of `metrics_key` from `loss` to `validation_loss`. The old default `loss` will no longer be accepted.
 - Renamed `per_species_rescale_trainable` to `per_species_rescale_scales_trainable` and `per_species_rescale_shifts_trainable`
-- Allow e3nn 0.4.*, which changes the default normalization of `TensorProduct`s; this change _should_ not affect typical NequIP networks
 
 ### Fixed
 - The first 20 epochs/calls of inference are no longer painfully slow for recompilation
