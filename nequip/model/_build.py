@@ -4,25 +4,7 @@ import yaml
 
 from nequip.data import AtomicDataset
 from nequip.nn import GraphModuleMixin
-
-
-def _load_callable(obj: Union[str, Callable], prefix: Optional[str] = None) -> Callable:
-    """Load a callable from a name, or pass through a callable."""
-    if callable(obj):
-        pass
-    elif isinstance(obj, str):
-        if "." not in obj:
-            # It's an unqualified name
-            if prefix is not None:
-                obj = prefix + "." + obj
-            else:
-                # You can't have an unqualified name without a prefix
-                raise ValueError(f"Cannot load unqualified name {obj}.")
-        obj = yaml.load(f"!!python/name:{obj}", Loader=yaml.Loader)
-    else:
-        raise TypeError
-    assert callable(obj), f"{obj} isn't callable"
-    return obj
+from nequip.utils import load_callable
 
 
 def model_from_config(
@@ -59,7 +41,7 @@ def model_from_config(
 
     # Build
     builders = [
-        _load_callable(b, prefix="nequip.model")
+        load_callable(b, prefix="nequip.model")
         for b in config.get("model_builders", [])
     ]
 

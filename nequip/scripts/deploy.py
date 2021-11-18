@@ -101,7 +101,9 @@ def main(args=None):
         "info", help="Get information from a deployed model file"
     )
     info_parser.add_argument(
-        "model_path", help="Path to a deployed model file.", type=pathlib.Path,
+        "model_path",
+        help="Path to a deployed model file.",
+        type=pathlib.Path,
     )
 
     build_parser = subparsers.add_parser("build", help="Build a deployment model")
@@ -111,7 +113,9 @@ def main(args=None):
         type=pathlib.Path,
     )
     build_parser.add_argument(
-        "out_file", help="Output file for deployed model.", type=pathlib.Path,
+        "out_file",
+        help="Output file for deployed model.",
+        type=pathlib.Path,
     )
 
     args = parser.parse_args(args=args)

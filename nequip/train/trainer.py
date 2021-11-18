@@ -36,6 +36,7 @@ from nequip.utils import (
     instantiate,
     save_file,
     load_file,
+    load_callable,
     atomic_write,
     dtype_from_name,
 )
@@ -704,7 +705,7 @@ class Trainer:
             )
 
         for callback in self.init_callbacks:
-            callback(self)
+            load_callable(callback)(self)
 
         self.init_log()
         self.wall = perf_counter()
@@ -720,7 +721,7 @@ class Trainer:
             self.end_of_epoch_save()
 
         for callback in self.final_callbacks:
-            callback(self)
+            load_callable(callback)(self)
 
         self.final_log()
 
@@ -852,13 +853,13 @@ class Trainer:
                     )
                     self.end_of_batch_log(batch_type=category)
                     for callback in self.end_of_batch_callbacks:
-                        callback(self)
+                        load_callable(callback)(self)
                 self.metrics_dict[category] = self.metrics.current_result()
                 self.loss_dict[category] = self.loss_stat.current_result()
 
                 if category == TRAIN:
                     for callback in self.end_of_train_callbacks:
-                        callback(self)
+                        load_callable(callback)(self)
 
         self.iepoch += 1
 
@@ -868,7 +869,7 @@ class Trainer:
             self.lr_sched.step(metrics=self.mae_dict[self.metrics_key])
 
         for callback in self.end_of_epoch_callbacks:
-            callback(self)
+            load_callable(callback)(self)
 
     def end_of_batch_log(self, batch_type: str):
         """

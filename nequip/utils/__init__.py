@@ -3,7 +3,7 @@ from .auto_init import (
     instantiate,
     get_w_prefix,
 )
-from .savenload import save_file, load_file, atomic_write
+from .savenload import save_file, load_file, atomic_write, load_callable
 from .config import Config
 from .output import Output
 from .modules import find_first_of_type
