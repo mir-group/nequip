@@ -22,6 +22,7 @@ Most recent change on the bottom.
 - Better error when instantiation fails
 - Rename `npz_keys` to `include_keys`
 - Allow user to register `graph_fields`, `node_fields`, and `edge_fields` via yaml
+- Deployed models save the e3nn and torch versions they were created with
 
 ### Changed
 - Update example.yaml to use wandb by default, to only use 100 epochs of training, to set a very large batch logging frequency and to change Validation_loss to validation_loss

@@ -26,6 +26,8 @@ from nequip.train import Trainer
 
 CONFIG_KEY: Final[str] = "config"
 NEQUIP_VERSION_KEY: Final[str] = "nequip_version"
+TORCH_VERSION_KEY: Final[str] = "torch_version"
+E3NN_VERSION_KEY: Final[str] = "e3nn_version"
 R_MAX_KEY: Final[str] = "r_max"
 N_SPECIES_KEY: Final[str] = "n_species"
 TYPE_NAMES_KEY: Final[str] = "type_names"
@@ -100,9 +102,7 @@ def main(args=None):
         "info", help="Get information from a deployed model file"
     )
     info_parser.add_argument(
-        "model_path",
-        help="Path to a deployed model file.",
-        type=pathlib.Path,
+        "model_path", help="Path to a deployed model file.", type=pathlib.Path,
     )
 
     build_parser = subparsers.add_parser("build", help="Build a deployment model")
@@ -112,9 +112,7 @@ def main(args=None):
         type=pathlib.Path,
     )
     build_parser.add_argument(
-        "out_file",
-        help="Output file for deployed model.",
-        type=pathlib.Path,
+        "out_file", help="Output file for deployed model.", type=pathlib.Path,
     )
 
     args = parser.parse_args(args=args)
@@ -152,7 +150,10 @@ def main(args=None):
         config = yaml.load(config_str, Loader=yaml.Loader)
 
         # Deploy
-        metadata: dict = {NEQUIP_VERSION_KEY: nequip.__version__}
+        metadata: dict = {}
+        for code in ["e3nn", "nequip", "torch"]:
+            metadata[code + "_version"] = config[code + "_version"]
+
         metadata[R_MAX_KEY] = str(float(config["r_max"]))
         if "allowed_species" in config:
             # This is from before the atomic number updates
