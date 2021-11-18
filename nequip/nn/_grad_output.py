@@ -21,6 +21,7 @@ class GradientOutput(GraphModuleMixin, torch.nn.Module):
         sign: either 1 or -1; the returned gradient is multiplied by this.
     """
     sign: float
+    skip: bool
 
     def __init__(
         self,
@@ -35,6 +36,8 @@ class GradientOutput(GraphModuleMixin, torch.nn.Module):
         assert sign in (1.0, -1.0)
         self.sign = sign
         self.of = of
+        self.skip = False
+
         # TO DO: maybe better to force using list?
         if isinstance(wrt, str):
             wrt = [wrt]
@@ -64,6 +67,10 @@ class GradientOutput(GraphModuleMixin, torch.nn.Module):
         )
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
+
+        if self.skip:
+            return self.func(data)
+
         # set req grad
         wrt_tensors = []
         old_requires_grad: List[bool] = []
