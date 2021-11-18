@@ -126,11 +126,7 @@ def main(args=None):
             activities=[
                 torch.profiler.ProfilerActivity.CPU,
             ]
-            + (
-                [torch.profiler.ProfilerActivity.CUDA]
-                if torch.cuda.is_available()
-                else []
-            ),
+            + ([torch.profiler.ProfilerActivity.CUDA] if device.type == "cuda" else []),
             schedule=torch.profiler.schedule(
                 wait=1, warmup=warmup, active=args.n, repeat=1
             ),
