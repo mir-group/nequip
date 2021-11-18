@@ -11,30 +11,32 @@ del version_dict
 setup(
     name="nequip",
     version=version,
-    description="NequIP is a software for building SE(3)-equivariant neural network interatomic potentials ",
+    description="NequIP is an open-source code for building E(3)-equivariant interatomic potentials.",
     download_url="https://github.com/mir-group/nequip",
-    author="Simon Batzner, Anders Johansson, Albert Musealian, Lixin Sun, Mario Geiger, Tess Smidt",
+    author="Simon Batzner, Albert Musealian, Lixin Sun, Mario Geiger, Anders Johansson, Tess Smidt",
     python_requires=">=3.6",
     packages=find_packages(include=["nequip", "nequip.*"]),
     entry_points={
         # make the scripts available as command line scripts
         "console_scripts": [
             "nequip-train = nequip.scripts.train:main",
-            "nequip-restart = nequip.scripts.restart:main",
-            "nequip-requeue = nequip.scripts.requeue:main",
+            "nequip-evaluate = nequip.scripts.evaluate:main",
+            "nequip-benchmark = nequip.scripts.benchmark:main",
             "nequip-deploy = nequip.scripts.deploy:main",
         ]
     },
     install_requires=[
         "numpy",
-        "scipy",
         "ase",
-        "torch",
-        "torch_geometric",
-        "e3nn>=0.2.5",
+        "tqdm",
+        "torch>=1.8,<1.10",  # torch.fx added in 1.8
+        "e3nn>=0.3.5,<0.5.0",
         "pyyaml",
         "contextlib2;python_version<'3.7'",  # backport of nullcontext
-        "typing_extensions;python_version<'3.8'",
+        "typing_extensions;python_version<'3.8'",  # backport of Final
+        "torch-runstats>=0.2.0",
+        "torch-ema>=0.3.0",
+        "scikit_learn",  # for GaussianProcess for per-species statistics
     ],
     zip_safe=True,
 )

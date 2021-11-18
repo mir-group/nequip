@@ -1,20 +1,33 @@
-"""
-Dataset classes that parse array of positions, cells to AtomicData object
-
-This module requre the torch_geometric to catch up with the github main branch from Jan. 18, 2021
-
-"""
 import numpy as np
 import logging
-
+import tempfile
+import inspect
+import yaml
+import hashlib
 from os.path import dirname, basename, abspath
-from typing import Tuple, Dict, Any, List, Callable, Union, Optional
+from typing import Tuple, Dict, Any, List, Callable, Union, Optional, Sequence
+
+import ase
 
 import torch
-from torch_geometric.data import Batch, Dataset, download_url, extract_zip
 
-from nequip.data import AtomicData, AtomicDataDict
-from ._util import _TORCH_INTEGER_DTYPES
+from torch_runstats.scatter import scatter_std, scatter_mean
+
+from nequip.utils.torch_geometric import Batch, Dataset
+from nequip.utils.torch_geometric.utils import download_url, extract_zip
+
+import nequip
+from nequip.data import (
+    AtomicData,
+    AtomicDataDict,
+    _NODE_FIELDS,
+    _EDGE_FIELDS,
+    _GRAPH_FIELDS,
+)
+from nequip.utils.batch_ops import bincount
+from nequip.utils.regressor import solver
+from nequip.utils.savenload import atomic_write
+from .transforms import TypeMapper
 
 
 class AtomicDataset(Dataset):
@@ -24,36 +37,28 @@ class AtomicDataset(Dataset):
     root: str
 
     def statistics(
-        self, fields: List[Union[str, Callable]], stride: int = 1, unbiased: bool = True
+        self,
+        fields: List[Union[str, Callable]],
+        modes: List[str],
+        stride: int = 1,
+        unbiased: bool = True,
+        kwargs: Optional[Dict[str, dict]] = {},
     ) -> List[tuple]:
-        """Compute the statistics of ``fields`` in the dataset.
-
-        If the values at the fields are vectors/multidimensional, they must be of fixed shape and elementwise statistics will be computed.
-
-        Args:
-            fields: the names of the fields to compute statistics for.
-                Instead of a field name, a callable can also be given that reuturns a quantity to compute the statisics for.
-
-                If a callable is given, it will be called with a (possibly batched) ``Data`` object and must return a sequence of points to add to the set over which the statistics will be computed.
-
-                For example, to compute the overall statistics of the x,y, and z components of a per-node vector ``force`` field:
-
-                    data.statistics([lambda data: data.force.flatten()])
-
-                The above computes the statistics over a set of size 3N, where N is the total number of nodes in the dataset.
-
-        Returns:
-            List of statistics. For fields of floating dtype the statistics are the two-tuple (mean, std); for fields of integer dtype the statistics are a one-tuple (bincounts,)
-        """
         # TODO: If needed, this can eventually be implimented for general AtomicDataset by computing an online running mean and using Welford's method for a stable running standard deviation: https://jonisalonen.com/2013/deriving-welfords-method-for-computing-variance/
         # That would be needed if we have lazy loading datasets.
         # TODO: When lazy-loading datasets are implimented, how to deal with statistics, sampling, and subsets?
         raise NotImplementedError("not implimented for general AtomicDataset yet")
 
+    @property
+    def type_mapper(self) -> Optional[TypeMapper]:
+        # self.transform is always a TypeMapper
+        return self.transform
+
 
 class AtomicInMemoryDataset(AtomicDataset):
     r"""Base class for all datasets that fit in memory.
 
+    Please note that, as a ``pytorch_geometric`` dataset, it must be backed by some kind of disk storage.
     By default, the raw file will be stored at root/raw and the processed torch
     file will be at root/process.
 
@@ -64,13 +69,14 @@ class AtomicInMemoryDataset(AtomicDataset):
     Subclasses may implement:
      - ``download()`` or ``self.url`` or ``ClassName.URL``
 
-     Args:
+    Args:
+        root (str, optional): Root directory where the dataset should be saved. Defaults to current working directory.
         file_name (str, optional): file name of data source. only used in children class
         url (str, optional): url to download data source
-        root (str, optional): Root directory where the dataset should be saved. Defaults to current working directory.
         force_fixed_keys (list, optional): keys to move from AtomicData to fixed_fields dictionary
         extra_fixed_fields (dict, optional): extra key that are not stored in data but needed for AtomicData initialization
         include_frames (list, optional): the frames to process with the constructor.
+        type_mapper (TypeMapper): the transformation to map atomic information to species index. Optional
     """
 
     def __init__(
@@ -81,8 +87,9 @@ class AtomicInMemoryDataset(AtomicDataset):
         force_fixed_keys: List[str] = [],
         extra_fixed_fields: Dict[str, Any] = {},
         include_frames: Optional[List[int]] = None,
+        type_mapper: TypeMapper = None,
     ):
-        # TO DO, this may be symplified
+        # TO DO, this may be simplified
         # See if a subclass defines some inputs
         self.file_name = (
             getattr(type(self), "FILE_NAME", None) if file_name is None else file_name
@@ -112,7 +119,7 @@ class AtomicInMemoryDataset(AtomicDataset):
         # Initialize the InMemoryDataset, which runs download and process
         # See https://pytorch-geometric.readthedocs.io/en/latest/notes/create_dataset.html#creating-in-memory-datasets
         # Then pre-process the data if disk files are not found
-        super().__init__(root=root)
+        super().__init__(root=root, transform=type_mapper)
         if self.data is None:
             self.data, self.fixed_fields, include_frames = torch.load(
                 self.processed_paths[0]
@@ -123,20 +130,6 @@ class AtomicInMemoryDataset(AtomicDataset):
                     f"please delete the processed folder and rerun {self.processed_paths[0]}"
                 )
 
-    @classmethod
-    def from_data_list(cls, data_list: List[AtomicData], **kwargs):
-        """Make an ``AtomicInMemoryDataset`` from a list of ``AtomicData`` objects.
-
-        Args:
-            data_list (List[AtomicData])
-            **kwargs: passed through to the constructor
-        Returns:
-            The constructed ``AtomicInMemoryDataset``.
-        """
-        obj = cls(**kwargs)
-        obj.get_data = lambda: (data_list,)
-        return obj
-
     def len(self):
         if self.data is None:
             return 0
@@ -146,14 +139,40 @@ class AtomicInMemoryDataset(AtomicDataset):
     def raw_file_names(self):
         raise NotImplementedError()
 
+    def _get_parameters(self) -> Dict[str, Any]:
+        """Get a dict of the parameters used to build this dataset."""
+        pnames = list(inspect.signature(self.__init__).parameters)
+        IGNORE_KEYS = {
+            # the type mapper is applied after saving, not before, so doesn't matter to cache validity
+            "type_mapper"
+        }
+        params = {
+            k: getattr(self, k)
+            for k in pnames
+            if k not in IGNORE_KEYS and hasattr(self, k)
+        }
+        # Add other relevant metadata:
+        params["dtype"] = str(torch.get_default_dtype())
+        params["nequip_version"] = nequip.__version__
+        return params
+
     @property
-    def processed_file_names(self):
-        # TO DO, can be updated to hash all simple terms in extra_fixed_fields
-        r_max = self.extra_fixed_fields["r_max"]
-        dtype = str(torch.get_default_dtype())
-        if dtype.startswith("torch."):
-            dtype = dtype[len("torch.") :]
-        return [f"{r_max}_{dtype}_data.pt"]
+    def processed_dir(self) -> str:
+        # We want the file name to change when the parameters change
+        # So, first we get all parameters:
+        params = self._get_parameters()
+        # Make some kind of string of them:
+        # we don't care about this possibly changing between python versions,
+        # since a change in python version almost certainly means a change in
+        # versions of other things too, and is a good reason to recompute
+        buffer = yaml.dump(params).encode("ascii")
+        # And hash it:
+        param_hash = hashlib.sha1(buffer).hexdigest()
+        return f"{self.root}/processed_dataset_{param_hash}"
+
+    @property
+    def processed_file_names(self) -> List[str]:
+        return ["data.pth", "params.yaml"]
 
     def get_data(
         self,
@@ -276,7 +295,19 @@ class AtomicInMemoryDataset(AtomicDataset):
 
         logging.info(f"Loaded data: {data}")
 
-        torch.save((data, fixed_fields, self.include_frames), self.processed_paths[0])
+        # use atomic writes to avoid race conditions between
+        # different trainings that use the same dataset
+        # since those separate trainings should all produce the same results,
+        # it doesn't matter if they overwrite each others cached'
+        # datasets. It only matters that they don't simultaneously try
+        # to write the _same_ file, corrupting it.
+        with atomic_write(self.processed_paths[0]) as tmppth:
+            torch.save((data, fixed_fields, self.include_frames), tmppth)
+        with atomic_write(self.processed_paths[1]) as tmppth:
+            with open(tmppth, "w") as f:
+                yaml.dump(self._get_parameters(), f)
+
+        logging.info("Cached processed data to disk")
 
         self.data = data
         self.fixed_fields = fixed_fields
@@ -291,99 +322,321 @@ class AtomicInMemoryDataset(AtomicDataset):
     def statistics(
         self,
         fields: List[Union[str, Callable]],
+        modes: List[str],
         stride: int = 1,
         unbiased: bool = True,
-        modes: Optional[List[Union[str]]] = None,
+        kwargs: Optional[Dict[str, dict]] = {},
     ) -> List[tuple]:
-        if self.__indices__ is not None:
-            selector = torch.as_tensor(self.__indices__)[::stride]
+        """Compute the statistics of ``fields`` in the dataset.
+
+        If the values at the fields are vectors/multidimensional, they must be of fixed shape and elementwise statistics will be computed.
+
+        Args:
+            fields: the names of the fields to compute statistics for.
+                Instead of a field name, a callable can also be given that reuturns a quantity to compute the statisics for.
+
+                If a callable is given, it will be called with a (possibly batched) ``Data``-like object and must return a sequence of points to add to the set over which the statistics will be computed.
+                The callable must also return a string, one of ``"node"`` or ``"graph"``, indicating whether the value it returns is a per-node or per-graph quantity.
+                PLEASE NOTE: the argument to the callable may be "batched", and it may not be batched "contiguously": ``batch`` and ``edge_index`` may have "gaps" in their values.
+
+                For example, to compute the overall statistics of the x,y, and z components of a per-node vector ``force`` field:
+
+                    data.statistics([lambda data: (data.force.flatten(), "node")])
+
+                The above computes the statistics over a set of size 3N, where N is the total number of nodes in the dataset.
+
+            modes: the statistic to compute for each field. Valid options are TODO.
+
+            stride: the stride over the dataset while computing statistcs.
+
+            unbiased: whether to use unbiased for standard deviations.
+
+            kwargs: other options for individual statistics modes.
+
+        Returns:
+            List of statistics. For fields of floating dtype the statistics are the two-tuple (mean, std); for fields of integer dtype the statistics are a one-tuple (bincounts,)
+        """
+
+        # Short circut:
+        assert len(modes) == len(fields)
+        if len(fields) == 0:
+            return []
+
+        if self._indices is not None:
+            graph_selector = torch.as_tensor(self._indices)[::stride]
         else:
-            selector = torch.arange(0, self.len(), stride)
+            graph_selector = torch.arange(0, self.len(), stride)
+        num_graphs = len(graph_selector)
 
         node_selector = torch.as_tensor(
-            np.in1d(self.data.batch.numpy(), selector.numpy())
+            np.in1d(self.data.batch.numpy(), graph_selector.numpy())
         )
-        # the pure PyTorch alternative to ^ is:
-        # hack for in1d: https://github.com/pytorch/pytorch/issues/3025#issuecomment-392601780
-        # node_selector = (self.data.batch[..., None] == selector).any(-1)
-        # but this is unnecessary because no backward is done through statistics
+        num_nodes = node_selector.sum()
 
-        if modes is not None:
-            assert len(modes) == len(fields)
+        edge_index = self.data[AtomicDataDict.EDGE_INDEX_KEY]
+        edge_selector = node_selector[edge_index[0]] & node_selector[edge_index[1]]
+        num_edges = edge_selector.sum()
+        del edge_index
 
-        out = []
+        if self.transform is not None:
+            # pre-transform the fixed fields and data so that statistics process transformed data
+            ff_transformed = self.transform(self.fixed_fields, types_required=False)
+            data_transformed = self.transform(self.data.to_dict(), types_required=False)
+        else:
+            ff_transformed = self.fixed_fields
+            data_transformed = self.data.to_dict()
+        # pre-select arrays
+        # this ensures that all following computations use the right data
+        selectors = {}
+        for k in list(ff_transformed.keys()) + list(data_transformed.keys()):
+            if k in _NODE_FIELDS:
+                selectors[k] = node_selector
+            elif k in _GRAPH_FIELDS:
+                selectors[k] = graph_selector
+            elif k == AtomicDataDict.EDGE_INDEX_KEY:
+                selectors[k] = (slice(None, None, None), edge_selector)
+            elif k in _EDGE_FIELDS:
+                selectors[k] = edge_selector
+        # TODO: do the batch indexes, edge_indexes, etc. after selection need to be
+        # "compacted" to subtract out their offsets? For now, we just punt this
+        # onto the writer of the callable field.
+        # do not actually select on fixed fields, since they are constant
+        # but still only select fields that are correctly registered
+        ff_transformed = {k: v for k, v in ff_transformed.items() if k in selectors}
+        # apply selector to actual data
+        data_transformed = {
+            k: data_transformed[k][selectors[k]]
+            for k in data_transformed.keys()
+            if k in selectors
+        }
+
+        atom_types: Optional[torch.Tensor] = None
+        out: list = []
         for ifield, field in enumerate(fields):
-
-            if field in self.fixed_fields:
-                obj = self.fixed_fields
-            else:
-                obj = self.data
-
             if callable(field):
-                arr = field(obj)
+                # make a joined thing? so it includes fixed fields
+                arr, arr_is_per = field(data_transformed)
+                arr = arr.to(
+                    torch.get_default_dtype()
+                )  # all statistics must be on floating
+                assert arr_is_per in ("node", "graph", "edge")
             else:
-                arr = obj[field]
-            # Apply selector
-            # TODO: this might be quite expensive if the dataset is large.
-            # Better to impliment the general running average case in AtomicDataset,
-            # and just call super here in AtomicInMemoryDataset?
-            #
-            # TODO: !!! this is a terrible shape-based hack that needs to be fixed !!!
-            if len(self.data.batch) == self.data.num_graphs:
-                raise NotImplementedError(
-                    "AtomicDataset.statistics cannot currently handle datasets whose number of examples is the same as their number of nodes"
-                )
-            if obj is self.fixed_fields:
-                # arr is fixed, nothing to select.
-                pass
-            elif len(arr) == self.data.num_graphs:
-                # arr is per example (probably)
-                arr = arr[selector]
-            elif len(arr) == len(self.data.batch):
-                # arr is per-node (probably)
-                arr = arr[node_selector]
-            else:
-                raise NotImplementedError(
-                    "Statistics of properties that are not per-graph or per-node are not yet implimented"
-                )
+                # Give a better error
+                if field not in selectors:
+                    # this means field is not selected and so not available
+                    raise RuntimeError(
+                        f"Only per-node and per-graph fields can have statistics computed; `{field}` has not been registered as either. If it is per-node or per-graph, please register it as such using `nequip.data.register_fields`"
+                    )
+                if field in ff_transformed:
+                    arr = ff_transformed[field]
+                else:
+                    arr = data_transformed[field]
+                if field in _NODE_FIELDS:
+                    arr_is_per = "node"
+                elif field in _GRAPH_FIELDS:
+                    arr_is_per = "graph"
+                elif field in _EDGE_FIELDS:
+                    arr_is_per = "edge"
+                else:
+                    raise RuntimeError
 
-            ana_mode = None if modes is None else modes[ifield]
+            # Check arr
+            if arr is None:
+                raise ValueError(
+                    f"Cannot compute statistics over field `{field}` whose value is None!"
+                )
             if not isinstance(arr, torch.Tensor):
                 if np.issubdtype(arr.dtype, np.floating):
                     arr = torch.as_tensor(arr, dtype=torch.get_default_dtype())
                 else:
                     arr = torch.as_tensor(arr)
-            if ana_mode is None:
-                ana_mode = "count" if arr.dtype in _TORCH_INTEGER_DTYPES else "mean_std"
+            if arr_is_per == "node":
+                arr = arr.view(num_nodes, -1)
+            elif arr_is_per == "graph":
+                arr = arr.view(num_graphs, -1)
+            elif arr_is_per == "edge":
+                arr = arr.view(num_edges, -1)
 
+            ana_mode = modes[ifield]
+            # compute statistics
             if ana_mode == "count":
+                # count integers
                 uniq, counts = torch.unique(
                     torch.flatten(arr), return_counts=True, sorted=True
                 )
                 out.append((uniq, counts))
             elif ana_mode == "rms":
-
+                # root-mean-square
                 out.append((torch.sqrt(torch.mean(arr * arr)),))
 
             elif ana_mode == "mean_std":
-
+                # mean and std
                 mean = torch.mean(arr, dim=0)
                 std = torch.std(arr, dim=0, unbiased=unbiased)
                 out.append((mean, std))
 
+            elif ana_mode.startswith("per_species_"):
+                # per-species
+                algorithm_kwargs = kwargs.pop(field + ana_mode, {})
+
+                ana_mode = ana_mode[len("per_species_") :]
+
+                if atom_types is None:
+                    if AtomicDataDict.ATOM_TYPE_KEY in data_transformed:
+                        atom_types = data_transformed[AtomicDataDict.ATOM_TYPE_KEY]
+                    elif AtomicDataDict.ATOM_TYPE_KEY in ff_transformed:
+                        atom_types = ff_transformed[AtomicDataDict.ATOM_TYPE_KEY]
+                        atom_types = (
+                            atom_types.unsqueeze(0)
+                            .expand((num_graphs,) + atom_types.shape)
+                            .reshape(-1)
+                        )
+
+                results = self._per_species_statistics(
+                    ana_mode,
+                    arr,
+                    arr_is_per=arr_is_per,
+                    batch=data_transformed[AtomicDataDict.BATCH_KEY],
+                    atom_types=atom_types,
+                    unbiased=unbiased,
+                    algorithm_kwargs=algorithm_kwargs,
+                )
+                out.append(results)
+
+            elif ana_mode.startswith("per_atom_"):
+                # per-atom
+                # only makes sense for a per-graph quantity
+                if arr_is_per != "graph":
+                    raise ValueError(
+                        f"It doesn't make sense to ask for `{ana_mode}` since `{field}` is not per-graph"
+                    )
+                ana_mode = ana_mode[len("per_atom_") :]
+                results = self._per_atom_statistics(
+                    ana_mode=ana_mode,
+                    arr=arr,
+                    batch=data_transformed[AtomicDataDict.BATCH_KEY],
+                    unbiased=unbiased,
+                )
+                out.append(results)
+
+            else:
+                raise NotImplementedError(f"Cannot handle statistics mode {ana_mode}")
+
         return out
+
+    @staticmethod
+    def _per_atom_statistics(
+        ana_mode: str,
+        arr: torch.Tensor,
+        batch: torch.Tensor,
+        unbiased: bool = True,
+    ):
+        """Compute "per-atom" statistics that are normalized by the number of atoms in the system.
+
+        Only makes sense for a graph-level quantity (checked by .statistics).
+        """
+        # using unique_consecutive handles the non-contiguous selected batch index
+        _, N = torch.unique_consecutive(batch, return_counts=True)
+        if ana_mode == "mean_std":
+            arr = arr / N
+            mean = torch.mean(arr)
+            std = torch.std(arr, unbiased=unbiased)
+            return mean, std
+        elif ana_mode == "rms":
+            arr = arr / N
+            return (torch.sqrt(torch.mean(arr.square())),)
+        else:
+            raise NotImplementedError(
+                f"{ana_mode} for per-atom analysis is not implemented"
+            )
+
+    @staticmethod
+    def _per_species_statistics(
+        ana_mode: str,
+        arr: torch.Tensor,
+        arr_is_per: str,
+        atom_types: torch.Tensor,
+        batch: torch.Tensor,
+        unbiased: bool = True,
+        algorithm_kwargs: Optional[dict] = {},
+    ):
+        """Compute "per-species" statistics.
+
+        For a graph-level quantity, models it as a linear combintation of the number of atoms of different types in the graph.
+
+        For a per-node quantity, computes the expected statistic but for each type instead of over all nodes.
+        """
+        N = bincount(atom_types, batch)
+        N = N[(N > 0).any(dim=1)]  # deal with non-contiguous batch indexes
+
+        if arr_is_per == "graph":
+
+            if ana_mode != "mean_std":
+                raise NotImplementedError(
+                    f"{ana_mode} for per species analysis is not implemented for shape {arr.shape}"
+                )
+
+            N = N.type(torch.get_default_dtype())
+
+            return solver(N, arr, **algorithm_kwargs)
+
+        elif arr_is_per == "node":
+            arr = arr.type(torch.get_default_dtype())
+
+            if ana_mode == "mean_std":
+                mean = scatter_mean(arr, atom_types, dim=0)
+                std = scatter_std(arr, atom_types, dim=0, unbiased=unbiased)
+                return mean, std
+            elif ana_mode == "rms":
+                square = scatter_mean(arr.square(), atom_types, dim=0)
+                dims = len(square.shape) - 1
+                for i in range(dims):
+                    square = square.mean(axis=-1)
+                return (torch.sqrt(square),)
+
+        else:
+            raise NotImplementedError
 
 
 # TODO: document fixed field mapped key behavior more clearly
 class NpzDataset(AtomicInMemoryDataset):
     """Load data from an npz file.
 
-    To avoid loading unneeded data, keys are ignored by default unless they are in ``key_mapping``, ``npz_keys``, or ``npz_fixed_fields``.
+    To avoid loading unneeded data, keys are ignored by default unless they are in ``key_mapping``, ``include_keys``,
+    ``npz_fixed_fields`` or ``extra_fixed_fields``.
 
     Args:
-        file_name (str): file name of the npz file
-        key_mapping (Dict[str, str]): mapping of npz keys to ``AtomicData`` keys
-        force_fixed_keys (list): keys in the npz to treat as fixed quantities that don't change across examples. For example: cell, atomic_numbers
+        key_mapping (Dict[str, str]): mapping of npz keys to ``AtomicData`` keys. Optional
+        include_keys (list): the attributes to be processed and stored. Optional
+        npz_fixed_field_keys: the attributes that only have one instance but apply to all frames. Optional
+
+    Example: Given a npz file with 10 configurations, each with 14 atoms.
+
+        position: (10, 14, 3)
+        force: (10, 14, 3)
+        energy: (10,)
+        Z: (14)
+        user_label1: (10)        # per config
+        user_label2: (10, 14, 3) # per atom
+
+    The input yaml should be
+
+    ```yaml
+    dataset: npz
+    dataset_file_name: example.npz
+    include_keys:
+      - user_label1
+      - user_label2
+    npz_fixed_field_keys:
+      - cell
+      - atomic_numbers
+    key_mapping:
+      position: pos
+      force: forces
+      energy: total_energy
+      Z: atomic_numbers
+    ```
+
     """
 
     def __init__(
@@ -397,17 +650,18 @@ class NpzDataset(AtomicInMemoryDataset):
             "Z": AtomicDataDict.ATOMIC_NUMBERS_KEY,
             "atomic_number": AtomicDataDict.ATOMIC_NUMBERS_KEY,
         },
-        npz_keys: List[str] = [],
+        include_keys: List[str] = [],
         npz_fixed_field_keys: List[str] = [],
         file_name: Optional[str] = None,
         url: Optional[str] = None,
         force_fixed_keys: List[str] = [],
         extra_fixed_fields: Dict[str, Any] = {},
         include_frames: Optional[List[int]] = None,
+        type_mapper: TypeMapper = None,
     ):
         self.key_mapping = key_mapping
         self.npz_fixed_field_keys = npz_fixed_field_keys
-        self.npz_keys = npz_keys
+        self.include_keys = include_keys
 
         super().__init__(
             file_name=file_name,
@@ -416,6 +670,7 @@ class NpzDataset(AtomicInMemoryDataset):
             force_fixed_keys=force_fixed_keys,
             extra_fixed_fields=extra_fixed_fields,
             include_frames=include_frames,
+            type_mapper=type_mapper,
         )
 
     @property
@@ -428,17 +683,22 @@ class NpzDataset(AtomicInMemoryDataset):
 
     # TODO: fixed fields?
     def get_data(self):
+
         data = np.load(self.raw_dir + "/" + self.raw_file_names[0], allow_pickle=True)
 
+        # only the keys explicitly mentioned in the yaml file will be parsed
         keys = set(list(self.key_mapping.keys()))
         keys.update(self.npz_fixed_field_keys)
-        keys.update(self.npz_keys)
+        keys.update(self.include_keys)
+        keys.update(list(self.extra_fixed_fields.keys()))
         keys = keys.intersection(set(list(data.keys())))
+
         mapped = {self.key_mapping.get(k, k): data[k] for k in keys}
+
         # TODO: generalize this?
         for intkey in (
             AtomicDataDict.ATOMIC_NUMBERS_KEY,
-            AtomicDataDict.SPECIES_INDEX_KEY,
+            AtomicDataDict.ATOM_TYPE_KEY,
             AtomicDataDict.EDGE_INDEX_KEY,
         ):
             if intkey in mapped:
@@ -452,9 +712,53 @@ class NpzDataset(AtomicInMemoryDataset):
 
 
 class ASEDataset(AtomicInMemoryDataset):
-    """TODO
+    """
 
-    r_max and an override PBC can be specified in extra_fixed_fields
+    Args:
+        ase_args (dict): arguments for ase.io.read
+        include_keys (list): in addition to forces and energy, the keys that needs to
+             be parsed into dataset
+             The data stored in ase.atoms.Atoms.array has the lowest priority,
+             and it will be overrided by data in ase.atoms.Atoms.info
+             and ase.atoms.Atoms.calc.results. Optional
+        key_mapping (dict): rename some of the keys to the value str. Optional
+
+    Example: Given an atomic data stored in "H2.extxyz" that looks like below:
+
+    ```H2.extxyz
+    2
+    Properties=species:S:1:pos:R:3 energy=-10 user_label=2.0 pbc="F F F"
+     H       0.00000000       0.00000000       0.00000000
+     H       0.00000000       0.00000000       1.02000000
+    ```
+
+    The yaml input should be
+
+    ```
+    dataset: ase
+    dataset_file_name: H2.extxyz
+    ase_args:
+      format: extxyz
+    include_keys:
+      - user_label
+    key_mapping:
+      user_label: label0
+    chemical_symbol_to_type:
+      H: 0
+    ```
+
+    for VASP parser, the yaml input should be
+    ```
+    dataset: ase
+    dataset_file_name: OUTCAR
+    ase_args:
+      format: vasp-out
+    key_mapping:
+      free_energy: total_energy
+    chemical_symbol_to_type:
+      H: 0
+    ```
+
     """
 
     def __init__(
@@ -466,11 +770,17 @@ class ASEDataset(AtomicInMemoryDataset):
         force_fixed_keys: List[str] = [],
         extra_fixed_fields: Dict[str, Any] = {},
         include_frames: Optional[List[int]] = None,
+        type_mapper: TypeMapper = None,
+        key_mapping: Optional[dict] = None,
+        include_keys: Optional[List[str]] = None,
     ):
 
         self.ase_args = dict(index=":")
         self.ase_args.update(getattr(type(self), "ASE_ARGS", dict()))
         self.ase_args.update(ase_args)
+
+        self.include_keys = include_keys
+        self.key_mapping = key_mapping
 
         super().__init__(
             file_name=file_name,
@@ -479,21 +789,42 @@ class ASEDataset(AtomicInMemoryDataset):
             force_fixed_keys=force_fixed_keys,
             extra_fixed_fields=extra_fixed_fields,
             include_frames=include_frames,
+            type_mapper=type_mapper,
         )
 
     @classmethod
-    def from_atoms(cls, atoms: list, **kwargs):
+    def from_atoms_list(cls, atoms: Sequence[ase.Atoms], **kwargs):
         """Make an ``ASEDataset`` from a list of ``ase.Atoms`` objects.
 
+        If `root` is not provided, a temporary directory will be used.
+
+        Please note that this is a convinience method that does NOT avoid a round-trip to disk; the provided ``atoms`` will be written out to a file.
+
+        Ignores ``kwargs["file_name"]`` if it is provided.
+
         Args:
-            atoms (List[ase.Atoms])
+            atoms
             **kwargs: passed through to the constructor
         Returns:
             The constructed ``ASEDataset``.
         """
-        # TO DO, this funciton fails. It also needs to be unit tested
+        if "root" not in kwargs:
+            tmpdir = tempfile.TemporaryDirectory()
+            kwargs["root"] = tmpdir.name
+        else:
+            tmpdir = None
+        kwargs["file_name"] = tmpdir.name + "/atoms.xyz"
+        atoms = list(atoms)
+        # Write them out
+        ase.io.write(kwargs["file_name"], atoms, format="extxyz")
+        # Read them in
         obj = cls(**kwargs)
-        obj.get_atoms = lambda: atoms
+        if tmpdir is not None:
+            # Make it keep a reference to the tmpdir to keep it alive
+            # When the dataset is garbage collected, the tmpdir will
+            # be too, and will (hopefully) get deleted eventually.
+            # Or at least by end of program...
+            obj._tmpdir_ref = tmpdir
         return obj
 
     @property
@@ -510,19 +841,26 @@ class ASEDataset(AtomicInMemoryDataset):
         return aseread(self.raw_dir + "/" + self.raw_file_names[0], **self.ase_args)
 
     def get_data(self):
+
         # Get our data
         atoms_list = self.get_atoms()
+
+        # skip the None arguments
+        kwargs = dict(
+            include_keys=self.include_keys,
+            key_mapping=self.key_mapping,
+        )
+        kwargs = {k: v for k, v in kwargs.items() if v is not None}
+        kwargs.update(self.extra_fixed_fields)
+
         if self.include_frames is None:
             return (
-                [
-                    AtomicData.from_ase(atoms=atoms, **self.extra_fixed_fields)
-                    for atoms in atoms_list
-                ],
+                [AtomicData.from_ase(atoms=atoms, **kwargs) for atoms in atoms_list],
             )
         else:
             return (
                 [
-                    AtomicData.from_ase(atoms=atoms_list[i], **self.extra_fixed_fields)
+                    AtomicData.from_ase(atoms=atoms_list[i], **kwargs)
                     for i in self.include_frames
                 ],
             )

@@ -1,0 +1,6 @@
+Python API
+==========
+
+ .. toctree::
+
+    data

@@ -1,9 +1,9 @@
 """ Interaction Block """
-from typing import Optional
+from typing import Optional, Dict, Callable
 
 import torch
 
-from torch_scatter import scatter
+from torch_runstats.scatter import scatter
 
 from e3nn import o3
 from e3nn.nn import FullyConnectedNet
@@ -25,7 +25,8 @@ class InteractionBlock(GraphModuleMixin, torch.nn.Module):
         invariant_layers=1,
         invariant_neurons=8,
         avg_num_neighbors=None,
-        use_sc=False,
+        use_sc=True,
+        nonlinearity_scalars: Dict[int, Callable] = {"e": "ssp"},
     ) -> None:
         """
         InteractionBlock.
@@ -114,7 +115,10 @@ class InteractionBlock(GraphModuleMixin, torch.nn.Module):
             [self.irreps_in[AtomicDataDict.EDGE_EMBEDDING_KEY].num_irreps]
             + invariant_layers * [invariant_neurons]
             + [tp.weight_numel],
-            ShiftedSoftPlus,
+            {
+                "ssp": ShiftedSoftPlus,
+                "silu": torch.nn.functional.silu,
+            }[nonlinearity_scalars["e"]],
         )
 
         self.tp = tp
@@ -154,8 +158,8 @@ class InteractionBlock(GraphModuleMixin, torch.nn.Module):
         weight = self.fc(data[AtomicDataDict.EDGE_EMBEDDING_KEY])
 
         x = data[AtomicDataDict.NODE_FEATURES_KEY]
-        edge_src = data[AtomicDataDict.EDGE_INDEX_KEY][0]
-        edge_dst = data[AtomicDataDict.EDGE_INDEX_KEY][1]
+        edge_src = data[AtomicDataDict.EDGE_INDEX_KEY][1]
+        edge_dst = data[AtomicDataDict.EDGE_INDEX_KEY][0]
 
         if self.sc is not None:
             sc = self.sc(x, data[AtomicDataDict.NODE_ATTRS_KEY])

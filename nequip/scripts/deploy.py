@@ -1,4 +1,10 @@
-from typing import Final, Tuple, Dict, Union
+import sys
+
+if sys.version_info[1] >= 8:
+    from typing import Final
+else:
+    from typing_extensions import Final
+from typing import Tuple, Dict, Union
 import argparse
 import pathlib
 import logging
@@ -11,17 +17,40 @@ import numpy as np  # noqa: F401
 
 import torch
 
+import ase.data
+
 from e3nn.util.jit import script
 
-import nequip
-from nequip.nn import GraphModuleMixin
+from nequip.train import Trainer
 
 CONFIG_KEY: Final[str] = "config"
 NEQUIP_VERSION_KEY: Final[str] = "nequip_version"
+TORCH_VERSION_KEY: Final[str] = "torch_version"
+E3NN_VERSION_KEY: Final[str] = "e3nn_version"
 R_MAX_KEY: Final[str] = "r_max"
 N_SPECIES_KEY: Final[str] = "n_species"
+TYPE_NAMES_KEY: Final[str] = "type_names"
+JIT_BAILOUT_KEY: Final[str] = "_jit_bailout_depth"
+TF32_KEY: Final[str] = "allow_tf32"
 
-_ALL_METADATA_KEYS = [CONFIG_KEY, NEQUIP_VERSION_KEY, R_MAX_KEY, N_SPECIES_KEY]
+_ALL_METADATA_KEYS = [
+    CONFIG_KEY,
+    NEQUIP_VERSION_KEY,
+    R_MAX_KEY,
+    N_SPECIES_KEY,
+    TYPE_NAMES_KEY,
+    JIT_BAILOUT_KEY,
+    TF32_KEY,
+]
+
+
+def _compile_for_deploy(model):
+    model.eval()
+
+    if not isinstance(model, torch.jit.ScriptModule):
+        model = script(model)
+
+    return torch.jit.freeze(model)
 
 
 def load_deployed_model(
@@ -72,9 +101,7 @@ def main(args=None):
         "info", help="Get information from a deployed model file"
     )
     info_parser.add_argument(
-        "model_path",
-        help="Path to a deployed model file.",
-        type=pathlib.Path,
+        "model_path", help="Path to a deployed model file.", type=pathlib.Path,
     )
 
     build_parser = subparsers.add_parser("build", help="Build a deployment model")
@@ -84,9 +111,7 @@ def main(args=None):
         type=pathlib.Path,
     )
     build_parser.add_argument(
-        "out_file",
-        help="Output file for deployed model.",
-        type=pathlib.Path,
+        "out_file", help="Output file for deployed model.", type=pathlib.Path,
     )
 
     args = parser.parse_args(args=args)
@@ -98,7 +123,8 @@ def main(args=None):
         model, metadata = load_deployed_model(args.model_path)
         del model
         config = metadata.pop(CONFIG_KEY)
-        logging.info(f"Loaded TorchScript model with metadata {metadata}")
+        metadata_str = "\n".join("  %s: %s" % e for e in metadata.items())
+        logging.info(f"Loaded TorchScript model with metadata:\n{metadata_str}\n")
         logging.info("Model was built with config:")
         print(config)
 
@@ -110,42 +136,42 @@ def main(args=None):
                 f"{args.out_dir} is a directory, but a path to a file for the deployed model must be given"
             )
         # -- load model --
-        model_is_jit = False
-        model_path = args.train_dir / "best_model.pth"
-        try:
-            model = torch.jit.load(model_path, map_location=torch.device("cpu"))
-            model_is_jit = True
-            logging.info("Loaded TorchScript model")
-        except RuntimeError:
-            # ^ jit.load throws this when it can't find TorchScript files
-            model = torch.load(model_path, map_location=torch.device("cpu"))
-            if not isinstance(model, GraphModuleMixin):
-                raise TypeError(
-                    "Model contained object that wasn't a NequIP model (nequip.nn.GraphModuleMixin)"
-                )
-            logging.info("Loaded pickled model")
-        model = model.to(device=torch.device("cpu"))
+        model, _ = Trainer.load_model_from_training_session(
+            args.train_dir, model_name="best_model.pth", device="cpu"
+        )
 
         # -- compile --
-        if not model_is_jit:
-            model = script(model)
-            logging.info("Compiled model to TorchScript")
-
-        model.eval()  # just to be sure
-
-        model = torch.jit.freeze(model)
-        logging.info("Froze TorchScript model")
+        model = _compile_for_deploy(model)
+        logging.info("Compiled & optimized model.")
 
         # load config
-        # TODO: walk module tree if config does not exist to find params?
-        config_str = (args.train_dir / "config_final.yaml").read_text()
+        config_str = (args.train_dir / "config.yaml").read_text()
         config = yaml.load(config_str, Loader=yaml.Loader)
 
         # Deploy
-        metadata: dict = {NEQUIP_VERSION_KEY: nequip.__version__}
+        metadata: dict = {}
+        for code in ["e3nn", "nequip", "torch"]:
+            metadata[code + "_version"] = config[code + "_version"]
+
         metadata[R_MAX_KEY] = str(float(config["r_max"]))
-        metadata[N_SPECIES_KEY] = str(len(config["allowed_species"]))
+        if "allowed_species" in config:
+            # This is from before the atomic number updates
+            n_species = len(config["allowed_species"])
+            type_names = {
+                type: ase.data.chemical_symbols[atomic_num]
+                for type, atomic_num in enumerate(config["allowed_species"])
+            }
+        else:
+            # The new atomic number setup
+            n_species = str(config["num_types"])
+            type_names = config["type_names"]
+        metadata[N_SPECIES_KEY] = str(n_species)
+        metadata[TYPE_NAMES_KEY] = " ".join(type_names)
+
+        metadata[JIT_BAILOUT_KEY] = str(config["_jit_bailout_depth"])
+        metadata[TF32_KEY] = str(int(config["allow_tf32"]))
         metadata[CONFIG_KEY] = config_str
+
         metadata = {k: v.encode("ascii") for k, v in metadata.items()}
         torch.jit.save(model, args.out_file, _extra_files=metadata)
     else:

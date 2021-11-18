@@ -1,63 +1,8 @@
+from typing import Optional, Union, List
 import inspect
 import logging
 
-from importlib import import_module
-from typing import Optional, Union, List
-
-from nequip import data, datasets
 from .config import Config
-
-
-def dataset_from_config(config):
-    """initialize database based on a config instance
-
-    It needs dataset type name (case insensitive),
-    and all the parameters needed in the constructor.
-
-    Examples see tests/data/test_dataset.py TestFromConfig
-    and tests/datasets/test_simplest.py
-    """
-
-    if inspect.isclass(config.dataset):
-        # user define class
-        class_name = config.dataset
-    else:
-        try:
-            module_name = ".".join(config.dataset.split(".")[:-1])
-            class_name = ".".join(config.dataset.split(".")[-1:])
-            class_name = getattr(import_module(module_name), class_name)
-        except Exception as e:
-            # ^ TODO: don't catch all Exception
-            # default class defined in nequip.data or nequip.dataset
-            dataset_name = config.dataset.lower()
-
-            class_name = None
-            for k, v in inspect.getmembers(data, inspect.isclass) + inspect.getmembers(
-                datasets, inspect.isclass
-            ):
-                if k.endswith("Dataset"):
-                    if k.lower() == dataset_name:
-                        class_name = v
-                    if k[:-7].lower() == dataset_name:
-                        class_name = v
-                elif k.lower() == dataset_name:
-                    class_name = v
-
-    if class_name is None:
-        raise NameError(f"dataset {dataset_name} does not exists")
-
-    # if dataset r_max is not found, use the universal r_max
-    if "dataset_extra_fixed_fields" not in config:
-        config.dataset_extra_fixed_fields = {}
-        if "extra_fixed_fields" in config:
-            config.dataset_extra_fixed_fields.update(config.extra_fixed_fields)
-
-    if "r_max" in config and "r_max" not in config.dataset_extra_fixed_fields:
-        config.dataset_extra_fixed_fields["r_max"] = config.r_max
-
-    instance, _ = instantiate(class_name, prefix="dataset", optional_args=config)
-
-    return instance
 
 
 def instantiate_from_cls_name(
@@ -144,8 +89,10 @@ def instantiate(
     prefix_list = [builder.__name__] if inspect.isclass(builder) else []
     if isinstance(prefix, str):
         prefix_list += [prefix]
-    else:
+    elif isinstance(prefix, list):
         prefix_list += prefix
+    else:
+        raise ValueError(f"prefix has the wrong type {type(prefix)}")
 
     # detect the input parameters needed from params
     config = Config.from_class(builder, remove_kwargs=remove_kwargs)
@@ -281,6 +228,75 @@ def instantiate(
     logging.debug(f"...   optional_args = {final_optional_args},")
     logging.debug(f"...   positional_args = {positional_args})")
 
-    instance = builder(**positional_args, **final_optional_args)
+    try:
+        instance = builder(**positional_args, **final_optional_args)
+    except Exception as e:
+        raise RuntimeError(
+            f"Failed to build object with prefix `{prefix}` using builder `{builder.__name__}`"
+        ) from e
 
     return instance, final_optional_args
+
+
+def get_w_prefix(
+    key: List[str],
+    *kwargs,
+    arg_dicts: List[dict] = [],
+    prefix: Optional[Union[str, List[str]]] = [],
+):
+    """
+    act as the get function and try to search for the value key from arg_dicts
+    """
+
+    # detect the input parameters needed from params
+    config = Config(config={}, allow_list=[key])
+
+    # sort out all possible prefixes
+    if isinstance(prefix, str):
+        prefix_list = [prefix]
+    elif isinstance(prefix, list):
+        prefix_list = prefix
+    else:
+        raise ValueError(f"prefix is with a wrong type {type(prefix)}")
+
+    if not isinstance(arg_dicts, list):
+        arg_dicts = [arg_dicts]
+
+    # extract all the parameters that has the pattern prefix_variable
+    # debug container to record all the variable name transformation
+    key_mapping = {}
+    for idx, arg_dict in enumerate(arg_dicts[::-1]):
+        # fetch paratemeters that directly match the name
+        _keys = config.update(arg_dict)
+        key_mapping[idx] = {k: k for k in _keys}
+        # fetch paratemeters that match prefix + "_" + name
+        for idx, prefix_str in enumerate(prefix_list):
+            _keys = config.update_w_prefix(
+                arg_dict,
+                prefix=prefix_str,
+            )
+            key_mapping[idx].update(_keys)
+
+    # for logging only, remove the overlapped keys
+    num_dicts = len(arg_dicts)
+    if num_dicts > 1:
+        for id_dict in range(num_dicts - 1):
+            higher_priority_keys = []
+            for id_higher in range(id_dict + 1, num_dicts):
+                higher_priority_keys += list(key_mapping[id_higher].keys())
+            key_mapping[id_dict] = {
+                k: v
+                for k, v in key_mapping[id_dict].items()
+                if k not in higher_priority_keys
+            }
+
+    # debug info
+    logging.debug(f"search for {key} with prefix {prefix}")
+    for t in key_mapping:
+        for k, v in key_mapping[t].items():
+            string = f" {str(t):>10.10}_args :  {k:>50s}"
+            if k != v:
+                string += f" <- {v:>50s}"
+            logging.debug(string)
+
+    return config.get(key, *kwargs)

@@ -1,42 +1,75 @@
 """ Train a network."""
-from typing import Union, Callable
 import logging
 import argparse
-import yaml
 
 # This is a weird hack to avoid Intel MKL issues on the cluster when this is called as a subprocess of a process that has itself initialized PyTorch.
 # Since numpy gets imported later anyway for dataset stuff, this shouldn't affect performance.
 import numpy as np  # noqa: F401
+
+from os.path import isdir
+from pathlib import Path
 
 import torch
 
 import e3nn
 import e3nn.util.jit
 
-from nequip.utils import Config, dataset_from_config
-from nequip.data import AtomicDataDict
-from nequip.nn import RescaleOutput
+from nequip.model import model_from_config
+from nequip.utils import Config
+from nequip.data import dataset_from_config
 from nequip.utils.test import assert_AtomicData_equivariant, set_irreps_debug
+from nequip.utils import load_file, dtype_from_name
+from nequip.scripts.logger import set_up_script_logger
 
 default_config = dict(
-    requeue=False,
+    root="./",
+    run_name="NequIP",
     wandb=False,
     wandb_project="NequIP",
-    wandb_resume=False,
     compile_model=False,
-    model_builder="nequip.models.ForceModel",
-    model_initializers=[],
+    model_builders=[
+        "EnergyModel",
+        "PerSpeciesRescale",
+        "ForceOutput",
+        "RescaleEnergyEtc",
+    ],
     dataset_statistics_stride=1,
     default_dtype="float32",
+    allow_tf32=False,  # TODO: until we understand equivar issues
     verbose="INFO",
     model_debug_mode=False,
     equivariance_test=False,
     grad_anomaly_mode=False,
+    append=False,
+    _jit_bailout_depth=2,  # avoid 20 iters of pain, see https://github.com/pytorch/pytorch/issues/52286
 )
 
 
-def main(args=None):
-    fresh_start(parse_command_line(args))
+def main(args=None, running_as_script: bool = True):
+
+    config = parse_command_line(args)
+
+    if running_as_script:
+        set_up_script_logger(config.get("log", None), config.verbose)
+
+    found_restart_file = isdir(f"{config.root}/{config.run_name}")
+    if found_restart_file and not config.append:
+        raise RuntimeError(
+            f"Training instance exists at {config.root}/{config.run_name}; "
+            "either set append to True or use a different root or runname"
+        )
+
+    # for fresh new train
+    if not found_restart_file:
+        trainer = fresh_start(config)
+    else:
+        trainer = restart(config)
+
+    # Train
+    trainer.save()
+    trainer.train()
+
+    return
 
 
 def parse_command_line(args=None):
@@ -57,6 +90,12 @@ def parse_command_line(args=None):
         help="enable PyTorch autograd anomaly mode to debug NaN gradients. Do not use for production training!",
         action="store_true",
     )
+    parser.add_argument(
+        "--log",
+        help="log file to store all the screen logging",
+        type=Path,
+        default=None,
+    )
     args = parser.parse_args(args=args)
 
     config = Config.from_file(args.config, defaults=default_config)
@@ -66,28 +105,32 @@ def parse_command_line(args=None):
     return config
 
 
-def _load_callable(obj: Union[str, Callable]) -> Callable:
-    if callable(obj):
-        pass
-    elif isinstance(obj, str):
-        obj = yaml.load(f"!!python/name:{obj}", Loader=yaml.Loader)
-    else:
-        raise TypeError
-    assert callable(obj), f"{obj} isn't callable"
-    return obj
+def _set_global_options(config):
+    """Configure global options of libraries like `torch` and `e3nn` based on `config`."""
+    # Set TF32 support
+    # See https://pytorch.org/docs/stable/notes/cuda.html#tensorfloat-32-tf32-on-ampere-devices
+    if torch.cuda.is_available():
+        if torch.torch.backends.cuda.matmul.allow_tf32 and not config.allow_tf32:
+            # it is enabled, and we dont want it to, so disable:
+            torch.backends.cuda.matmul.allow_tf32 = False
+            torch.backends.cudnn.allow_tf32 = False
 
+    # For avoiding 20 steps of painfully slow JIT recompilation
+    # See https://github.com/pytorch/pytorch/issues/52286
+    torch._C._jit_set_bailout_depth(config["_jit_bailout_depth"])
 
-def fresh_start(config):
-    # = Set global state =
     if config.model_debug_mode:
         set_irreps_debug(enabled=True)
-    torch.set_default_dtype(
-        {"float32": torch.float32, "float64": torch.float64}[config.default_dtype]
-    )
+    torch.set_default_dtype(dtype_from_name(config.default_dtype))
     if config.grad_anomaly_mode:
         torch.autograd.set_detect_anomaly(True)
 
     e3nn.set_optimization_defaults(**config.get("e3nn_optimization_defaults", {}))
+
+
+def fresh_start(config):
+
+    _set_global_options(config)
 
     # = Make the trainer =
     if config.wandb:
@@ -105,128 +148,28 @@ def fresh_start(config):
 
         trainer = Trainer(model=None, **dict(config))
 
-    output = trainer.output
-    config.update(output.updated_dict())
+    # what is this
+    # to update wandb data?
+    config.update(trainer.params)
 
     # = Load the dataset =
-    dataset = dataset_from_config(config)
+    dataset = dataset_from_config(config, prefix="dataset")
     logging.info(f"Successfully loaded the data set of type {dataset}...")
+    try:
+        validation_dataset = dataset_from_config(config, prefix="validation_dataset")
+        logging.info(
+            f"Successfully loaded the validation data set of type {validation_dataset}..."
+        )
+    except KeyError:
+        # It couldn't be found
+        validation_dataset = None
 
     # = Train/test split =
-    trainer.set_dataset(dataset)
+    trainer.set_dataset(dataset, validation_dataset)
 
-    # = Determine training type =
-    train_on = config.loss_coeffs
-    train_on = [train_on] if isinstance(train_on, str) else train_on
-    train_on = set(train_on)
-    if not train_on.issubset({"forces", "total_energy"}):
-        raise NotImplementedError(
-            f"Training on fields `{train_on}` besides forces and total energy not supported in the out-of-the-box training script yet; please use your own training script based on train.py."
-        )
-    force_training = "forces" in train_on
-    logging.debug(f"Force training mode: {force_training}")
-    del train_on
-
-    # = Get statistics of training dataset =
-    stats_fields = [
-        AtomicDataDict.TOTAL_ENERGY_KEY,
-        AtomicDataDict.ATOMIC_NUMBERS_KEY,
-    ]
-    stats_modes = ["mean_std", "count"]
-    if force_training:
-        stats_fields.append(AtomicDataDict.FORCE_KEY)
-        stats_modes.append("rms")
-    stats = trainer.dataset_train.statistics(
-        fields=stats_fields, modes=stats_modes, stride=config.dataset_statistics_stride
-    )
-    (
-        (energies_mean, energies_std),
-        (allowed_species, Z_count),
-    ) = stats[:2]
-    if force_training:
-        # Scale by the force std instead
-        force_rms = stats[2][0]
-    del stats_modes
-    del stats_fields
-
-    config.update(dict(allowed_species=allowed_species))
-
-    # = Build a model =
-    model_builder = _load_callable(config.model_builder)
-    core_model = model_builder(**dict(config))
-
-    # = Reinit if wanted =
-    with torch.no_grad():
-        for initer in config.model_initializers:
-            initer = _load_callable(initer)
-            core_model.apply(initer)
-
-    # = Determine shifts, scales =
-    # This is a bit awkward, but necessary for there to be a value
-    # in the config that signals "use dataset"
-    global_shift = config.get("global_rescale_shift", "dataset_energy_mean")
-    if global_shift == "dataset_energy_mean":
-        global_shift = energies_mean
-    elif (
-        global_shift is None
-        or isinstance(global_shift, float)
-        or isinstance(global_shift, torch.Tensor)
-    ):
-        # valid values
-        pass
-    else:
-        raise ValueError(f"Invalid global shift `{global_shift}`")
-
-    global_scale = config.get(
-        "global_rescale_scale", force_rms if force_training else energies_std
-    )
-    if global_scale == "dataset_energy_std":
-        global_scale = energies_std
-    elif global_scale == "dataset_force_rms":
-        if not force_training:
-            raise ValueError(
-                "Cannot have global_scale = 'dataset_force_rms' without force training"
-            )
-        global_scale = force_rms
-    elif (
-        global_scale is None
-        or isinstance(global_scale, float)
-        or isinstance(global_scale, torch.Tensor)
-    ):
-        # valid values
-        pass
-    else:
-        raise ValueError(f"Invalid global scale `{global_scale}`")
-
-    RESCALE_THRESHOLD = 1e-6
-    if isinstance(global_scale, float) and global_scale < RESCALE_THRESHOLD:
-        raise ValueError(
-            f"Global energy scaling was very low: {global_scale}. If dataset values were used, does the dataset contain insufficient variation? Maybe try disabling global scaling with global_scale=None."
-        )
-        # TODO: offer option to disable rescaling?
-
-    logging.debug(
-        f"Initially outputs are scaled by: {global_scale}, eneriges are shifted by {global_shift}."
-    )
-
-    # == Build the model ==
-    final_model = RescaleOutput(
-        model=core_model,
-        scale_keys=[AtomicDataDict.TOTAL_ENERGY_KEY]
-        + (
-            [AtomicDataDict.FORCE_KEY]
-            if AtomicDataDict.FORCE_KEY in core_model.irreps_out
-            else []
-        ),
-        scale_by=global_scale,
-        shift_keys=AtomicDataDict.TOTAL_ENERGY_KEY,
-        shift_by=global_shift,
-        trainable_global_rescale_shift=config.get(
-            "trainable_global_rescale_shift", False
-        ),
-        trainable_global_rescale_scale=config.get(
-            "trainable_global_rescale_scale", False
-        ),
+    # = Build model =
+    final_model = model_from_config(
+        config=config, initialize=True, dataset=trainer.dataset_train
     )
 
     logging.info("Successfully built the network...")
@@ -235,17 +178,12 @@ def fresh_start(config):
         final_model = e3nn.util.jit.script(final_model)
         logging.info("Successfully compiled model...")
 
-    # Record final config
-    with open(output.generate_file("config_final.yaml"), "w+") as fp:
-        yaml.dump(dict(config), fp)
-
     # Equivar test
     if config.equivariance_test:
-        equivar_err = assert_AtomicData_equivariant(final_model, dataset.get(0))
-        errstr = "\n".join(
-            f"    parity_k={parity_k.item()}, did_translate={did_trans} -> max componentwise error={err.item()}"
-            for (parity_k, did_trans), err in equivar_err.items()
-        )
+        from e3nn.util.test import format_equivariance_error
+
+        equivar_err = assert_AtomicData_equivariant(final_model, dataset[0])
+        errstr = format_equivariance_error(equivar_err)
         del equivar_err
         logging.info(f"Equivariance test passed; equivariance errors:\n{errstr}")
         del errstr
@@ -253,11 +191,70 @@ def fresh_start(config):
     # Set the trainer
     trainer.model = final_model
 
-    # Train
-    trainer.train()
+    # Store any updated config information in the trainer
+    trainer.update_kwargs(config)
 
-    return
+    return trainer
+
+
+def restart(config):
+
+    # load the dictionary
+    restart_file = f"{config.root}/{config.run_name}/trainer.pth"
+    dictionary = load_file(
+        supported_formats=dict(torch=["pt", "pth"]),
+        filename=restart_file,
+        enforced_format="torch",
+    )
+
+    # compare dictionary to config and update stop condition related arguments
+    for k in config.keys():
+        if config[k] != dictionary.get(k, ""):
+            if k == "max_epochs":
+                dictionary[k] = config[k]
+                logging.info(f'Update "{k}" to {dictionary[k]}')
+            elif k.startswith("early_stop"):
+                dictionary[k] = config[k]
+                logging.info(f'Update "{k}" to {dictionary[k]}')
+            elif isinstance(config[k], type(dictionary.get(k, ""))):
+                raise ValueError(
+                    f'Key "{k}" is different in config and the result trainer.pth file. Please double check'
+                )
+
+    # recursive loop, if same type but different value
+    # raise error
+
+    config = Config(dictionary, exclude_keys=["state_dict", "progress"])
+
+    # dtype, etc.
+    _set_global_options(config)
+
+    if config.wandb:
+        from nequip.train.trainer_wandb import TrainerWandB
+        from nequip.utils.wandb import resume
+
+        resume(config)
+        trainer = TrainerWandB.from_dict(dictionary)
+    else:
+        from nequip.train.trainer import Trainer
+
+        trainer = Trainer.from_dict(dictionary)
+
+    # = Load the dataset =
+    dataset = dataset_from_config(config, prefix="dataset")
+    logging.info(f"Successfully re-loaded the data set of type {dataset}...")
+    try:
+        validation_dataset = dataset_from_config(config, prefix="validation_dataset")
+        logging.info(
+            f"Successfully re-loaded the validation data set of type {validation_dataset}..."
+        )
+    except KeyError:
+        # It couldn't be found
+        validation_dataset = None
+    trainer.set_dataset(dataset, validation_dataset)
+
+    return trainer
 
 
 if __name__ == "__main__":
-    main()
+    main(running_as_script=True)

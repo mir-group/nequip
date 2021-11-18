@@ -1,3 +1,4 @@
+from typing import Dict, Callable
 import torch
 import logging
 
@@ -13,14 +14,11 @@ from nequip.nn.nonlinearities import ShiftedSoftPlus
 from nequip.utils.tp_utils import tp_path_exists
 
 
-act = {
-    1: ShiftedSoftPlus,
-    -1: torch.tanh,
-}
-
-act_gates = {
-    1: ShiftedSoftPlus,
-    -1: torch.abs,
+acts = {
+    "abs": torch.abs,
+    "tanh": torch.tanh,
+    "ssp": ShiftedSoftPlus,
+    "silu": torch.nn.functional.silu,
 }
 
 
@@ -41,10 +39,22 @@ class ConvNetLayer(GraphModuleMixin, torch.nn.Module):
         num_layers: int = 3,
         resnet: bool = True,
         nonlinearity_type: str = "gate",
+        nonlinearity_scalars: Dict[int, Callable] = {"e": "ssp", "o": "tanh"},
+        nonlinearity_gates: Dict[int, Callable] = {"e": "ssp", "o": "abs"},
     ):
         super().__init__()
         # initialization
         assert nonlinearity_type in ("gate", "norm")
+        # make the nonlin dicts from parity ints instead of convinience strs
+        nonlinearity_scalars = {
+            1: nonlinearity_scalars["e"],
+            -1: nonlinearity_scalars["o"],
+        }
+        nonlinearity_gates = {
+            1: nonlinearity_gates["e"],
+            -1: nonlinearity_gates["o"],
+        }
+
         self.feature_irreps_hidden = o3.Irreps(feature_irreps_hidden)
         self.resnet = resnet
         self.num_layers = num_layers
@@ -90,9 +100,11 @@ class ConvNetLayer(GraphModuleMixin, torch.nn.Module):
             # dictionary
             equivariant_nonlin = Gate(
                 irreps_scalars=irreps_scalars,
-                act_scalars=[act[ir.p] for _, ir in irreps_scalars],
+                act_scalars=[
+                    acts[nonlinearity_scalars[ir.p]] for _, ir in irreps_scalars
+                ],
                 irreps_gates=irreps_gates,
-                act_gates=[act_gates[ir.p] for _, ir in irreps_gates],
+                act_gates=[acts[nonlinearity_gates[ir.p]] for _, ir in irreps_gates],
                 irreps_gated=irreps_gated,
             )
 
@@ -103,7 +115,8 @@ class ConvNetLayer(GraphModuleMixin, torch.nn.Module):
 
             equivariant_nonlin = NormActivation(
                 irreps_in=conv_irreps_out,
-                scalar_nonlinearity=ShiftedSoftPlus,
+                # norm is an even scalar, so use nonlinearity_scalars[1]
+                scalar_nonlinearity=acts[nonlinearity_scalars[1]],
                 normalize=True,
                 epsilon=1e-8,
                 bias=False,

@@ -11,10 +11,8 @@ from ase.io import read, write
 from ase.md.velocitydistribution import MaxwellBoltzmannDistribution
 from ase.md.velocitydistribution import Stationary, ZeroRotation
 
-import nequip
-from nequip.dynamics.nequip_calculator import NequIPCalculator
-from nequip.scripts.deploy import load_deployed_model
-from nequip.dynamics.nosehoover import NoseHoover
+from nequip.ase import NequIPCalculator
+from nequip.ase import NoseHoover
 
 
 def save_to_xyz(atoms, logdir, prefix=""):

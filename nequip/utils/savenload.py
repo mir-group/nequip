@@ -2,6 +2,7 @@
 utilities that involve file searching and operations (i.e. save/load)
 """
 from typing import Union
+import sys
 import logging
 import contextlib
 from pathlib import Path
@@ -22,7 +23,13 @@ def atomic_write(filename: Union[Path, str]):
         tmp_path.rename(filename)
     finally:
         # clean up
-        tmp_path.unlink(missing_ok=True)
+        # better for python 3.8 >
+        if sys.version_info[1] >= 8:
+            tmp_path.unlink(missing_ok=True)
+        else:
+            # race condition?
+            if tmp_path.exists():
+                tmp_path.unlink()
 
 
 def save_file(
@@ -87,7 +94,8 @@ def load_file(supported_formats: dict, filename: str, enforced_format: str = Non
         format = enforced_format
 
     if not isfile(filename):
-        raise OSError(f"file {filename} is not found")
+        abs_path = str(Path(filename).resolve())
+        raise OSError(f"file {filename} at {abs_path} is not found")
 
     if format == "json":
         import json
