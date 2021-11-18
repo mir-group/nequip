@@ -114,7 +114,7 @@ The result is an optimized model file that has no Python dependency and can be u
 
 ```
 pair_style	nequip
-pair_coeff	* * deployed.pth
+pair_coeff	* * deployed.pth <NequIP type for LAMMPS type 1> <NequIP type for LAMMPS type 2> ...
 ```
 
 For installation instructions, please see the [`pair_nequip` repository](https://github.com/mir-group/pair_nequip).
