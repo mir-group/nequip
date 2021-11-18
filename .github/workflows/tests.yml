@@ -41,6 +41,8 @@ jobs:
     - name: Install pytest
       run: |
         pip install pytest
+        pip install pytest-xdist[psutil]
     - name: Test with pytest
       run: |
-        pytest --ignore=docs/ .
+        # See https://github.com/pytest-dev/pytest/issues/1075
+        PYTHONHASHSEED=0 pytest -n auto --ignore=docs/ .
