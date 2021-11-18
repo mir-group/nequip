@@ -96,8 +96,6 @@ For more details on this command, please run `nequip-deploy --help`.
 
 ### Using models in Python
 
-Both deployed and undeployed models can be used in Python code; for details, see the end of the [Developer's tutorial](https://deepnote.com/project/2412ca93-7ad1-4458-972c-5d5add5a667e) mentioned again below.
-
 An ASE calculator is also provided in `nequip.dynamics`.
 
 ### LAMMPS Integration 
@@ -121,12 +119,6 @@ pair_coeff	* * deployed.pth
 
 For installation instructions, please see the [`pair_nequip` repository](https://github.com/mir-group/pair_nequip).
 
-
-## Developer's tutorial 
-
-A more in-depth introduction to the internals of NequIP can be found in the [tutorial notebook](https://deepnote.com/project/2412ca93-7ad1-4458-972c-5d5add5a667e). This notebook discusses theoretical background as well as the Python interfaces that can be used to train and call models.
-
-Please note that for most common usecases, including customized models, the `nequip-*` commands should be prefered for training models.
 
 ## References & citing
 
