@@ -122,10 +122,24 @@ def linear_regression(trainer):
 
 
 def update_rescales(trainer):
-    per_species_rescale = find_first_of_type(trainer.model, PerSpeciesScaleShift)
-    if per_species_rescale is None or not per_species_rescale.has_shifts:
+
+    if not hasattr(itrainer, "delta_shifts"):
         return
 
+    per_species_rescale = find_first_of_type(trainer.model, PerSpeciesScaleShift)
     trainer.logger.info(f"update shifts from {per_species_rescale.shifts} ...")
+
     per_species_rescale.shifts = per_species_rescale.shifts + trainer.delta_shifts
+
+    trainer.logger.info(f"                to {per_species_rescale.shifts} .")
+
+def recover_rescales(trainer):
+
+    if not hasattr(itrainer, "delta_shifts"):
+        return
+
+    per_species_rescale = find_first_of_type(trainer.model, PerSpeciesScaleShift)
+
+    trainer.logger.info(f"update shifts from {per_species_rescale.shifts} ...")
+    per_species_rescale.shifts = per_species_rescale.shifts - trainer.delta_shifts
     trainer.logger.info(f"                to {per_species_rescale.shifts} .")
