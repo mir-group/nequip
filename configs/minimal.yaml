@@ -35,6 +35,7 @@ chemical_symbol_to_type:
 #   0: my_type
 #   1: atom
 #   2: thing
+avg_num_neighbors: auto
 
 # logging
 wandb: false

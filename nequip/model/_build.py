@@ -75,9 +75,13 @@ def model_from_config(
         if "dataset" in pnames:
             if "initialize" not in pnames:
                 raise ValueError("Cannot request dataset without requesting initialize")
-            if initialize and dataset is None:
+            if (
+                initialize
+                and pnames["dataset"].default != inspect.Parameter.empty
+                and dataset is None
+            ):
                 raise RuntimeError(
-                    f"Builder {builder.__name__} asked for the dataset, initialize is true, but no dataset was provided to `model_from_config`."
+                    f"Builder {builder.__name__} requires the dataset, initialize is true, but no dataset was provided to `model_from_config`."
                 )
             params["dataset"] = dataset
         if "model" in pnames:
