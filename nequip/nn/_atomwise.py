@@ -118,6 +118,7 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
         irreps_in={},
     ):
         super().__init__()
+        self.num_types = num_types
         self.field = field
         self.out_field = f"shifted_{field}" if out_field is None else out_field
         self._init_irreps(
