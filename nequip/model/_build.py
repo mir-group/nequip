@@ -1,6 +1,5 @@
-from typing import Optional, Union, Callable
 import inspect
-import yaml
+from typing import Optional
 
 from nequip.data import AtomicDataset
 from nequip.nn import GraphModuleMixin

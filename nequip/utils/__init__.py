@@ -15,6 +15,7 @@ __all__ = [
     get_w_prefix,
     save_file,
     load_file,
+    load_callable,
     atomic_write,
     Config,
     Output,
