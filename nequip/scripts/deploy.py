@@ -21,7 +21,6 @@ import ase.data
 
 from e3nn.util.jit import script
 
-import nequip
 from nequip.train import Trainer
 
 CONFIG_KEY: Final[str] = "config"
