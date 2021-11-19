@@ -8,7 +8,7 @@ Most recent change on the bottom.
 
 ## [Unreleased] - 0.5.0
 ### Added
-- Asynchronous IO
+- Asynchronous IO: during training, models are written asynchronously.
 
 ### Changed
 - Allow e3nn 0.4.*, which changes the default normalization of `TensorProduct`s; this change _should_ not affect typical NequIP networks
