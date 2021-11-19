@@ -35,7 +35,7 @@ def _process_moves(moves: List[Tuple[bool, Path, Path]]):
                     tmp_path.unlink()
 
 
-_ASYNC_ENABLED = os.environ.get("NEQUIP_ASYNC_IO", "false").lower()
+_ASYNC_ENABLED = os.environ.get("NEQUIP_ASYNC_IO", "true").lower()
 assert _ASYNC_ENABLED in ("true", "false")
 _ASYNC_ENABLED = _ASYNC_ENABLED == "true"
 
