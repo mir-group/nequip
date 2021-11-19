@@ -138,7 +138,9 @@ class TestWorkflow:
         model_script = script(instance)
 
         assert torch.allclose(
-            instance(data)[out_field], model_script(data)[out_field], atol=1e-7
+            instance(data)[out_field],
+            model_script(data)[out_field],
+            atol=1e-6,
         )
 
         # - Try saving, loading in another process, and running -
