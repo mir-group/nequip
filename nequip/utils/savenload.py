@@ -16,24 +16,30 @@ import os
 _MOVE_SET = contextvars.ContextVar("_move_set", default=None)
 
 
+def _delete_files_if_exist(paths):
+    # clean up
+    # better for python 3.8 >
+    if sys.version_info[1] >= 8:
+        for f in paths:
+            f.unlink(missing_ok=True)
+    else:
+        # race condition?
+        for f in paths:
+            if f.exists():
+                f.unlink()
+
+
 def _process_moves(moves: List[Tuple[bool, Path, Path]]):
     """blocking to copy (possibly across filesystems) to temp name; then atomic rename to final name"""
-    for _, from_name, to_name in moves:
-        try:
+    try:
+        for _, from_name, to_name in moves:
             # blocking copy to temp file in same filesystem
             tmp_path = to_name.parent / (f".tmp-{to_name.name}~")
             shutil.move(from_name, tmp_path)
             # then atomic rename to overwrite
             tmp_path.rename(to_name)
-        finally:
-            # clean up
-            # better for python 3.8 >
-            if sys.version_info[1] >= 8:
-                tmp_path.unlink(missing_ok=True)
-            else:
-                # race condition?
-                if tmp_path.exists():
-                    tmp_path.unlink()
+    finally:
+        _delete_files_if_exist([m[2] for m in moves])
 
 
 # allow user to enable/disable depending on their filesystem
@@ -161,10 +167,15 @@ def atomic_write(
             )
             for _ in filename
         ]
-        if not aslist:
-            yield files[0]
-        else:
-            yield files
+        try:
+            if not aslist:
+                yield files[0]
+            else:
+                yield files
+        except:
+            # only remove them if there was an error
+            _delete_files_if_exist([Path(f.name) for f in files])
+            raise
 
         for tp, fname in zip(files, filename):
             _submit_move(Path(tp.name), Path(fname), blocking=blocking)
