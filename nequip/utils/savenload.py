@@ -9,8 +9,7 @@ import contextvars
 import tempfile
 from pathlib import Path
 import shutil
-from os import makedirs
-from os.path import isfile, isdir, dirname, realpath
+import os
 
 
 _MOVE_SET = contextvars.ContextVar("_move_set", default=None)
@@ -36,7 +35,11 @@ def _process_moves(moves: List[Tuple[bool, Path, Path]]):
                     tmp_path.unlink()
 
 
-if True:
+_ASYNC_ENABLED = os.environ.get("NEQUIP_ASYNC_IO", "false").lower()
+assert _ASYNC_ENABLED in ("true", "false")
+_ASYNC_ENABLED = _ASYNC_ENABLED == "true"
+
+if _ASYNC_ENABLED:
     import threading
     from queue import Queue
 
@@ -168,10 +171,10 @@ def save_file(
     """
 
     # check whether folder exist
-    path = dirname(realpath(filename))
-    if not isdir(path):
+    path = os.path.dirname(os.path.realpath(filename))
+    if not os.path.isdir(path):
         logging.debug(f"save_file make dirs {path}")
-        makedirs(path, exist_ok=True)
+        os.makedirs(path, exist_ok=True)
 
     format, filename = adjust_format_name(
         supported_formats=supported_formats,
@@ -228,7 +231,7 @@ def load_file(supported_formats: dict, filename: str, enforced_format: str = Non
     else:
         format = enforced_format
 
-    if not isfile(filename):
+    if not os.path.isfile(filename):
         abs_path = str(Path(filename).resolve())
         raise OSError(f"file {filename} at {abs_path} is not found")
 
