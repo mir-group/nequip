@@ -13,7 +13,7 @@ from os import makedirs
 from os.path import isfile, isdir, dirname, realpath
 
 
-_MOVE_SET = contextvars.ContextVar("_move_set")
+_MOVE_SET = contextvars.ContextVar("_move_set", default=None)
 
 
 def _process_moves(moves: List[Tuple[bool, Path, Path]]):
@@ -39,7 +39,6 @@ def _process_moves(moves: List[Tuple[bool, Path, Path]]):
 if True:
     import threading
     from queue import Queue
-    import io
 
     _MOVE_QUEUE = Queue()
     _MOVE_THREAD = None
@@ -57,6 +56,7 @@ if True:
     def _submit_move(from_name, to_name, blocking: bool):
         global _MOVE_QUEUE
         global _MOVE_THREAD
+        global _MOVE_SET
 
         if _MOVE_THREAD is None:
             _MOVE_THREAD = threading.Thread(
@@ -69,7 +69,7 @@ if True:
             raise RuntimeError("Writer thread failed.")
 
         obj = (blocking, from_name, to_name)
-        if _MOVE_SET.get(None) is None:
+        if _MOVE_SET.get() is None:
             # no current group
             _MOVE_QUEUE.put([obj])
             if blocking:
@@ -80,6 +80,11 @@ if True:
 
     @contextlib.contextmanager
     def atomic_write_group():
+        global _MOVE_SET
+        if _MOVE_SET.get() is not None:
+            # don't nest them
+            yield
+            return
         token = _MOVE_SET.set(list())
         yield
         _MOVE_QUEUE.put(_MOVE_SET.get())  # send it off
@@ -89,14 +94,16 @@ if True:
         _MOVE_SET.reset(token)
 
     def finish_all_writes():
+        global _MOVE_QUEUE
         _MOVE_QUEUE.join()
 
 
 else:
 
     def _submit_move(from_name, to_name, blocking: bool):
+        global _MOVE_SET
         obj = (blocking, from_name, to_name)
-        if _MOVE_SET.get(None) is None:
+        if _MOVE_SET.get() is None:
             # no current group just do it
             _process_moves([obj])
         else:
@@ -105,6 +112,11 @@ else:
 
     @contextlib.contextmanager
     def atomic_write_group():
+        global _MOVE_SET
+        if _MOVE_SET.get() is not None:
+            # don't nest them
+            yield
+            return
         token = _MOVE_SET.set(list())
         yield
         _process_moves(_MOVE_SET.get())  # do it
