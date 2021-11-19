@@ -37,6 +37,7 @@ from nequip.utils import (
     save_file,
     load_file,
     atomic_write,
+    finish_all_writes,
     dtype_from_name,
 )
 from nequip.utils.git import get_commit
@@ -727,6 +728,7 @@ class Trainer:
         self.final_log()
 
         self.save()
+        finish_all_writes()
 
     def batch_step(self, data, validation=False):
         # no need to have gradients from old steps taking up memory

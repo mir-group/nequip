@@ -71,6 +71,7 @@ if True:  # change this to disable async IO
                 f.write(data)
             # logging is thread safe: https://stackoverflow.com/questions/2973900/is-pythons-logging-module-thread-safe
             logging.debug(f"Finished writing {fname}")
+            queue.task_done()
 
     @contextlib.contextmanager
     def atomic_write(
@@ -113,10 +114,17 @@ if True:  # change this to disable async IO
             for fname, buf in zip(filename, buffer):
                 _WRITING_QUEUE.put((fname, binary, buf.getvalue()))
 
+    def finish_all_writes():
+        _WRITING_QUEUE.join()
+
 
 else:
     # Just use the blocking fallback for everything
     atomic_write = _atomic_write
+
+    # It's a no-op if all are blocking
+    def finish_all_writes():
+        pass
 
 
 def save_file(
