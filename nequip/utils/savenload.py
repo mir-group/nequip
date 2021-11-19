@@ -11,14 +11,19 @@ from os.path import isfile, isdir, dirname, realpath
 
 
 @contextlib.contextmanager
-def atomic_write(filename: Union[Path, str]):
+def _atomic_write(
+    filename: Union[Path, str], blocking: bool = True, binary: bool = False
+):
+    """Blockingly write a file in an atomic way.
+
+    Ignores `blocking`.
+    """
     filename = Path(filename)
     tmp_path = filename.parent / (f".tmp-{filename.name}~")
-    # Create the temp file
-    open(tmp_path, "w").close()
     try:
         # do the IO
-        yield tmp_path
+        with open(tmp_path, "w" + ("b" if binary else "")) as f:
+            yield f
         # move the temp file to the final output path, which also removes the temp file
         tmp_path.rename(filename)
     finally:
@@ -32,8 +37,62 @@ def atomic_write(filename: Union[Path, str]):
                 tmp_path.unlink()
 
 
+if True:  # change this to disable async IO
+    import threading
+    from queue import Queue
+    import io
+
+    _WRITING_THREAD = None
+    _WRITING_QUEUE = Queue()
+
+    def _writing_thread(queue):
+        while True:
+            fname, binary, data = queue.get()
+            with _atomic_write(fname, binary=binary) as f:
+                f.write(data)
+            raise ValueError
+            # logging is thread safe: https://stackoverflow.com/questions/2973900/is-pythons-logging-module-thread-safe
+            logging.debug(f"Finished writing {fname}")
+
+    @contextlib.contextmanager
+    def atomic_write(
+        filename: Union[Path, str], blocking: bool = True, binary: bool = False
+    ):
+        global _WRITING_QUEUE
+        global _WRITING_THREAD
+        filename = Path(filename)
+        if blocking:
+            with _atomic_write(filename, binary=binary) as f:
+                yield f
+        else:
+            # First, do the IO to a memory buffer:
+            buffer = io.BytesIO() if binary else io.StringIO()
+            yield buffer
+            # Now, we have a copy of the data--
+            # the main thread can keep going and do
+            # whatever without affecting it
+            # So we can submit it to the writing queue
+
+            # if we don't have a writing thread, make one
+            if _WRITING_THREAD is None:
+                _WRITING_THREAD = threading.Thread(
+                    target=_writing_thread, args=(_WRITING_QUEUE,), daemon=True
+                )
+
+            _WRITING_QUEUE.put(filename, binary, buffer.getvalue())
+
+
+else:
+    # Just use the blocking fallback for everything
+    atomic_write = _atomic_write
+
+
 def save_file(
-    item, supported_formats: dict, filename: str, enforced_format: str = None
+    item,
+    supported_formats: dict,
+    filename: str,
+    enforced_format: str = None,
+    blocking: bool = True,
 ):
     """
     Save file. It can take yaml, json, pickle, json, npz and torch save
@@ -51,17 +110,25 @@ def save_file(
         enforced_format=enforced_format,
     )
 
-    with atomic_write(filename) as write_to:
+    with atomic_write(
+        filename,
+        blocking=blocking,
+        binary={
+            "json": False,
+            "yaml": False,
+            "pickle": True,
+            "torch": True,
+            "npz": True,
+        }[format],
+    ) as write_to:
         if format == "json":
             import json
 
-            with open(write_to, "w+") as fout:
-                json.dump(item, fout)
+            json.dump(item, write_to)
         elif format == "yaml":
             import yaml
 
-            with open(write_to, "w+") as fout:
-                yaml.dump(item, fout)
+            yaml.dump(item, write_to)
         elif format == "torch":
             import torch
 
@@ -69,8 +136,7 @@ def save_file(
         elif format == "pickle":
             import pickle
 
-            with open(write_to, "wb") as fout:
-                pickle.save(item, fout)
+            pickle.dump(item, write_to)
         elif format == "npz":
             import numpy as np
 

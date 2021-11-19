@@ -481,15 +481,16 @@ class Trainer:
 
         return dictionary
 
-    def save_config(self) -> None:
+    def save_config(self, blocking: bool = True) -> None:
         save_file(
             item=self.as_dict(state_dict=False, training_progress=False),
             supported_formats=dict(yaml=["yaml"]),
             filename=self.config_path,
             enforced_format=None,
+            blocking=blocking,
         )
 
-    def save(self, filename: Optional[str] = None, format=None):
+    def save(self, filename: Optional[str] = None, format=None, blocking: bool = True):
         """save the file as filename
 
         Args:
@@ -516,11 +517,12 @@ class Trainer:
             supported_formats=dict(torch=["pth", "pt"], yaml=["yaml"], json=["json"]),
             filename=filename,
             enforced_format=format,
+            blocking=blocking,
         )
         logger.debug(f"Saved trainer to {filename}")
 
-        self.save_config()
-        self.save_model(self.last_model_path)
+        self.save_config(blocking=blocking)
+        self.save_model(self.last_model_path, blocking=blocking)
         logger.debug(f"Saved last model to to {self.last_model_path}")
 
         return filename
@@ -939,23 +941,23 @@ class Trainer:
             )
 
         if (self.iepoch + 1) % self.log_epoch_freq == 0:
-            self.save()
+            self.save(blocking=False)
 
         if (
             self.save_checkpoint_freq > 0
             and (self.iepoch + 1) % self.save_checkpoint_freq == 0
         ):
             ckpt_path = self.output.generate_file(f"ckpt{self.iepoch+1}.pth")
-            self.save_model(ckpt_path)
+            self.save_model(ckpt_path, blocking=False)
 
         if (
             self.save_ema_checkpoint_freq > 0
             and (self.iepoch + 1) % self.save_ema_checkpoint_freq == 0
         ):
             ckpt_path = self.output.generate_file(f"ckpt_ema_{self.iepoch+1}.pth")
-            self.save_ema_model(ckpt_path)
+            self.save_ema_model(ckpt_path, blocking=False)
 
-    def save_ema_model(self, path):
+    def save_ema_model(self, path, blocking: bool = True):
 
         if self.use_ema:
             # If using EMA, store the EMA validation model
@@ -967,11 +969,11 @@ class Trainer:
             cm = contextlib.nullcontext()
 
         with cm:
-            self.save_model(path)
+            self.save_model(path, blocking=blocking)
 
-    def save_model(self, path):
+    def save_model(self, path, blocking: bool = True):
         self.save_config()
-        with atomic_write(path) as write_to:
+        with atomic_write(path, blocking=blocking, binary=True) as write_to:
             if isinstance(self.model, torch.jit.ScriptModule):
                 torch.jit.save(self.model, write_to)
             else:
