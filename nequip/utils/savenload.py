@@ -1,130 +1,147 @@
 """
 utilities that involve file searching and operations (i.e. save/load)
 """
-from typing import Union, List
+from typing import Union, List, Tuple
 import sys
 import logging
 import contextlib
+import contextvars
+import tempfile
 from pathlib import Path
+import shutil
 from os import makedirs
 from os.path import isfile, isdir, dirname, realpath
 
 
+_MOVE_SET = contextvars.ContextVar("_move_set")
+
+
+def _process_moves(moves: List[Tuple[bool, Path, Path]]):
+    """blocking"""
+    for _, from_name, to_name in moves:
+        try:
+            # blocking copy to temp file in same filesystem
+            tmp_path = to_name.parent / (f".tmp-{to_name.name}~")
+            shutil.move(from_name, tmp_path)
+            # then atomic rename to overwrite
+            tmp_path.rename(to_name)
+        finally:
+            # clean up
+            # better for python 3.8 >
+            if sys.version_info[1] >= 8:
+                tmp_path.unlink(missing_ok=True)
+            else:
+                # race condition?
+                if tmp_path.exists():
+                    tmp_path.unlink()
+
+
+if True:
+    import threading
+    from queue import Queue
+    import io
+
+    _MOVE_QUEUE = Queue()
+    _MOVE_THREAD = None
+
+    # Because we use a queue, later writes will always (correctly)
+    # overwrite earlier writes
+    def _moving_thread(queue):
+        while True:
+            moves = queue.get()
+            _process_moves(moves)
+            # logging is thread safe: https://stackoverflow.com/questions/2973900/is-pythons-logging-module-thread-safe
+            logging.info(f"Finished writing {', '.join(m[2].name for m in moves)}")
+            queue.task_done()
+
+    def _submit_move(from_name, to_name, blocking: bool):
+        global _MOVE_QUEUE
+        global _MOVE_THREAD
+
+        if _MOVE_THREAD is None:
+            _MOVE_THREAD = threading.Thread(
+                target=_moving_thread, args=(_MOVE_QUEUE,), daemon=True
+            )
+            _MOVE_THREAD.start()
+
+        if not _MOVE_THREAD.is_alive():
+            _MOVE_THREAD.join()  # will raise exception
+            raise RuntimeError("Writer thread failed.")
+
+        obj = (blocking, from_name, to_name)
+        if _MOVE_SET.get(None) is None:
+            # no current group
+            _MOVE_QUEUE.put([obj])
+            if blocking:
+                _MOVE_QUEUE.join()
+        else:
+            # add and let the group block (or not)
+            _MOVE_SET.get().append(obj)
+
+    @contextlib.contextmanager
+    def atomic_write_group():
+        token = _MOVE_SET.set(list())
+        yield
+        _MOVE_QUEUE.put(_MOVE_SET.get())  # send it off
+        if any(m[0] for m in _MOVE_SET.get()):
+            # someone is blocking
+            _MOVE_QUEUE.join()
+        _MOVE_SET.reset(token)
+
+    def finish_all_writes():
+        _MOVE_QUEUE.join()
+
+
+else:
+
+    def _submit_move(from_name, to_name, blocking: bool):
+        obj = (blocking, from_name, to_name)
+        if _MOVE_SET.get(None) is None:
+            # no current group just do it
+            _process_moves([obj])
+        else:
+            # add and let the group do it
+            _MOVE_SET.get().append(obj)
+
+    @contextlib.contextmanager
+    def atomic_write_group():
+        token = _MOVE_SET.set(list())
+        yield
+        _process_moves(_MOVE_SET.get())  # do it
+        _MOVE_SET.reset(token)
+
+    def finish_all_writes():
+        pass  # nothing to do since all writes blocked
+
+
 @contextlib.contextmanager
-def _atomic_write(
+def atomic_write(
     filename: Union[Path, str, List[Union[Path, str]]],
     blocking: bool = True,
     binary: bool = False,
 ):
-    """Blockingly write a file in an atomic way.
-
-    Ignores `blocking`.
-    """
     aslist: bool = True
     if not isinstance(filename, list):
         aslist = False
         filename = [filename]
     filename = [Path(f) for f in filename]
-    tmp_path = [f.parent / (f".tmp-{f.name}~") for f in filename]
-    try:
-        # do the IO
-        with contextlib.ExitStack() as stack:
-            files = [
-                stack.enter_context(open(tp, "w" + ("b" if binary else "")))
-                for tp in tmp_path
-            ]
-            if not aslist:
-                yield files[0]
-            else:
-                yield files
 
-        for tp, fname in zip(tmp_path, filename):
-            # move the temp file to the final output path, which also removes the temp file
-            tp.rename(fname)
-    finally:
-        # clean up
-        # better for python 3.8 >
-        if sys.version_info[1] >= 8:
-            for tp in tmp_path:
-                tp.unlink(missing_ok=True)
-        else:
-            # race condition?
-            for tp in tmp_path:
-                if tp.exists():
-                    tp.unlink()
-
-
-if True:  # change this to disable async IO
-    import threading
-    from queue import Queue
-    import io
-
-    _WRITING_THREAD = None
-    _WRITING_QUEUE = Queue()
-
-    # Because we use a queue, later writes will always (correctly)
-    # overwrite earlier writes
-    def _writing_thread(queue):
-        while True:
-            fname, binary, data = queue.get()
-            with _atomic_write(fname, binary=binary) as f:
-                f.write(data)
-            # logging is thread safe: https://stackoverflow.com/questions/2973900/is-pythons-logging-module-thread-safe
-            logging.debug(f"Finished writing {fname}")
-            queue.task_done()
-
-    @contextlib.contextmanager
-    def atomic_write(
-        filename: Union[Path, str, List[Union[Path, str]]],
-        blocking: bool = True,
-        binary: bool = False,
-    ):
-        global _WRITING_QUEUE
-        global _WRITING_THREAD
-        if blocking:
-            with _atomic_write(filename, binary=binary) as f:
-                yield f
-        else:
-            aslist: bool = True
-            if not isinstance(filename, list):
-                aslist = False
-                filename = [filename]
-            # First, do the IO to a memory buffer:
-            buffer = [io.BytesIO() if binary else io.StringIO() for _ in filename]
-            if not aslist:
-                yield buffer[0]
-            else:
-                yield buffer
-            # Now, we have a copy of the data--
-            # the main thread can keep going and do
-            # whatever without affecting it
-            # So we can submit it to the writing queue
-
-            # if we don't have a writing thread, make one
-            if _WRITING_THREAD is None:
-                _WRITING_THREAD = threading.Thread(
-                    target=_writing_thread, args=(_WRITING_QUEUE,), daemon=True
+    with contextlib.ExitStack() as stack:
+        files = [
+            stack.enter_context(
+                tempfile.NamedTemporaryFile(
+                    mode="w" + ("b" if binary else ""), delete=False
                 )
-                _WRITING_THREAD.start()
+            )
+            for _ in filename
+        ]
+        if not aslist:
+            yield files[0]
+        else:
+            yield files
 
-            if not _WRITING_THREAD.is_alive():
-                _WRITING_THREAD.join()  # will raise exception
-                raise RuntimeError("Writer thread failed.")
-
-            for fname, buf in zip(filename, buffer):
-                _WRITING_QUEUE.put((fname, binary, buf.getvalue()))
-
-    def finish_all_writes():
-        _WRITING_QUEUE.join()
-
-
-else:
-    # Just use the blocking fallback for everything
-    atomic_write = _atomic_write
-
-    # It's a no-op if all are blocking
-    def finish_all_writes():
-        pass
+        for tp, fname in zip(files, filename):
+            _submit_move(Path(tp.name), Path(fname), blocking=blocking)
 
 
 def save_file(
