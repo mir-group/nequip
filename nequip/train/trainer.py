@@ -38,6 +38,7 @@ from nequip.utils import (
     load_file,
     atomic_write,
     finish_all_writes,
+    atomic_write_group,
     dtype_from_name,
 )
 from nequip.utils.git import get_commit
@@ -641,10 +642,7 @@ class Trainer:
         if config.get("compile_model", False):
             model = torch.jit.load(traindir + "/" + model_name, map_location=device)
         else:
-            model = model_from_config(
-                config=config,
-                initialize=False,
-            )
+            model = model_from_config(config=config, initialize=False,)
             if model is not None:
                 # TODO: this is not exactly equivalent to building with
                 # this set as default dtype... does it matter?
@@ -851,8 +849,7 @@ class Trainer:
                 self.n_batches = len(dataset)
                 for self.ibatch, batch in enumerate(dataset):
                     self.batch_step(
-                        data=batch,
-                        validation=(category == VALIDATION),
+                        data=batch, validation=(category == VALIDATION),
                     )
                     self.end_of_batch_log(batch_type=category)
                     for callback in self.end_of_batch_callbacks:
@@ -930,34 +927,34 @@ class Trainer:
         """
         save model and trainer details
         """
+        with atomic_write_group():
+            current_metrics = self.mae_dict[self.metrics_key]
+            if current_metrics < self.best_metrics:
+                self.best_metrics = current_metrics
+                self.best_epoch = self.iepoch
 
-        current_metrics = self.mae_dict[self.metrics_key]
-        if current_metrics < self.best_metrics:
-            self.best_metrics = current_metrics
-            self.best_epoch = self.iepoch
+                self.save_ema_model(self.best_model_path, blocking=False)
 
-            self.save_ema_model(self.best_model_path)
+                self.logger.info(
+                    f"! Best model {self.best_epoch:8d} {self.best_metrics:8.3f}"
+                )
 
-            self.logger.info(
-                f"! Best model {self.best_epoch:8d} {self.best_metrics:8.3f}"
-            )
+            if (self.iepoch + 1) % self.log_epoch_freq == 0:
+                self.save(blocking=False)
 
-        if (self.iepoch + 1) % self.log_epoch_freq == 0:
-            self.save(blocking=False)
+            if (
+                self.save_checkpoint_freq > 0
+                and (self.iepoch + 1) % self.save_checkpoint_freq == 0
+            ):
+                ckpt_path = self.output.generate_file(f"ckpt{self.iepoch+1}.pth")
+                self.save_model(ckpt_path, blocking=False)
 
-        if (
-            self.save_checkpoint_freq > 0
-            and (self.iepoch + 1) % self.save_checkpoint_freq == 0
-        ):
-            ckpt_path = self.output.generate_file(f"ckpt{self.iepoch+1}.pth")
-            self.save_model(ckpt_path, blocking=False)
-
-        if (
-            self.save_ema_checkpoint_freq > 0
-            and (self.iepoch + 1) % self.save_ema_checkpoint_freq == 0
-        ):
-            ckpt_path = self.output.generate_file(f"ckpt_ema_{self.iepoch+1}.pth")
-            self.save_ema_model(ckpt_path, blocking=False)
+            if (
+                self.save_ema_checkpoint_freq > 0
+                and (self.iepoch + 1) % self.save_ema_checkpoint_freq == 0
+            ):
+                ckpt_path = self.output.generate_file(f"ckpt_ema_{self.iepoch+1}.pth")
+                self.save_ema_model(ckpt_path, blocking=False)
 
     def save_ema_model(self, path, blocking: bool = True):
 
@@ -974,12 +971,13 @@ class Trainer:
             self.save_model(path, blocking=blocking)
 
     def save_model(self, path, blocking: bool = True):
-        self.save_config()
-        with atomic_write(path, blocking=blocking, binary=True) as write_to:
-            if isinstance(self.model, torch.jit.ScriptModule):
-                torch.jit.save(self.model, write_to)
-            else:
-                torch.save(self.model.state_dict(), write_to)
+        with atomic_write_group():
+            self.save_config(blocking=blocking)
+            with atomic_write(path, blocking=blocking, binary=True) as write_to:
+                if isinstance(self.model, torch.jit.ScriptModule):
+                    torch.jit.save(self.model, write_to)
+                else:
+                    torch.save(self.model.state_dict(), write_to)
 
     def init_log(self):
         if self.iepoch > 0:
@@ -1000,11 +998,7 @@ class Trainer:
 
         lr = self.optim.param_groups[0]["lr"]
         wall = perf_counter() - self.wall
-        self.mae_dict = dict(
-            LR=lr,
-            epoch=self.iepoch,
-            wall=wall,
-        )
+        self.mae_dict = dict(LR=lr, epoch=self.iepoch, wall=wall,)
 
         header = "epoch, wall, LR"
 
