@@ -39,7 +39,7 @@ def _process_moves(moves: List[Tuple[bool, Path, Path]]):
             # then atomic rename to overwrite
             tmp_path.rename(to_name)
     finally:
-        _delete_files_if_exist([m[2] for m in moves])
+        _delete_files_if_exist([m[1] for m in moves])
 
 
 # allow user to enable/disable depending on their filesystem
