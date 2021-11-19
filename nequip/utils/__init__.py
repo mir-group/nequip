@@ -16,6 +16,7 @@ __all__ = [
     save_file,
     load_file,
     atomic_write,
+    finish_all_writes,
     Config,
     Output,
     find_first_of_type,
