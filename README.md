@@ -77,7 +77,7 @@ A number of example configuration files are provided:
  - [`configs/example.yaml`](configs/example.yaml): Training a more realistic model on forces and energies. Start here for real models.
  - [`configs/full.yaml`](configs/full.yaml): A complete configuration file containing all available options along with documenting comments.
 
-Training runs can be restarted using `nequip-restart`; training that starts fresh or restarts depending on the existance of the working directory can be launched using `nequip-requeue`. All `nequip-*` commands accept the `--help` option to show their call signatures and options.
+Training runs can be restarted using `append: true` flag in the yaml file. This this `append: true` flag, training starts fresh when `root/run_name` does not exist or restarts. All `nequip-*` commands accept the `--help` option to show their call signatures and options.
 
 ### Evaluating trained models (and their error)
 
