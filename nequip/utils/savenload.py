@@ -12,11 +12,12 @@ import shutil
 import os
 
 
+# accumulate writes to group for renaming
 _MOVE_SET = contextvars.ContextVar("_move_set", default=None)
 
 
 def _process_moves(moves: List[Tuple[bool, Path, Path]]):
-    """blocking"""
+    """blocking to copy (possibly across filesystems) to temp name; then atomic rename to final name"""
     for _, from_name, to_name in moves:
         try:
             # blocking copy to temp file in same filesystem
@@ -35,6 +36,7 @@ def _process_moves(moves: List[Tuple[bool, Path, Path]]):
                     tmp_path.unlink()
 
 
+# allow user to enable/disable depending on their filesystem
 _ASYNC_ENABLED = os.environ.get("NEQUIP_ASYNC_IO", "true").lower()
 assert _ASYNC_ENABLED in ("true", "false")
 _ASYNC_ENABLED = _ASYNC_ENABLED == "true"
@@ -53,7 +55,7 @@ if _ASYNC_ENABLED:
             moves = queue.get()
             _process_moves(moves)
             # logging is thread safe: https://stackoverflow.com/questions/2973900/is-pythons-logging-module-thread-safe
-            logging.info(f"Finished writing {', '.join(m[2].name for m in moves)}")
+            logging.debug(f"Finished writing {', '.join(m[2].name for m in moves)}")
             queue.task_done()
 
     def _submit_move(from_name, to_name, blocking: bool):
@@ -61,44 +63,53 @@ if _ASYNC_ENABLED:
         global _MOVE_THREAD
         global _MOVE_SET
 
+        # launch thread if its not running
         if _MOVE_THREAD is None:
             _MOVE_THREAD = threading.Thread(
                 target=_moving_thread, args=(_MOVE_QUEUE,), daemon=True
             )
             _MOVE_THREAD.start()
 
+        # check on health of copier thread
         if not _MOVE_THREAD.is_alive():
             _MOVE_THREAD.join()  # will raise exception
             raise RuntimeError("Writer thread failed.")
 
+        # submit this move
         obj = (blocking, from_name, to_name)
         if _MOVE_SET.get() is None:
             # no current group
             _MOVE_QUEUE.put([obj])
+            # if it should be blocking, wait for it to be processed
             if blocking:
                 _MOVE_QUEUE.join()
         else:
-            # add and let the group block (or not)
+            # add and let the group submit and block (or not)
             _MOVE_SET.get().append(obj)
 
     @contextlib.contextmanager
     def atomic_write_group():
         global _MOVE_SET
         if _MOVE_SET.get() is not None:
-            # don't nest them
+            # nesting is a no-op
+            # submit along with outermost context manager
             yield
             return
         token = _MOVE_SET.set(list())
+        # run the saves
         yield
         _MOVE_QUEUE.put(_MOVE_SET.get())  # send it off
+        # if anyone is blocking, block the whole group:
         if any(m[0] for m in _MOVE_SET.get()):
             # someone is blocking
             _MOVE_QUEUE.join()
+        # exit context
         _MOVE_SET.reset(token)
 
     def finish_all_writes():
         global _MOVE_QUEUE
         _MOVE_QUEUE.join()
+        # ^ wait for all remaining moves to be processed
 
 
 else:
