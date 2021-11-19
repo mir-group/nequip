@@ -1,7 +1,7 @@
 """
 utilities that involve file searching and operations (i.e. save/load)
 """
-from typing import Union
+from typing import Union, List
 import sys
 import logging
 import contextlib
@@ -12,29 +12,46 @@ from os.path import isfile, isdir, dirname, realpath
 
 @contextlib.contextmanager
 def _atomic_write(
-    filename: Union[Path, str], blocking: bool = True, binary: bool = False
+    filename: Union[Path, str, List[Union[Path, str]]],
+    blocking: bool = True,
+    binary: bool = False,
 ):
     """Blockingly write a file in an atomic way.
 
     Ignores `blocking`.
     """
-    filename = Path(filename)
-    tmp_path = filename.parent / (f".tmp-{filename.name}~")
+    aslist: bool = True
+    if not isinstance(filename, list):
+        aslist = False
+        filename = [filename]
+    filename = [Path(f) for f in filename]
+    tmp_path = [f.parent / (f".tmp-{f.name}~") for f in filename]
     try:
         # do the IO
-        with open(tmp_path, "w" + ("b" if binary else "")) as f:
-            yield f
-        # move the temp file to the final output path, which also removes the temp file
-        tmp_path.rename(filename)
+        with contextlib.ExitStack() as stack:
+            files = [
+                stack.enter_context(open(tp, "w" + ("b" if binary else "")))
+                for tp in tmp_path
+            ]
+            if not aslist:
+                yield files[0]
+            else:
+                yield files
+
+        for tp, fname in zip(tmp_path, filename):
+            # move the temp file to the final output path, which also removes the temp file
+            tp.rename(fname)
     finally:
         # clean up
         # better for python 3.8 >
         if sys.version_info[1] >= 8:
-            tmp_path.unlink(missing_ok=True)
+            for tp in tmp_path:
+                tp.unlink(missing_ok=True)
         else:
             # race condition?
-            if tmp_path.exists():
-                tmp_path.unlink()
+            for tp in tmp_path:
+                if tp.exists():
+                    tp.unlink()
 
 
 if True:  # change this to disable async IO
@@ -57,18 +74,26 @@ if True:  # change this to disable async IO
 
     @contextlib.contextmanager
     def atomic_write(
-        filename: Union[Path, str], blocking: bool = True, binary: bool = False
+        filename: Union[Path, str, List[Union[Path, str]]],
+        blocking: bool = True,
+        binary: bool = False,
     ):
         global _WRITING_QUEUE
         global _WRITING_THREAD
-        filename = Path(filename)
         if blocking:
             with _atomic_write(filename, binary=binary) as f:
                 yield f
         else:
+            aslist: bool = True
+            if not isinstance(filename, list):
+                aslist = False
+                filename = [filename]
             # First, do the IO to a memory buffer:
-            buffer = io.BytesIO() if binary else io.StringIO()
-            yield buffer
+            buffer = [io.BytesIO() if binary else io.StringIO() for _ in filename]
+            if not aslist:
+                yield buffer[0]
+            else:
+                yield buffer
             # Now, we have a copy of the data--
             # the main thread can keep going and do
             # whatever without affecting it
@@ -85,7 +110,8 @@ if True:  # change this to disable async IO
                 _WRITING_THREAD.join()  # will raise exception
                 raise RuntimeError("Writer thread failed.")
 
-            _WRITING_QUEUE.put((filename, binary, buffer.getvalue()))
+            for fname, buf in zip(filename, buffer):
+                _WRITING_QUEUE.put((fname, binary, buf.getvalue()))
 
 
 else:
