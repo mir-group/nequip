@@ -45,12 +45,13 @@ if True:  # change this to disable async IO
     _WRITING_THREAD = None
     _WRITING_QUEUE = Queue()
 
+    # Because we use a queue, later writes will always (correctly)
+    # overwrite earlier writes
     def _writing_thread(queue):
         while True:
             fname, binary, data = queue.get()
             with _atomic_write(fname, binary=binary) as f:
                 f.write(data)
-            raise ValueError
             # logging is thread safe: https://stackoverflow.com/questions/2973900/is-pythons-logging-module-thread-safe
             logging.debug(f"Finished writing {fname}")
 
@@ -78,8 +79,13 @@ if True:  # change this to disable async IO
                 _WRITING_THREAD = threading.Thread(
                     target=_writing_thread, args=(_WRITING_QUEUE,), daemon=True
                 )
+                _WRITING_THREAD.start()
 
-            _WRITING_QUEUE.put(filename, binary, buffer.getvalue())
+            if not _WRITING_THREAD.is_alive():
+                _WRITING_THREAD.join()  # will raise exception
+                raise RuntimeError("Writer thread failed.")
+
+            _WRITING_QUEUE.put((filename, binary, buffer.getvalue()))
 
 
 else:
