@@ -172,7 +172,8 @@ def atomic_write(
                 yield files[0]
             else:
                 yield files
-        except:
+        except:  # noqa
+            # ^ noqa cause we want to delete them no matter what if there was a failure
             # only remove them if there was an error
             _delete_files_if_exist([Path(f.name) for f in files])
             raise
