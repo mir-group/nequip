@@ -60,10 +60,6 @@ def linear_regression(trainer):
         return
 
     _key = AtomicDataDict.TOTAL_ENERGY_KEY
-    if trainer.use_ema:
-        cm = trainer.ema.average_parameters()
-    else:
-        cm = contextlib.nullcontext()
 
     num_types = per_species_rescale.num_types
     force_module = find_first_of_type(trainer.model, GradientOutput)
@@ -76,11 +72,10 @@ def linear_regression(trainer):
 
     X = []
     y = []
-    with cm:
 
-        for trainer.ibatch, data in enumerate(dataset):
+    with torch.no_grad():
 
-            trainer.optim.zero_grad(set_to_none=True)
+        for _, data in enumerate(dataset):
 
             # Do any target rescaling
             data = data.to(trainer.torch_device)
@@ -107,7 +102,6 @@ def linear_regression(trainer):
             X += [N]
             y += [res]
 
-    with torch.no_grad():
         X = torch.cat(X, dim=0)
         y = torch.cat(y, dim=0)
         mean, _ = solver(X.cpu(), y.cpu())
@@ -129,9 +123,10 @@ def update_rescales(trainer):
     per_species_rescale = find_first_of_type(trainer.model, PerSpeciesScaleShift)
     trainer.logger.info(f"update shifts from {per_species_rescale.shifts} ...")
 
-    per_species_rescale.shifts = per_species_rescale.shifts + trainer.delta_shifts
+    per_species_rescale.shifts += trainer.delta_shifts
 
     trainer.logger.info(f"                to {per_species_rescale.shifts} .")
+
 
 def recover_rescales(trainer):
 
@@ -140,6 +135,6 @@ def recover_rescales(trainer):
 
     per_species_rescale = find_first_of_type(trainer.model, PerSpeciesScaleShift)
 
-    trainer.logger.info(f"recover shifts from {per_species_rescale.shifts} ...")
-    per_species_rescale.shifts = per_species_rescale.shifts - trainer.delta_shifts
+    trainer.logger.info(f"update shifts from {per_species_rescale.shifts} ...")
+    per_species_rescale.shifts -= trainer.delta_shifts
     trainer.logger.info(f"                to {per_species_rescale.shifts} .")
