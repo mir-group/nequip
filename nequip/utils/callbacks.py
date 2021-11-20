@@ -80,7 +80,7 @@ def linear_regression(trainer):
 
         for trainer.ibatch, data in enumerate(dataset):
 
-            # trainer.optim.zero_grad(set_to_none=True)
+            trainer.optim.zero_grad(set_to_none=True)
 
             # Do any target rescaling
             data = data.to(trainer.torch_device)
@@ -110,10 +110,10 @@ def linear_regression(trainer):
     with torch.no_grad():
         X = torch.cat(X, dim=0)
         y = torch.cat(y, dim=0)
-        mean, _ = solver(X, y)
+        mean, _ = solver(X.cpu(), y.cpu())
 
         trainer.logger.info(f"residue shifts {mean}")
-        trainer.delta_shifts = mean
+        trainer.delta_shifts = mean.to(trainer.device)
 
     if force_module is not None:
         force_module.skip = False
@@ -123,7 +123,7 @@ def linear_regression(trainer):
 
 def update_rescales(trainer):
 
-    if not hasattr(itrainer, "delta_shifts"):
+    if not hasattr(trainer, "delta_shifts"):
         return
 
     per_species_rescale = find_first_of_type(trainer.model, PerSpeciesScaleShift)
@@ -135,11 +135,11 @@ def update_rescales(trainer):
 
 def recover_rescales(trainer):
 
-    if not hasattr(itrainer, "delta_shifts"):
+    if not hasattr(trainer, "delta_shifts"):
         return
 
     per_species_rescale = find_first_of_type(trainer.model, PerSpeciesScaleShift)
 
-    trainer.logger.info(f"update shifts from {per_species_rescale.shifts} ...")
+    trainer.logger.info(f"recover shifts from {per_species_rescale.shifts} ...")
     per_species_rescale.shifts = per_species_rescale.shifts - trainer.delta_shifts
     trainer.logger.info(f"                to {per_species_rescale.shifts} .")
