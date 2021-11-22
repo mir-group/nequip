@@ -9,6 +9,10 @@ Most recent change on the bottom.
 ## [Unreleased] - 0.5.0
 ### Changed
 - Allow e3nn 0.4.*, which changes the default normalization of `TensorProduct`s; this change _should_ not affect typical NequIP networks
+- Deployed are now frozen on load, rather than compile
+
+### Fixed
+- `load_deployed_model` respects global JIT settings
 
 ## [Unreleased] - 0.4.0
 ### Added
