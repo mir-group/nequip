@@ -1,9 +1,6 @@
 from typing import Optional
 import logging
 
-import torch
-from nequip import data
-
 from nequip.data import AtomicDataDict, AtomicDataset
 from nequip.nn import (
     SequentialGraphNetwork,
@@ -17,6 +14,8 @@ from nequip.nn.embedding import (
     SphericalHarmonicEdgeAttrs,
 )
 
+from . import builder_utils
+
 
 def EnergyModel(
     config, initialize: bool, dataset: Optional[AtomicDataset] = None
@@ -27,30 +26,9 @@ def EnergyModel(
     """
     logging.debug("Start building the network model")
 
-    # Compute avg_num_neighbors
-    annkey: str = "avg_num_neighbors"
-    if config.get(annkey, None) == "auto" and initialize:
-        if dataset is None:
-            raise ValueError(
-                "When avg_num_neighbors = auto, the dataset is required to build+initialize a model"
-            )
-        config[annkey] = dataset.statistics(
-            fields=[
-                lambda data: (
-                    torch.unique(
-                        data[AtomicDataDict.EDGE_INDEX_KEY][0], return_counts=True
-                    )[1],
-                    "node",
-                )
-            ],
-            modes=["mean_std"],
-            stride=config.dataset_statistics_stride,
-        )[0][0].item()
-    else:
-        # make sure its valid
-        ann = config.get(annkey, None)
-        if ann is not None:
-            assert isinstance(ann, float) or isinstance(ann, int)
+    builder_utils.add_avg_num_neighbors(
+        config=config, initialize=initialize, dataset=dataset
+    )
 
     num_layers = config.get("num_layers", 3)
 
@@ -90,4 +68,7 @@ def EnergyModel(
         ),
     )
 
-    return SequentialGraphNetwork.from_parameters(shared_params=config, layers=layers,)
+    return SequentialGraphNetwork.from_parameters(
+        shared_params=config,
+        layers=layers,
+    )
