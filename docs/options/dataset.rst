@@ -28,7 +28,7 @@ key_mapping
     | Type: dict
     | Default: ``{'positions': 'pos', 'energy': 'total_energy', 'force': 'forces', 'forces': 'forces', 'Z': 'atomic_numbers', 'atomic_number': 'atomic_numbers'}``
 
-npz_keys
+include_keys
 ^^^^^^^^
     | Type: list
     | Default: ``[]``
@@ -63,5 +63,11 @@ include_frames
     | Type: NoneType
     | Default: ``None``
 
+ase_args
+^^^^^^^^
+    | Type: dict
+    | Default: ``{}``
+
 Advanced
 --------
+See tutorial on :ref:`../guide/_dataset_note`.
