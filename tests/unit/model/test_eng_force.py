@@ -21,6 +21,7 @@ logging.basicConfig(level=logging.DEBUG)
 COMMON_CONFIG = {
     "num_types": 3,
     "types_names": ["H", "C", "O"],
+    "avg_num_neighbors": None,
 }
 r_max = 3
 minimal_config1 = dict(
