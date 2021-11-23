@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Union
 
 import torch
 
@@ -7,16 +7,20 @@ from nequip.data import AtomicDataset, AtomicDataDict
 
 
 def add_avg_num_neighbors(
-    config: Config, initialize: bool, dataset: Optional[AtomicDataset] = None
+    config: Config,
+    initialize: bool,
+    dataset: Optional[AtomicDataset] = None,
+    default: Optional[Union[str, float]] = "auto",
 ) -> Optional[float]:
     # Compute avg_num_neighbors
     annkey: str = "avg_num_neighbors"
-    if config.get(annkey, None) == "auto" and initialize:
+    ann = config.get(annkey, default)
+    if ann == "auto" and initialize:
         if dataset is None:
             raise ValueError(
                 "When avg_num_neighbors = auto, the dataset is required to build+initialize a model"
             )
-        config[annkey] = dataset.statistics(
+        ann = dataset.statistics(
             fields=[
                 lambda data: (
                     torch.unique(
@@ -26,11 +30,11 @@ def add_avg_num_neighbors(
                 )
             ],
             modes=["mean_std"],
-            stride=config.dataset_statistics_stride,
+            stride=config.get("dataset_statistics_stride", 1),
         )[0][0].item()
 
     # make sure its valid
-    ann = config.get(annkey, None)
     if ann is not None:
-        config[annkey] = float(config[annkey])
-    return config[annkey]
+        ann = float(ann)
+    config[annkey] = ann
+    return ann
