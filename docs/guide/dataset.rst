@@ -3,21 +3,21 @@
 How to prepare training dataset
 =======================================
 
-What NequIP do behind the scene
+What does NequIP behind the scene
 --------------
 
 NequIP uses AtomicDataset class to store the atomic configurations. 
 During the initialization of an AtomicDataset object, 
-NequIP reads the atomic structure from the dataset, 
+NequIP reads the atomic structures from the dataset, 
 computes the neighbor list and other data structures needed for the GNN 
-by converting raw data to `AtomicData` objects.
+by converting raw data to a list of `AtomicData` objects.
 
 The computed results are then cached on harddisk `root/processed_hashkey` folder.
 The hashing is based on all the metadata provided for the dataset, 
-which includes all the arguments provided for the dataset, such as the file name, the cutoff radius, precision.
-In the case where multiple training/evaluation use the same dataset,
+which includes the file name, the cutoff radius, float number precision and etc.
+In the case where multiple training/evaluation runs use the same dataset,
 the neighbor list will only be computed in the first NequIP run.
-The later processes will load from the cached to save computation time.
+The later runs will directly load the AtomicDataset object from the cache file to save computation time.
 
 Note: be careful to the cached file. If you update your raw data file but keep using the same filename,
 NequIP will not automatically update the cached data.
@@ -41,7 +41,7 @@ Later sections offer a couple different examples.
 If the training and validation datasets are from different raw files, the arguments for each set
 can be defined with `dataset` prefix and `validation_dataset` prefix, respectively.
 
-For example `dataset_file_name` is used for training data and `validation_dataset_file_name` is for validation data.
+For example, `dataset_file_name` is used for training data and `validation_dataset_file_name` is for validation data.
 
 python interface
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -78,9 +78,10 @@ The yaml input should be
    chemical_symbol_to_type:
      H: 0
 
-For other formats than `extxyz`, be careful to the ase parser, it may have different behavior than extxyz.
-For example, the vasp parser store potential energy to `free_energy` instead of `energy`.
-Because we optimize our code to the `extxyz` parser, we need some additional keys to help NequIP to understand the situtaion
+For other formats than `extxyz`, be careful to the ase parsers; they may have different behavior from the extxyz parser.
+For example, the ase vasp parser store potential energy to `free_energy` instead of `energy`.
+Because we optimize our code to the `extxyz` parser, NequIP will not be able to load any `total_energy` labels.
+We need some additional keys to help NequIP to understand the situtaion
 Here's an example for vasp outcar. 
 
 .. code:: yaml
@@ -140,7 +141,7 @@ skip frames during data processing
 The `include_frame` argument can be specified in yaml to skip certain frames in the raw datafile.
 The item has to be a list or a python iteratable object.
 
-register graph, node, edge fields
+register user-defined graph, node, edge fields
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 Graph, node, edge fields are quantities that belong to 
 the whole graph, each atom, each edge, respectively.
