@@ -77,7 +77,7 @@ def model_from_config(
                 raise ValueError("Cannot request dataset without requesting initialize")
             if (
                 initialize
-                and pnames["dataset"].default != inspect.Parameter.empty
+                and pnames["dataset"].default == inspect.Parameter.empty
                 and dataset is None
             ):
                 raise RuntimeError(
