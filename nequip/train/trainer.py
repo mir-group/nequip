@@ -523,7 +523,6 @@ class Trainer:
         )
         logger.debug(f"Saved trainer to {filename}")
 
-        self.save_config(blocking=blocking)
         self.save_model(self.last_model_path, blocking=blocking)
         logger.debug(f"Saved last model to to {self.last_model_path}")
 
@@ -710,8 +709,11 @@ class Trainer:
         self.init_log()
         self.wall = perf_counter()
 
-        if self.iepoch == -1:
-            self.save()
+        with atomic_write_group():
+            if self.iepoch == -1:
+                self.save()
+            if self.iepoch in [-1, 0]:
+                self.save_config()
 
         self.init_metrics()
 
@@ -725,7 +727,7 @@ class Trainer:
 
         self.final_log()
 
-        self.save()
+        self.save(blocking=False)
         finish_all_writes()
 
     def batch_step(self, data, validation=False):
@@ -971,13 +973,11 @@ class Trainer:
             self.save_model(path, blocking=blocking)
 
     def save_model(self, path, blocking: bool = True):
-        with atomic_write_group():
-            self.save_config(blocking=blocking)
-            with atomic_write(path, blocking=blocking, binary=True) as write_to:
-                if isinstance(self.model, torch.jit.ScriptModule):
-                    torch.jit.save(self.model, write_to)
-                else:
-                    torch.save(self.model.state_dict(), write_to)
+        with atomic_write(path, blocking=blocking, binary=True) as write_to:
+            if isinstance(self.model, torch.jit.ScriptModule):
+                torch.jit.save(self.model, write_to)
+            else:
+                torch.save(self.model.state_dict(), write_to)
 
     def init_log(self):
         if self.iepoch > 0:
