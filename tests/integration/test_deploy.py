@@ -72,7 +72,11 @@ def test_deploy(nequip_dataset, BENCHMARK_ROOT, device):
 
         # load model and check that metadata saved
         # TODO: use both CPU and CUDA to load?
-        deploy_mod, metadata = deploy.load_deployed_model(deployed_path, device="cpu")
+        deploy_mod, metadata = deploy.load_deployed_model(
+            deployed_path,
+            device="cpu",
+            set_global_options=False,  # don't need this corrupting test environment
+        )
         # Everything we store right now is ASCII, so decode for printing
         assert metadata[deploy.NEQUIP_VERSION_KEY] == nequip.__version__
         assert np.allclose(float(metadata[deploy.R_MAX_KEY]), true_config["r_max"])

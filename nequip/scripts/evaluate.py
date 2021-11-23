@@ -159,7 +159,11 @@ def main(args=None, running_as_script: bool = True):
     logger.info("Loading model... ")
     model_from_training: bool = False
     try:
-        model, _ = load_deployed_model(args.model, device=device)
+        model, _ = load_deployed_model(
+            args.model,
+            device=device,
+            set_global_options=True,  # don't warn that setting
+        )
         logger.info("loaded deployed model.")
     except ValueError:  # its not a deployed model
         model, _ = Trainer.load_model_from_training_session(
@@ -171,19 +175,23 @@ def main(args=None, running_as_script: bool = True):
     model.eval()
 
     # Load a config file
-    logger.info(f"Loading {'original ' if dataset_is_from_training else ''}dataset...",)
+    logger.info(
+        f"Loading {'original ' if dataset_is_from_training else ''}dataset...",
+    )
     config = Config.from_file(str(args.dataset_config))
 
     # set global options
     if model_from_training:
         # Use the model config, regardless of dataset config
         global_config = args.model.parent / "config.yaml"
+        global_config = Config.from_file(str(global_config), defaults=default_config)
+        _set_global_options(global_config)
+        del global_config
     else:
-        # use dataset config
-        global_config = args.dataset_config
-    global_config = Config.from_file(str(global_config), defaults=default_config)
-    _set_global_options(global_config)
-    del global_config
+        # the global settings for a deployed model are set by
+        # set_global_options in the call to load_deployed_model
+        # above
+        pass
 
     dataset_is_validation: bool = False
     # Currently, pytorch_geometric prints some status messages to stdout while loading the dataset
