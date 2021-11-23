@@ -727,7 +727,7 @@ class Trainer:
 
         self.final_log()
 
-        self.save(blocking=False)
+        self.save()
         finish_all_writes()
 
     def batch_step(self, data, validation=False):
