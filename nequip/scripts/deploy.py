@@ -50,7 +50,7 @@ def _compile_for_deploy(model):
     if not isinstance(model, torch.jit.ScriptModule):
         model = script(model)
 
-    return torch.jit.freeze(model)
+    return model
 
 
 def load_deployed_model(
