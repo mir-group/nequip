@@ -1,18 +1,18 @@
 .. _dataset_note:
    
 How to prepare training dataset
-=======================================
+===============================
 
 What does NequIP behind the scene
---------------
+---------------------------------
 
 NequIP uses AtomicDataset class to store the atomic configurations. 
 During the initialization of an AtomicDataset object, 
 NequIP reads the atomic structures from the dataset, 
 computes the neighbor list and other data structures needed for the GNN 
-by converting raw data to a list of `AtomicData` objects.
+by converting raw data to a list of ``AtomicData`` objects.
 
-The computed results are then cached on harddisk `root/processed_hashkey` folder.
+The computed results are then cached on harddisk ``root/processed_hashkey`` folder.
 The hashing is based on all the metadata provided for the dataset, 
 which includes the file name, the cutoff radius, float number precision and etc.
 In the case where multiple training/evaluation runs use the same dataset,
@@ -23,10 +23,10 @@ Note: be careful to the cached file. If you update your raw data file but keep u
 NequIP will not automatically update the cached data.
 
 Key concepts
---------------
+------------
 
 fixed_fields
-~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~
 Fixed fields are the quantities that are shared among all the configurations in the dataset.
 For example, if the dataset is a trajectory of an NVT MD simulation, the super cell size and the atomic species 
 are indeed a constant matrix/vector through out the whole dataset.
@@ -34,24 +34,24 @@ In this case, in stead of repeating the same values for many times,
 we specify the cell and species as fixed fields and only provide them once.
 
 yaml interface
-~~~~~~~~~~~~~~~~~~~~~~~~~
-`nequip-train` and `nequip-evaluate` automatically construct the AtomicDataset based on the yaml arguments.
+~~~~~~~~~~~~~~
+``nequip-train`` and ``nequip-evaluate`` automatically construct the AtomicDataset based on the yaml arguments.
 Later sections offer a couple different examples.
 
 If the training and validation datasets are from different raw files, the arguments for each set
-can be defined with `dataset` prefix and `validation_dataset` prefix, respectively.
+can be defined with ``dataset`` prefix and ``validation_dataset`` prefix, respectively.
 
-For example, `dataset_file_name` is used for training data and `validation_dataset_file_name` is for validation data.
+For example, ``dataset_file_name`` is used for training data and ``validation_dataset_file_name`` is for validation data.
 
-python interface
-~~~~~~~~~~~~~~~~~~~~~~~~~
-See `nequip.data.dataset.AtomicInMemoryDataset`.
+Python interface
+~~~~~~~~~~~~~~~~
+See ``nequip.data.dataset.AtomicInMemoryDataset``.
 
 Prepare dataset and specify in yaml config
---------------
+------------------------------------------
 
 ASE format
-~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~
 
 NequIP accept all format that can be parsed by `ase.io.read` function. 
 We recommend `extxyz`.
@@ -59,6 +59,7 @@ We recommend `extxyz`.
 Example: Given an atomic data stored in "H2.extxyz" that looks like below:
 
 .. code:: extxyz
+
    2
    Properties=species:S:1:pos:R:3 energy=-10 user_label=2.0 pbc="F F F"
    H       0.00000000       0.00000000       0.00000000
@@ -67,6 +68,7 @@ Example: Given an atomic data stored in "H2.extxyz" that looks like below:
 The yaml input should be
 
 .. code:: yaml
+
    dataset: ase
    dataset_file_name: H2.extxyz
    ase_args:
@@ -85,6 +87,7 @@ We need some additional keys to help NequIP to understand the situtaion
 Here's an example for vasp outcar. 
 
 .. code:: yaml
+
    dataset: ase
    dataset_file_name: OUTCAR
    ase_args:
@@ -96,8 +99,8 @@ Here's an example for vasp outcar.
 
 The way around is to use key mapping, please see more note below.
 
-NPZ formate
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+NPZ format
+~~~~~~~~~~
 
 If your dataset constitute configurations that always have the same number of atoms, npz data format can be an option.
 
@@ -108,6 +111,7 @@ their total_energy array should have the shape of (36).
 Below is an example of the yaml specification.
 
 .. code:: yaml
+
    dataset: npz
    dataset_file_name: example.npz
    include_keys:
@@ -137,12 +141,12 @@ Advanced options
 ----------------
 
 skip frames during data processing
-~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The `include_frame` argument can be specified in yaml to skip certain frames in the raw datafile.
 The item has to be a list or a python iteratable object.
 
 register user-defined graph, node, edge fields
-~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Graph, node, edge fields are quantities that belong to 
 the whole graph, each atom, each edge, respectively.
 Example graph fields include cell, pbc, and total_energy.

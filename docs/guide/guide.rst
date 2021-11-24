@@ -4,6 +4,7 @@ NequIP User Guide
  .. toctree::
 
     intro
-    irreps
+    dataset
     conventions
+    migrate
     FAQ
