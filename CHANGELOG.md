@@ -6,7 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Most recent change on the bottom.
 
-## [Unreleased] - 0.5.0
+## [Unreleased]
+
+## [0.5.0] - 2021-11-24
 ### Changed
 - Allow e3nn 0.4.*, which changes the default normalization of `TensorProduct`s; this change _should_ not affect typical NequIP networks
 - Deployed are now frozen on load, rather than compile
@@ -14,7 +16,7 @@ Most recent change on the bottom.
 ### Fixed
 - `load_deployed_model` respects global JIT settings
 
-## [Unreleased] - 0.4.0
+## [0.4.0] - not released
 ### Added
 - Support for `e3nn`'s `soft_one_hot_linspace` as radial bases
 - Support for parallel dataloader workers with `dataloader_num_workers`
