@@ -3,7 +3,7 @@ from typing import Optional, Dict, Callable
 
 import torch
 
-from torch_scatter import scatter
+from torch_runstats.scatter import scatter
 
 from e3nn import o3
 from e3nn.nn import FullyConnectedNet
@@ -25,7 +25,7 @@ class InteractionBlock(GraphModuleMixin, torch.nn.Module):
         invariant_layers=1,
         invariant_neurons=8,
         avg_num_neighbors=None,
-        use_sc=False,
+        use_sc=True,
         nonlinearity_scalars: Dict[int, Callable] = {"e": "ssp"},
     ) -> None:
         """

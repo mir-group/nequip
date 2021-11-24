@@ -1,4 +1,3 @@
-import os
 import wandb
 import logging
 from wandb.util import json_friendly_val

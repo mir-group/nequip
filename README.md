@@ -13,16 +13,9 @@ NequIP is an open-source code for building E(3)-equivariant interatomic potentia
 NequIP requires:
 
 * Python >= 3.6
-* PyTorch >= 1.8, <1.10 (PyTorch 1.10 support is in the works on `develop`.)
+* PyTorch >= 1.8, <=1.10.*. PyTorch can be installed following the [instructions from their documentation](https://pytorch.org/get-started/locally/). Note that neither `torchvision` nor `torchaudio`, included in the default install command, are needed for NequIP. NequIP is also not currently compatible with PyTorch 1.10; PyTorch 1.9 can be specified with `pytorch==1.9` in the install command.
 
 To install:
-
-* Install [PyTorch Geometric](https://github.com/rusty1s/pytorch_geometric), following [their installation instructions](https://pytorch-geometric.readthedocs.io/en/1.7.2/notes/installation.html) and making sure to install with the correct version of CUDA. Please note that `torch_geometric==1.7.2` is required.
-
-* Install our fork of [`pytorch_ema`](https://github.com/Linux-cpp-lisp/pytorch_ema) for using an Exponential Moving Average on the weights: 
-```bash
-$ pip install "git+https://github.com/Linux-cpp-lisp/pytorch_ema@context_manager#egg=torch_ema"
-```
 
 * We use [Weights&Biases](https://wandb.ai) to keep track of experiments. This is not a strict requirement — you can use our package without it — but it may make your life easier. If you want to use it, create an account [here](https://wandb.ai) and install the Python package:
 
@@ -40,14 +33,24 @@ pip install .
 
 ### Installation Issues
 
-We recommend running the tests using ```pytest```: 
+The easiest way to check if your installation is working is to train a toy model:
+```bash
+$ nequip-train configs/minimal.yaml
+```
+
+If you suspect something is wrong, encounter errors, or just want to confirm that everything is in working order, you can also run the unit tests:
 
 ```
 pip install pytest
-pytest ./tests/
+pytest tests/unit/
 ```
 
-While the tests are somewhat compute intensive, we've known them to hang on certain systems that have GPUs. If this happens to you, please report it along with information on your software environment in the [Issues](https://github.com/mir-group/nequip/issues)!
+To run the full tests, including a set of longer/more intensive integration tests, run:
+```
+pytest tests/
+```
+
+Note: the integration tests have hung in the past on certain systems that have GPUs. If this happens to you, please report it along with information on your software environment in the [Issues](https://github.com/mir-group/nequip/issues)!
 
 ## Usage
 
@@ -64,7 +67,7 @@ $ nequip-train configs/example.yaml
 A number of example configuration files are provided:
  - [`configs/minimal.yaml`](configs/minimal.yaml): A minimal example of training a toy model on force data.
  - [`configs/minimal_eng.yaml`](configs/minimal_eng.yaml): The same, but for a toy model that predicts and trains on only energy labels.
- - [`configs/example.yaml`](configs/example.yaml): Training a more realistic model on forces and energies.
+ - [`configs/example.yaml`](configs/example.yaml): Training a more realistic model on forces and energies. Start here for real models.
  - [`configs/full.yaml`](configs/full.yaml): A complete configuration file containing all available options along with documenting comments.
 
 Training runs can be restarted using `nequip-restart`; training that starts fresh or restarts depending on the existance of the working directory can be launched using `nequip-requeue`. All `nequip-*` commands accept the `--help` option to show their call signatures and options.
@@ -87,13 +90,11 @@ The `nequip-deploy` command is used to deploy the result of a training session i
 It compiles a NequIP model trained in Python to [TorchScript](https://pytorch.org/docs/stable/jit.html).
 The result is an optimized model file that has no dependency on the `nequip` Python library, or even on Python itself:
 ```bash
-nequip-deploy build path/to/training/session/ path/to/deployed.pth
+nequip-deploy build path/to/training/session/ where/to/put/deployed_model.pth
 ```
 For more details on this command, please run `nequip-deploy --help`.
 
 ### Using models in Python
-
-Both deployed and undeployed models can be used in Python code; for details, see the end of the [Developer's tutorial](https://deepnote.com/project/2412ca93-7ad1-4458-972c-5d5add5a667e) mentioned again below.
 
 An ASE calculator is also provided in `nequip.dynamics`.
 
@@ -113,17 +114,11 @@ The result is an optimized model file that has no Python dependency and can be u
 
 ```
 pair_style	nequip
-pair_coeff	* * deployed.pth
+pair_coeff	* * deployed.pth <NequIP type for LAMMPS type 1> <NequIP type for LAMMPS type 2> ...
 ```
 
 For installation instructions, please see the [`pair_nequip` repository](https://github.com/mir-group/pair_nequip).
 
-
-## Developer's tutorial 
-
-A more in-depth introduction to the internals of NequIP can be found in the [tutorial notebook](https://deepnote.com/project/2412ca93-7ad1-4458-972c-5d5add5a667e). This notebook discusses theoretical background as well as the Python interfaces that can be used to train and call models.
-
-Please note that for most common usecases, including customized models, the `nequip-*` commands should be prefered for training models.
 
 ## References & citing
 

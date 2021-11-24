@@ -1,5 +1,6 @@
 import sys
 import argparse
+import logging
 import textwrap
 from pathlib import Path
 import contextlib
@@ -9,23 +10,30 @@ import ase.io
 
 import torch
 
-from nequip.utils import Config, dataset_from_config
-from nequip.data import AtomicData, Collater
+from nequip.utils import Config
+from nequip.data import AtomicData, Collater, dataset_from_config
+from nequip.train import Trainer
 from nequip.scripts.deploy import load_deployed_model
+from nequip.scripts.train import default_config, _set_global_options
 from nequip.utils import load_file, instantiate
 from nequip.train.loss import Loss
 from nequip.train.metrics import Metrics
+from nequip.scripts.logger import set_up_script_logger
 
 
-def main(args=None):
+def main(args=None, running_as_script: bool = True):
     # in results dir, do: nequip-deploy build . deployed.pth
     parser = argparse.ArgumentParser(
         description=textwrap.dedent(
             """Compute the error of a model on a test set using various metrics.
 
             The model, metrics, dataset, etc. can specified individually, or a training session can be indicated with `--train-dir`.
+            In order of priority, the global settings (dtype, TensorFloat32, etc.) are taken from:
+              1. The model config (for a training session)
+              2. The dataset config (for a deployed model)
+              3. The defaults
 
-            Prints only the final result in `name = num` format to stdout; all other information is printed to stderr.
+            Prints only the final result in `name = num` format to stdout; all other information is logging.debuged to stderr.
 
             WARNING: Please note that results of CUDA models are rarely exactly reproducible, and that even CPU models can be nondeterministic.
             """
@@ -45,13 +53,13 @@ def main(args=None):
     )
     parser.add_argument(
         "--dataset-config",
-        help="A YAML config file specifying the dataset to load test data from. If omitted, `config_final.yaml` in `train_dir` will be used",
+        help="A YAML config file specifying the dataset to load test data from. If omitted, `config.yaml` in `train_dir` will be used",
         type=Path,
         default=None,
     )
     parser.add_argument(
         "--metrics-config",
-        help="A YAML config file specifying the metrics to compute. If omitted, `config_final.yaml` in `train_dir` will be used. If the config does not specify `metrics_components`, the default is to print MAEs and RMSEs for all fields given in the loss function. If the literal string `None`, no metrics will be computed.",
+        help="A YAML config file specifying the metrics to compute. If omitted, `config.yaml` in `train_dir` will be used. If the config does not specify `metrics_components`, the default is to logging.debug MAEs and RMSEs for all fields given in the loss function. If the literal string `None`, no metrics will be computed.",
         type=str,
         default=None,
     )
@@ -63,7 +71,7 @@ def main(args=None):
     )
     parser.add_argument(
         "--batch-size",
-        help="Batch size to use. Larger is usually faster on GPU.",
+        help="Batch size to use. Larger is usually faster on GPU. If you run out of memory, lower this.",
         type=int,
         default=50,
     )
@@ -79,8 +87,14 @@ def main(args=None):
         type=Path,
         default=None,
     )
+    parser.add_argument(
+        "--log",
+        help="log file to store all the metrics and screen logging.debug",
+        type=Path,
+        default=None,
+    )
     # Something has to be provided
-    # See https://stackoverflow.com/questions/22368458/how-to-make-argparse-print-usage-when-no-option-is-given-to-the-code
+    # See https://stackoverflow.com/questions/22368458/how-to-make-argparse-logging.debug-usage-when-no-option-is-given-to-the-code
     if len(sys.argv) == 1:
         parser.print_help()
         parser.exit()
@@ -91,10 +105,10 @@ def main(args=None):
     dataset_is_from_training: bool = False
     if args.train_dir:
         if args.dataset_config is None:
-            args.dataset_config = args.train_dir / "config_final.yaml"
+            args.dataset_config = args.train_dir / "config.yaml"
             dataset_is_from_training = True
         if args.metrics_config is None:
-            args.metrics_config = args.train_dir / "config_final.yaml"
+            args.metrics_config = args.train_dir / "config.yaml"
         if args.model is None:
             args.model = args.train_dir / "best_model.pth"
         if args.test_indexes is None:
@@ -129,56 +143,107 @@ def main(args=None):
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     else:
         device = torch.device(args.device)
-    print(f"Using device: {device}", file=sys.stderr)
+
+    if running_as_script:
+        set_up_script_logger(args.log)
+    logger = logging.getLogger("nequip-evaluate")
+    logger.setLevel(logging.INFO)
+
+    logger.info(f"Using device: {device}")
     if device.type == "cuda":
-        print(
+        logger.info(
             "WARNING: please note that models running on CUDA are usually nondeterministc and that this manifests in the final test errors; for a _more_ deterministic result, please use `--device cpu`",
-            file=sys.stderr,
         )
 
     # Load model:
-    print("Loading model... ", file=sys.stderr, end="")
+    logger.info("Loading model... ")
+    model_from_training: bool = False
     try:
-        model, _ = load_deployed_model(args.model, device=device)
-        print("loaded deployed model.", file=sys.stderr)
+        model, _ = load_deployed_model(
+            args.model,
+            device=device,
+            set_global_options=True,  # don't warn that setting
+        )
+        logger.info("loaded deployed model.")
     except ValueError:  # its not a deployed model
-        model = torch.load(args.model, map_location=device)
+        model, _ = Trainer.load_model_from_training_session(
+            traindir=args.model.parent, model_name=args.model.name
+        )
+        model_from_training = True
         model = model.to(device)
-        print("loaded pickled Python model.", file=sys.stderr)
+        logger.info("loaded model from training session")
+    model.eval()
 
     # Load a config file
-    print(
-        f"Loading {'original training ' if dataset_is_from_training else ''}dataset...",
-        file=sys.stderr,
+    logger.info(
+        f"Loading {'original ' if dataset_is_from_training else ''}dataset...",
     )
     config = Config.from_file(str(args.dataset_config))
 
+    # set global options
+    if model_from_training:
+        # Use the model config, regardless of dataset config
+        global_config = args.model.parent / "config.yaml"
+        global_config = Config.from_file(str(global_config), defaults=default_config)
+        _set_global_options(global_config)
+        del global_config
+    else:
+        # the global settings for a deployed model are set by
+        # set_global_options in the call to load_deployed_model
+        # above
+        pass
+
+    dataset_is_validation: bool = False
     # Currently, pytorch_geometric prints some status messages to stdout while loading the dataset
     # TODO: fix may come soon: https://github.com/rusty1s/pytorch_geometric/pull/2950
     # Until it does, just redirect them.
     with contextlib.redirect_stdout(sys.stderr):
-        dataset = dataset_from_config(config)
+        try:
+            # Try to get validation dataset
+            dataset = dataset_from_config(config, prefix="validation_dataset")
+            dataset_is_validation = True
+        except KeyError:
+            # Get shared train + validation dataset
+            dataset = dataset_from_config(config)
+    logger.info(
+        f"Loaded {'validation_' if dataset_is_validation else ''}dataset specified in {args.dataset_config.name}.",
+    )
 
     c = Collater.for_dataset(dataset, exclude_keys=[])
 
     # Determine the test set
     # this makes no sense if a dataset is given seperately
-    if train_idcs is not None and dataset_is_from_training:
+    if (
+        args.test_indexes is None
+        and train_idcs is not None
+        and dataset_is_from_training
+    ):
         # we know the train and val, get the rest
         all_idcs = set(range(len(dataset)))
         # set operations
-        test_idcs = list(all_idcs - train_idcs - val_idcs)
-        assert set(test_idcs).isdisjoint(train_idcs)
-        assert set(test_idcs).isdisjoint(val_idcs)
-        print(
-            f"Using training dataset minus training and validation frames, yielding a test set size of {len(test_idcs)} frames.",
-            file=sys.stderr,
-        )
-        if not do_metrics:
-            print(
-                "WARNING: using the automatic test set ^^^ but not computing metrics, is this really what you wanted to do?",
-                file=sys.stderr,
+        if dataset_is_validation:
+            test_idcs = list(all_idcs - val_idcs)
+            logger.info(
+                f"Using origial validation dataset minus validation set frames, yielding a test set size of {len(test_idcs)} frames.",
             )
+        else:
+            test_idcs = list(all_idcs - train_idcs - val_idcs)
+            assert set(test_idcs).isdisjoint(train_idcs)
+            logger.info(
+                f"Using origial training dataset minus training and validation frames, yielding a test set size of {len(test_idcs)} frames.",
+            )
+        # No matter what it should be disjoint from validation:
+        assert set(test_idcs).isdisjoint(val_idcs)
+        if not do_metrics:
+            logger.info(
+                "WARNING: using the automatic test set ^^^ but not computing metrics, is this really what you wanted to do?",
+            )
+    elif args.test_indexes is None:
+        # Default to all frames
+        test_idcs = torch.arange(dataset.len())
+        logger.info(
+            f"Using all frames from the specified test dataset, yielding a test set size of {len(test_idcs)} frames.",
+        )
     else:
         # load from file
         test_idcs = load_file(
@@ -187,9 +252,8 @@ def main(args=None):
             ),
             filename=str(args.test_indexes),
         )
-        print(
+        logger.info(
             f"Using provided test set indexes, yielding a test set size of {len(test_idcs)} frames.",
-            file=sys.stderr,
         )
 
     # Figure out what metrics we're actually computing
@@ -224,7 +288,7 @@ def main(args=None):
     batch_i: int = 0
     batch_size: int = args.batch_size
 
-    print("Starting...", file=sys.stderr)
+    logger.info("Starting...")
     context_stack = contextlib.ExitStack()
     with contextlib.ExitStack() as context_stack:
         # "None" checks if in a TTY and disables if not
@@ -246,7 +310,7 @@ def main(args=None):
 
         while True:
             datas = [
-                dataset.get(int(idex))
+                dataset[int(idex)]
                 for idex in test_idcs[batch_i * batch_size : (batch_i + 1) * batch_size]
             ]
             if len(datas) == 0:
@@ -269,7 +333,7 @@ def main(args=None):
                     metrics(out, batch)
                     display_bar.set_description_str(
                         " | ".join(
-                            f"{k} = {v:4.2f}"
+                            f"{k} = {v:4.4f}"
                             for k, v in metrics.flatten_metrics(
                                 metrics.current_result()
                             )[0].items()
@@ -284,9 +348,8 @@ def main(args=None):
             display_bar.close()
 
     if do_metrics:
-        print(file=sys.stderr)
-        print("--- Final result: ---", file=sys.stderr)
-        print(
+        logger.info("\n--- Final result: ---")
+        logger.critical(
             "\n".join(
                 f"{k:>20s} = {v:< 20f}"
                 for k, v in metrics.flatten_metrics(metrics.current_result())[0].items()
@@ -295,4 +358,4 @@ def main(args=None):
 
 
 if __name__ == "__main__":
-    main()
+    main(running_as_script=True)

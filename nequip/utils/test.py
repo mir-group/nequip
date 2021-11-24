@@ -1,11 +1,16 @@
-from typing import Union, Sequence, Set
+from typing import Union
 
 import torch
 from e3nn import o3
 from e3nn.util.test import assert_equivariant
 
 from nequip.nn import GraphModuleMixin
-from nequip.data import AtomicData, AtomicDataDict
+from nequip.data import (
+    AtomicData,
+    AtomicDataDict,
+    _NODE_FIELDS,
+    _EDGE_FIELDS,
+)
 
 
 PERMUTATION_FLOAT_TOLERANCE = {torch.float32: 1e-5, torch.float64: 1e-10}
@@ -18,84 +23,18 @@ def _inverse_permutation(perm):
     return inv
 
 
-_DEFAULT_NODE_PERMUTE_FIELDS: Set[str] = {
-    AtomicDataDict.POSITIONS_KEY,
-    AtomicDataDict.WEIGHTS_KEY,
-    AtomicDataDict.NODE_FEATURES_KEY,
-    AtomicDataDict.NODE_ATTRS_KEY,
-    AtomicDataDict.ATOMIC_NUMBERS_KEY,
-    AtomicDataDict.SPECIES_INDEX_KEY,
-    AtomicDataDict.FORCE_KEY,
-    AtomicDataDict.PER_ATOM_ENERGY_KEY,
-    AtomicDataDict.BATCH_KEY,
-}
-_DEFAULT_EDGE_PERMUTE_FIELDS: Set[str] = {
-    AtomicDataDict.EDGE_CELL_SHIFT_KEY,
-    AtomicDataDict.EDGE_VECTORS_KEY,
-    AtomicDataDict.EDGE_LENGTH_KEY,
-    AtomicDataDict.EDGE_ATTRS_KEY,
-    AtomicDataDict.EDGE_EMBEDDING_KEY,
-}
-_NODE_PERMUTE_FIELDS: Set[str] = set(_DEFAULT_NODE_PERMUTE_FIELDS)
-_EDGE_PERMUTE_FIELDS: Set[str] = set(_DEFAULT_EDGE_PERMUTE_FIELDS)
-
-
-def register_fields(
-    node_permute_fields: Sequence[str] = [], edge_permute_fields: Sequence[str] = []
-) -> None:
-    r"""Register a field as having specific properties for testing purposes.
-
-    See ``assert_permutation_equivariant``.
-
-    Args:
-        node_permute_fields: fields that are equivariant to node permutations.
-        edge_permute_fields: fields that are equivariant to edge permutations.
-    """
-    node_permute_fields: set = set(node_permute_fields)
-    edge_permute_fields: set = set(edge_permute_fields)
-    assert node_permute_fields.isdisjoint(
-        edge_permute_fields
-    ), "Fields cannot be both node and edge equivariant"
-    assert (_NODE_PERMUTE_FIELDS.union(_EDGE_PERMUTE_FIELDS)).isdisjoint(
-        node_permute_fields.union(edge_permute_fields)
-    ), "Cannot reregister a field that has already been registered"
-    _NODE_PERMUTE_FIELDS.update(node_permute_fields)
-    _EDGE_PERMUTE_FIELDS.update(edge_permute_fields)
-
-
-def deregister_fields(*fields: Sequence[str]) -> None:
-    r"""Deregister a field registered with ``register_fields``.
-
-    Silently ignores fields that were never registered to begin with.
-
-    Args:
-        *fields: fields to deregister.
-    """
-    for f in fields:
-        assert f not in _DEFAULT_EDGE_PERMUTE_FIELDS, "Cannot deregister built-in field"
-        assert f not in _DEFAULT_NODE_PERMUTE_FIELDS, "Cannot deregister built-in field"
-        _NODE_PERMUTE_FIELDS.discard(f)
-        _EDGE_PERMUTE_FIELDS.discard(f)
-
-
 def assert_permutation_equivariant(
-    func: GraphModuleMixin,
-    data_in: AtomicDataDict.Type,
-    extra_node_permute_fields: Sequence[str] = [],
-    extra_edge_permute_fields: Sequence[str] = [],
+    func: GraphModuleMixin, data_in: AtomicDataDict.Type
 ):
     r"""Test the permutation equivariance of ``func``.
 
-    Standard fields are assumed to be equivariant to node or edge permutations according to their standard interpretions; all other fields are assumed to be invariant to all permutations. Non-standard fields can be registered as node/edge permutation equivariant using ``register_fields``, or can be provided directly in the
-    ``extra_node_permute_fields`` and ``extra_edge_permute_fields`` arguments.
+    Standard fields are assumed to be equivariant to node or edge permutations according to their standard interpretions; all other fields are assumed to be invariant to all permutations. Non-standard fields can be registered as node/edge permutation equivariant using ``register_fields``.
 
     Raises ``AssertionError`` if issues are found.
 
     Args:
         func: the module or model to test
         data_in: the example input data to test with
-        extra_node_permute_fields: names of non-standard fields that should be equivariant to permutations of the *node* ordering
-        extra_edge_permute_fields: names of non-standard fields that should be equivariant to permutations of the *edge* ordering
     """
     # Prevent pytest from showing this function in the traceback
     # __tracebackhide__ = True
@@ -105,20 +44,8 @@ def assert_permutation_equivariant(
     data_in = data_in.copy()
     device = data_in[AtomicDataDict.POSITIONS_KEY].device
 
-    # instead of doing fragile shape checks, just do a list of fields that permute
-    extra_node_permute_fields: Set[str] = set(extra_node_permute_fields)
-    extra_edge_permute_fields: Set[str] = set(extra_edge_permute_fields)
-    assert extra_edge_permute_fields.isdisjoint(
-        extra_node_permute_fields
-    ), "A field cannot be both edge and node permutation equivariant"
-    assert _EDGE_PERMUTE_FIELDS.isdisjoint(
-        extra_node_permute_fields
-    ), "Some member of extra_node_permute_fields is registered as an edge permutation equivariant"
-    assert _NODE_PERMUTE_FIELDS.isdisjoint(
-        extra_edge_permute_fields
-    ), "Some member of extra_edge_permute_fields is registered as an node permutation equivariant"
-    node_permute_fields = _NODE_PERMUTE_FIELDS.union(extra_node_permute_fields)
-    edge_permute_fields = _EDGE_PERMUTE_FIELDS.union(extra_edge_permute_fields)
+    node_permute_fields = _NODE_FIELDS
+    edge_permute_fields = _EDGE_FIELDS
 
     # Make permutations and make sure they are not identities
     n_node: int = len(data_in[AtomicDataDict.POSITIONS_KEY])
@@ -193,8 +120,6 @@ def assert_permutation_equivariant(
 def assert_AtomicData_equivariant(
     func: GraphModuleMixin,
     data_in: Union[AtomicData, AtomicDataDict.Type],
-    extra_node_permute_fields: Sequence[str] = [],
-    extra_edge_permute_fields: Sequence[str] = [],
     **kwargs,
 ):
     r"""Test the rotation, translation, parity, and permutation equivariance of ``func``.
@@ -207,8 +132,6 @@ def assert_AtomicData_equivariant(
     Args:
         func: the module or model to test
         data_in: the example input data to test with
-        extra_node_permute_fields: see ``assert_permutation_equivariant``
-        extra_edge_permute_fields: see ``assert_permutation_equivariant``
         **kwargs: passed to ``e3nn.util.test.assert_equivariant``
 
     Returns:
@@ -224,8 +147,6 @@ def assert_AtomicData_equivariant(
     assert_permutation_equivariant(
         func,
         data_in,
-        extra_node_permute_fields=extra_node_permute_fields,
-        extra_edge_permute_fields=extra_edge_permute_fields,
     )
 
     # == Test rotation, parity, and translation using e3nn ==
@@ -298,7 +219,7 @@ def set_irreps_debug(enabled: bool = False) -> None:
         pass
 
     import torch.nn.modules
-    from torch_geometric.data import Data
+    from nequip.utils.torch_geometric import Data
 
     def pre_hook(mod: GraphModuleMixin, inp):
         # __tracebackhide__ = True

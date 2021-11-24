@@ -17,21 +17,47 @@ import numpy as np  # noqa: F401
 
 import torch
 
+import ase.data
+
 from e3nn.util.jit import script
 
-import nequip
-from nequip.nn import GraphModuleMixin
+from nequip.train import Trainer
 
 CONFIG_KEY: Final[str] = "config"
 NEQUIP_VERSION_KEY: Final[str] = "nequip_version"
+TORCH_VERSION_KEY: Final[str] = "torch_version"
+E3NN_VERSION_KEY: Final[str] = "e3nn_version"
 R_MAX_KEY: Final[str] = "r_max"
 N_SPECIES_KEY: Final[str] = "n_species"
+TYPE_NAMES_KEY: Final[str] = "type_names"
+JIT_BAILOUT_KEY: Final[str] = "_jit_bailout_depth"
+TF32_KEY: Final[str] = "allow_tf32"
 
-_ALL_METADATA_KEYS = [CONFIG_KEY, NEQUIP_VERSION_KEY, R_MAX_KEY, N_SPECIES_KEY]
+_ALL_METADATA_KEYS = [
+    CONFIG_KEY,
+    NEQUIP_VERSION_KEY,
+    R_MAX_KEY,
+    N_SPECIES_KEY,
+    TYPE_NAMES_KEY,
+    JIT_BAILOUT_KEY,
+    TF32_KEY,
+]
+
+
+def _compile_for_deploy(model):
+    model.eval()
+
+    if not isinstance(model, torch.jit.ScriptModule):
+        model = script(model)
+
+    return model
 
 
 def load_deployed_model(
-    model_path: Union[pathlib.Path, str], device: Union[str, torch.device] = "cpu"
+    model_path: Union[pathlib.Path, str],
+    device: Union[str, torch.device] = "cpu",
+    freeze: bool = True,
+    set_global_options: Union[str, bool] = "warn",
 ) -> Tuple[torch.jit.ScriptModule, Dict[str, str]]:
     r"""Load a deployed model.
 
@@ -43,6 +69,7 @@ def load_deployed_model(
     """
     metadata = {k: "" for k in _ALL_METADATA_KEYS}
     try:
+        # TODO: use .to()? instead of map_location
         model = torch.jit.load(model_path, map_location=device, _extra_files=metadata)
     except RuntimeError as e:
         raise ValueError(
@@ -53,19 +80,42 @@ def load_deployed_model(
         raise ValueError(
             f"{model_path} does not seem to be a deployed NequIP model file"
         )
-    # Remove missing metadata
-    for k in metadata:
-        # TODO: some better semver based checking of versions here, or something
-        if metadata[k] == "":
-            warnings.warn(
-                f"Metadata key `{k}` wasn't present in the saved model; this may indicate compatability issues."
-            )
     # Confirm its TorchScript
     assert isinstance(model, torch.jit.ScriptModule)
     # Make sure we're in eval mode
     model.eval()
+    # Freeze on load:
+    if freeze and hasattr(model, "training"):
+        # hasattr is how torch checks whether model is unfrozen
+        # only freeze if already unfrozen
+        model = torch.jit.freeze(model)
     # Everything we store right now is ASCII, so decode for printing
     metadata = {k: v.decode("ascii") for k, v in metadata.items()}
+    # Set up global settings:
+    assert set_global_options in (True, False, "warn")
+    if set_global_options:
+        # Set TF32 support
+        # See https://pytorch.org/docs/stable/notes/cuda.html#tensorfloat-32-tf32-on-ampere-devices
+        if torch.cuda.is_available() and metadata[TF32_KEY] != "":
+            allow_tf32 = bool(int(metadata[TF32_KEY]))
+            if torch.torch.backends.cuda.matmul.allow_tf32 is not allow_tf32:
+                # Update setting
+                if set_global_options == "warn":
+                    warnings.warn(
+                        "Loaded model had a different value for allow_tf32 than was currently set; changing the GLOBAL setting!"
+                    )
+                torch.backends.cuda.matmul.allow_tf32 = allow_tf32
+                torch.backends.cudnn.allow_tf32 = allow_tf32
+
+        # JIT bailout
+        if metadata[JIT_BAILOUT_KEY] != "":
+            jit_bailout: int = int(metadata[JIT_BAILOUT_KEY])
+            # no way to get current value, so assume we are overwriting it
+            if set_global_options == "warn":
+                warnings.warn(
+                    "Loaded model had a different value for _jit_bailout_depth than was currently set; changing the GLOBAL setting!"
+                )
+            torch._C._jit_set_bailout_depth(jit_bailout)
     return model, metadata
 
 
@@ -73,7 +123,12 @@ def main(args=None):
     parser = argparse.ArgumentParser(
         description="Create and view information about deployed NequIP potentials."
     )
-    subparsers = parser.add_subparsers(dest="command", required=True, title="commands")
+    # backward compat for 3.6
+    if sys.version_info[1] > 6:
+        required = {"required": True}
+    else:
+        required = {}
+    subparsers = parser.add_subparsers(dest="command", title="commands", **required)
     info_parser = subparsers.add_parser(
         "info", help="Get information from a deployed model file"
     )
@@ -101,10 +156,11 @@ def main(args=None):
     logging.basicConfig(level=logging.INFO)
 
     if args.command == "info":
-        model, metadata = load_deployed_model(args.model_path)
+        model, metadata = load_deployed_model(args.model_path, set_global_options=False)
         del model
         config = metadata.pop(CONFIG_KEY)
-        logging.info(f"Loaded TorchScript model with metadata {metadata}")
+        metadata_str = "\n".join("  %s: %s" % e for e in metadata.items())
+        logging.info(f"Loaded TorchScript model with metadata:\n{metadata_str}\n")
         logging.info("Model was built with config:")
         print(config)
 
@@ -116,42 +172,42 @@ def main(args=None):
                 f"{args.out_dir} is a directory, but a path to a file for the deployed model must be given"
             )
         # -- load model --
-        model_is_jit = False
-        model_path = args.train_dir / "best_model.pth"
-        try:
-            model = torch.jit.load(model_path, map_location=torch.device("cpu"))
-            model_is_jit = True
-            logging.info("Loaded TorchScript model")
-        except RuntimeError:
-            # ^ jit.load throws this when it can't find TorchScript files
-            model = torch.load(model_path, map_location=torch.device("cpu"))
-            if not isinstance(model, GraphModuleMixin):
-                raise TypeError(
-                    "Model contained object that wasn't a NequIP model (nequip.nn.GraphModuleMixin)"
-                )
-            logging.info("Loaded pickled model")
-        model = model.to(device=torch.device("cpu"))
+        model, _ = Trainer.load_model_from_training_session(
+            args.train_dir, model_name="best_model.pth", device="cpu"
+        )
 
         # -- compile --
-        if not model_is_jit:
-            model = script(model)
-            logging.info("Compiled model to TorchScript")
-
-        model.eval()  # just to be sure
-
-        model = torch.jit.freeze(model)
-        logging.info("Froze TorchScript model")
+        model = _compile_for_deploy(model)
+        logging.info("Compiled & optimized model.")
 
         # load config
-        # TODO: walk module tree if config does not exist to find params?
-        config_str = (args.train_dir / "config_final.yaml").read_text()
+        config_str = (args.train_dir / "config.yaml").read_text()
         config = yaml.load(config_str, Loader=yaml.Loader)
 
         # Deploy
-        metadata: dict = {NEQUIP_VERSION_KEY: nequip.__version__}
+        metadata: dict = {}
+        for code in ["e3nn", "nequip", "torch"]:
+            metadata[code + "_version"] = config[code + "_version"]
+
         metadata[R_MAX_KEY] = str(float(config["r_max"]))
-        metadata[N_SPECIES_KEY] = str(len(config["allowed_species"]))
+        if "allowed_species" in config:
+            # This is from before the atomic number updates
+            n_species = len(config["allowed_species"])
+            type_names = {
+                type: ase.data.chemical_symbols[atomic_num]
+                for type, atomic_num in enumerate(config["allowed_species"])
+            }
+        else:
+            # The new atomic number setup
+            n_species = str(config["num_types"])
+            type_names = config["type_names"]
+        metadata[N_SPECIES_KEY] = str(n_species)
+        metadata[TYPE_NAMES_KEY] = " ".join(type_names)
+
+        metadata[JIT_BAILOUT_KEY] = str(config["_jit_bailout_depth"])
+        metadata[TF32_KEY] = str(int(config["allow_tf32"]))
         metadata[CONFIG_KEY] = config_str
+
         metadata = {k: v.encode("ascii") for k, v in metadata.items()}
         torch.jit.save(model, args.out_file, _extra_files=metadata)
     else:
