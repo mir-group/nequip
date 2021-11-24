@@ -93,7 +93,7 @@ def load_deployed_model(
 
 def main(args=None):
     parser = argparse.ArgumentParser(
-        description="Create and view information about deployed NequIP potentials."
+        description="Deploy and view information about previously deployed NequIP models."
     )
     subparsers = parser.add_subparsers(dest="command", required=True, title="commands")
     info_parser = subparsers.add_parser(
