@@ -123,7 +123,12 @@ def main(args=None):
     parser = argparse.ArgumentParser(
         description="Create and view information about deployed NequIP potentials."
     )
-    subparsers = parser.add_subparsers(dest="command", required=True, title="commands")
+    # backward compat for 3.6
+    if sys.version_info[1] > 6:
+        required = {"required": True}
+    else:
+        required = {}
+    subparsers = parser.add_subparsers(dest="command", title="commands", **required)
     info_parser = subparsers.add_parser(
         "info", help="Get information from a deployed model file"
     )
