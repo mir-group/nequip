@@ -8,6 +8,7 @@ Most recent change on the bottom.
 
 ## [Unreleased] - 0.5.1
 ### Added
+- Added `avg_num_neighbors: auto` option
 - Asynchronous IO: during training, models are written asynchronously.
 - `dataset_seed` to separately control randomness used to select training data (and their order)
 

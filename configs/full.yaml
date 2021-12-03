@@ -46,7 +46,7 @@ PolynomialCutoff_p: 6                                                           
 # radial network
 invariant_layers: 2                                                               # number of radial layers, usually 1-3 works best, smaller is faster
 invariant_neurons: 64                                                             # number of hidden neurons in radial function, smaller is faster
-avg_num_neighbors: null                                                           # number of neighbors to divide by, null => no normalization.
+avg_num_neighbors: auto                                                           # number of neighbors to divide by, null => no normalization.
 use_sc: true                                                                      # use self-connection or not, usually gives big improvement
 compile_model: false                                                              # whether to compile the constructed model to TorchScript
 

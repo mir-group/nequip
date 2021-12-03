@@ -5,6 +5,8 @@ from ._weight_init import uniform_initialize_FCs, initialize_from_state
 
 from ._build import model_from_config
 
+from . import builder_utils
+
 __all__ = [
     EnergyModel,
     ForceOutput,
@@ -14,4 +16,5 @@ __all__ = [
     uniform_initialize_FCs,
     initialize_from_state,
     model_from_config,
+    builder_utils,
 ]
