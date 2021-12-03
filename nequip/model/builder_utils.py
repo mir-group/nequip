@@ -14,7 +14,9 @@ def add_avg_num_neighbors(
     # Compute avg_num_neighbors
     annkey: str = "avg_num_neighbors"
     ann = config.get(annkey, None)
-    if ann == "auto" and initialize:
+    if ann == "auto":
+        if not initialize:
+            raise ValueError("avg_num_neighbors = auto but initialize is False")
         if dataset is None:
             raise ValueError(
                 "When avg_num_neighbors = auto, the dataset is required to build+initialize a model"
