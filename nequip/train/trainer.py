@@ -16,8 +16,6 @@ from time import perf_counter
 from typing import Callable, Optional, Union, Tuple, List
 from pathlib import Path
 
-from nequip import data
-
 if sys.version_info[1] >= 7:
     import contextlib
 else:
