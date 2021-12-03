@@ -6,8 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Most recent change on the bottom.
 
-## [Unreleased]
+## [Unreleased] - 0.5.1
 ### Added
+- Asynchronous IO: during training, models are written asynchronously.
 - `dataset_seed` to separately control randomness used to select training data (and their order)
 
 ### Changed

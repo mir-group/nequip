@@ -262,6 +262,10 @@ class Config(object):
             filename=filename,
             enforced_format=format,
         )
+        return Config.from_dict(dictionary, defaults)
+
+    @staticmethod
+    def from_dict(dictionary: dict, defaults: dict = {}):
         c = Config(defaults)
         c.update(dictionary)
         return c
