@@ -94,6 +94,7 @@ def RescaleEnergyEtc(
                 AtomicDataDict.TOTAL_ENERGY_KEY,
                 AtomicDataDict.PER_ATOM_ENERGY_KEY,
                 AtomicDataDict.FORCE_KEY,
+                AtomicDataDict.STRESS_KEY,
             )
             if k in model.irreps_out
         ],
