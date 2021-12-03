@@ -2,6 +2,7 @@ import pytest
 
 import logging
 import tempfile
+import functools
 import torch
 
 import numpy as np
@@ -190,9 +191,37 @@ class TestWorkflow:
         output = instance(AtomicData.to_AtomicDataDict(data))
         assert out_field in output
 
-    def test_saveload(self, model):
-        # TO DO, test load/save state_dict
-        pass
+    def test_batch(self, model, atomic_batch, device, float_tolerance):
+        """Confirm that the results for individual examples are the same regardless of whether they are batched."""
+        allclose = functools.partial(torch.allclose, atol=float_tolerance)
+        instance, out_field = model
+        instance.to(device)
+        data = atomic_batch.to(device)
+        data1 = data.get_example(0)
+        data2 = data.get_example(1)
+        output1 = instance(AtomicData.to_AtomicDataDict(data1))
+        output2 = instance(AtomicData.to_AtomicDataDict(data2))
+        output = instance(AtomicData.to_AtomicDataDict(data))
+        if out_field in (AtomicDataDict.TOTAL_ENERGY_KEY, AtomicDataDict.STRESS_KEY):
+            assert allclose(
+                output1[out_field],
+                output[out_field][0],
+            )
+            assert allclose(
+                output2[out_field],
+                output[out_field][1],
+            )
+        elif out_field in (AtomicDataDict.FORCE_KEY,):
+            assert allclose(
+                output1[out_field],
+                output[out_field][output[AtomicDataDict.BATCH_KEY] == 0],
+            )
+            assert allclose(
+                output2[out_field],
+                output[out_field][output[AtomicDataDict.BATCH_KEY] == 1],
+            )
+        else:
+            raise NotImplementedError
 
 
 class TestGradient:
