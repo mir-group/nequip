@@ -179,8 +179,7 @@ class StressOutput(GraphModuleMixin, torch.nn.Module):
             raise NotImplementedError
         self.do_forces = do_forces
 
-        # Displacement is to cell, so has same irreps?
-        # TODO !!
+        # Displacement is cartesian tensor, is not in irreps
         energy_model.irreps_in["_displacement"] = None
 
         self._grad = GradientOutput(
@@ -251,6 +250,8 @@ class StressOutput(GraphModuleMixin, torch.nn.Module):
         )[..., None]
         assert len(volume) == num_batch
         data[AtomicDataDict.STRESS_KEY] = data[AtomicDataDict.STRESS_KEY] / volume
+
+        breakpoint()
 
         # Remove helper
         del data["_displacement"]
