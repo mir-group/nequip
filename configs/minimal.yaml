@@ -25,16 +25,11 @@ key_mapping:
   R: pos                                                                           # raw atomic positions
 npz_fixed_field_keys:                                                              # fields that are repeated across different examples
   - atomic_numbers
-# A mapping of chemical species to type indexes is necessary if the dataset is provided with atomic numbers instead of type indexes.
-chemical_symbol_to_type:
-  H: 0
-  C: 1
-  O: 2
-# Alternatively, if the dataset has type indexes, the total number of types is all that is required:
-# type_names:
-#   0: my_type
-#   1: atom
-#   2: thing
+
+chemical_symbols:
+  - H
+  - O
+  - C
 
 # logging
 wandb: false

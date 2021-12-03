@@ -58,10 +58,10 @@ key_mapping:
 npz_fixed_field_keys:                                                              # fields that are repeated across different examples
   - atomic_numbers
 
-# A mapping of chemical species to type indexes is necessary if the dataset is provided with atomic numbers instead of type indexes.
-chemical_symbol_to_type:
-  H: 0
-  C: 1
+# A list of atomic types to be found in the data. The NequIP types will be named with the chemical symbols, and inputs with the correct atomic numbers will be mapped to the corresponding types.
+chemical_symbols:
+  - H
+  - C
 
 # logging
 wandb: true                                                                       # we recommend using wandb for logging, we'll turn it off here as it's optional

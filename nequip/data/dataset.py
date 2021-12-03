@@ -526,10 +526,7 @@ class AtomicInMemoryDataset(AtomicDataset):
 
     @staticmethod
     def _per_atom_statistics(
-        ana_mode: str,
-        arr: torch.Tensor,
-        batch: torch.Tensor,
-        unbiased: bool = True,
+        ana_mode: str, arr: torch.Tensor, batch: torch.Tensor, unbiased: bool = True,
     ):
         """Compute "per-atom" statistics that are normalized by the number of atoms in the system.
 
@@ -743,8 +740,8 @@ class ASEDataset(AtomicInMemoryDataset):
       - user_label
     key_mapping:
       user_label: label0
-    chemical_symbol_to_type:
-      H: 0
+    chemical_symbols:
+      - H
     ```
 
     for VASP parser, the yaml input should be
@@ -755,8 +752,8 @@ class ASEDataset(AtomicInMemoryDataset):
       format: vasp-out
     key_mapping:
       free_energy: total_energy
-    chemical_symbol_to_type:
-      H: 0
+    chemical_symbols:
+      - H
     ```
 
     """
@@ -846,10 +843,7 @@ class ASEDataset(AtomicInMemoryDataset):
         atoms_list = self.get_atoms()
 
         # skip the None arguments
-        kwargs = dict(
-            include_keys=self.include_keys,
-            key_mapping=self.key_mapping,
-        )
+        kwargs = dict(include_keys=self.include_keys, key_mapping=self.key_mapping,)
         kwargs = {k: v for k, v in kwargs.items() if v is not None}
         kwargs.update(self.extra_fixed_fields)
 
