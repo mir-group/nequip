@@ -9,6 +9,7 @@ Most recent change on the bottom.
 ## [Unreleased]
 ### Added
 - Model builders may now process only the configuration
+- Allow irreps to optionally be specified through the simplified keys `l_max`, `parity`, and `num_features`
 
 ### Fixed
 - Equivariance testing no longer unintentionally skips translation

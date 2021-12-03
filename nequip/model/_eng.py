@@ -1,5 +1,7 @@
 import logging
 
+from e3nn import o3
+
 from nequip.data import AtomicDataDict
 from nequip.nn import (
     SequentialGraphNetwork,
@@ -12,6 +14,51 @@ from nequip.nn.embedding import (
     RadialBasisEdgeEncoding,
     SphericalHarmonicEdgeAttrs,
 )
+
+
+def SimpleIrrepsConfig(config):
+    """Builder that pre-processes options to allow "simple" configuration of irreps."""
+    # We allow some simpler parameters to be provided, but if they are,
+    # they have to be correct and not overridden
+    simple_irreps_keys = ["l_max", "parity", "num_features"]
+    real_irreps_keys = [
+        "chemical_embedding_irreps_out",
+        "feature_irreps_hidden",
+        "irreps_edge_sh",
+        "conv_to_output_hidden_irreps_out",
+    ]
+    # check for overlap
+    is_simple: bool = False
+    if any(k in config for k in simple_irreps_keys):
+        is_simple = True
+        if any(k in config for k in real_irreps_keys):
+            raise ValueError(
+                f"Cannot specify irreps using the simple and full option styles at the same time--- the sets of options {simple_irreps_keys} and {real_irreps_keys} are mutually exclusive."
+            )
+    if is_simple:
+        # nothing to do if not
+        lmax = config.pop("l_max")
+        parity = config.pop("parity")
+        num_features = config.pop("num_features")
+        config["chemical_embedding_irreps_out"] = repr(
+            o3.Irreps([(num_features, (0, 1))])  # n scalars
+        )
+        config["irreps_edge_sh"] = repr(
+            o3.Irreps.spherical_harmonics(lmax=lmax, p=-1 if parity else 1)
+        )
+        config["feature_irreps_hidden"] = repr(
+            o3.Irreps(
+                [
+                    (num_features, (l, p))
+                    for p in ((1, -1) if parity else (1,))
+                    for l in range(lmax + 1)
+                ]
+            )
+        )
+        config["conv_to_output_hidden_irreps_out"] = repr(
+            # num_features // 2  scalars
+            o3.Irreps([(max(1, num_features // 2), (0, 1))])
+        )
 
 
 def EnergyModel(config) -> SequentialGraphNetwork:
@@ -59,7 +106,4 @@ def EnergyModel(config) -> SequentialGraphNetwork:
         ),
     )
 
-    return SequentialGraphNetwork.from_parameters(
-        shared_params=config,
-        layers=layers,
-    )
+    return SequentialGraphNetwork.from_parameters(shared_params=config, layers=layers,)
