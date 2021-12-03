@@ -224,7 +224,7 @@ class AtomicData(Data):
         ):
             assert self.atomic_numbers.dtype in _TORCH_INTEGER_DTYPES
         if "batch" in self and self.batch is not None:
-            assert self.batch.dim() == 1 and self.batch.shape[0] == self.num_nodes
+            assert self.batch.dim() == 2 and self.batch.shape[0] == self.num_nodes
             # Check that there are the right number of cells
             if "cell" in self and self.cell is not None:
                 cell = self.cell.view(-1, 3, 3)
@@ -454,6 +454,7 @@ class AtomicData(Data):
         for batch_idx in range(n_batches):
             if batch is not None:
                 mask = batch == batch_idx
+                mask = mask.view(-1)
             else:
                 mask = slice(None)
 
