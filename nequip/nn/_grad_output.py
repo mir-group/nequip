@@ -21,6 +21,7 @@ class GradientOutput(GraphModuleMixin, torch.nn.Module):
         sign: either 1 or -1; the returned gradient is multiplied by this.
     """
     sign: float
+    _negate: bool
 
     def __init__(
         self,
@@ -34,6 +35,7 @@ class GradientOutput(GraphModuleMixin, torch.nn.Module):
         sign = float(sign)
         assert sign in (1.0, -1.0)
         self.sign = sign
+        self._negate = sign == -1.0
         self.of = of
         # TO DO: maybe better to force using list?
         if isinstance(wrt, str):
@@ -89,8 +91,10 @@ class GradientOutput(GraphModuleMixin, torch.nn.Module):
             if grad is None:
                 # From the docs: "If an output doesn’t require_grad, then the gradient can be None"
                 raise RuntimeError("Something is wrong, gradient couldn't be computed")
-            else:
-                data[out] = self.sign * grad
+
+            if self._negate:
+                grad = torch.neg(grad)
+            data[out] = grad
 
         # unset requires_grad_
         for req_grad, k in zip(old_requires_grad, self.wrt):
