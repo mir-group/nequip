@@ -24,6 +24,17 @@ from nequip.utils.torch_geometric import Data
 # A type representing ASE-style periodic boundary condtions, which can be partial (the tuple case)
 PBC = Union[bool, Tuple[bool, bool, bool]]
 
+_DEFAULT_SCALAR_FIELDS: Set[str] = {
+    AtomicDataDict.ATOMIC_NUMBERS_KEY,
+    AtomicDataDict.ATOM_TYPE_KEY,
+    AtomicDataDict.BATCH_KEY,
+}
+_DEFAULT_LONG_FIELDS: Set[str] = {
+    AtomicDataDict.EDGE_INDEX_KEY,
+    AtomicDataDict.ATOMIC_NUMBERS_KEY,
+    AtomicDataDict.ATOM_TYPE_KEY,
+    AtomicDataDict.BATCH_KEY,
+}
 _DEFAULT_NODE_FIELDS: Set[str] = {
     AtomicDataDict.POSITIONS_KEY,
     AtomicDataDict.WEIGHTS_KEY,
@@ -44,16 +55,22 @@ _DEFAULT_EDGE_FIELDS: Set[str] = {
 }
 _DEFAULT_GRAPH_FIELDS: Set[str] = {
     AtomicDataDict.TOTAL_ENERGY_KEY,
+    AtomicDataDict.PBC_KEY,
+    AtomicDataDict.CELL_KEY,
 }
 _NODE_FIELDS: Set[str] = set(_DEFAULT_NODE_FIELDS)
 _EDGE_FIELDS: Set[str] = set(_DEFAULT_EDGE_FIELDS)
 _GRAPH_FIELDS: Set[str] = set(_DEFAULT_GRAPH_FIELDS)
+_SCALAR_FIELDS: Set[str] = set(_DEFAULT_SCALAR_FIELDS)
+_LONG_FIELDS: Set[str] = set(_DEFAULT_LONG_FIELDS)
 
 
 def register_fields(
     node_fields: Sequence[str] = [],
     edge_fields: Sequence[str] = [],
     graph_fields: Sequence[str] = [],
+    scalar_fields: Sequence[str] = [],
+    long_fields: Sequence[str] = [],
 ) -> None:
     r"""Register fields as being per-atom, per-edge, or per-frame.
 
@@ -64,11 +81,14 @@ def register_fields(
     node_fields: set = set(node_fields)
     edge_fields: set = set(edge_fields)
     graph_fields: set = set(graph_fields)
+    scalar_fields: set = set(scalar_fields)
     allfields = node_fields.union(edge_fields, graph_fields)
     assert len(allfields) == len(node_fields) + len(edge_fields) + len(graph_fields)
     _NODE_FIELDS.update(node_fields)
     _EDGE_FIELDS.update(edge_fields)
     _GRAPH_FIELDS.update(graph_fields)
+    _SCALAR_FIELDS.update(scalar_fields)
+    _LONG_FIELDS.update(long_fields)
     if len(set.union(_NODE_FIELDS, _EDGE_FIELDS, _GRAPH_FIELDS)) < (
         len(_NODE_FIELDS) + len(_EDGE_FIELDS) + len(_GRAPH_FIELDS)
     ):
@@ -135,12 +155,7 @@ class AtomicData(Data):
         AtomicDataDict.validate_keys(kwargs)
         # Deal with _some_ dtype issues
         for k, v in kwargs.items():
-            if (
-                k == AtomicDataDict.EDGE_INDEX_KEY
-                or k == AtomicDataDict.ATOMIC_NUMBERS_KEY
-                or k == AtomicDataDict.ATOM_TYPE_KEY
-                or k == AtomicDataDict.BATCH_KEY
-            ):
+            if k in _LONG_FIELDS:
                 # Any property used as an index must be long (or byte or bool, but those are not relevant for atomic scale systems)
                 # int32 would pass later checks, but is actually disallowed by torch
                 kwargs[k] = torch.as_tensor(v, dtype=torch.long)
@@ -165,7 +180,15 @@ class AtomicData(Data):
 
         for k, v in kwargs.items():
 
-            if len(kwargs[k].shape) == 0:
+            if len(v.shape) == 0:
+                kwargs[k] = v.unsqueeze(-1)
+                v = kwargs[k]
+
+            if (
+                k in set.union(_NODE_FIELDS, _EDGE_FIELDS)
+                and k not in _SCALAR_FIELDS
+                and len(v.shape) == 1
+            ):
                 kwargs[k] = v.unsqueeze(-1)
                 v = kwargs[k]
 
@@ -184,9 +207,7 @@ class AtomicData(Data):
                     f"{k} is a edge field but has the wrong dimension {v.shape}"
                 )
             elif k in _GRAPH_FIELDS:
-                if num_frames == 1 and v.shape[0] != 1:
-                    kwargs[k] = v.unsqueeze(0)
-                elif v.shape[0] != num_frames:
+                if num_frames > 1 and v.shape[0] != num_frames:
                     raise ValueError(f"Wrong shape for graph property {k}")
 
         super().__init__(num_nodes=len(kwargs["pos"]), **kwargs)
@@ -425,6 +446,7 @@ class AtomicData(Data):
         cell = getattr(self, AtomicDataDict.CELL_KEY, None)
         batch = getattr(self, AtomicDataDict.BATCH_KEY, None)
         energy = getattr(self, AtomicDataDict.TOTAL_ENERGY_KEY, None)
+        energies = getattr(self, AtomicDataDict.PER_ATOM_ENERGY_KEY, None)
         force = getattr(self, AtomicDataDict.FORCE_KEY, None)
         do_calc = energy is not None or force is not None
 
@@ -456,6 +478,8 @@ class AtomicData(Data):
 
             if do_calc:
                 fields = {}
+                if energies is not None:
+                    fields["energies"] = energies[mask].cpu().numpy()
                 if energy is not None:
                     fields["energy"] = energy[batch_idx].cpu().numpy()
                 if force is not None:
@@ -504,15 +528,13 @@ class AtomicData(Data):
         return self.__irreps__
 
     def __cat_dim__(self, key, value):
-        if key in (
-            AtomicDataDict.CELL_KEY,
-            AtomicDataDict.PBC_KEY,
-            AtomicDataDict.TOTAL_ENERGY_KEY,
-        ):
-            # the cell and PBC are graph-level properties and so need a new batch dimension
+        if key == AtomicDataDict.EDGE_INDEX_KEY:
+            return 1  # always cat in the edge dimension
+        elif key in _GRAPH_FIELDS:
+            # graph-level properties and so need a new batch dimension
             return None
         else:
-            return super().__cat_dim__(key, value)
+            return 0  # cat along node/edge dimension
 
     def without_nodes(self, which_nodes):
         """Return a copy of ``self`` with ``which_nodes`` removed.
