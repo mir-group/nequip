@@ -504,15 +504,13 @@ class AtomicData(Data):
         return self.__irreps__
 
     def __cat_dim__(self, key, value):
-        if key in (
-            AtomicDataDict.CELL_KEY,
-            AtomicDataDict.PBC_KEY,
-            AtomicDataDict.TOTAL_ENERGY_KEY,
-        ):
-            # the cell and PBC are graph-level properties and so need a new batch dimension
+        if key == AtomicDataDict.EDGE_INDEX_KEY:
+            return 1  # always cat in the edge dimension
+        elif key in _GRAPH_FIELDS:
+            # graph-level properties and so need a new batch dimension
             return None
         else:
-            return super().__cat_dim__(key, value)
+            return 0  # cat along node/edge dimension
 
     def without_nodes(self, which_nodes):
         """Return a copy of ``self`` with ``which_nodes`` removed.
@@ -665,9 +663,5 @@ def neighbor_list_and_relative_vec(
         (torch.LongTensor(first_idex), torch.LongTensor(second_idex))
     ).to(device=out_device)
 
-    shifts = torch.as_tensor(
-        shifts,
-        dtype=out_dtype,
-        device=out_device,
-    )
+    shifts = torch.as_tensor(shifts, dtype=out_dtype, device=out_device,)
     return edge_index, shifts, cell_tensor

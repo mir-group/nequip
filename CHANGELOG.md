@@ -9,6 +9,7 @@ Most recent change on the bottom.
 ## [Unreleased]
 ### Fixed
 - Equivariance testing no longer unintentionally skips translation
+- Correct cat dim for all registered per-graph fields
 
 ## [0.5.0] - 2021-11-24
 ### Changed
