@@ -10,11 +10,10 @@ def add_avg_num_neighbors(
     config: Config,
     initialize: bool,
     dataset: Optional[AtomicDataset] = None,
-    default: Optional[Union[str, float]] = "auto",
 ) -> Optional[float]:
     # Compute avg_num_neighbors
     annkey: str = "avg_num_neighbors"
-    ann = config.get(annkey, default)
+    ann = config.get(annkey, None)
     if ann == "auto" and initialize:
         if dataset is None:
             raise ValueError(
