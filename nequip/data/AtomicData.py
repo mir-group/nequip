@@ -180,7 +180,7 @@ class AtomicData(Data):
 
         for k, v in kwargs.items():
 
-            if len(kwargs[k].shape) == 0:
+            if len(v.shape) == 0:
                 kwargs[k] = v.unsqueeze(-1)
                 v = kwargs[k]
 
@@ -207,9 +207,7 @@ class AtomicData(Data):
                     f"{k} is a edge field but has the wrong dimension {v.shape}"
                 )
             elif k in _GRAPH_FIELDS:
-                if num_frames == 1 and v.shape[0] != 1:
-                    kwargs[k] = v.unsqueeze(0)
-                elif v.shape[0] != num_frames:
+                if num_frames > 1 and v.shape[0] != num_frames:
                     raise ValueError(f"Wrong shape for graph property {k}")
 
         super().__init__(num_nodes=len(kwargs["pos"]), **kwargs)
