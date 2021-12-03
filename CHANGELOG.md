@@ -10,6 +10,9 @@ Most recent change on the bottom.
 ### Added
 - `dataset_seed` to separately control randomness used to select training data (and their order)
 
+### Changed
+- Changed default `seed` and `dataset_seed` in example YAMLs
+
 ### Fixed
 - Equivariance testing no longer unintentionally skips translation
 - Correct cat dim for all registered per-graph fields
