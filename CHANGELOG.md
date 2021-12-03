@@ -12,6 +12,7 @@ Most recent change on the bottom.
 
 ### Changed
 - All fields now have consistant [N, dim] shaping
+- Changed default `seed` and `dataset_seed` in example YAMLs
 
 ### Fixed
 - Equivariance testing no longer unintentionally skips translation
