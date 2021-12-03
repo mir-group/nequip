@@ -10,6 +10,9 @@ Most recent change on the bottom.
 ### Added
 - `dataset_seed` to separately control randomness used to select training data (and their order)
 
+### Changed
+- All fields now have consistant [N, dim] shaping
+
 ### Fixed
 - Equivariance testing no longer unintentionally skips translation
 - Correct cat dim for all registered per-graph fields
