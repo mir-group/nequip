@@ -151,14 +151,24 @@ def assert_AtomicData_equivariant(
 
     # == Test rotation, parity, and translation using e3nn ==
     irreps_in = {k: None for k in AtomicDataDict.ALLOWED_KEYS}
-    irreps_in.update(
-        {
-            AtomicDataDict.POSITIONS_KEY: "cartesian_points",
-            AtomicDataDict.CELL_KEY: "3x1o",
-        }
-    )
     irreps_in.update(func.irreps_in)
     irreps_in = {k: v for k, v in irreps_in.items() if k in data_in}
+    irreps_out = func.irreps_out.copy()
+    # for certain things, we don't care what the given irreps are...
+    # make sure that we test correctly for equivariance:
+    for irps in (irreps_in, irreps_out):
+        if AtomicDataDict.POSITIONS_KEY in irps:
+            # it should always have been 1o vectors
+            # since that's actually a valid Irreps
+            assert o3.Irreps(irps[AtomicDataDict.POSITIONS_KEY]) == o3.Irreps("1o")
+            irps[AtomicDataDict.POSITIONS_KEY] = "cartesian_points"
+        if AtomicDataDict.CELL_KEY in irps:
+            prev_cell_irps = irps[AtomicDataDict.CELL_KEY]
+            assert prev_cell_irps is None or o3.Irreps(prev_cell_irps) == o3.Irreps(
+                "3x1o"
+            )
+            # must be this to actually rotate it
+            irps[AtomicDataDict.CELL_KEY] = "3x1o"
 
     def wrapper(*args):
         arg_dict = {k: v for k, v in zip(irreps_in, args)}
@@ -175,7 +185,7 @@ def assert_AtomicData_equivariant(
             cell = arg_dict[AtomicDataDict.CELL_KEY]
             assert cell.shape[-2:] == (3, 3)
             arg_dict[AtomicDataDict.CELL_KEY] = cell.reshape(cell.shape[:-2] + (9,))
-        return [output[k] for k in func.irreps_out]
+        return [output[k] for k in irreps_out]
 
     data_in = AtomicData.to_AtomicDataDict(data_in)
     # cell is a special case
@@ -191,7 +201,7 @@ def assert_AtomicData_equivariant(
         wrapper,
         args_in=args_in,
         irreps_in=list(irreps_in.values()),
-        irreps_out=list(func.irreps_out.values()),
+        irreps_out=list(irreps_out.values()),
         **kwargs,
     )
 

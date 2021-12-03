@@ -3,6 +3,7 @@ import tempfile
 import pathlib
 import yaml
 import subprocess
+import sys
 
 import numpy as np
 import torch
@@ -72,7 +73,11 @@ def test_deploy(nequip_dataset, BENCHMARK_ROOT, device):
 
         # load model and check that metadata saved
         # TODO: use both CPU and CUDA to load?
-        deploy_mod, metadata = deploy.load_deployed_model(deployed_path, device="cpu")
+        deploy_mod, metadata = deploy.load_deployed_model(
+            deployed_path,
+            device="cpu",
+            set_global_options=False,  # don't need this corrupting test environment
+        )
         # Everything we store right now is ASCII, so decode for printing
         assert metadata[deploy.NEQUIP_VERSION_KEY] == nequip.__version__
         assert np.allclose(float(metadata[deploy.R_MAX_KEY]), true_config["r_max"])
@@ -84,10 +89,15 @@ def test_deploy(nequip_dataset, BENCHMARK_ROOT, device):
         assert torch.allclose(train_pred, deploy_pred, atol=1e-7)
 
         # now test info
+        # hack for old version
+        if sys.version_info[1] > 6:
+            text = {"text": True}
+        else:
+            text = {}
         retcode = subprocess.run(
             ["nequip-deploy", "info", str(deployed_path)],
-            text=True,
             stdout=subprocess.PIPE,
+            **text,
         )
         retcode.check_returncode()
         # Try to load extract config

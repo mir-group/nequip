@@ -301,11 +301,10 @@ class AtomicInMemoryDataset(AtomicDataset):
         # it doesn't matter if they overwrite each others cached'
         # datasets. It only matters that they don't simultaneously try
         # to write the _same_ file, corrupting it.
-        with atomic_write(self.processed_paths[0]) as tmppth:
-            torch.save((data, fixed_fields, self.include_frames), tmppth)
-        with atomic_write(self.processed_paths[1]) as tmppth:
-            with open(tmppth, "w") as f:
-                yaml.dump(self._get_parameters(), f)
+        with atomic_write(self.processed_paths[0], binary=True) as f:
+            torch.save((data, fixed_fields, self.include_frames), f)
+        with atomic_write(self.processed_paths[1], binary=False) as f:
+            yaml.dump(self._get_parameters(), f)
 
         logging.info("Cached processed data to disk")
 
@@ -566,7 +565,7 @@ class AtomicInMemoryDataset(AtomicDataset):
 
         For a per-node quantity, computes the expected statistic but for each type instead of over all nodes.
         """
-        N = bincount(atom_types, batch)
+        N = bincount(atom_types.squeeze(-1), batch)
         N = N[(N > 0).any(dim=1)]  # deal with non-contiguous batch indexes
 
         if arr_is_per == "graph":

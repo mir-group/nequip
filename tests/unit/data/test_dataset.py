@@ -210,7 +210,9 @@ class TestPerSpeciesStatistics:
         # get species count per graph
         Ns = []
         for i in range(npz_dataset.len()):
-            Ns.append(torch.bincount(npz_dataset[i][AtomicDataDict.ATOM_TYPE_KEY]))
+            Ns.append(
+                torch.bincount(npz_dataset[i][AtomicDataDict.ATOM_TYPE_KEY].view(-1))
+            )
         n_spec = max(len(e) for e in Ns)
         N = torch.zeros(len(Ns), n_spec)
         for i in range(len(Ns)):
@@ -234,7 +236,11 @@ class TestPerSpeciesStatistics:
             modes=["per_species_mean_std"],
             kwargs={
                 AtomicDataDict.TOTAL_ENERGY_KEY
-                + "per_species_mean_std": {"alpha": alpha, "regressor": regressor}
+                + "per_species_mean_std": {
+                    "alpha": alpha,
+                    "regressor": regressor,
+                    "stride": 1,
+                }
             },
         )
 

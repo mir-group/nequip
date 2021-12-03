@@ -10,7 +10,8 @@
 # if 'root'/'run_name' exists, 'root'/'run_name'_'year'-'month'-'day'-'hour'-'min'-'s' will be used instead.
 root: results/toluene
 run_name: example-run-toluene
-seed: 0                                                                           # random number seed for numpy and torch
+seed: 123
+dataset_seed: 456                                                                          # random number seed for numpy and torch
 append: true                                                                      # set true if a restarted run should append to the previous log file
 default_dtype: float32                                                            # type of float to use, e.g. float32 and float64
 allow_tf32: false                                                                 # whether to use TensorFloat32 if it is available
@@ -131,7 +132,7 @@ batch_size: 5                                                                   
 max_epochs: 100000                                                                      # stop training after _ number of epochs, we set a very large number here, it won't take this long in practice and we will use early stopping instead
 train_val_split: random                                                            # can be random or sequential. if sequential, first n_train elements are training, next n_val are val, else random, usually random is the right choice
 shuffle: true                                                                      # If true, the data loader will shuffle the data, usually a good idea
-metrics_key: valitaion_loss                                                        # metrics used for scheduling and saving best model. Options: `set`_`quantity`, set can be either "train" or "validation, "quantity" can be loss or anything that appears in the validation batch step header, such as f_mae, f_rmse, e_mae, e_rmse
+metrics_key: validation_loss                                                        # metrics used for scheduling and saving best model. Options: `set`_`quantity`, set can be either "train" or "validation, "quantity" can be loss or anything that appears in the validation batch step header, such as f_mae, f_rmse, e_mae, e_rmse
 use_ema: true                                                                      # if true, use exponential moving average on weights for val/test, usually helps a lot with training, in particular for energy errors
 ema_decay: 0.99                                                                    # ema weight, typically set to 0.99 or 0.999
 ema_use_num_updates: true                                                          # whether to use number of updates when computing averages
@@ -260,6 +261,7 @@ per_species_rescale_scales: dataset_forces_rms
 #   total_energy: 
 #     alpha: 0.1
 #     max_iteration: 20
+#     stride: 100
 # keywords for GP decomposition of per specie energy. Optional. Defaults to 0.1
 # per_species_rescale_arguments_in_dataset_units: True
 # if explicit numbers are given for the shifts/scales, this parameter must specify whether the given numbers are unitless shifts/scales or are in the units of the dataset. If ``True``, any global rescalings will correctly be applied to the per-species values.
