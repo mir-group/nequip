@@ -7,8 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Most recent change on the bottom.
 
 ## [Unreleased]
+### Added
+- `dataset_seed` to separately control randomness used to select training data (and their order)
+
 ### Changed
 - All fields now have consistant [N, dim] shaping
+- Changed default `seed` and `dataset_seed` in example YAMLs
 
 ### Fixed
 - Equivariance testing no longer unintentionally skips translation

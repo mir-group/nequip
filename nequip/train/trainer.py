@@ -131,7 +131,8 @@ class Trainer:
     Args:
         model: neural network model
 
-        seed (int): random see number
+        seed (int): random seed number
+        dataset_seed (int): random seed for dataset operations
 
         loss_coeffs (dict): dictionary to store coefficient and loss functions
 
@@ -214,6 +215,7 @@ class Trainer:
         model_builders: Optional[list] = [],
         device: str = "cuda" if torch.cuda.is_available() else "cpu",
         seed: Optional[int] = None,
+        dataset_seed: Optional[int] = None,
         loss_coeffs: Union[dict, str] = AtomicDataDict.TOTAL_ENERGY_KEY,
         train_on_keys: Optional[List[str]] = None,
         metrics_components: Optional[Union[dict, str]] = None,
@@ -292,6 +294,10 @@ class Trainer:
         if seed is not None:
             torch.manual_seed(seed)
             np.random.seed(seed)
+
+        self.dataset_rng = torch.Generator()
+        if dataset_seed is not None:
+            self.dataset_rng.manual_seed(dataset_seed)
 
         self.logger.info(f"Torch device: {self.device}")
         self.torch_device = torch.device(self.device)
@@ -453,6 +459,7 @@ class Trainer:
                 if item is not None:
                     dictionary["state_dict"][key] = item.state_dict()
             dictionary["state_dict"]["rng_state"] = torch.get_rng_state()
+            dictionary["state_dict"]["dataset_rng_state"] = self.dataset_rng.get_state()
             if torch.cuda.is_available():
                 dictionary["state_dict"]["cuda_rng_state"] = torch.cuda.get_rng_state(
                     device=self.torch_device
@@ -604,6 +611,7 @@ class Trainer:
             trainer._initialized = True
 
             torch.set_rng_state(state_dict["rng_state"])
+            trainer.dataset_rng.set_state(state_dict["dataset_rng_state"])
             if torch.cuda.is_available():
                 torch.cuda.set_rng_state(state_dict["cuda_rng_state"])
 
@@ -638,10 +646,7 @@ class Trainer:
         if config.get("compile_model", False):
             model = torch.jit.load(traindir + "/" + model_name, map_location=device)
         else:
-            model = model_from_config(
-                config=config,
-                initialize=False,
-            )
+            model = model_from_config(config=config, initialize=False,)
             if model is not None:
                 # TODO: this is not exactly equivalent to building with
                 # this set as default dtype... does it matter?
@@ -847,8 +852,7 @@ class Trainer:
                 self.n_batches = len(dataset)
                 for self.ibatch, batch in enumerate(dataset):
                     self.batch_step(
-                        data=batch,
-                        validation=(category == VALIDATION),
+                        data=batch, validation=(category == VALIDATION),
                     )
                     self.end_of_batch_log(batch_type=category)
                     for callback in self.end_of_batch_callbacks:
@@ -996,11 +1000,7 @@ class Trainer:
 
         lr = self.optim.param_groups[0]["lr"]
         wall = perf_counter() - self.wall
-        self.mae_dict = dict(
-            LR=lr,
-            epoch=self.iepoch,
-            wall=wall,
-        )
+        self.mae_dict = dict(LR=lr, epoch=self.iepoch, wall=wall,)
 
         header = "epoch, wall, LR"
 
@@ -1100,7 +1100,7 @@ class Trainer:
                     )
 
                 if self.train_val_split == "random":
-                    idcs = torch.randperm(total_n)
+                    idcs = torch.randperm(total_n, generator=self.dataset_rng)
                 elif self.train_val_split == "sequential":
                     idcs = torch.arange(total_n)
                 else:
@@ -1116,10 +1116,12 @@ class Trainer:
                 if self.n_val > len(validation_dataset):
                     raise ValueError("Not enough data in dataset for requested n_train")
                 if self.train_val_split == "random":
-                    self.train_idcs = torch.randperm(len(dataset))[: self.n_train]
-                    self.val_idcs = torch.randperm(len(validation_dataset))[
-                        : self.n_val
-                    ]
+                    self.train_idcs = torch.randperm(
+                        len(dataset), generator=self.dataset_rng
+                    )[: self.n_train]
+                    self.val_idcs = torch.randperm(
+                        len(validation_dataset), generator=self.dataset_rng
+                    )[: self.n_val]
                 elif self.train_val_split == "sequential":
                     self.train_idcs = torch.arange(self.n_train)
                     self.val_idcs = torch.arange(self.n_val)
@@ -1139,7 +1141,6 @@ class Trainer:
         # https://pytorch.org/tutorials/recipes/recipes/tuning_guide.html#enable-async-data-loading-and-augmentation
         dl_kwargs = dict(
             batch_size=self.batch_size,
-            shuffle=self.shuffle,
             exclude_keys=self.exclude_keys,
             num_workers=self.dataloader_num_workers,
             # keep stuff around in memory
@@ -1150,6 +1151,14 @@ class Trainer:
             pin_memory=(self.torch_device != torch.device("cpu")),
             # avoid getting stuck
             timeout=(10 if self.dataloader_num_workers > 0 else 0),
+            # use the right randomness
+            generator=self.dataset_rng,
         )
-        self.dl_train = DataLoader(dataset=self.dataset_train, **dl_kwargs)
+        self.dl_train = DataLoader(
+            dataset=self.dataset_train,
+            shuffle=self.shuffle,  # training should shuffle
+            **dl_kwargs,
+        )
+        # validation, on the other hand, shouldn't shuffle
+        # we still pass the generator just to be safe
         self.dl_val = DataLoader(dataset=self.dataset_val, **dl_kwargs)
