@@ -17,7 +17,7 @@ class Concat(GraphModuleMixin, torch.nn.Module):
         self.out_field = out_field
         self._init_irreps(irreps_in=irreps_in, required_irreps_in=self.in_fields)
         self.irreps_out[self.out_field] = sum(
-            (self.irreps_in[k] for k in self.in_fields), start=o3.Irreps()
+            (self.irreps_in[k] for k in self.in_fields), o3.Irreps()
         )
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:

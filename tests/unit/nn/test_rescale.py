@@ -1,6 +1,12 @@
 import pytest
 
-import contextlib
+import sys
+
+if sys.version_info[1] >= 7:
+    import contextlib
+else:
+    # has backport of nullcontext
+    import contextlib2 as contextlib
 
 import torch
 
