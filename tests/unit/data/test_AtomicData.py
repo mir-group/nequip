@@ -39,11 +39,17 @@ def test_to_ase_batches(atomic_batch):
         assert np.allclose(atoms.get_positions(), atomic_data.pos[mask])
         assert atoms.get_atomic_numbers().shape == (len(atoms),)
         assert np.array_equal(
-            atoms.get_atomic_numbers(), atomic_data[AtomicDataDict.ATOM_TYPE_KEY][mask]
+            atoms.get_atomic_numbers(),
+            atomic_data[AtomicDataDict.ATOM_TYPE_KEY][mask].view(-1),
         )
 
-        assert np.max(np.abs(atoms.get_cell()[:]-atomic_data.cell[batch_idx].numpy())) == 0
-        assert not np.logical_xor(atoms.get_pbc(), atomic_data.pbc[batch_idx].numpy()).all()
+        assert (
+            np.max(np.abs(atoms.get_cell()[:] - atomic_data.cell[batch_idx].numpy()))
+            == 0
+        )
+        assert not np.logical_xor(
+            atoms.get_pbc(), atomic_data.pbc[batch_idx].numpy()
+        ).all()
 
 
 def test_ase_roundtrip(CuFcc):
