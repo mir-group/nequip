@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Most recent change on the bottom.
 
 ## [Unreleased]
+### Changed
+- All fields now have consistant [N, dim] shaping
+
 ### Fixed
 - Equivariance testing no longer unintentionally skips translation
 - Correct cat dim for all registered per-graph fields
