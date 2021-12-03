@@ -55,6 +55,8 @@ _DEFAULT_EDGE_FIELDS: Set[str] = {
 }
 _DEFAULT_GRAPH_FIELDS: Set[str] = {
     AtomicDataDict.TOTAL_ENERGY_KEY,
+    AtomicDataDict.PBC_KEY,
+    AtomicDataDict.CELL_KEY,
 }
 _NODE_FIELDS: Set[str] = set(_DEFAULT_NODE_FIELDS)
 _EDGE_FIELDS: Set[str] = set(_DEFAULT_EDGE_FIELDS)
@@ -687,5 +689,9 @@ def neighbor_list_and_relative_vec(
         (torch.LongTensor(first_idex), torch.LongTensor(second_idex))
     ).to(device=out_device)
 
-    shifts = torch.as_tensor(shifts, dtype=out_dtype, device=out_device,)
+    shifts = torch.as_tensor(
+        shifts,
+        dtype=out_dtype,
+        device=out_device,
+    )
     return edge_index, shifts, cell_tensor
