@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Most recent change on the bottom.
 
 ## [Unreleased]
+### Added
+- `dataset_seed` to separately control randomness used to select training data (and their order)
+
 ### Fixed
 - Equivariance testing no longer unintentionally skips translation
 - Correct cat dim for all registered per-graph fields
