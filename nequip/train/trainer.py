@@ -557,10 +557,10 @@ class Trainer:
         append (bool): if True, append the old model files and append the same logfile
         """
 
-        d = deepcopy(dictionary)
+        dictionary = deepcopy(dictionary)
 
         for code in [e3nn, nequip, torch]:
-            version = d.get(f"{code.__name__}_version", None)
+            version = dictionary.get(f"{code.__name__}_version", None)
             if version is not None and version != code.__version__:
                 logging.warning(
                     "Loading a pickled model created with different library version(s) may cause issues."
@@ -570,14 +570,14 @@ class Trainer:
 
         # update the restart and append option
         if append is not None:
-            d["append"] = append
+            dictionary["append"] = append
 
         model = None
         iepoch = -1
-        if "model" in d:
-            model = d.pop("model")
-        elif "progress" in d:
-            progress = d["progress"]
+        if "model" in dictionary:
+            model = dictionary.pop("model")
+        elif "progress" in dictionary:
+            progress = dictionary["progress"]
 
             # load the model from file
             iepoch = progress["iepoch"]
@@ -588,15 +588,17 @@ class Trainer:
                 raise AttributeError("model weights & bias are not saved")
 
             model, _ = Trainer.load_model_from_training_session(
-                traindir=load_path.parent, model_name=load_path.name
+                traindir=load_path.parent,
+                model_name=load_path.name,
+                config_dictionary=dictionary,
             )
             logging.debug(f"Reload the model from {load_path}")
 
-            d.pop("progress")
+            dictionary.pop("progress")
 
-        state_dict = d.pop("state_dict", None)
+        state_dict = dictionary.pop("state_dict", None)
 
-        trainer = cls(model=model, **d)
+        trainer = cls(model=model, **dictionary)
 
         if state_dict is not None and trainer.model is not None:
             logging.debug("Reload optimizer and scheduler states")
@@ -610,7 +612,7 @@ class Trainer:
             if torch.cuda.is_available():
                 torch.cuda.set_rng_state(state_dict["cuda_rng_state"])
 
-        if "progress" in d:
+        if "progress" in dictionary:
             trainer.best_metrics = progress["best_metrics"]
             trainer.best_epoch = progress["best_epoch"]
             stop_arg = progress.pop("stop_arg", None)
@@ -631,17 +633,26 @@ class Trainer:
 
     @staticmethod
     def load_model_from_training_session(
-        traindir, model_name="best_model.pth", device="cpu"
+        traindir,
+        model_name="best_model.pth",
+        device="cpu",
+        config_dictionary: Optional[dict] = None,
     ) -> Tuple[torch.nn.Module, Config]:
         traindir = str(traindir)
         model_name = str(model_name)
 
-        config = Config.from_file(traindir + "/config.yaml")
+        if config_dictionary is not None:
+            config = Config.from_dict(config_dictionary)
+        else:
+            config = Config.from_file(traindir + "/config.yaml")
 
         if config.get("compile_model", False):
             model = torch.jit.load(traindir + "/" + model_name, map_location=device)
         else:
-            model = model_from_config(config=config, initialize=False,)
+            model = model_from_config(
+                config=config,
+                initialize=False,
+            )
             if model is not None:
                 # TODO: this is not exactly equivalent to building with
                 # this set as default dtype... does it matter?
@@ -851,7 +862,8 @@ class Trainer:
                 self.n_batches = len(dataset)
                 for self.ibatch, batch in enumerate(dataset):
                     self.batch_step(
-                        data=batch, validation=(category == VALIDATION),
+                        data=batch,
+                        validation=(category == VALIDATION),
                     )
                     self.end_of_batch_log(batch_type=category)
                     for callback in self.end_of_batch_callbacks:
@@ -998,7 +1010,11 @@ class Trainer:
 
         lr = self.optim.param_groups[0]["lr"]
         wall = perf_counter() - self.wall
-        self.mae_dict = dict(LR=lr, epoch=self.iepoch, wall=wall,)
+        self.mae_dict = dict(
+            LR=lr,
+            epoch=self.iepoch,
+            wall=wall,
+        )
 
         header = "epoch, wall, LR"
 
