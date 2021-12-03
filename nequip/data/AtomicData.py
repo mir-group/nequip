@@ -24,11 +24,7 @@ from nequip.utils.torch_geometric import Data
 # A type representing ASE-style periodic boundary condtions, which can be partial (the tuple case)
 PBC = Union[bool, Tuple[bool, bool, bool]]
 
-_DEFAULT_SCALAR_FIELDS: Set[str] = {
-    AtomicDataDict.ATOMIC_NUMBERS_KEY,
-    AtomicDataDict.ATOM_TYPE_KEY,
-    AtomicDataDict.BATCH_KEY,
-}
+
 _DEFAULT_LONG_FIELDS: Set[str] = {
     AtomicDataDict.EDGE_INDEX_KEY,
     AtomicDataDict.ATOMIC_NUMBERS_KEY,
@@ -61,7 +57,6 @@ _DEFAULT_GRAPH_FIELDS: Set[str] = {
 _NODE_FIELDS: Set[str] = set(_DEFAULT_NODE_FIELDS)
 _EDGE_FIELDS: Set[str] = set(_DEFAULT_EDGE_FIELDS)
 _GRAPH_FIELDS: Set[str] = set(_DEFAULT_GRAPH_FIELDS)
-_SCALAR_FIELDS: Set[str] = set(_DEFAULT_SCALAR_FIELDS)
 _LONG_FIELDS: Set[str] = set(_DEFAULT_LONG_FIELDS)
 
 
@@ -69,7 +64,6 @@ def register_fields(
     node_fields: Sequence[str] = [],
     edge_fields: Sequence[str] = [],
     graph_fields: Sequence[str] = [],
-    scalar_fields: Sequence[str] = [],
     long_fields: Sequence[str] = [],
 ) -> None:
     r"""Register fields as being per-atom, per-edge, or per-frame.
@@ -81,13 +75,11 @@ def register_fields(
     node_fields: set = set(node_fields)
     edge_fields: set = set(edge_fields)
     graph_fields: set = set(graph_fields)
-    scalar_fields: set = set(scalar_fields)
     allfields = node_fields.union(edge_fields, graph_fields)
     assert len(allfields) == len(node_fields) + len(edge_fields) + len(graph_fields)
     _NODE_FIELDS.update(node_fields)
     _EDGE_FIELDS.update(edge_fields)
     _GRAPH_FIELDS.update(graph_fields)
-    _SCALAR_FIELDS.update(scalar_fields)
     _LONG_FIELDS.update(long_fields)
     if len(set.union(_NODE_FIELDS, _EDGE_FIELDS, _GRAPH_FIELDS)) < (
         len(_NODE_FIELDS) + len(_EDGE_FIELDS) + len(_GRAPH_FIELDS)
@@ -184,11 +176,7 @@ class AtomicData(Data):
                 kwargs[k] = v.unsqueeze(-1)
                 v = kwargs[k]
 
-            if (
-                k in set.union(_NODE_FIELDS, _EDGE_FIELDS)
-                and k not in _SCALAR_FIELDS
-                and len(v.shape) == 1
-            ):
+            if k in set.union(_NODE_FIELDS, _EDGE_FIELDS) and len(v.shape) == 1:
                 kwargs[k] = v.unsqueeze(-1)
                 v = kwargs[k]
 
@@ -470,7 +458,7 @@ class AtomicData(Data):
                 mask = slice(None)
 
             mol = ase.Atoms(
-                numbers=atomic_nums[mask],
+                numbers=atomic_nums[mask].view(-1),  # must be flat for ASE
                 positions=positions[mask],
                 cell=cell[batch_idx] if cell is not None else None,
                 pbc=pbc[batch_idx] if pbc is not None else None,

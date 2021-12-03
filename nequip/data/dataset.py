@@ -565,7 +565,7 @@ class AtomicInMemoryDataset(AtomicDataset):
 
         For a per-node quantity, computes the expected statistic but for each type instead of over all nodes.
         """
-        N = bincount(atom_types, batch)
+        N = bincount(atom_types.squeeze(-1), batch)
         N = N[(N > 0).any(dim=1)]  # deal with non-contiguous batch indexes
 
         if arr_is_per == "graph":

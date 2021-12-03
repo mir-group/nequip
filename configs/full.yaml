@@ -10,7 +10,8 @@
 # if 'root'/'run_name' exists, 'root'/'run_name'_'year'-'month'-'day'-'hour'-'min'-'s' will be used instead.
 root: results/toluene
 run_name: example-run-toluene
-seed: 0                                                                           # random number seed for numpy and torch
+seed: 123
+dataset_seed: 456                                                                          # random number seed for numpy and torch
 append: true                                                                      # set true if a restarted run should append to the previous log file
 default_dtype: float32                                                            # type of float to use, e.g. float32 and float64
 allow_tf32: false                                                                 # whether to use TensorFloat32 if it is available
