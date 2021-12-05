@@ -11,6 +11,7 @@ Most recent change on the bottom.
 - Added `avg_num_neighbors: auto` option
 - Asynchronous IO: during training, models are written asynchronously.
 - `dataset_seed` to separately control randomness used to select training data (and their order)
+- The types may now be specified with a simpler `chemical_symbols` option
 
 ### Changed
 - All fields now have consistant [N, dim] shaping

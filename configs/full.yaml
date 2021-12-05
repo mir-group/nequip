@@ -89,16 +89,21 @@ npz_fixed_field_keys:                                                           
 # key_mapping:
 #   free_energy: total_energy
 
-# A mapping of chemical species to type indexes is necessary if the dataset is provided with atomic numbers instead of type indexes.
-chemical_symbol_to_type:
-  H: 0
-  C: 1
+# A list of atomic types to be found in the data. The NequIP types will be named with the chemical symbols, and inputs with the correct atomic numbers will be mapped to the corresponding types.
+chemical_symbols:
+ - H
+ - C
+# Alternatively, you may explicitly specify which chemical species maps to which type in NequIP (type index; the name is still taken from the chemical symbol)
+# chemical_symbol_to_type:
+#   H: 0
+#   C: 1
 
-# Alternatively, if the dataset has type indicess, the total number of types is all that is required:
+# Alternatively, if the dataset has type indices, you may give the names for the types in order:
+# (this also sets the number of types)
 # type_names:
-#   0: my_type
-#   1: atom
-#   2: thing
+#   - my_type
+#   - atom
+#   - thing
 
 # As an alternative option to npz, you can also pass data ase ASE Atoms-objects
 # This can often be easier to work with, simply make sure the ASE Atoms object
