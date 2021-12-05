@@ -6,9 +6,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Most recent change on the bottom.
 
-## [Unreleased]
+## [Unreleased] - 0.5.1
 ### Added
+- Added `avg_num_neighbors: auto` option
+- Asynchronous IO: during training, models are written asynchronously.
+- `dataset_seed` to separately control randomness used to select training data (and their order)
 - The types may now be specified with a simpler `chemical_symbols` option
+
+### Changed
+- All fields now have consistant [N, dim] shaping
+- Changed default `seed` and `dataset_seed` in example YAMLs
 
 ### Fixed
 - Equivariance testing no longer unintentionally skips translation

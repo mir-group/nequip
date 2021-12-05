@@ -1,49 +1,203 @@
 """
 utilities that involve file searching and operations (i.e. save/load)
 """
-from typing import Union
+from typing import Union, List, Tuple
 import sys
 import logging
 import contextlib
+import contextvars
+import tempfile
 from pathlib import Path
-from os import makedirs
-from os.path import isfile, isdir, dirname, realpath
+import shutil
+import os
+
+
+# accumulate writes to group for renaming
+_MOVE_SET = contextvars.ContextVar("_move_set", default=None)
+
+
+def _delete_files_if_exist(paths):
+    # clean up
+    # better for python 3.8 >
+    if sys.version_info[1] >= 8:
+        for f in paths:
+            f.unlink(missing_ok=True)
+    else:
+        # race condition?
+        for f in paths:
+            if f.exists():
+                f.unlink()
+
+
+def _process_moves(moves: List[Tuple[bool, Path, Path]]):
+    """blocking to copy (possibly across filesystems) to temp name; then atomic rename to final name"""
+    try:
+        for _, from_name, to_name in moves:
+            # blocking copy to temp file in same filesystem
+            tmp_path = to_name.parent / (f".tmp-{to_name.name}~")
+            shutil.move(from_name, tmp_path)
+            # then atomic rename to overwrite
+            tmp_path.rename(to_name)
+    finally:
+        _delete_files_if_exist([m[1] for m in moves])
+
+
+# allow user to enable/disable depending on their filesystem
+_ASYNC_ENABLED = os.environ.get("NEQUIP_ASYNC_IO", "true").lower()
+assert _ASYNC_ENABLED in ("true", "false")
+_ASYNC_ENABLED = _ASYNC_ENABLED == "true"
+
+if _ASYNC_ENABLED:
+    import threading
+    from queue import Queue
+
+    _MOVE_QUEUE = Queue()
+    _MOVE_THREAD = None
+
+    # Because we use a queue, later writes will always (correctly)
+    # overwrite earlier writes
+    def _moving_thread(queue):
+        while True:
+            moves = queue.get()
+            _process_moves(moves)
+            # logging is thread safe: https://stackoverflow.com/questions/2973900/is-pythons-logging-module-thread-safe
+            logging.debug(f"Finished writing {', '.join(m[2].name for m in moves)}")
+            queue.task_done()
+
+    def _submit_move(from_name, to_name, blocking: bool):
+        global _MOVE_QUEUE
+        global _MOVE_THREAD
+        global _MOVE_SET
+
+        # launch thread if its not running
+        if _MOVE_THREAD is None:
+            _MOVE_THREAD = threading.Thread(
+                target=_moving_thread, args=(_MOVE_QUEUE,), daemon=True
+            )
+            _MOVE_THREAD.start()
+
+        # check on health of copier thread
+        if not _MOVE_THREAD.is_alive():
+            _MOVE_THREAD.join()  # will raise exception
+            raise RuntimeError("Writer thread failed.")
+
+        # submit this move
+        obj = (blocking, from_name, to_name)
+        if _MOVE_SET.get() is None:
+            # no current group
+            _MOVE_QUEUE.put([obj])
+            # if it should be blocking, wait for it to be processed
+            if blocking:
+                _MOVE_QUEUE.join()
+        else:
+            # add and let the group submit and block (or not)
+            _MOVE_SET.get().append(obj)
+
+    @contextlib.contextmanager
+    def atomic_write_group():
+        global _MOVE_SET
+        if _MOVE_SET.get() is not None:
+            # nesting is a no-op
+            # submit along with outermost context manager
+            yield
+            return
+        token = _MOVE_SET.set(list())
+        # run the saves
+        yield
+        _MOVE_QUEUE.put(_MOVE_SET.get())  # send it off
+        # if anyone is blocking, block the whole group:
+        if any(m[0] for m in _MOVE_SET.get()):
+            # someone is blocking
+            _MOVE_QUEUE.join()
+        # exit context
+        _MOVE_SET.reset(token)
+
+    def finish_all_writes():
+        global _MOVE_QUEUE
+        _MOVE_QUEUE.join()
+        # ^ wait for all remaining moves to be processed
+
+
+else:
+
+    def _submit_move(from_name, to_name, blocking: bool):
+        global _MOVE_SET
+        obj = (blocking, from_name, to_name)
+        if _MOVE_SET.get() is None:
+            # no current group just do it
+            _process_moves([obj])
+        else:
+            # add and let the group do it
+            _MOVE_SET.get().append(obj)
+
+    @contextlib.contextmanager
+    def atomic_write_group():
+        global _MOVE_SET
+        if _MOVE_SET.get() is not None:
+            # don't nest them
+            yield
+            return
+        token = _MOVE_SET.set(list())
+        yield
+        _process_moves(_MOVE_SET.get())  # do it
+        _MOVE_SET.reset(token)
+
+    def finish_all_writes():
+        pass  # nothing to do since all writes blocked
 
 
 @contextlib.contextmanager
-def atomic_write(filename: Union[Path, str]):
-    filename = Path(filename)
-    tmp_path = filename.parent / (f".tmp-{filename.name}~")
-    # Create the temp file
-    open(tmp_path, "w").close()
-    try:
-        # do the IO
-        yield tmp_path
-        # move the temp file to the final output path, which also removes the temp file
-        tmp_path.rename(filename)
-    finally:
-        # clean up
-        # better for python 3.8 >
-        if sys.version_info[1] >= 8:
-            tmp_path.unlink(missing_ok=True)
-        else:
-            # race condition?
-            if tmp_path.exists():
-                tmp_path.unlink()
+def atomic_write(
+    filename: Union[Path, str, List[Union[Path, str]]],
+    blocking: bool = True,
+    binary: bool = False,
+):
+    aslist: bool = True
+    if not isinstance(filename, list):
+        aslist = False
+        filename = [filename]
+    filename = [Path(f) for f in filename]
+
+    with contextlib.ExitStack() as stack:
+        files = [
+            stack.enter_context(
+                tempfile.NamedTemporaryFile(
+                    mode="w" + ("b" if binary else ""), delete=False
+                )
+            )
+            for _ in filename
+        ]
+        try:
+            if not aslist:
+                yield files[0]
+            else:
+                yield files
+        except:  # noqa
+            # ^ noqa cause we want to delete them no matter what if there was a failure
+            # only remove them if there was an error
+            _delete_files_if_exist([Path(f.name) for f in files])
+            raise
+
+        for tp, fname in zip(files, filename):
+            _submit_move(Path(tp.name), Path(fname), blocking=blocking)
 
 
 def save_file(
-    item, supported_formats: dict, filename: str, enforced_format: str = None
+    item,
+    supported_formats: dict,
+    filename: str,
+    enforced_format: str = None,
+    blocking: bool = True,
 ):
     """
     Save file. It can take yaml, json, pickle, json, npz and torch save
     """
 
     # check whether folder exist
-    path = dirname(realpath(filename))
-    if not isdir(path):
+    path = os.path.dirname(os.path.realpath(filename))
+    if not os.path.isdir(path):
         logging.debug(f"save_file make dirs {path}")
-        makedirs(path, exist_ok=True)
+        os.makedirs(path, exist_ok=True)
 
     format, filename = adjust_format_name(
         supported_formats=supported_formats,
@@ -51,17 +205,25 @@ def save_file(
         enforced_format=enforced_format,
     )
 
-    with atomic_write(filename) as write_to:
+    with atomic_write(
+        filename,
+        blocking=blocking,
+        binary={
+            "json": False,
+            "yaml": False,
+            "pickle": True,
+            "torch": True,
+            "npz": True,
+        }[format],
+    ) as write_to:
         if format == "json":
             import json
 
-            with open(write_to, "w+") as fout:
-                json.dump(item, fout)
+            json.dump(item, write_to)
         elif format == "yaml":
             import yaml
 
-            with open(write_to, "w+") as fout:
-                yaml.dump(item, fout)
+            yaml.dump(item, write_to)
         elif format == "torch":
             import torch
 
@@ -69,8 +231,7 @@ def save_file(
         elif format == "pickle":
             import pickle
 
-            with open(write_to, "wb") as fout:
-                pickle.save(item, fout)
+            pickle.dump(item, write_to)
         elif format == "npz":
             import numpy as np
 
@@ -93,7 +254,7 @@ def load_file(supported_formats: dict, filename: str, enforced_format: str = Non
     else:
         format = enforced_format
 
-    if not isfile(filename):
+    if not os.path.isfile(filename):
         abs_path = str(Path(filename).resolve())
         raise OSError(f"file {filename} at {abs_path} is not found")
 

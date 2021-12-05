@@ -1,6 +1,7 @@
+from typing import Optional
 import logging
 
-from nequip.data import AtomicDataDict
+from nequip.data import AtomicDataDict, AtomicDataset
 from nequip.nn import (
     SequentialGraphNetwork,
     AtomwiseLinear,
@@ -13,13 +14,21 @@ from nequip.nn.embedding import (
     SphericalHarmonicEdgeAttrs,
 )
 
+from . import builder_utils
 
-def EnergyModel(config) -> SequentialGraphNetwork:
+
+def EnergyModel(
+    config, initialize: bool, dataset: Optional[AtomicDataset] = None
+) -> SequentialGraphNetwork:
     """Base default energy model archetecture.
 
     For minimal and full configuration option listings, see ``minimal.yaml`` and ``example.yaml``.
     """
     logging.debug("Start building the network model")
+
+    builder_utils.add_avg_num_neighbors(
+        config=config, initialize=initialize, dataset=dataset
+    )
 
     num_layers = config.get("num_layers", 3)
 

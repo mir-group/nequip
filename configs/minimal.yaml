@@ -1,7 +1,8 @@
 # general
 root: results/aspirin
 run_name: minimal
-seed: 0
+seed: 123
+dataset_seed: 456
 
 # network
 num_basis: 8

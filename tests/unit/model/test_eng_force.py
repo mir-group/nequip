@@ -21,6 +21,7 @@ logging.basicConfig(level=logging.DEBUG)
 COMMON_CONFIG = {
     "num_types": 3,
     "types_names": ["H", "C", "O"],
+    "avg_num_neighbors": None,
 }
 r_max = 3
 minimal_config1 = dict(
@@ -216,6 +217,43 @@ class TestGradient:
             assert torch.isclose(numeric, analytical, atol=2e-2) or torch.isclose(
                 numeric, analytical, rtol=5e-2
             )
+
+    def test_partial_forces(self, atomic_batch, device):
+        config = minimal_config1.copy()
+        config["model_builders"] = [
+            "EnergyModel",
+            "ForceOutput",
+        ]
+        partial_config = config.copy()
+        partial_config["model_builders"] = [
+            "EnergyModel",
+            "PartialForceOutput",
+        ]
+        model = model_from_config(config=config, initialize=True)
+        partial_model = model_from_config(config=partial_config, initialize=True)
+        model.to(device)
+        partial_model.to(device)
+        partial_model.load_state_dict(model.state_dict())
+        data = atomic_batch.to(device)
+        output = model(AtomicData.to_AtomicDataDict(data))
+        output_partial = partial_model(AtomicData.to_AtomicDataDict(data))
+        # everything should be the same
+        # including the
+        for k in output:
+            assert k != AtomicDataDict.PARTIAL_FORCE_KEY
+            assert k in output_partial
+            if output[k].is_floating_point():
+                assert torch.allclose(
+                    output[k],
+                    output_partial[k],
+                    atol=1e-6 if k == AtomicDataDict.FORCE_KEY else 1e-8,
+                )
+            else:
+                assert torch.equal(output[k], output_partial[k])
+        n_at = data[AtomicDataDict.POSITIONS_KEY].shape[0]
+        partial_forces = output_partial[AtomicDataDict.PARTIAL_FORCE_KEY]
+        assert partial_forces.shape == (n_at, n_at, 3)
+        # TODO check sparsity?
 
 
 class TestAutoGradient:
