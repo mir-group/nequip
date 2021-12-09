@@ -386,8 +386,10 @@ class AtomicInMemoryDataset(AtomicDataset):
             data_transformed = self.data.to_dict()
         # pre-select arrays
         # this ensures that all following computations use the right data
+        all_keys = set()
         selectors = {}
         for k in list(ff_transformed.keys()) + list(data_transformed.keys()):
+            all_keys.add(k)
             if k in _NODE_FIELDS:
                 selectors[k] = node_selector
             elif k in _GRAPH_FIELDS:
@@ -420,7 +422,10 @@ class AtomicInMemoryDataset(AtomicDataset):
                 )  # all statistics must be on floating
                 assert arr_is_per in ("node", "graph", "edge")
             else:
-                # Give a better error
+                if field not in all_keys:
+                    raise RuntimeError(
+                        f"The field key `{field}` is not present in this dataset"
+                    )
                 if field not in selectors:
                     # this means field is not selected and so not available
                     raise RuntimeError(
@@ -525,7 +530,10 @@ class AtomicInMemoryDataset(AtomicDataset):
 
     @staticmethod
     def _per_atom_statistics(
-        ana_mode: str, arr: torch.Tensor, batch: torch.Tensor, unbiased: bool = True,
+        ana_mode: str,
+        arr: torch.Tensor,
+        batch: torch.Tensor,
+        unbiased: bool = True,
     ):
         """Compute "per-atom" statistics that are normalized by the number of atoms in the system.
 
@@ -842,7 +850,10 @@ class ASEDataset(AtomicInMemoryDataset):
         atoms_list = self.get_atoms()
 
         # skip the None arguments
-        kwargs = dict(include_keys=self.include_keys, key_mapping=self.key_mapping,)
+        kwargs = dict(
+            include_keys=self.include_keys,
+            key_mapping=self.key_mapping,
+        )
         kwargs = {k: v for k, v in kwargs.items() if v is not None}
         kwargs.update(self.extra_fixed_fields)
 
