@@ -344,7 +344,7 @@ class TestCutoff:
         atoms2.positions += 40.0 + np.random.randn(3)
         atoms_both = atoms1.copy()
         atoms_both.extend(atoms2)
-        tm = TypeMapper(chemical_symbol_to_type={"H": 0, "C": 1, "O": 2})
+        tm = TypeMapper(chemical_symbols=["H", "C", "O"])
         data1 = tm(AtomicData.from_ase(atoms1, r_max=r_max))
         data2 = tm(AtomicData.from_ase(atoms2, r_max=r_max))
         data_both = tm(AtomicData.from_ase(atoms_both, r_max=r_max))
