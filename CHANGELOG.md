@@ -21,6 +21,7 @@ Most recent change on the bottom.
 - Equivariance testing no longer unintentionally skips translation
 - Correct cat dim for all registered per-graph fields
 - Equivariance testing correctly handles output cells
+- Handling of `include_frames` with `ASEDataset`
 
 ## [0.5.0] - 2021-11-24
 ### Changed

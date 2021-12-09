@@ -865,6 +865,8 @@ class ASEDataset(AtomicInMemoryDataset):
             return (
                 [
                     AtomicData.from_ase(atoms=atoms_list[i], **kwargs)
-                    for i in self.include_frames
+                    if i in self.include_frames
+                    else None
+                    for i in range(len(atoms_list))
                 ],
             )
