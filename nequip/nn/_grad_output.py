@@ -212,9 +212,9 @@ class StressOutput(GraphModuleMixin, torch.nn.Module):
         data = AtomicDataDict.with_batch(data)
         batch = data[AtomicDataDict.BATCH_KEY]
         num_batch: int = int(batch.max().cpu().item()) + 1
-        data[AtomicDataDict.CELL_KEY] = (
-            data[AtomicDataDict.CELL_KEY].view(-1, 3, 3).expand(num_batch, 3, 3)
-        )
+
+        orig_cell = data[AtomicDataDict.CELL_KEY]
+        data[AtomicDataDict.CELL_KEY] = orig_cell.view(-1, 3, 3).expand(num_batch, 3, 3)
         # Add the displacements
         # the GradientOutput will make them require grad
         # See https://github.com/atomistic-machine-learning/schnetpack/blob/master/src/schnetpack/atomistic/model.py#L45
@@ -250,6 +250,7 @@ class StressOutput(GraphModuleMixin, torch.nn.Module):
         )[..., None]
         assert len(volume) == num_batch
         data[AtomicDataDict.STRESS_KEY] = data[AtomicDataDict.STRESS_KEY] / volume
+        data[AtomicDataDict.CELL_KEY] = orig_cell
 
         # Remove helper
         del data["_displacement"]
