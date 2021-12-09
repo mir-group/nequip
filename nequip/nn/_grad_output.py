@@ -251,8 +251,6 @@ class StressOutput(GraphModuleMixin, torch.nn.Module):
         assert len(volume) == num_batch
         data[AtomicDataDict.STRESS_KEY] = data[AtomicDataDict.STRESS_KEY] / volume
 
-        breakpoint()
-
         # Remove helper
         del data["_displacement"]
 

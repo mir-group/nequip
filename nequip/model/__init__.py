@@ -1,5 +1,5 @@
 from ._eng import EnergyModel
-from ._grads import ForceOutput, PartialForceOutput
+from ._grads import ForceOutput, PartialForceOutput, StressForceOutput
 from ._scaling import RescaleEnergyEtc, PerSpeciesRescale
 from ._weight_init import uniform_initialize_FCs, initialize_from_state
 
@@ -11,6 +11,7 @@ __all__ = [
     EnergyModel,
     ForceOutput,
     PartialForceOutput,
+    StressForceOutput,
     RescaleEnergyEtc,
     PerSpeciesRescale,
     uniform_initialize_FCs,
