@@ -81,14 +81,14 @@ def config(request):
 
 @pytest.fixture(
     params=[
-        # (
-        #     ["EnergyModel", "ForceOutput"],
-        #     AtomicDataDict.FORCE_KEY,
-        # ),
-        # (
-        #     ["EnergyModel"],
-        #     AtomicDataDict.TOTAL_ENERGY_KEY,
-        # ),
+        (
+            ["EnergyModel", "ForceOutput"],
+            AtomicDataDict.FORCE_KEY,
+        ),
+        (
+            ["EnergyModel"],
+            AtomicDataDict.TOTAL_ENERGY_KEY,
+        ),
         (
             ["EnergyModel", "StressForceOutput"],
             AtomicDataDict.STRESS_KEY,
