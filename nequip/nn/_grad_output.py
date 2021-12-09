@@ -198,13 +198,13 @@ class StressOutput(GraphModuleMixin, torch.nn.Module):
         # check and init irreps
         irreps_in = self._grad.irreps_in.copy()
         assert AtomicDataDict.POSITIONS_KEY in irreps_in
-        irreps_in[AtomicDataDict.CELL_KEY] = None  # three vectors
         del irreps_in["_displacement"]
         self._init_irreps(
             irreps_in=irreps_in,
             irreps_out=self._grad.irreps_out,
         )
         del self.irreps_out["_displacement"]
+        self.irreps_out[AtomicDataDict.STRESS_KEY] = "3x1o"
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
         # TODO: does any of this make sense without PBC? check it

@@ -173,27 +173,30 @@ def assert_AtomicData_equivariant(
     def wrapper(*args):
         arg_dict = {k: v for k, v in zip(irreps_in, args)}
         # cell is a special case
-        if AtomicDataDict.CELL_KEY in arg_dict:
-            # unflatten
-            cell = arg_dict[AtomicDataDict.CELL_KEY]
-            assert cell.shape[-1] == 9
-            arg_dict[AtomicDataDict.CELL_KEY] = cell.reshape(cell.shape[:-1] + (3, 3))
+        for key in (AtomicDataDict.CELL_KEY, AtomicDataDict.STRESS_KEY):
+            if key in arg_dict:
+                # unflatten
+                val = arg_dict[key]
+                assert val.shape[-1] == 9
+                arg_dict[key] = val.reshape(val.shape[:-1] + (3, 3))
         output = func(arg_dict)
         # cell is a special case
-        if AtomicDataDict.CELL_KEY in output:
-            # flatten
-            cell = output[AtomicDataDict.CELL_KEY]
-            assert cell.shape[-2:] == (3, 3)
-            output[AtomicDataDict.CELL_KEY] = cell.reshape(cell.shape[:-2] + (9,))
+        for key in (AtomicDataDict.CELL_KEY, AtomicDataDict.STRESS_KEY):
+            if key in output:
+                # flatten
+                val = output[key]
+                assert val.shape[-2:] == (3, 3)
+                output[key] = val.reshape(val.shape[:-2] + (9,))
         return [output[k] for k in irreps_out]
 
     data_in = AtomicData.to_AtomicDataDict(data_in)
     # cell is a special case
-    if AtomicDataDict.CELL_KEY in data_in:
-        # flatten
-        cell = data_in[AtomicDataDict.CELL_KEY]
-        assert cell.shape[-2:] == (3, 3)
-        data_in[AtomicDataDict.CELL_KEY] = cell.reshape(cell.shape[:-2] + (9,))
+    for key in (AtomicDataDict.CELL_KEY, AtomicDataDict.STRESS_KEY):
+        if key in data_in:
+            # unflatten
+            val = data_in[key]
+            assert val.shape[-2:] == (3, 3)
+            data_in[key] = val.reshape(val.shape[:-2] + (9,))
 
     args_in = [data_in[k] for k in irreps_in]
 
