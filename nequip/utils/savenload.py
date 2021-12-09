@@ -43,7 +43,7 @@ def _process_moves(moves: List[Tuple[bool, Path, Path]]):
 
 
 # allow user to enable/disable depending on their filesystem
-_ASYNC_ENABLED = os.environ.get("NEQUIP_ASYNC_IO", "true").lower()
+_ASYNC_ENABLED = os.environ.get("NEQUIP_ASYNC_IO", "false").lower()
 assert _ASYNC_ENABLED in ("true", "false")
 _ASYNC_ENABLED = _ASYNC_ENABLED == "true"
 
