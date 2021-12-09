@@ -182,9 +182,9 @@ def assert_AtomicData_equivariant(
         # cell is a special case
         if AtomicDataDict.CELL_KEY in output:
             # flatten
-            cell = arg_dict[AtomicDataDict.CELL_KEY]
+            cell = output[AtomicDataDict.CELL_KEY]
             assert cell.shape[-2:] == (3, 3)
-            arg_dict[AtomicDataDict.CELL_KEY] = cell.reshape(cell.shape[:-2] + (9,))
+            output[AtomicDataDict.CELL_KEY] = cell.reshape(cell.shape[:-2] + (9,))
         return [output[k] for k in irreps_out]
 
     data_in = AtomicData.to_AtomicDataDict(data_in)

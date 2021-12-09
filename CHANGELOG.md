@@ -19,6 +19,7 @@ Most recent change on the bottom.
 ### Fixed
 - Equivariance testing no longer unintentionally skips translation
 - Correct cat dim for all registered per-graph fields
+- Equivariance testing correctly handles output cells
 
 ## [0.5.0] - 2021-11-24
 ### Changed
