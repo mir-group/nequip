@@ -69,7 +69,7 @@ def RescaleEnergyEtc(
             global_shift = computed_stats[str_names.index(global_shift)]
             logging.debug(f"Replace string {s} to {global_shift}")
 
-        if isinstance(global_scale, float) and global_scale < RESCALE_THRESHOLD:
+        if global_scale is not None and global_scale < RESCALE_THRESHOLD:
             raise ValueError(
                 f"Global energy scaling was very low: {global_scale}. If dataset values were used, does the dataset contain insufficient variation? Maybe try disabling global scaling with global_scale=None."
             )
