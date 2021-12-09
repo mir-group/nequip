@@ -70,6 +70,7 @@ class EMTTestDataset(AtomicInMemoryDataset):
                     base_atoms,
                     forces=base_atoms.get_forces(),
                     total_energy=base_atoms.get_potential_energy(),
+                    stress=base_atoms.get_stress(voigt=False),
                     **self.extra_fixed_fields
                 )
             )
