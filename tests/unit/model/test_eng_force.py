@@ -89,6 +89,10 @@ def config(request):
             ["EnergyModel"],
             AtomicDataDict.TOTAL_ENERGY_KEY,
         ),
+        (
+            ["EnergyModel", "StressForceOutput"],
+            AtomicDataDict.STRESS_KEY,
+        ),
     ]
 )
 def model(request, config):
