@@ -5,23 +5,93 @@ Authors: Albert Musaelian
 
 import warnings
 from copy import deepcopy
-from typing import Union, Tuple, Dict, Optional, List
+from typing import Union, Tuple, Dict, Optional, List, Set, Sequence
 from collections.abc import Mapping
 
 import numpy as np
 import ase.neighborlist
 import ase
 from ase.calculators.singlepoint import SinglePointCalculator, SinglePointDFTCalculator
+from ase.calculators.calculator import all_properties as ase_all_properties
 
 import torch
-from torch_geometric.data import Data
 import e3nn.o3
 
 from . import AtomicDataDict
 from ._util import _TORCH_INTEGER_DTYPES
+from nequip.utils.torch_geometric import Data
 
 # A type representing ASE-style periodic boundary condtions, which can be partial (the tuple case)
 PBC = Union[bool, Tuple[bool, bool, bool]]
+
+_DEFAULT_NODE_FIELDS: Set[str] = {
+    AtomicDataDict.POSITIONS_KEY,
+    AtomicDataDict.WEIGHTS_KEY,
+    AtomicDataDict.NODE_FEATURES_KEY,
+    AtomicDataDict.NODE_ATTRS_KEY,
+    AtomicDataDict.ATOMIC_NUMBERS_KEY,
+    AtomicDataDict.ATOM_TYPE_KEY,
+    AtomicDataDict.FORCE_KEY,
+    AtomicDataDict.PER_ATOM_ENERGY_KEY,
+    AtomicDataDict.BATCH_KEY,
+}
+_DEFAULT_EDGE_FIELDS: Set[str] = {
+    AtomicDataDict.EDGE_CELL_SHIFT_KEY,
+    AtomicDataDict.EDGE_VECTORS_KEY,
+    AtomicDataDict.EDGE_LENGTH_KEY,
+    AtomicDataDict.EDGE_ATTRS_KEY,
+    AtomicDataDict.EDGE_EMBEDDING_KEY,
+}
+_DEFAULT_GRAPH_FIELDS: Set[str] = {
+    AtomicDataDict.TOTAL_ENERGY_KEY,
+}
+_NODE_FIELDS: Set[str] = set(_DEFAULT_NODE_FIELDS)
+_EDGE_FIELDS: Set[str] = set(_DEFAULT_EDGE_FIELDS)
+_GRAPH_FIELDS: Set[str] = set(_DEFAULT_GRAPH_FIELDS)
+
+
+def register_fields(
+    node_fields: Sequence[str] = [],
+    edge_fields: Sequence[str] = [],
+    graph_fields: Sequence[str] = [],
+) -> None:
+    r"""Register fields as being per-atom, per-edge, or per-frame.
+
+    Args:
+        node_permute_fields: fields that are equivariant to node permutations.
+        edge_permute_fields: fields that are equivariant to edge permutations.
+    """
+    node_fields: set = set(node_fields)
+    edge_fields: set = set(edge_fields)
+    graph_fields: set = set(graph_fields)
+    allfields = node_fields.union(edge_fields, graph_fields)
+    assert len(allfields) == len(node_fields) + len(edge_fields) + len(graph_fields)
+    _NODE_FIELDS.update(node_fields)
+    _EDGE_FIELDS.update(edge_fields)
+    _GRAPH_FIELDS.update(graph_fields)
+    if len(set.union(_NODE_FIELDS, _EDGE_FIELDS, _GRAPH_FIELDS)) < (
+        len(_NODE_FIELDS) + len(_EDGE_FIELDS) + len(_GRAPH_FIELDS)
+    ):
+        raise ValueError(
+            "At least one key was registered as more than one of node, edge, or graph!"
+        )
+
+
+def deregister_fields(*fields: Sequence[str]) -> None:
+    r"""Deregister a field registered with ``register_fields``.
+
+    Silently ignores fields that were never registered to begin with.
+
+    Args:
+        *fields: fields to deregister.
+    """
+    for f in fields:
+        assert f not in _DEFAULT_NODE_FIELDS, "Cannot deregister built-in field"
+        assert f not in _DEFAULT_EDGE_FIELDS, "Cannot deregister built-in field"
+        assert f not in _DEFAULT_GRAPH_FIELDS, "Cannot deregister built-in field"
+        _NODE_FIELDS.discard(f)
+        _EDGE_FIELDS.discard(f)
+        _GRAPH_FIELDS.discard(f)
 
 
 class AtomicData(Data):
@@ -50,7 +120,7 @@ class AtomicData(Data):
         node_attrs (Tensor [n_atom, ...]): the attributes of the nodes, for instance the atom type, optional
         batch (Tensor [n_atom]): the graph to which the node belongs, optional
         atomic_numbers (Tensor [n_atom]): optional.
-        species_index (Tensor [n_atom]): optional.
+        atom_type (Tensor [n_atom]): optional.
         **kwargs: other data, optional.
     """
 
@@ -68,7 +138,7 @@ class AtomicData(Data):
             if (
                 k == AtomicDataDict.EDGE_INDEX_KEY
                 or k == AtomicDataDict.ATOMIC_NUMBERS_KEY
-                or k == AtomicDataDict.SPECIES_INDEX_KEY
+                or k == AtomicDataDict.ATOM_TYPE_KEY
                 or k == AtomicDataDict.BATCH_KEY
             ):
                 # Any property used as an index must be long (or byte or bool, but those are not relevant for atomic scale systems)
@@ -82,13 +152,42 @@ class AtomicData(Data):
             elif np.issubdtype(type(v), np.floating):
                 # Force scalars to be tensors with a data dimension
                 # This makes them play well with irreps
-                kwargs[k] = torch.as_tensor(
-                    v, dtype=torch.get_default_dtype()
-                ).unsqueeze(-1)
+                kwargs[k] = torch.as_tensor(v, dtype=torch.get_default_dtype())
             elif isinstance(v, torch.Tensor) and len(v.shape) == 0:
                 # ^ this tensor is a scalar; we need to give it
                 # a data dimension to play nice with irreps
+                kwargs[k] = v
+
+        if AtomicDataDict.BATCH_KEY in kwargs:
+            num_frames = kwargs[AtomicDataDict.BATCH_KEY].max() + 1
+        else:
+            num_frames = 1
+
+        for k, v in kwargs.items():
+
+            if len(kwargs[k].shape) == 0:
                 kwargs[k] = v.unsqueeze(-1)
+                v = kwargs[k]
+
+            if (
+                k in _NODE_FIELDS
+                and v.shape[0] != kwargs[AtomicDataDict.POSITIONS_KEY].shape[0]
+            ):
+                raise ValueError(
+                    f"{k} is a node field but has the wrong dimension {v.shape}"
+                )
+            elif (
+                k in _EDGE_FIELDS
+                and v.shape[0] != kwargs[AtomicDataDict.EDGE_INDEX_KEY].shape[1]
+            ):
+                raise ValueError(
+                    f"{k} is a edge field but has the wrong dimension {v.shape}"
+                )
+            elif k in _GRAPH_FIELDS:
+                if num_frames == 1 and v.shape[0] != 1:
+                    kwargs[k] = v.unsqueeze(0)
+                elif v.shape[0] != num_frames:
+                    raise ValueError(f"Wrong shape for graph property {k}")
 
         super().__init__(num_nodes=len(kwargs["pos"]), **kwargs)
 
@@ -154,8 +253,7 @@ class AtomicData(Data):
             strict_self_interaction (bool): Whether to include *any* self interaction edges in the graph, even if the
             two instances of the atom are in different periodic images. Defaults to True, should be True for most
             applications.
-            **kwargs (optional): other information to pass to the ``torch_geometric.data.Data`` constructor for
-            inclusion in the object. Keys listed in ``AtomicDataDict.*_KEY` will be treated specially.
+            **kwargs (optional): other fields to add. Keys listed in ``AtomicDataDict.*_KEY` will be treated specially.
         """
         if pos is None or r_max is None:
             raise ValueError("pos and r_max must be given.")
@@ -196,7 +294,14 @@ class AtomicData(Data):
         return cls(edge_index=edge_index, pos=torch.as_tensor(pos), **kwargs)
 
     @classmethod
-    def from_ase(cls, atoms, r_max, **kwargs):
+    def from_ase(
+        cls,
+        atoms,
+        r_max,
+        key_mapping: Optional[Dict[str, str]] = {},
+        include_keys: Optional[list] = [],
+        **kwargs,
+    ):
         """Build a ``AtomicData`` from an ``ase.Atoms`` object.
 
         Respects ``atoms``'s ``pbc`` and ``cell``.
@@ -211,51 +316,84 @@ class AtomicData(Data):
             r_max (float): neighbor cutoff radius.
             features (torch.Tensor shape [N, M], optional): per-atom M-dimensional feature vectors. If ``None`` (the
              default), uses a one-hot encoding of the species present in ``atoms``.
+            include_keys (list): list of additional keys to include in AtomicData aside from the ones defined in
+                 ase.calculators.calculator.all_properties. Optional
+            key_mapping (dict): rename ase property name to a new string name. Optional
             **kwargs (optional): other arguments for the ``AtomicData`` constructor.
 
         Returns:
             A ``AtomicData``.
         """
+        from nequip.ase import NequIPCalculator
+
+        assert "pos" not in kwargs
+
+        default_args = set(
+            [
+                "numbers",
+                "positions",
+            ]  # ase internal names for position and atomic_numbers
+            + ["pbc", "cell", "pos", "r_max"]  # arguments for from_points method
+            + list(kwargs.keys())
+        )
+        # the keys that are duplicated in kwargs are removed from the include_keys
+        include_keys = list(set(include_keys + ase_all_properties) - default_args)
+
+        km = {
+            "forces": AtomicDataDict.FORCE_KEY,
+            "energy": AtomicDataDict.TOTAL_ENERGY_KEY,
+        }
+        km.update(key_mapping)
+        key_mapping = km
+
         add_fields = {}
+
+        # Get info from atoms.arrays; lowest priority. copy first
+        add_fields = {
+            key_mapping.get(k, k): v
+            for k, v in atoms.arrays.items()
+            if k in include_keys
+        }
+
+        # Get info from atoms.info; second lowest priority.
+        add_fields.update(
+            {
+                key_mapping.get(k, k): v
+                for k, v in atoms.info.items()
+                if k in include_keys
+            }
+        )
+
         if atoms.calc is not None:
+
             if isinstance(
                 atoms.calc, (SinglePointCalculator, SinglePointDFTCalculator)
             ):
-                add_fields = deepcopy(atoms.calc.results)
-                if "forces" in add_fields:
-                    add_fields.pop("forces")
-                    add_fields[AtomicDataDict.FORCE_KEY] = atoms.get_forces()
-
-                if "free_energy" in add_fields and "energy" not in add_fields:
-                    add_fields[AtomicDataDict.TOTAL_ENERGY_KEY] = add_fields.pop(
-                        "free_energy"
-                    )
-                elif "energy" in add_fields:
-                    add_fields[AtomicDataDict.TOTAL_ENERGY_KEY] = add_fields.pop(
-                        "energy"
-                    )
-
-        if AtomicDataDict.FORCE_KEY not in add_fields:
-            # Get it from arrays
-            for k in ("force", "forces"):
-                if k in atoms.arrays:
-                    add_fields[AtomicDataDict.FORCE_KEY] = atoms.arrays[k]
-                    break
-
-        if AtomicDataDict.TOTAL_ENERGY_KEY not in add_fields:
-            # Get it from arrays
-            for k in ("energy", "energies"):
-                if k in atoms.arrays:
-                    add_fields[AtomicDataDict.TOTAL_ENERGY_KEY] = atoms.arrays[k]
-                    break
+                add_fields.update(
+                    {
+                        key_mapping.get(k, k): deepcopy(v)
+                        for k, v in atoms.calc.results.items()
+                        if k in include_keys
+                    }
+                )
+            elif isinstance(atoms.calc, NequIPCalculator):
+                pass  # otherwise the calculator breaks
+            else:
+                raise NotImplementedError(
+                    f"`from_ase` does not support calculator {atoms.calc}"
+                )
 
         add_fields[AtomicDataDict.ATOMIC_NUMBERS_KEY] = atoms.get_atomic_numbers()
+
+        # cell and pbc in kwargs can override the ones stored in atoms
+        cell = kwargs.pop("cell", atoms.get_cell())
+        pbc = kwargs.pop("pbc", atoms.pbc)
 
         return cls.from_points(
             pos=atoms.positions,
             r_max=r_max,
-            cell=atoms.get_cell(),
-            pbc=atoms.pbc,
+            cell=cell,
+            pbc=pbc,
             **kwargs,
             **add_fields,
         )
@@ -276,7 +414,13 @@ class AtomicData(Data):
             raise TypeError(
                 "Explicitly move this `AtomicData` to CPU using `.to()` before calling `to_ase()`."
             )
-        atomic_nums = self.atomic_numbers
+        if AtomicDataDict.ATOMIC_NUMBERS_KEY in self:
+            atomic_nums = self.atomic_numbers
+        else:
+            warnings.warn(
+                "AtomicData.to_ase(): self didn't contain atomic numbers... using atom_type as atomic numbers instead, but this means the chemical symbols in ASE (outputs) will be wrong"
+            )
+            atomic_nums = self[AtomicDataDict.ATOM_TYPE_KEY]
         pbc = getattr(self, AtomicDataDict.PBC_KEY, None)
         cell = getattr(self, AtomicDataDict.CELL_KEY, None)
         batch = getattr(self, AtomicDataDict.BATCH_KEY, None)

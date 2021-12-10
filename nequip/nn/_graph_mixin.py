@@ -78,6 +78,25 @@ class GraphModuleMixin:
         new_out.update(irreps_out)
         self.irreps_out = new_out
 
+    def _add_independent_irreps(self, irreps: Dict[str, Any]):
+        """
+        Insert some independent irreps that need to be exposed to the self.irreps_in and self.irreps_out.
+        The terms that have already appeared in the irreps_in will be removed.
+
+        Args:
+            irreps (dict): maps names of all new fields
+        """
+
+        irreps = {
+            key: irrep for key, irrep in irreps.items() if key not in self.irreps_in
+        }
+        irreps_in = AtomicDataDict._fix_irreps_dict(irreps)
+        irreps_out = AtomicDataDict._fix_irreps_dict(
+            {key: irrep for key, irrep in irreps.items() if key not in self.irreps_out}
+        )
+        self.irreps_in.update(irreps_in)
+        self.irreps_out.update(irreps_out)
+
     def _make_tracing_inputs(self, n):
         # We impliment this to be able to trace graph modules
         out = []
@@ -89,7 +108,11 @@ class GraphModuleMixin:
             out.append(
                 {
                     "forward": (
-                        {k: i.randn(batch, -1) for k, i in self.irreps_in.items()},
+                        {
+                            k: i.randn(batch, -1)
+                            for k, i in self.irreps_in.items()
+                            if i is not None
+                        },
                     )
                 }
             )
@@ -229,43 +252,91 @@ class SequentialGraphNetwork(GraphModuleMixin, torch.nn.Sequential):
         self.append(name, instance)
         return
 
-    def insert(self, after: str, name: str, module: GraphModuleMixin) -> None:
+    def insert(
+        self,
+        name: str,
+        module: GraphModuleMixin,
+        after: Optional[str] = None,
+        before: Optional[str] = None,
+    ) -> None:
         """Insert a module after the module with name ``after``.
 
         Args:
-            after: the module to insert after
             name: the name of the module to insert
             module: the moldule to insert
+            after: the module to insert after
+            before: the module to insert before
         """
+
+        if (before is None) is (after is None):
+            raise ValueError("Only one of before or after argument needs to be defined")
+        elif before is None:
+            insert_location = after
+        else:
+            insert_location = before
+
         # This checks names, etc.
         self.add_module(name, module)
         # Now insert in the right place by overwriting
         names = list(self._modules.keys())
         modules = list(self._modules.values())
-        idx = names.index(after)
-        names.insert(idx + 1, name)
-        modules.insert(idx + 1, module)
+        idx = names.index(insert_location)
+        if before is None:
+            idx += 1
+        names.insert(idx, name)
+        modules.insert(idx, module)
+
         self._modules = OrderedDict(zip(names, modules))
+
+        module_list = list(self._modules.values())
+
+        # sanity check the compatibility
+        if idx > 0:
+            assert AtomicDataDict._irreps_compatible(
+                module_list[idx - 1].irreps_out, module.irreps_in
+            )
+        if len(module_list) > idx:
+            assert AtomicDataDict._irreps_compatible(
+                module_list[idx + 1].irreps_in, module.irreps_out
+            )
+
+        # insert the new irreps_out to the later modules
+        for module_id, next_module in enumerate(module_list[idx + 1 :]):
+            next_module._add_independent_irreps(module.irreps_out)
+
+        # update the final wrapper irreps_out
+        self.irreps_out = dict(module_list[-1].irreps_out)
+
         return
 
     def insert_from_parameters(
         self,
-        after: str,
         shared_params: Mapping,
         name: str,
         builder: Callable,
         params: Dict[str, Any] = {},
+        after: Optional[str] = None,
+        before: Optional[str] = None,
     ) -> None:
         r"""Build a module from parameters and insert it after ``after``.
 
         Args:
-            after: the name of the module to insert after
             shared_params (dict-like): shared parameters from which to pull when instantiating the module
             name (str): the name for the module
             builder (callable): a class or function to build a module
             params (dict, optional): extra specific parameters for this module that take priority over those in ``shared_params``
+            after: the name of the module to insert after
+            before: the name of the module to insert before
         """
-        idx = list(self._modules.keys()).index(after)
+        if (before is None) is (after is None):
+            raise ValueError("Only one of before or after argument needs to be defined")
+        elif before is None:
+            insert_location = after
+        else:
+            insert_location = before
+        idx = list(self._modules.keys()).index(insert_location) - 1
+        if before is None:
+            idx += 1
         instance, _ = instantiate(
             builder=builder,
             prefix=name,
@@ -273,7 +344,7 @@ class SequentialGraphNetwork(GraphModuleMixin, torch.nn.Sequential):
             optional_args=params,
             all_args=shared_params,
         )
-        self.insert(after, name, instance)
+        self.insert(after=after, before=before, name=name, module=instance)
         return
 
     # Copied from https://pytorch.org/docs/stable/_modules/torch/nn/modules/container.html#Sequential

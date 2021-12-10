@@ -242,7 +242,7 @@ class Config(object):
         pass
 
     def save(self, filename: str, format: Optional[str] = None):
-        """ Print config to file. """
+        """Print config to file."""
 
         supported_formats = {"yaml": ("yml", "yaml"), "json": "json"}
         return save_file(
@@ -254,7 +254,7 @@ class Config(object):
 
     @staticmethod
     def from_file(filename: str, format: Optional[str] = None, defaults: dict = {}):
-        """ Load arguments from file """
+        """Load arguments from file"""
 
         supported_formats = {"yaml": ("yml", "yaml"), "json": "json"}
         dictionary = load_file(

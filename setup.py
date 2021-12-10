@@ -20,9 +20,8 @@ setup(
         # make the scripts available as command line scripts
         "console_scripts": [
             "nequip-train = nequip.scripts.train:main",
-            "nequip-restart = nequip.scripts.restart:main",
-            "nequip-requeue = nequip.scripts.requeue:main",
             "nequip-evaluate = nequip.scripts.evaluate:main",
+            "nequip-benchmark = nequip.scripts.benchmark:main",
             "nequip-deploy = nequip.scripts.deploy:main",
         ]
     },
@@ -30,13 +29,14 @@ setup(
         "numpy",
         "ase",
         "tqdm",
-        "torch>=1.8",
-        "torch_geometric==1.7.2",
-        "e3nn>=0.3.3",
+        "torch>=1.8,<1.11",  # torch.fx added in 1.8
+        "e3nn>=0.3.5,<0.5.0",
         "pyyaml",
         "contextlib2;python_version<'3.7'",  # backport of nullcontext
-        "typing_extensions;python_version<'3.8'",
-        "torch-runstats",
+        "typing_extensions;python_version<'3.8'",  # backport of Final
+        "torch-runstats>=0.2.0",
+        "torch-ema>=0.3.0",
+        "scikit_learn",  # for GaussianProcess for per-species statistics
     ],
     zip_safe=True,
 )
