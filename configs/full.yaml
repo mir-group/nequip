@@ -14,7 +14,7 @@ seed: 0                                                                         
 append: true                                                                      # set true if a restarted run should append to the previous log file
 default_dtype: float32                                                            # type of float to use, e.g. float32 and float64
 allow_tf32: false                                                                 # whether to use TensorFloat32 if it is available
-device:  cuda                                                                     # which device to use. Default: automatically detected cuda or "cpu"
+# device: cuda                                                                     # which device to use. Default: automatically detected cuda or "cpu"
 
 # network
 r_max: 4.0                                                                        # cutoff radius in length units, here Angstrom, this is an important hyperparamter to scan
@@ -139,12 +139,12 @@ report_init_validation: false                                                   
 
 # early stopping based on metrics values. 
 # LR, wall and any keys printed in the log file can be used. 
-# The key can start with Training or Validation. If not defined, the validation value will be used.
+# The key can start with Training or validation. If not defined, the validation value will be used.
 early_stopping_patiences:                                                          # stop early if a metric value stopped decreasing for n epochs
-  Validation_loss: 50
+  validation_loss: 50
 
 early_stopping_delta:                                                              # If delta is defined, a decrease smaller than delta will not be considered as a decrease
-  Validation_loss: 0.005
+  validation_loss: 0.005
 
 early_stopping_cumulative_delta: false                                             # If True, the minimum value recorded will not be updated when the decrease is smaller than delta
 
