@@ -72,11 +72,7 @@ def dataset_from_config(config, prefix: str = "dataset") -> AtomicDataset:
     type_mapper, _ = instantiate(TypeMapper, prefix=prefix, optional_args=config)
 
     # Register fields:
-    register_fields(
-        node_fields=config.get("node_fields", []),
-        edge_fields=config.get("edge_fields", []),
-        graph_fields=config.get("graph_fields", []),
-    )
+    instantiate(register_fields, all_args=config)
 
     instance, _ = instantiate(
         class_name,

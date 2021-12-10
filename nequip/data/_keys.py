@@ -38,6 +38,7 @@ ATOM_TYPE_KEY: Final[str] = "atom_types"
 PER_ATOM_ENERGY_KEY: Final[str] = "atomic_energy"
 TOTAL_ENERGY_KEY: Final[str] = "total_energy"
 FORCE_KEY: Final[str] = "forces"
+PARTIAL_FORCE_KEY: Final[str] = "partial_forces"
 
 BATCH_KEY: Final[str] = "batch"
 
