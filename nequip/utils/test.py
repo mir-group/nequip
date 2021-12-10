@@ -2,7 +2,7 @@ from typing import Union
 
 import torch
 from e3nn import o3
-from e3nn.util.test import assert_equivariant
+from e3nn.util.test import equivariance_error, FLOAT_TOLERANCE
 
 from nequip.nn import GraphModuleMixin
 from nequip.data import (
@@ -139,7 +139,7 @@ def assert_AtomicData_equivariant(
         **kwargs: passed to ``e3nn.util.test.assert_equivariant``
 
     Returns:
-        Information on equivariance error from ``e3nn.util.test.assert_equivariant``
+        A string describing the results of the test.
     """
     # Prevent pytest from showing this function in the traceback
     __tracebackhide__ = True
@@ -173,6 +173,8 @@ def assert_AtomicData_equivariant(
             )
             # must be this to actually rotate it
             irps[AtomicDataDict.CELL_KEY] = "3x1o"
+        if AtomicDataDict.STRESS_KEY in irps:
+            irps[AtomicDataDict.STRESS_KEY] = "0e + 1o + 2e"
 
     def wrapper(*args):
         arg_dict = {k: v for k, v in zip(irreps_in, args)}
@@ -191,6 +193,16 @@ def assert_AtomicData_equivariant(
                 val = output[key]
                 assert val.shape[-2:] == (3, 3)
                 output[key] = val.reshape(val.shape[:-2] + (9,))
+        # stress is also a special case,
+        # we need it to be decomposed into irreps for equivar testing
+        if AtomicDataDict.STRESS_KEY in output:
+            from e3nn.io import CartesianTensor
+
+            # TODO
+            ct = CartesianTensor("ij=ji")
+            output[AtomicDataDict.STRESS_KEY] = ct.from_cartesian(
+                output[AtomicDataDict.STRESS_KEY]
+            )
         return [output[k] for k in irreps_out]
 
     data_in = AtomicData.to_AtomicDataDict(data_in)
@@ -204,13 +216,39 @@ def assert_AtomicData_equivariant(
 
     args_in = [data_in[k] for k in irreps_in]
 
-    return assert_equivariant(
+    errs = equivariance_error(
         wrapper,
         args_in=args_in,
         irreps_in=list(irreps_in.values()),
         irreps_out=list(irreps_out.values()),
         **kwargs,
     )
+
+    threshold = FLOAT_TOLERANCE[torch.get_default_dtype()]
+    if any(results.max() > threshold for results in errs.values()):
+        description = "Equivariance test failed:\n" + "\n".join(
+            "   (parity_k={},translate={}) -> ".format(int(test[0]), bool(test[1]))
+            + "; ".join(
+                "error {:.3e} above threshold for key `{}`".format(
+                    results[i],
+                    list(irreps_out.keys())[i],
+                )
+                for i in torch.where(results > threshold)[0]
+            )
+            for test, results in errs.items()
+        )
+        raise AssertionError(description)
+
+    description = "Equivariance test results:\n" + "\n".join(
+        "   (parity_k={},translate={}) -> max error={:.3e} on `{}`".format(
+            int(test[0]),
+            bool(test[1]),
+            results.max(),
+            list(irreps_out.keys())[int(results.argmax())],
+        )
+        for test, results in errs.items()
+    )
+    return description
 
 
 _DEBUG_HOOKS = None
