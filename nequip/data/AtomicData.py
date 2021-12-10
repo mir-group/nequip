@@ -51,6 +51,7 @@ _DEFAULT_EDGE_FIELDS: Set[str] = {
 }
 _DEFAULT_GRAPH_FIELDS: Set[str] = {
     AtomicDataDict.TOTAL_ENERGY_KEY,
+    AtomicDataDict.STRESS_KEY,
     AtomicDataDict.PBC_KEY,
     AtomicDataDict.CELL_KEY,
 }
