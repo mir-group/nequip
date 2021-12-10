@@ -51,11 +51,15 @@ def assert_permutation_equivariant(
     n_node: int = len(data_in[AtomicDataDict.POSITIONS_KEY])
     while True:
         node_perm = torch.randperm(n_node, device=device)
+        if n_node <= 1:
+            break  # otherwise inf loop
         if not torch.all(node_perm == torch.arange(n_node, device=device)):
             break
     n_edge: int = data_in[AtomicDataDict.EDGE_INDEX_KEY].shape[1]
     while True:
         edge_perm = torch.randperm(n_edge, device=device)
+        if n_edge <= 1:
+            break  # otherwise inf loop
         if not torch.all(edge_perm == torch.arange(n_edge, device=device)):
             break
     # ^ note that these permutations are maps from the "to" index to the "from" index

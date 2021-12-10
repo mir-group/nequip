@@ -22,6 +22,7 @@ Most recent change on the bottom.
 - Correct cat dim for all registered per-graph fields
 - Equivariance testing correctly handles output cells
 - Handling of `include_frames` with `ASEDataset`
+- Equivariance testing correctly handles one-node or one-edge data
 
 ## [0.5.0] - 2021-11-24
 ### Changed
