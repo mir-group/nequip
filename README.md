@@ -4,7 +4,7 @@ NequIP is an open-source code for building E(3)-equivariant interatomic potentia
 
 [![Documentation Status](https://readthedocs.org/projects/nequip/badge/?version=latest)](https://nequip.readthedocs.io/en/latest/?badge=latest)
 
-![nequip](./nequip.png)
+![nequip](./logo.png)
 
 **PLEASE NOTE:** the NequIP code is under active development and is still in beta versions 0.x.x. In general changes to the patch version (the third number) indicate backward compatible beta releases, but please be aware that file formats and APIs may change. Bug reports are also welcomed in the GitHub issues!
 
@@ -51,6 +51,10 @@ pytest tests/
 ```
 
 Note: the integration tests have hung in the past on certain systems that have GPUs. If this happens to you, please report it along with information on your software environment in the [Issues](https://github.com/mir-group/nequip/issues)!
+
+## Tutorial 
+
+The best way to learn how to use NequIP is through the [Colab Tutorial](https://bit.ly/mrs-nequip). This will run entirely on Google Hardware, you will not need to install anything, but can instead simply run it in your browser. 
 
 ## Usage
 
