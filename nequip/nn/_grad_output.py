@@ -179,37 +179,21 @@ class StressOutput(GraphModuleMixin, torch.nn.Module):
             raise NotImplementedError
         self.do_forces = do_forces
 
-        # Displacement is cartesian tensor, is not in irreps
-        energy_model.irreps_in["_displacement"] = None
-
-        self._grad = GradientOutput(
-            func=energy_model,
-            of=AtomicDataDict.TOTAL_ENERGY_KEY,
-            wrt=[
-                AtomicDataDict.POSITIONS_KEY,
-                "_displacement",
-            ],
-            out_field=[
-                AtomicDataDict.FORCE_KEY,
-                AtomicDataDict.STRESS_KEY,
-            ],
-        )
+        self.energy_model = energy_model
 
         # check and init irreps
-        irreps_in = self._grad.irreps_in.copy()
-        assert AtomicDataDict.POSITIONS_KEY in irreps_in
-        del irreps_in["_displacement"]
         self._init_irreps(
-            irreps_in=irreps_in,
-            irreps_out=self._grad.irreps_out,
+            irreps_in=self.energy_model.irreps_in.copy(),
+            irreps_out=self.energy_model.irreps_out.copy(),
         )
-        del self.irreps_out["_displacement"]
+        self.irreps_out[AtomicDataDict.FORCE_KEY] = "1o"
         self.irreps_out[AtomicDataDict.STRESS_KEY] = "3x1o"
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
         # TODO: does any of this make sense without PBC? check it
         # Make the cell per-batch
         data = AtomicDataDict.with_batch(data)
+
         batch = data[AtomicDataDict.BATCH_KEY]
         num_batch: int = int(batch.max().cpu().item()) + 1
 
@@ -226,6 +210,7 @@ class StressOutput(GraphModuleMixin, torch.nn.Module):
         displacement.requires_grad_(True)
         data["_displacement"] = displacement
         pos = data[AtomicDataDict.POSITIONS_KEY]
+        pos.requires_grad_(True)
         # bmm is natom in batch
         data[AtomicDataDict.POSITIONS_KEY] = pos + torch.bmm(
             pos.unsqueeze(-2), displacement[batch]
@@ -235,10 +220,16 @@ class StressOutput(GraphModuleMixin, torch.nn.Module):
         data[AtomicDataDict.CELL_KEY] = cell + torch.bmm(cell, displacement)
 
         # Call model and get gradients
-        data = self._grad(data)
+        data = self.energy_model(data)
+
+        grads = torch.autograd.grad(
+            [data[AtomicDataDict.TOTAL_ENERGY_KEY].sum()],
+            [pos, data["_displacement"]],
+            create_graph=self.training,  # needed to allow gradients of this output during training
+        )
 
         # Put negative sign on forces
-        data[AtomicDataDict.FORCE_KEY] = torch.neg(data[AtomicDataDict.FORCE_KEY])
+        data[AtomicDataDict.FORCE_KEY] = torch.neg(grads[0])
 
         # Rescale stress tensor
         # See https://github.com/atomistic-machine-learning/schnetpack/blob/master/src/schnetpack/atomistic/output_modules.py#L180
@@ -249,10 +240,11 @@ class StressOutput(GraphModuleMixin, torch.nn.Module):
             keepdim=True,
         )[..., None]
         assert len(volume) == num_batch
-        data[AtomicDataDict.STRESS_KEY] = data[AtomicDataDict.STRESS_KEY] / volume
+        data[AtomicDataDict.STRESS_KEY] = grads[1] / volume
         data[AtomicDataDict.CELL_KEY] = orig_cell
 
         # Remove helper
         del data["_displacement"]
+        pos.requires_grad_(False)
 
         return data
