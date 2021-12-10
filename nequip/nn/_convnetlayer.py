@@ -16,9 +16,9 @@ from nequip.utils.tp_utils import tp_path_exists
 
 acts = {
     "abs": torch.abs,
-    "tanh": torch.tanh,
-    "ssp": ShiftedSoftPlus,
-    "silu": torch.nn.functional.silu,
+    "tanh": torch.nn.Tanh(),
+    "ssp": ShiftedSoftPlus(),
+    "silu": torch.nn.SiLU(),
 }
 
 
