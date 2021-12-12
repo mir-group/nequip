@@ -492,9 +492,7 @@ class Trainer:
             if len(builder) > 1:
                 # it's not a single name which is from nequip
                 codes_for_git.add(builder[0])
-        dictionary[f"code_versions"] = {
-            code: get_commit(code) for code in codes_for_git
-        }
+        dictionary["code_versions"] = {code: get_commit(code) for code in codes_for_git}
 
         return dictionary
 
@@ -665,7 +663,10 @@ class Trainer:
         if config.get("compile_model", False):
             model = torch.jit.load(traindir + "/" + model_name, map_location=device)
         else:
-            model = model_from_config(config=config, initialize=False,)
+            model = model_from_config(
+                config=config,
+                initialize=False,
+            )
             if model is not None:
                 # TODO: this is not exactly equivalent to building with
                 # this set as default dtype... does it matter?
@@ -875,7 +876,8 @@ class Trainer:
                 self.n_batches = len(dataset)
                 for self.ibatch, batch in enumerate(dataset):
                     self.batch_step(
-                        data=batch, validation=(category == VALIDATION),
+                        data=batch,
+                        validation=(category == VALIDATION),
                     )
                     self.end_of_batch_log(batch_type=category)
                     for callback in self.end_of_batch_callbacks:
@@ -1022,7 +1024,11 @@ class Trainer:
 
         lr = self.optim.param_groups[0]["lr"]
         wall = perf_counter() - self.wall
-        self.mae_dict = dict(LR=lr, epoch=self.iepoch, wall=wall,)
+        self.mae_dict = dict(
+            LR=lr,
+            epoch=self.iepoch,
+            wall=wall,
+        )
 
         header = "epoch, wall, LR"
 
