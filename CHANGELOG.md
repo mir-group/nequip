@@ -12,6 +12,7 @@ Most recent change on the bottom.
 - Asynchronous IO: during training, models are written asynchronously.
 - `dataset_seed` to separately control randomness used to select training data (and their order). Enable this with environment variable `NEQUIP_ASYNC_IO=true`.
 - The types may now be specified with a simpler `chemical_symbols` option
+- Equivariance testing reports per-field errors
 
 ### Changed
 - All fields now have consistant [N, dim] shaping

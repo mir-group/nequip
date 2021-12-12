@@ -180,11 +180,7 @@ def fresh_start(config):
 
     # Equivar test
     if config.equivariance_test:
-        from e3nn.util.test import format_equivariance_error
-
-        equivar_err = assert_AtomicData_equivariant(final_model, dataset[0])
-        errstr = format_equivariance_error(equivar_err)
-        del equivar_err
+        errstr = assert_AtomicData_equivariant(final_model, dataset[0])
         logging.info(f"Equivariance test passed; equivariance errors:\n{errstr}")
         del errstr
 
