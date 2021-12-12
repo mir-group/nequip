@@ -488,6 +488,8 @@ class Trainer:
 
         codes_for_git = {"e3nn", "nequip"}
         for builder in self.model_builders:
+            if not isinstance(builder, str):
+                continue
             builder = builder.split(".")
             if len(builder) > 1:
                 # it's not a single name which is from nequip
