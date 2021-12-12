@@ -485,8 +485,16 @@ class Trainer:
 
         for code in [e3nn, nequip, torch]:
             dictionary[f"{code.__name__}_version"] = code.__version__
-        for code in ["e3nn", "nequip"]:
-            dictionary[f"{code}_commit"] = get_commit(code)
+
+        codes_for_git = {"e3nn", "nequip"}
+        for builder in self.model_builders:
+            builder = builder.split(".")
+            if len(builder) > 1:
+                # it's not a single name which is from nequip
+                codes_for_git.add(builder[0])
+        dictionary[f"code_versions"] = {
+            code: get_commit(code) for code in codes_for_git
+        }
 
         return dictionary
 
