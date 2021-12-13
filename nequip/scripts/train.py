@@ -180,10 +180,18 @@ def fresh_start(config):
 
     # Equivar test
     if config.equivariance_test:
-        final_model.eval()
+        # final_model.eval()
         errstr = assert_AtomicData_equivariant(final_model, dataset[0])
         final_model.train()
-        logging.info(f"Equivariance test passed; equivariance errors:\n{errstr}")
+        logging.info(
+            "Equivariance test passed; equivariance errors:\n"
+            "   Errors are in real units, where relevant.\n"
+            "   Please note that the large scale of the typical\n"
+            "   shifts to the (atomic) energy can cause\n"
+            "   catastrophic cancellation and give incorrectly\n"
+            "   the equivariance error as zero for those fields.\n"
+            f"{errstr}"
+        )
         del errstr
 
     # Set the trainer
