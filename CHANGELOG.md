@@ -21,6 +21,7 @@ Most recent change on the bottom.
 ### Fixed
 - Equivariance testing no longer unintentionally skips translation
 - Correct cat dim for all registered per-graph fields
+- `PerSpeciesScaleShift` now correctly outputs when scales, but not shifts, are enabled— previously it was broken and would only output updated values when both were enabled.
 
 ## [0.5.0] - 2021-11-24
 ### Changed
