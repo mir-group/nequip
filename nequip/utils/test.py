@@ -1,8 +1,8 @@
-from typing import Union
+from typing import Union, Optional
 
 import torch
 from e3nn import o3
-from e3nn.util.test import assert_equivariant
+from e3nn.util.test import equivariance_error, FLOAT_TOLERANCE
 
 from nequip.nn import GraphModuleMixin
 from nequip.data import (
@@ -24,7 +24,9 @@ def _inverse_permutation(perm):
 
 
 def assert_permutation_equivariant(
-    func: GraphModuleMixin, data_in: AtomicDataDict.Type
+    func: GraphModuleMixin,
+    data_in: AtomicDataDict.Type,
+    tolerance: Optional[float] = None,
 ):
     r"""Test the permutation equivariance of ``func``.
 
@@ -39,7 +41,10 @@ def assert_permutation_equivariant(
     # Prevent pytest from showing this function in the traceback
     # __tracebackhide__ = True
 
-    atol = PERMUTATION_FLOAT_TOLERANCE[torch.get_default_dtype()]
+    if tolerance is None:
+        atol = PERMUTATION_FLOAT_TOLERANCE[torch.get_default_dtype()]
+    else:
+        atol = tolerance
 
     data_in = data_in.copy()
     device = data_in[AtomicDataDict.POSITIONS_KEY].device
@@ -120,8 +125,10 @@ def assert_permutation_equivariant(
 def assert_AtomicData_equivariant(
     func: GraphModuleMixin,
     data_in: Union[AtomicData, AtomicDataDict.Type],
+    permutation_tolerance: Optional[float] = None,
+    o3_tolerance: Optional[float] = None,
     **kwargs,
-):
+) -> str:
     r"""Test the rotation, translation, parity, and permutation equivariance of ``func``.
 
     For details on permutation testing, see ``assert_permutation_equivariant``.
@@ -135,7 +142,7 @@ def assert_AtomicData_equivariant(
         **kwargs: passed to ``e3nn.util.test.assert_equivariant``
 
     Returns:
-        Information on equivariance error from ``e3nn.util.test.assert_equivariant``
+        A string description of the errors.
     """
     # Prevent pytest from showing this function in the traceback
     __tracebackhide__ = True
@@ -144,10 +151,7 @@ def assert_AtomicData_equivariant(
         data_in = AtomicData.to_AtomicDataDict(data_in)
 
     # == Test permutation of graph nodes ==
-    assert_permutation_equivariant(
-        func,
-        data_in,
-    )
+    assert_permutation_equivariant(func, data_in, tolerance=permutation_tolerance)
 
     # == Test rotation, parity, and translation using e3nn ==
     irreps_in = {k: None for k in AtomicDataDict.ALLOWED_KEYS}
@@ -197,13 +201,59 @@ def assert_AtomicData_equivariant(
 
     args_in = [data_in[k] for k in irreps_in]
 
-    return assert_equivariant(
+    errs = equivariance_error(
         wrapper,
         args_in=args_in,
         irreps_in=list(irreps_in.values()),
         irreps_out=list(irreps_out.values()),
         **kwargs,
     )
+
+    if o3_tolerance is None:
+        o3_tolerance = FLOAT_TOLERANCE[torch.get_default_dtype()]
+    anerr = next(iter(errs.values()))
+    if isinstance(anerr, float) or anerr.ndim == 0:
+        # old e3nn doesn't report which key
+        problems = {k: v for k, v in errs.items() if v > o3_tolerance}
+
+        def _describe(errors):
+            return "\n".join(
+                "(parity_k={:d}, did_translate={}) -> max error={:.3e}".format(
+                    int(k[0]),
+                    bool(k[1]),
+                    float(v),
+                )
+                for k, v in errors.items()
+            )
+
+        if len(problems) > 0:
+            raise AssertionError(
+                "Equivariance test failed for cases:" + _describe(problems)
+            )
+
+        return _describe(errs)
+    else:
+        # it's newer and tells us which is which
+        all_errs = []
+        for case, err in errs.items():
+            for key, this_err in zip(irreps_out.keys(), err):
+                all_errs.append(case + (key, this_err))
+        problems = [e for e in all_errs if e[-1] > o3_tolerance]
+
+        def _describe(errors):
+            return "\n".join(
+                "   (parity_k={:1d}, did_translate={:5}, field={:20}) -> max error={:.3e}".format(
+                    int(k[0]), str(bool(k[1])), str(k[2]), float(k[3])
+                )
+                for k in errors
+            )
+
+        if len(problems) > 0:
+            raise AssertionError(
+                "Equivariance test failed for cases:\n" + _describe(problems)
+            )
+
+        return _describe(all_errs)
 
 
 _DEBUG_HOOKS = None
