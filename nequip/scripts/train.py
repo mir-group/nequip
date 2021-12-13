@@ -180,7 +180,9 @@ def fresh_start(config):
 
     # Equivar test
     if config.equivariance_test:
+        final_model.eval()
         errstr = assert_AtomicData_equivariant(final_model, dataset[0])
+        final_model.train()
         logging.info(f"Equivariance test passed; equivariance errors:\n{errstr}")
         del errstr
 
