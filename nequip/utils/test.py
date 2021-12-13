@@ -211,7 +211,8 @@ def assert_AtomicData_equivariant(
 
     if o3_tolerance is None:
         o3_tolerance = FLOAT_TOLERANCE[torch.get_default_dtype()]
-    if isinstance(next(iter(errs.values())), float):
+    anerr = next(iter(errs.values()))
+    if isinstance(anerr, float) or anerr.ndim == 0:
         # old e3nn doesn't report which key
         problems = {k: v for k, v in errs.items() if v > o3_tolerance}
 
