@@ -106,10 +106,13 @@ def deregister_fields(*fields: Sequence[str]) -> None:
         _GRAPH_FIELDS.discard(f)
 
 
-def _process_dict(kwargs):
+def _process_dict(kwargs, ignore_fields=[]):
     """Convert a dict of data into correct dtypes/shapes according to key"""
     # Deal with _some_ dtype issues
     for k, v in kwargs.items():
+        if k in ignore_fields:
+            continue
+
         if k in _LONG_FIELDS:
             # Any property used as an index must be long (or byte or bool, but those are not relevant for atomic scale systems)
             # int32 would pass later checks, but is actually disallowed by torch
@@ -134,6 +137,8 @@ def _process_dict(kwargs):
         num_frames = 1
 
     for k, v in kwargs.items():
+        if k in ignore_fields:
+            continue
 
         if len(v.shape) == 0:
             kwargs[k] = v.unsqueeze(-1)

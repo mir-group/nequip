@@ -281,7 +281,7 @@ class AtomicInMemoryDataset(AtomicDataset):
         del fields
 
         # type conversion
-        _process_dict(fixed_fields)
+        _process_dict(fixed_fields, ignore_fields=["r_max"])
 
         logging.info(f"Loaded data: {data}")
 
