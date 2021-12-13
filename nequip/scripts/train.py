@@ -77,8 +77,10 @@ def parse_command_line(args=None):
     parser.add_argument("config", help="configuration file")
     parser.add_argument(
         "--equivariance-test",
-        help="test the model's equivariance before training",
-        action="store_true",
+        help="test the model's equivariance before training on n (default 1) random frames from the dataset",
+        const=1,
+        type=int,
+        nargs="?",
     )
     parser.add_argument(
         "--model-debug-mode",
@@ -179,9 +181,14 @@ def fresh_start(config):
         logging.info("Successfully compiled model...")
 
     # Equivar test
-    if config.equivariance_test:
-        # final_model.eval()
-        errstr = assert_AtomicData_equivariant(final_model, dataset[0])
+    if config.equivariance_test > 0:
+        n_train: int = len(trainer.dataset_train)
+        assert config.equivariance_test <= n_train
+        final_model.eval()
+        indexes = torch.randperm(n_train)[: config.equivariance_test]
+        errstr = assert_AtomicData_equivariant(
+            final_model, [trainer.dataset_train[i] for i in indexes]
+        )
         final_model.train()
         logging.info(
             "Equivariance test passed; equivariance errors:\n"
@@ -192,7 +199,7 @@ def fresh_start(config):
             "   the equivariance error as zero for those fields.\n"
             f"{errstr}"
         )
-        del errstr
+        del errstr, indexes, n_train
 
     # Set the trainer
     trainer.model = final_model

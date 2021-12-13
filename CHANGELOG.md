@@ -13,10 +13,12 @@ Most recent change on the bottom.
 - `dataset_seed` to separately control randomness used to select training data (and their order). Enable this with environment variable `NEQUIP_ASYNC_IO=true`.
 - The types may now be specified with a simpler `chemical_symbols` option
 - Equivariance testing reports per-field errors
+- `--equivariance-test n` tests equivariance on `n` frames from the training dataset
 
 ### Changed
 - All fields now have consistant [N, dim] shaping
 - Changed default `seed` and `dataset_seed` in example YAMLs
+- Equivariance testing can only use training frames now
 
 ### Fixed
 - Equivariance testing no longer unintentionally skips translation

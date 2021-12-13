@@ -1,4 +1,4 @@
-from typing import Union, Optional
+from typing import Union, Optional, List
 
 import torch
 from e3nn import o3
@@ -124,7 +124,9 @@ def assert_permutation_equivariant(
 
 def assert_AtomicData_equivariant(
     func: GraphModuleMixin,
-    data_in: Union[AtomicData, AtomicDataDict.Type],
+    data_in: Union[
+        AtomicData, AtomicDataDict.Type, List[Union[AtomicData, AtomicDataDict.Type]]
+    ],
     permutation_tolerance: Optional[float] = None,
     o3_tolerance: Optional[float] = None,
     **kwargs,
@@ -138,7 +140,7 @@ def assert_AtomicData_equivariant(
 
     Args:
         func: the module or model to test
-        data_in: the example input data to test with
+        data_in: the example input data(s) to test with. Only the first is used for permutation testing.
         **kwargs: passed to ``e3nn.util.test.assert_equivariant``
 
     Returns:
@@ -147,16 +149,18 @@ def assert_AtomicData_equivariant(
     # Prevent pytest from showing this function in the traceback
     __tracebackhide__ = True
 
-    if not isinstance(data_in, dict):
-        data_in = AtomicData.to_AtomicDataDict(data_in)
+    if not isinstance(data_in, list):
+        data_in = [data_in]
+    data_in = [AtomicData.to_AtomicDataDict(d) for d in data_in]
 
     # == Test permutation of graph nodes ==
-    assert_permutation_equivariant(func, data_in, tolerance=permutation_tolerance)
+    # TODO: since permutation is distinct, run only on one.
+    assert_permutation_equivariant(func, data_in[0], tolerance=permutation_tolerance)
 
     # == Test rotation, parity, and translation using e3nn ==
     irreps_in = {k: None for k in AtomicDataDict.ALLOWED_KEYS}
     irreps_in.update(func.irreps_in)
-    irreps_in = {k: v for k, v in irreps_in.items() if k in data_in}
+    irreps_in = {k: v for k, v in irreps_in.items() if k in data_in[0]}
     irreps_out = func.irreps_out.copy()
     # for certain things, we don't care what the given irreps are...
     # make sure that we test correctly for equivariance:
@@ -191,23 +195,28 @@ def assert_AtomicData_equivariant(
             arg_dict[AtomicDataDict.CELL_KEY] = cell.reshape(cell.shape[:-2] + (9,))
         return [output[k] for k in irreps_out]
 
-    data_in = AtomicData.to_AtomicDataDict(data_in)
-    # cell is a special case
-    if AtomicDataDict.CELL_KEY in data_in:
-        # flatten
-        cell = data_in[AtomicDataDict.CELL_KEY]
-        assert cell.shape[-2:] == (3, 3)
-        data_in[AtomicDataDict.CELL_KEY] = cell.reshape(cell.shape[:-2] + (9,))
+    # prepare input data
+    for d in data_in:
+        # cell is a special case
+        if AtomicDataDict.CELL_KEY in d:
+            # flatten
+            cell = d[AtomicDataDict.CELL_KEY]
+            assert cell.shape[-2:] == (3, 3)
+            d[AtomicDataDict.CELL_KEY] = cell.reshape(cell.shape[:-2] + (9,))
 
-    args_in = [data_in[k] for k in irreps_in]
+    errs = [
+        equivariance_error(
+            wrapper,
+            args_in=[d[k] for k in irreps_in],
+            irreps_in=list(irreps_in.values()),
+            irreps_out=list(irreps_out.values()),
+            **kwargs,
+        )
+        for d in data_in
+    ]
 
-    errs = equivariance_error(
-        wrapper,
-        args_in=args_in,
-        irreps_in=list(irreps_in.values()),
-        irreps_out=list(irreps_out.values()),
-        **kwargs,
-    )
+    # take max across errors
+    errs = {k: torch.max(torch.vstack([e[k] for e in errs]), dim=0)[0] for k in errs[0]}
 
     if o3_tolerance is None:
         o3_tolerance = FLOAT_TOLERANCE[torch.get_default_dtype()]
