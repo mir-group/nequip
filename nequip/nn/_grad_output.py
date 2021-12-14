@@ -239,7 +239,12 @@ class StressOutput(GraphModuleMixin, torch.nn.Module):
         )
 
         # Put negative sign on forces
-        data[AtomicDataDict.FORCE_KEY] = torch.neg(grads[0])
+        forces = grads[0]
+        if forces is None:
+            # condition needed to unwrap optional for torchscript
+            assert False, "failed to compute forces autograd"
+        forces = torch.neg(forces)
+        data[AtomicDataDict.FORCE_KEY] = forces
 
         # Rescale stress tensor
         # See https://github.com/atomistic-machine-learning/schnetpack/blob/master/src/schnetpack/atomistic/output_modules.py#L180
@@ -250,7 +255,13 @@ class StressOutput(GraphModuleMixin, torch.nn.Module):
             keepdim=True,
         )[..., None]
         assert len(volume) == num_batch
-        data[AtomicDataDict.STRESS_KEY] = grads[1] / volume
+
+        stress = grads[1]
+        if stress is None:
+            # condition needed to unwrap optional for torchscript
+            assert False, "failed to compute stress autograd"
+        stress = stress / volume
+        data[AtomicDataDict.STRESS_KEY] = stress
         data[AtomicDataDict.CELL_KEY] = orig_cell
 
         # Remove helper
