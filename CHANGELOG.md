@@ -14,6 +14,8 @@ Most recent change on the bottom.
 - The types may now be specified with a simpler `chemical_symbols` option
 - Equivariance testing reports per-field errors
 - `--equivariance-test n` tests equivariance on `n` frames from the training dataset
+- `EMTTestDataset` for quick synthetic fake PBC data
+- Support for stress
 
 ### Changed
 - All fields now have consistant [N, dim] shaping

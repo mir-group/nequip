@@ -8,19 +8,23 @@ import ase.build
 from ase.calculators.emt import EMT
 
 from nequip.data import AtomicInMemoryDataset, AtomicData, AtomicDataDict
+from .transforms import TypeMapper
 
 
 class EMTTestDataset(AtomicInMemoryDataset):
     """Test dataset with PBC based on the toy EMT potential included in ASE.
 
-    Randomly generates (in a reproducable manner) a basic bulk with added Gaussian noise.
+    Randomly generates (in a reproducable manner) a basic bulk with added
+    Gaussian noise around equilibrium positions.
+
+    In ASE units (eV/Å).
     """
 
     def __init__(
         self,
         root: str,
         supercell: Tuple[int, int, int] = (4, 4, 4),
-        sigma: float = 0.25,
+        sigma: float = 0.1,
         element: str = "Cu",
         num_frames: int = 10,
         dataset_seed: int = 123456,
@@ -28,6 +32,7 @@ class EMTTestDataset(AtomicInMemoryDataset):
         url: Optional[str] = None,
         extra_fixed_fields: Dict[str, Any] = {},
         include_frames: Optional[List[int]] = None,
+        type_mapper: TypeMapper = None,
     ):
         # Set properties for hashing
         assert element in ("Cu", "Pd", "Au", "Pt", "Al", "Ni", "Ag")
@@ -44,6 +49,7 @@ class EMTTestDataset(AtomicInMemoryDataset):
             force_fixed_keys=[AtomicDataDict.CELL_KEY, AtomicDataDict.PBC_KEY],
             extra_fixed_fields=extra_fixed_fields,
             include_frames=include_frames,
+            type_mapper=type_mapper,
         )
 
     @property
@@ -65,9 +71,10 @@ class EMTTestDataset(AtomicInMemoryDataset):
             base_atoms.positions += rng.normal(
                 loc=0.0, scale=self.sigma, size=base_atoms.positions.shape
             )
+
             datas.append(
                 AtomicData.from_ase(
-                    base_atoms,
+                    base_atoms.copy(),
                     forces=base_atoms.get_forces(),
                     total_energy=base_atoms.get_potential_energy(),
                     stress=base_atoms.get_stress(voigt=False),
