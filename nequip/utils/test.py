@@ -181,13 +181,16 @@ def assert_AtomicData_equivariant(
             )
             # must be this to actually rotate it
             irps[AtomicDataDict.CELL_KEY] = "3x1o"
-        if AtomicDataDict.STRESS_KEY in irps:
-            irps[AtomicDataDict.STRESS_KEY] = "0e + 1o + 2e"
+
+    irreps_in.pop(AtomicDataDict.STRESS_KEY, None)
+    if AtomicDataDict.STRESS_KEY in irreps_out:
+        # symmetric 3x3 cartesian tensor
+        irreps_out[AtomicDataDict.STRESS_KEY] = "0e + 2e"
 
     def wrapper(*args):
         arg_dict = {k: v for k, v in zip(irreps_in, args)}
         # cell is a special case
-        for key in (AtomicDataDict.CELL_KEY, AtomicDataDict.STRESS_KEY):
+        for key in (AtomicDataDict.CELL_KEY,):
             if key in arg_dict:
                 # unflatten
                 val = arg_dict[key]
@@ -195,7 +198,7 @@ def assert_AtomicData_equivariant(
                 arg_dict[key] = val.reshape(val.shape[:-1] + (3, 3))
         output = func(arg_dict)
         # cell is a special case
-        for key in (AtomicDataDict.CELL_KEY, AtomicDataDict.STRESS_KEY):
+        for key in (AtomicDataDict.CELL_KEY,):
             if key in output:
                 # flatten
                 val = output[key]
@@ -206,8 +209,7 @@ def assert_AtomicData_equivariant(
         if AtomicDataDict.STRESS_KEY in output:
             from e3nn.io import CartesianTensor
 
-            # TODO
-            ct = CartesianTensor("ij=ji")
+            ct = CartesianTensor("ij=ji")  # stress is symmetric
             output[AtomicDataDict.STRESS_KEY] = ct.from_cartesian(
                 output[AtomicDataDict.STRESS_KEY]
             )
