@@ -28,6 +28,7 @@ from nequip.utils.batch_ops import bincount
 from nequip.utils.regressor import solver
 from nequip.utils.savenload import atomic_write
 from .transforms import TypeMapper
+from .AtomicData import _process_dict
 
 
 class AtomicDataset(Dataset):
@@ -280,18 +281,7 @@ class AtomicInMemoryDataset(AtomicDataset):
         del fields
 
         # type conversion
-        for key, value in fixed_fields.items():
-            if isinstance(value, np.ndarray):
-                if np.issubdtype(value.dtype, np.floating):
-                    fixed_fields[key] = torch.as_tensor(
-                        value, dtype=torch.get_default_dtype()
-                    )
-                else:
-                    fixed_fields[key] = torch.as_tensor(value)
-            elif np.issubdtype(type(value), np.floating):
-                fixed_fields[key] = torch.as_tensor(
-                    value, dtype=torch.get_default_dtype()
-                )
+        _process_dict(fixed_fields, ignore_fields=["r_max"])
 
         logging.info(f"Loaded data: {data}")
 
