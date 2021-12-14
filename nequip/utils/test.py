@@ -184,8 +184,11 @@ def assert_AtomicData_equivariant(
 
     irreps_in.pop(AtomicDataDict.STRESS_KEY, None)
     if AtomicDataDict.STRESS_KEY in irreps_out:
-        # symmetric 3x3 cartesian tensor
-        irreps_out[AtomicDataDict.STRESS_KEY] = "0e + 2e"
+        from e3nn.io import CartesianTensor
+
+        stress_cart_tensor = CartesianTensor("ij=ji")  # stress is symmetric
+        # symmetric 3x3 cartesian tensor as irreps
+        irreps_out[AtomicDataDict.STRESS_KEY] = stress_cart_tensor
 
     def wrapper(*args):
         arg_dict = {k: v for k, v in zip(irreps_in, args)}
@@ -207,10 +210,7 @@ def assert_AtomicData_equivariant(
         # stress is also a special case,
         # we need it to be decomposed into irreps for equivar testing
         if AtomicDataDict.STRESS_KEY in output:
-            from e3nn.io import CartesianTensor
-
-            ct = CartesianTensor("ij=ji")  # stress is symmetric
-            output[AtomicDataDict.STRESS_KEY] = ct.from_cartesian(
+            output[AtomicDataDict.STRESS_KEY] = stress_cart_tensor.from_cartesian(
                 output[AtomicDataDict.STRESS_KEY]
             )
         return [output[k] for k in irreps_out]
