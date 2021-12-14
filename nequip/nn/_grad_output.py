@@ -215,15 +215,19 @@ class StressOutput(GraphModuleMixin, torch.nn.Module):
         )
         displacement.requires_grad_(True)
         data["_displacement"] = displacement
+        # in the above paper, the infinitesimal distortion is *symmetric*
+        # so we symmetrize the displacement before applying it to
+        # the positions/cell
+        symmetric_displacement = 0.5 * (displacement + displacement.transpose(-1, -2))
         pos = data[AtomicDataDict.POSITIONS_KEY]
         pos.requires_grad_(True)
         # bmm is natom in batch
         data[AtomicDataDict.POSITIONS_KEY] = pos + torch.bmm(
-            pos.unsqueeze(-2), displacement[batch]
+            pos.unsqueeze(-2), symmetric_displacement[batch]
         ).squeeze(-2)
         cell = data[AtomicDataDict.CELL_KEY]
         # bmm is num_batch in batch
-        data[AtomicDataDict.CELL_KEY] = cell + torch.bmm(cell, displacement)
+        data[AtomicDataDict.CELL_KEY] = cell + torch.bmm(cell, symmetric_displacement)
 
         # Call model and get gradients
         data = self.energy_model(data)
