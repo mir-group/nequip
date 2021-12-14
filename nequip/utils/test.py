@@ -156,6 +156,10 @@ def assert_AtomicData_equivariant(
     if not isinstance(data_in, list):
         data_in = [data_in]
     data_in = [AtomicData.to_AtomicDataDict(d) for d in data_in]
+    device, dtype = (
+        data_in[0][AtomicDataDict.POSITIONS_KEY].device,
+        data_in[0][AtomicDataDict.POSITIONS_KEY].dtype,
+    )
 
     # == Test permutation of graph nodes ==
     # TODO: since permutation is distinct, run only on one.
@@ -187,6 +191,7 @@ def assert_AtomicData_equivariant(
         from e3nn.io import CartesianTensor
 
         stress_cart_tensor = CartesianTensor("ij=ji")  # stress is symmetric
+        stress_rtp = stress_cart_tensor.reduced_tensor_products().to(device, dtype)
         # symmetric 3x3 cartesian tensor as irreps
         irreps_out[AtomicDataDict.STRESS_KEY] = stress_cart_tensor
 
@@ -211,7 +216,7 @@ def assert_AtomicData_equivariant(
         # we need it to be decomposed into irreps for equivar testing
         if AtomicDataDict.STRESS_KEY in output:
             output[AtomicDataDict.STRESS_KEY] = stress_cart_tensor.from_cartesian(
-                output[AtomicDataDict.STRESS_KEY]
+                output[AtomicDataDict.STRESS_KEY], rtp=stress_rtp
             )
         return [output[k] for k in irreps_out]
 
