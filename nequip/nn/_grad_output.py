@@ -201,7 +201,13 @@ class StressOutput(GraphModuleMixin, torch.nn.Module):
         data[AtomicDataDict.CELL_KEY] = orig_cell.view(-1, 3, 3).expand(num_batch, 3, 3)
         # Add the displacements
         # the GradientOutput will make them require grad
-        # See https://github.com/atomistic-machine-learning/schnetpack/blob/master/src/schnetpack/atomistic/model.py#L45
+        # See SchNetPack code:
+        # https://github.com/atomistic-machine-learning/schnetpack/blob/master/src/schnetpack/atomistic/model.py#L45
+        # SchNetPack issue:
+        # https://github.com/atomistic-machine-learning/schnetpack/issues/165
+        # Paper they worked from:
+        # Knuth et. al. Comput. Phys. Commun 190, 33-50, 2015
+        # https://pure.mpg.de/rest/items/item_2085135_9/component/file_2156800/content
         displacement = torch.zeros(
             (num_batch, 3, 3),
             dtype=data[AtomicDataDict.CELL_KEY].dtype,
