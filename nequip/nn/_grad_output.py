@@ -218,6 +218,14 @@ class StressOutput(GraphModuleMixin, torch.nn.Module):
         # in the above paper, the infinitesimal distortion is *symmetric*
         # so we symmetrize the displacement before applying it to
         # the positions/cell
+        # This is not strictly necessary (reasoning thanks to Mario):
+        # the displacement's asymmetric 1o term corresponds to an
+        # infinitesimal rotation, which should not affect the final
+        # output (invariance).
+        # That said, due to numerical error, this will never be
+        # exactly true. So, we symmetrize the deformation to
+        # take advantage of this understanding and not rely on
+        # the invariance here:
         symmetric_displacement = 0.5 * (displacement + displacement.transpose(-1, -2))
         pos = data[AtomicDataDict.POSITIONS_KEY]
         pos.requires_grad_(True)
