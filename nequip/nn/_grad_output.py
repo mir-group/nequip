@@ -249,12 +249,11 @@ class StressOutput(GraphModuleMixin, torch.nn.Module):
         # Rescale stress tensor
         # See https://github.com/atomistic-machine-learning/schnetpack/blob/master/src/schnetpack/atomistic/output_modules.py#L180
         # First dim is batch, second is vec, third is xyz
-        volume = torch.sum(
-            cell[:, 0, :] * torch.cross(cell[:, 1, :], cell[:, 2, :], dim=1),
-            dim=1,
-            keepdim=True,
-        )[..., None]
-        assert len(volume) == num_batch
+        volume = torch.einsum(
+            "zi,zi->z",
+            cell[:, 0, :],
+            torch.cross(cell[:, 1, :], cell[:, 2, :], dim=1),
+        ).unsqueeze(-1)
 
         stress = grads[1]
         if stress is None:
