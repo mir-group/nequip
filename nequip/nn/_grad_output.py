@@ -228,6 +228,7 @@ class StressOutput(GraphModuleMixin, torch.nn.Module):
         # the invariance here:
         symmetric_displacement = 0.5 * (displacement + displacement.transpose(-1, -2))
         pos = data[AtomicDataDict.POSITIONS_KEY]
+        did_pos_req_grad: bool = pos.requires_grad
         pos.requires_grad_(True)
         # bmm is natom in batch
         data[AtomicDataDict.POSITIONS_KEY] = pos + torch.bmm(
@@ -273,12 +274,14 @@ class StressOutput(GraphModuleMixin, torch.nn.Module):
         if stress is None:
             # condition needed to unwrap optional for torchscript
             assert False, "failed to compute stress autograd"
-        stress = stress / volume
+        stress = stress / volume.view(-1, 1, 1)
         data[AtomicDataDict.STRESS_KEY] = stress
         data[AtomicDataDict.CELL_KEY] = orig_cell
 
         # Remove helper
         del data["_displacement"]
-        pos.requires_grad_(False)
+        if not did_pos_req_grad:
+            # don't give later modules one that does
+            pos.requires_grad_(False)
 
         return data
