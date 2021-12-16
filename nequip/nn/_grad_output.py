@@ -235,6 +235,12 @@ class StressOutput(GraphModuleMixin, torch.nn.Module):
         ).squeeze(-2)
         cell = data[AtomicDataDict.CELL_KEY]
         # bmm is num_batch in batch
+        # here we apply the distortion to the cell as well
+        # this is critical also for the correctness
+        # if we didn't symmetrize the distortion, since without this
+        # there would then be an infinitesimal rotation of the positions
+        # but not cell, and it thus wouldn't be global and have
+        # no effect due to equivariance/invariance.
         data[AtomicDataDict.CELL_KEY] = cell + torch.bmm(cell, symmetric_displacement)
 
         # Call model and get gradients
