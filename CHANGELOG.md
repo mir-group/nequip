@@ -6,8 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Most recent change on the bottom.
 
+
 ## [Unreleased] - 0.5.1
 ### Added
+- `NequIPCalculator` can now be built via a `nequip_calculator()` function. This adds a minimal compatibility with [vibes](https://gitlab.com/vibes-developers/vibes/)
 - Added `avg_num_neighbors: auto` option
 - Asynchronous IO: during training, models are written asynchronously.
 - `dataset_seed` to separately control randomness used to select training data (and their order). Enable this with environment variable `NEQUIP_ASYNC_IO=true`.
@@ -24,7 +26,6 @@ Most recent change on the bottom.
 - Equivariance testing no longer unintentionally skips translation
 - Correct cat dim for all registered per-graph fields
 - `PerSpeciesScaleShift` now correctly outputs when scales, but not shifts, are enabled— previously it was broken and would only output updated values when both were enabled.
-
 ## [0.5.0] - 2021-11-24
 ### Changed
 - Allow e3nn 0.4.*, which changes the default normalization of `TensorProduct`s; this change _should_ not affect typical NequIP networks
