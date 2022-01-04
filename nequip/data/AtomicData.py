@@ -117,8 +117,16 @@ def _process_dict(kwargs, ignore_fields=[]):
             # Any property used as an index must be long (or byte or bool, but those are not relevant for atomic scale systems)
             # int32 would pass later checks, but is actually disallowed by torch
             kwargs[k] = torch.as_tensor(v, dtype=torch.long)
+        elif isinstance(v, bool):
+            kwargs[k] = torch.as_tensor(v)
         elif isinstance(v, np.ndarray):
             if np.issubdtype(v.dtype, np.floating):
+                kwargs[k] = torch.as_tensor(v, dtype=torch.get_default_dtype())
+            else:
+                kwargs[k] = torch.as_tensor(v)
+        elif isinstance(v, list):
+            ele = np.array(v).reshape([-1])[0]
+            if isinstance(ele, float):
                 kwargs[k] = torch.as_tensor(v, dtype=torch.get_default_dtype())
             else:
                 kwargs[k] = torch.as_tensor(v)
