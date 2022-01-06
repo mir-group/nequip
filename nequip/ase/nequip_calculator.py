@@ -11,6 +11,11 @@ from nequip.data.transforms import TypeMapper
 import nequip.scripts.deploy
 
 
+def nequip_calculator(model, **kwargs):
+    """Build ASE Calculator directly from deployed model."""
+    return NequIPCalculator.from_deployed_model(model, **kwargs)
+
+
 class NequIPCalculator(Calculator):
     """NequIP ASE Calculator.
 
