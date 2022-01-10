@@ -28,6 +28,7 @@ from nequip.utils.batch_ops import bincount
 from nequip.utils.regressor import solver
 from nequip.utils.savenload import atomic_write
 from .transforms import TypeMapper
+from .AtomicData import _process_dict
 
 
 class AtomicDataset(Dataset):
@@ -280,18 +281,7 @@ class AtomicInMemoryDataset(AtomicDataset):
         del fields
 
         # type conversion
-        for key, value in fixed_fields.items():
-            if isinstance(value, np.ndarray):
-                if np.issubdtype(value.dtype, np.floating):
-                    fixed_fields[key] = torch.as_tensor(
-                        value, dtype=torch.get_default_dtype()
-                    )
-                else:
-                    fixed_fields[key] = torch.as_tensor(value)
-            elif np.issubdtype(type(value), np.floating):
-                fixed_fields[key] = torch.as_tensor(
-                    value, dtype=torch.get_default_dtype()
-                )
+        _process_dict(fixed_fields, ignore_fields=["r_max"])
 
         logging.info(f"Loaded data: {data}")
 
@@ -525,7 +515,10 @@ class AtomicInMemoryDataset(AtomicDataset):
 
     @staticmethod
     def _per_atom_statistics(
-        ana_mode: str, arr: torch.Tensor, batch: torch.Tensor, unbiased: bool = True,
+        ana_mode: str,
+        arr: torch.Tensor,
+        batch: torch.Tensor,
+        unbiased: bool = True,
     ):
         """Compute "per-atom" statistics that are normalized by the number of atoms in the system.
 
@@ -842,7 +835,10 @@ class ASEDataset(AtomicInMemoryDataset):
         atoms_list = self.get_atoms()
 
         # skip the None arguments
-        kwargs = dict(include_keys=self.include_keys, key_mapping=self.key_mapping,)
+        kwargs = dict(
+            include_keys=self.include_keys,
+            key_mapping=self.key_mapping,
+        )
         kwargs = {k: v for k, v in kwargs.items() if v is not None}
         kwargs.update(self.extra_fixed_fields)
 

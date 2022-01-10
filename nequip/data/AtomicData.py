@@ -106,6 +106,69 @@ def deregister_fields(*fields: Sequence[str]) -> None:
         _GRAPH_FIELDS.discard(f)
 
 
+def _process_dict(kwargs, ignore_fields=[]):
+    """Convert a dict of data into correct dtypes/shapes according to key"""
+    # Deal with _some_ dtype issues
+    for k, v in kwargs.items():
+        if k in ignore_fields:
+            continue
+
+        if k in _LONG_FIELDS:
+            # Any property used as an index must be long (or byte or bool, but those are not relevant for atomic scale systems)
+            # int32 would pass later checks, but is actually disallowed by torch
+            kwargs[k] = torch.as_tensor(v, dtype=torch.long)
+        elif isinstance(v, np.ndarray):
+            if np.issubdtype(v.dtype, np.floating):
+                kwargs[k] = torch.as_tensor(v, dtype=torch.get_default_dtype())
+            else:
+                kwargs[k] = torch.as_tensor(v)
+        elif np.issubdtype(type(v), np.floating):
+            # Force scalars to be tensors with a data dimension
+            # This makes them play well with irreps
+            kwargs[k] = torch.as_tensor(v, dtype=torch.get_default_dtype())
+        elif isinstance(v, torch.Tensor) and len(v.shape) == 0:
+            # ^ this tensor is a scalar; we need to give it
+            # a data dimension to play nice with irreps
+            kwargs[k] = v
+
+    if AtomicDataDict.BATCH_KEY in kwargs:
+        num_frames = kwargs[AtomicDataDict.BATCH_KEY].max() + 1
+    else:
+        num_frames = 1
+
+    for k, v in kwargs.items():
+        if k in ignore_fields:
+            continue
+
+        if len(v.shape) == 0:
+            kwargs[k] = v.unsqueeze(-1)
+            v = kwargs[k]
+
+        if k in set.union(_NODE_FIELDS, _EDGE_FIELDS) and len(v.shape) == 1:
+            kwargs[k] = v.unsqueeze(-1)
+            v = kwargs[k]
+
+        if (
+            k in _NODE_FIELDS
+            and AtomicDataDict.POSITIONS_KEY in kwargs
+            and v.shape[0] != kwargs[AtomicDataDict.POSITIONS_KEY].shape[0]
+        ):
+            raise ValueError(
+                f"{k} is a node field but has the wrong dimension {v.shape}"
+            )
+        elif (
+            k in _EDGE_FIELDS
+            and AtomicDataDict.EDGE_INDEX_KEY in kwargs
+            and v.shape[0] != kwargs[AtomicDataDict.EDGE_INDEX_KEY].shape[1]
+        ):
+            raise ValueError(
+                f"{k} is a edge field but has the wrong dimension {v.shape}"
+            )
+        elif k in _GRAPH_FIELDS:
+            if num_frames > 1 and v.shape[0] != num_frames:
+                raise ValueError(f"Wrong shape for graph property {k}")
+
+
 class AtomicData(Data):
     """A neighbor graph for points in (periodic triclinic) real space.
 
@@ -145,58 +208,7 @@ class AtomicData(Data):
 
         # Check the keys
         AtomicDataDict.validate_keys(kwargs)
-        # Deal with _some_ dtype issues
-        for k, v in kwargs.items():
-            if k in _LONG_FIELDS:
-                # Any property used as an index must be long (or byte or bool, but those are not relevant for atomic scale systems)
-                # int32 would pass later checks, but is actually disallowed by torch
-                kwargs[k] = torch.as_tensor(v, dtype=torch.long)
-            elif isinstance(v, np.ndarray):
-                if np.issubdtype(v.dtype, np.floating):
-                    kwargs[k] = torch.as_tensor(v, dtype=torch.get_default_dtype())
-                else:
-                    kwargs[k] = torch.as_tensor(v)
-            elif np.issubdtype(type(v), np.floating):
-                # Force scalars to be tensors with a data dimension
-                # This makes them play well with irreps
-                kwargs[k] = torch.as_tensor(v, dtype=torch.get_default_dtype())
-            elif isinstance(v, torch.Tensor) and len(v.shape) == 0:
-                # ^ this tensor is a scalar; we need to give it
-                # a data dimension to play nice with irreps
-                kwargs[k] = v
-
-        if AtomicDataDict.BATCH_KEY in kwargs:
-            num_frames = kwargs[AtomicDataDict.BATCH_KEY].max() + 1
-        else:
-            num_frames = 1
-
-        for k, v in kwargs.items():
-
-            if len(v.shape) == 0:
-                kwargs[k] = v.unsqueeze(-1)
-                v = kwargs[k]
-
-            if k in set.union(_NODE_FIELDS, _EDGE_FIELDS) and len(v.shape) == 1:
-                kwargs[k] = v.unsqueeze(-1)
-                v = kwargs[k]
-
-            if (
-                k in _NODE_FIELDS
-                and v.shape[0] != kwargs[AtomicDataDict.POSITIONS_KEY].shape[0]
-            ):
-                raise ValueError(
-                    f"{k} is a node field but has the wrong dimension {v.shape}"
-                )
-            elif (
-                k in _EDGE_FIELDS
-                and v.shape[0] != kwargs[AtomicDataDict.EDGE_INDEX_KEY].shape[1]
-            ):
-                raise ValueError(
-                    f"{k} is a edge field but has the wrong dimension {v.shape}"
-                )
-            elif k in _GRAPH_FIELDS:
-                if num_frames > 1 and v.shape[0] != num_frames:
-                    raise ValueError(f"Wrong shape for graph property {k}")
+        _process_dict(kwargs)
 
         super().__init__(num_nodes=len(kwargs["pos"]), **kwargs)
 
