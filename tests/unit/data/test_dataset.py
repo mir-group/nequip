@@ -66,6 +66,15 @@ def root():
         yield path
 
 
+def test_type_mapper():
+    tm = TypeMapper(chemical_symbol_to_type={"C": 1, "H": 0})
+    atomic_numbers = torch.as_tensor([1, 1, 6, 1, 6, 6, 6])
+    atom_types = tm.transform(atomic_numbers)
+    assert atom_types[0] == 0
+    untransformed = tm.untransform(atom_types)
+    assert torch.equal(untransformed, atomic_numbers)
+
+
 class TestInit:
     def test_init(self):
         with pytest.raises(NotImplementedError) as excinfo:
@@ -210,7 +219,9 @@ class TestPerSpeciesStatistics:
         # get species count per graph
         Ns = []
         for i in range(npz_dataset.len()):
-            Ns.append(torch.bincount(npz_dataset[i][AtomicDataDict.ATOM_TYPE_KEY]))
+            Ns.append(
+                torch.bincount(npz_dataset[i][AtomicDataDict.ATOM_TYPE_KEY].view(-1))
+            )
         n_spec = max(len(e) for e in Ns)
         N = torch.zeros(len(Ns), n_spec)
         for i in range(len(Ns)):

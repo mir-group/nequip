@@ -37,6 +37,8 @@ from nequip.utils import (
     save_file,
     load_file,
     atomic_write,
+    finish_all_writes,
+    atomic_write_group,
     dtype_from_name,
 )
 from nequip.utils.git import get_commit
@@ -131,7 +133,8 @@ class Trainer:
     Args:
         model: neural network model
 
-        seed (int): random see number
+        seed (int): random seed number
+        dataset_seed (int): random seed for dataset operations
 
         loss_coeffs (dict): dictionary to store coefficient and loss functions
 
@@ -214,6 +217,7 @@ class Trainer:
         model_builders: Optional[list] = [],
         device: str = "cuda" if torch.cuda.is_available() else "cpu",
         seed: Optional[int] = None,
+        dataset_seed: Optional[int] = None,
         loss_coeffs: Union[dict, str] = AtomicDataDict.TOTAL_ENERGY_KEY,
         train_on_keys: Optional[List[str]] = None,
         metrics_components: Optional[Union[dict, str]] = None,
@@ -292,6 +296,10 @@ class Trainer:
         if seed is not None:
             torch.manual_seed(seed)
             np.random.seed(seed)
+
+        self.dataset_rng = torch.Generator()
+        if dataset_seed is not None:
+            self.dataset_rng.manual_seed(dataset_seed)
 
         self.logger.info(f"Torch device: {self.device}")
         self.torch_device = torch.device(self.device)
@@ -453,6 +461,7 @@ class Trainer:
                 if item is not None:
                     dictionary["state_dict"][key] = item.state_dict()
             dictionary["state_dict"]["rng_state"] = torch.get_rng_state()
+            dictionary["state_dict"]["dataset_rng_state"] = self.dataset_rng.get_state()
             if torch.cuda.is_available():
                 dictionary["state_dict"]["cuda_rng_state"] = torch.cuda.get_rng_state(
                     device=self.torch_device
@@ -476,20 +485,29 @@ class Trainer:
 
         for code in [e3nn, nequip, torch]:
             dictionary[f"{code.__name__}_version"] = code.__version__
-        for code in ["e3nn", "nequip"]:
-            dictionary[f"{code}_commit"] = get_commit(code)
+
+        codes_for_git = {"e3nn", "nequip"}
+        for builder in self.model_builders:
+            if not isinstance(builder, str):
+                continue
+            builder = builder.split(".")
+            if len(builder) > 1:
+                # it's not a single name which is from nequip
+                codes_for_git.add(builder[0])
+        dictionary["code_versions"] = {code: get_commit(code) for code in codes_for_git}
 
         return dictionary
 
-    def save_config(self) -> None:
+    def save_config(self, blocking: bool = True) -> None:
         save_file(
             item=self.as_dict(state_dict=False, training_progress=False),
             supported_formats=dict(yaml=["yaml"]),
             filename=self.config_path,
             enforced_format=None,
+            blocking=blocking,
         )
 
-    def save(self, filename: Optional[str] = None, format=None):
+    def save(self, filename: Optional[str] = None, format=None, blocking: bool = True):
         """save the file as filename
 
         Args:
@@ -516,11 +534,11 @@ class Trainer:
             supported_formats=dict(torch=["pth", "pt"], yaml=["yaml"], json=["json"]),
             filename=filename,
             enforced_format=format,
+            blocking=blocking,
         )
         logger.debug(f"Saved trainer to {filename}")
 
-        self.save_config()
-        self.save_model(self.last_model_path)
+        self.save_model(self.last_model_path, blocking=blocking)
         logger.debug(f"Saved last model to to {self.last_model_path}")
 
         return filename
@@ -554,10 +572,10 @@ class Trainer:
         append (bool): if True, append the old model files and append the same logfile
         """
 
-        d = deepcopy(dictionary)
+        dictionary = deepcopy(dictionary)
 
         for code in [e3nn, nequip, torch]:
-            version = d.get(f"{code.__name__}_version", None)
+            version = dictionary.get(f"{code.__name__}_version", None)
             if version is not None and version != code.__version__:
                 logging.warning(
                     "Loading a pickled model created with different library version(s) may cause issues."
@@ -567,14 +585,14 @@ class Trainer:
 
         # update the restart and append option
         if append is not None:
-            d["append"] = append
+            dictionary["append"] = append
 
         model = None
         iepoch = -1
-        if "model" in d:
-            model = d.pop("model")
-        elif "progress" in d:
-            progress = d["progress"]
+        if "model" in dictionary:
+            model = dictionary.pop("model")
+        elif "progress" in dictionary:
+            progress = dictionary["progress"]
 
             # load the model from file
             iepoch = progress["iepoch"]
@@ -585,15 +603,17 @@ class Trainer:
                 raise AttributeError("model weights & bias are not saved")
 
             model, _ = Trainer.load_model_from_training_session(
-                traindir=load_path.parent, model_name=load_path.name
+                traindir=load_path.parent,
+                model_name=load_path.name,
+                config_dictionary=dictionary,
             )
             logging.debug(f"Reload the model from {load_path}")
 
-            d.pop("progress")
+            dictionary.pop("progress")
 
-        state_dict = d.pop("state_dict", None)
+        state_dict = dictionary.pop("state_dict", None)
 
-        trainer = cls(model=model, **d)
+        trainer = cls(model=model, **dictionary)
 
         if state_dict is not None and trainer.model is not None:
             logging.debug("Reload optimizer and scheduler states")
@@ -604,10 +624,11 @@ class Trainer:
             trainer._initialized = True
 
             torch.set_rng_state(state_dict["rng_state"])
+            trainer.dataset_rng.set_state(state_dict["dataset_rng_state"])
             if torch.cuda.is_available():
                 torch.cuda.set_rng_state(state_dict["cuda_rng_state"])
 
-        if "progress" in d:
+        if "progress" in dictionary:
             trainer.best_metrics = progress["best_metrics"]
             trainer.best_epoch = progress["best_epoch"]
             stop_arg = progress.pop("stop_arg", None)
@@ -628,12 +649,18 @@ class Trainer:
 
     @staticmethod
     def load_model_from_training_session(
-        traindir, model_name="best_model.pth", device="cpu"
+        traindir,
+        model_name="best_model.pth",
+        device="cpu",
+        config_dictionary: Optional[dict] = None,
     ) -> Tuple[torch.nn.Module, Config]:
         traindir = str(traindir)
         model_name = str(model_name)
 
-        config = Config.from_file(traindir + "/config.yaml")
+        if config_dictionary is not None:
+            config = Config.from_dict(config_dictionary)
+        else:
+            config = Config.from_file(traindir + "/config.yaml")
 
         if config.get("compile_model", False):
             model = torch.jit.load(traindir + "/" + model_name, map_location=device)
@@ -709,8 +736,11 @@ class Trainer:
         self.init_log()
         self.wall = perf_counter()
 
-        if self.iepoch == -1:
-            self.save()
+        with atomic_write_group():
+            if self.iepoch == -1:
+                self.save()
+            if self.iepoch in [-1, 0]:
+                self.save_config()
 
         self.init_metrics()
 
@@ -725,6 +755,7 @@ class Trainer:
         self.final_log()
 
         self.save()
+        finish_all_writes()
 
     def batch_step(self, data, validation=False):
         # no need to have gradients from old steps taking up memory
@@ -926,36 +957,36 @@ class Trainer:
         """
         save model and trainer details
         """
+        with atomic_write_group():
+            current_metrics = self.mae_dict[self.metrics_key]
+            if current_metrics < self.best_metrics:
+                self.best_metrics = current_metrics
+                self.best_epoch = self.iepoch
 
-        current_metrics = self.mae_dict[self.metrics_key]
-        if current_metrics < self.best_metrics:
-            self.best_metrics = current_metrics
-            self.best_epoch = self.iepoch
+                self.save_ema_model(self.best_model_path, blocking=False)
 
-            self.save_ema_model(self.best_model_path)
+                self.logger.info(
+                    f"! Best model {self.best_epoch:8d} {self.best_metrics:8.3f}"
+                )
 
-            self.logger.info(
-                f"! Best model {self.best_epoch:8d} {self.best_metrics:8.3f}"
-            )
+            if (self.iepoch + 1) % self.log_epoch_freq == 0:
+                self.save(blocking=False)
 
-        if (self.iepoch + 1) % self.log_epoch_freq == 0:
-            self.save()
+            if (
+                self.save_checkpoint_freq > 0
+                and (self.iepoch + 1) % self.save_checkpoint_freq == 0
+            ):
+                ckpt_path = self.output.generate_file(f"ckpt{self.iepoch+1}.pth")
+                self.save_model(ckpt_path, blocking=False)
 
-        if (
-            self.save_checkpoint_freq > 0
-            and (self.iepoch + 1) % self.save_checkpoint_freq == 0
-        ):
-            ckpt_path = self.output.generate_file(f"ckpt{self.iepoch+1}.pth")
-            self.save_model(ckpt_path)
+            if (
+                self.save_ema_checkpoint_freq > 0
+                and (self.iepoch + 1) % self.save_ema_checkpoint_freq == 0
+            ):
+                ckpt_path = self.output.generate_file(f"ckpt_ema_{self.iepoch+1}.pth")
+                self.save_ema_model(ckpt_path, blocking=False)
 
-        if (
-            self.save_ema_checkpoint_freq > 0
-            and (self.iepoch + 1) % self.save_ema_checkpoint_freq == 0
-        ):
-            ckpt_path = self.output.generate_file(f"ckpt_ema_{self.iepoch+1}.pth")
-            self.save_ema_model(ckpt_path)
-
-    def save_ema_model(self, path):
+    def save_ema_model(self, path, blocking: bool = True):
 
         if self.use_ema:
             # If using EMA, store the EMA validation model
@@ -967,11 +998,10 @@ class Trainer:
             cm = contextlib.nullcontext()
 
         with cm:
-            self.save_model(path)
+            self.save_model(path, blocking=blocking)
 
-    def save_model(self, path):
-        self.save_config()
-        with atomic_write(path) as write_to:
+    def save_model(self, path, blocking: bool = True):
+        with atomic_write(path, blocking=blocking, binary=True) as write_to:
             if isinstance(self.model, torch.jit.ScriptModule):
                 torch.jit.save(self.model, write_to)
             else:
@@ -1100,7 +1130,7 @@ class Trainer:
                     )
 
                 if self.train_val_split == "random":
-                    idcs = torch.randperm(total_n)
+                    idcs = torch.randperm(total_n, generator=self.dataset_rng)
                 elif self.train_val_split == "sequential":
                     idcs = torch.arange(total_n)
                 else:
@@ -1116,10 +1146,12 @@ class Trainer:
                 if self.n_val > len(validation_dataset):
                     raise ValueError("Not enough data in dataset for requested n_train")
                 if self.train_val_split == "random":
-                    self.train_idcs = torch.randperm(len(dataset))[: self.n_train]
-                    self.val_idcs = torch.randperm(len(validation_dataset))[
-                        : self.n_val
-                    ]
+                    self.train_idcs = torch.randperm(
+                        len(dataset), generator=self.dataset_rng
+                    )[: self.n_train]
+                    self.val_idcs = torch.randperm(
+                        len(validation_dataset), generator=self.dataset_rng
+                    )[: self.n_val]
                 elif self.train_val_split == "sequential":
                     self.train_idcs = torch.arange(self.n_train)
                     self.val_idcs = torch.arange(self.n_val)
@@ -1139,7 +1171,6 @@ class Trainer:
         # https://pytorch.org/tutorials/recipes/recipes/tuning_guide.html#enable-async-data-loading-and-augmentation
         dl_kwargs = dict(
             batch_size=self.batch_size,
-            shuffle=self.shuffle,
             exclude_keys=self.exclude_keys,
             num_workers=self.dataloader_num_workers,
             # keep stuff around in memory
@@ -1150,6 +1181,14 @@ class Trainer:
             pin_memory=(self.torch_device != torch.device("cpu")),
             # avoid getting stuck
             timeout=(10 if self.dataloader_num_workers > 0 else 0),
+            # use the right randomness
+            generator=self.dataset_rng,
         )
-        self.dl_train = DataLoader(dataset=self.dataset_train, **dl_kwargs)
+        self.dl_train = DataLoader(
+            dataset=self.dataset_train,
+            shuffle=self.shuffle,  # training should shuffle
+            **dl_kwargs,
+        )
+        # validation, on the other hand, shouldn't shuffle
+        # we still pass the generator just to be safe
         self.dl_val = DataLoader(dataset=self.dataset_val, **dl_kwargs)
