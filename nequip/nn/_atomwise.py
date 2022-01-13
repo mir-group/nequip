@@ -166,7 +166,8 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
         if self.has_scales:
             in_field = self.scales[species_idx].view(-1, 1) * in_field
         if self.has_shifts:
-            data[self.out_field] = self.shifts[species_idx].view(-1, 1) + in_field
+            in_field = self.shifts[species_idx].view(-1, 1) + in_field
+        data[self.out_field] = in_field
         return data
 
     def update_for_rescale(self, rescale_module):

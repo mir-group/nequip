@@ -4,7 +4,7 @@ NequIP is an open-source code for building E(3)-equivariant interatomic potentia
 
 [![Documentation Status](https://readthedocs.org/projects/nequip/badge/?version=latest)](https://nequip.readthedocs.io/en/latest/?badge=latest)
 
-![nequip](./nequip.png)
+![nequip](./logo.png)
 
 **PLEASE NOTE:** the NequIP code is under active development and is still in beta versions 0.x.x. In general changes to the patch version (the third number) indicate backward compatible beta releases, but please be aware that file formats and APIs may change. Bug reports are also welcomed in the GitHub issues!
 
@@ -13,7 +13,7 @@ NequIP is an open-source code for building E(3)-equivariant interatomic potentia
 NequIP requires:
 
 * Python >= 3.6
-* PyTorch >= 1.8, <= 1.10.*
+* PyTorch >= 1.8, <=1.10.*. PyTorch can be installed following the [instructions from their documentation](https://pytorch.org/get-started/locally/). Note that neither `torchvision` nor `torchaudio`, included in the default install command, are needed for NequIP. NequIP is also not currently compatible with PyTorch 1.10; PyTorch 1.9 can be specified with `pytorch==1.9` in the install command.
 
 To install:
 
@@ -51,6 +51,10 @@ pytest tests/
 ```
 
 Note: the integration tests have hung in the past on certain systems that have GPUs. If this happens to you, please report it along with information on your software environment in the [Issues](https://github.com/mir-group/nequip/issues)!
+
+## Tutorial 
+
+The best way to learn how to use NequIP is through the [Colab Tutorial](https://bit.ly/mrs-nequip). This will run entirely on Google Hardware, you will not need to install anything, but can instead simply run it in your browser. 
 
 ## Usage
 
@@ -141,9 +145,11 @@ NequIP is being developed by:
 
 under the guidance of [Boris Kozinsky at Harvard](https://bkoz.seas.harvard.edu/).
 
-## Contact & questions
+## Contact, questions, and contributing
 
 If you have questions, please don't hesitate to reach out at batzner[at]g[dot]harvard[dot]edu. 
 
 If you find a bug or have a proposal for a feature, please post it in the [Issues](https://github.com/mir-group/nequip/issues).
 If you have a question, topic, or issue that isn't obviously one of those, try our [GitHub Disucssions](https://github.com/mir-group/nequip/discussions).
+
+If you want to contribute to the code, please read [`CONTRIBUTING.md`](CONTRIBUTING.md).

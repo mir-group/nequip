@@ -85,7 +85,9 @@ def load_deployed_model(
     # Make sure we're in eval mode
     model.eval()
     # Freeze on load:
-    if freeze:
+    if freeze and hasattr(model, "training"):
+        # hasattr is how torch checks whether model is unfrozen
+        # only freeze if already unfrozen
         model = torch.jit.freeze(model)
     # Everything we store right now is ASCII, so decode for printing
     metadata = {k: v.decode("ascii") for k, v in metadata.items()}
@@ -121,7 +123,12 @@ def main(args=None):
     parser = argparse.ArgumentParser(
         description="Create and view information about deployed NequIP potentials."
     )
-    subparsers = parser.add_subparsers(dest="command", required=True, title="commands")
+    # backward compat for 3.6
+    if sys.version_info[1] > 6:
+        required = {"required": True}
+    else:
+        required = {}
+    subparsers = parser.add_subparsers(dest="command", title="commands", **required)
     info_parser = subparsers.add_parser(
         "info", help="Get information from a deployed model file"
     )

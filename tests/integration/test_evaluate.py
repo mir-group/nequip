@@ -95,7 +95,7 @@ def test_metrics(training_session, do_test_idcs, do_metrics):
             ["nequip-evaluate"]
             + sum(
                 (["--" + k, str(v)] for k, v in params.items() if v is not None),
-                start=[],
+                [],
             ),
             cwd=tmpdir,
             env=env,
