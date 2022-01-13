@@ -321,10 +321,13 @@ def main(args=None, running_as_script: bool = True):
 
             with torch.no_grad():
                 # Write output
+                # TODO: make sure don't keep appending to existing file
                 if output is not None:
                     ase.io.write(
                         output,
-                        AtomicData.from_AtomicDataDict(out).to(device="cpu").to_ase(),
+                        AtomicData.from_AtomicDataDict(out)
+                        .to(device="cpu")
+                        .to_ase(type_mapper=dataset.type_mapper),
                         format="extxyz",
                         append=True,
                     )

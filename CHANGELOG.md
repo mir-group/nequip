@@ -26,6 +26,8 @@ Most recent change on the bottom.
 - Equivariance testing no longer unintentionally skips translation
 - Correct cat dim for all registered per-graph fields
 - `PerSpeciesScaleShift` now correctly outputs when scales, but not shifts, are enabled— previously it was broken and would only output updated values when both were enabled.
+- `nequip-evaluate` outputs correct species to the `extxyz` file when a chemical symbol <-> type mapping exists for the test dataset
+
 ## [0.5.0] - 2021-11-24
 ### Changed
 - Allow e3nn 0.4.*, which changes the default normalization of `TensorProduct`s; this change _should_ not affect typical NequIP networks
