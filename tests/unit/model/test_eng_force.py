@@ -80,8 +80,14 @@ def config(request):
 
 @pytest.fixture(
     params=[
-        (["EnergyModel", "ForceOutput"], AtomicDataDict.FORCE_KEY,),
-        (["EnergyModel"], AtomicDataDict.TOTAL_ENERGY_KEY,),
+        (
+            ["EnergyModel", "ForceOutput"],
+            AtomicDataDict.FORCE_KEY,
+        ),
+        (
+            ["EnergyModel"],
+            AtomicDataDict.TOTAL_ENERGY_KEY,
+        ),
     ]
 )
 def model(request, config):
@@ -133,7 +139,9 @@ class TestWorkflow:
         model_script = script(instance)
 
         assert torch.allclose(
-            instance(data)[out_field], model_script(data)[out_field], atol=1e-6,
+            instance(data)[out_field],
+            model_script(data)[out_field],
+            atol=1e-6,
         )
 
         # - Try saving, loading in another process, and running -

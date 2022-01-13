@@ -15,6 +15,7 @@ import os
 # accumulate writes to group for renaming
 _MOVE_SET = contextvars.ContextVar("_move_set", default=None)
 
+
 def _delete_files_if_exist(paths):
     # clean up
     # better for python 3.8 >
