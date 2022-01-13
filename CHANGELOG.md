@@ -11,8 +11,8 @@ Most recent change on the bottom.
 ### Added
 - `NequIPCalculator` can now be built via a `nequip_calculator()` function. This adds a minimal compatibility with [vibes](https://gitlab.com/vibes-developers/vibes/)
 - Added `avg_num_neighbors: auto` option
-- Asynchronous IO: during training, models are written asynchronously.
-- `dataset_seed` to separately control randomness used to select training data (and their order). Enable this with environment variable `NEQUIP_ASYNC_IO=true`.
+- Asynchronous IO: during training, models are written asynchronously. Enable this with environment variable `NEQUIP_ASYNC_IO=true`.
+- `dataset_seed` to separately control randomness used to select training data (and their order).
 - The types may now be specified with a simpler `chemical_symbols` option
 - Equivariance testing reports per-field errors
 - `--equivariance-test n` tests equivariance on `n` frames from the training dataset
