@@ -8,6 +8,8 @@ Most recent change on the bottom.
 
 
 ## [Unreleased] - 0.5.2
+### Fixed
+- Handle one of `per_species_shifts`/`scales` being `null` when the other is a dataset statistc
 
 ## [0.5.1] - 2022-01-13
 ### Added
