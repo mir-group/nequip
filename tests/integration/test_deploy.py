@@ -3,6 +3,7 @@ import tempfile
 import pathlib
 import yaml
 import subprocess
+import sys
 
 import numpy as np
 import torch
@@ -11,6 +12,7 @@ import nequip
 from nequip.data import AtomicDataDict, AtomicData
 from nequip.scripts import deploy
 from nequip.train import Trainer
+from nequip.ase import NequIPCalculator
 
 
 @pytest.mark.parametrize(
@@ -67,32 +69,49 @@ def test_deploy(nequip_dataset, BENCHMARK_ROOT, device):
         data[AtomicDataDict.TOTAL_ENERGY_KEY] = data[
             AtomicDataDict.TOTAL_ENERGY_KEY
         ].unsqueeze(0)
-        train_pred = best_mod(data)[AtomicDataDict.TOTAL_ENERGY_KEY]
+        train_pred = best_mod(data)[AtomicDataDict.TOTAL_ENERGY_KEY].to("cpu")
 
         # load model and check that metadata saved
-        metadata = {
-            deploy.NEQUIP_VERSION_KEY: "",
-            deploy.R_MAX_KEY: "",
-        }
-        deploy_mod = torch.jit.load(
-            deployed_path, _extra_files=metadata, map_location="cpu"
+        # TODO: use both CPU and CUDA to load?
+        deploy_mod, metadata = deploy.load_deployed_model(
+            deployed_path,
+            device="cpu",
+            set_global_options=False,  # don't need this corrupting test environment
         )
         # Everything we store right now is ASCII, so decode for printing
-        metadata = {k: v.decode("ascii") for k, v in metadata.items()}
         assert metadata[deploy.NEQUIP_VERSION_KEY] == nequip.__version__
         assert np.allclose(float(metadata[deploy.R_MAX_KEY]), true_config["r_max"])
+        assert len(metadata[deploy.TYPE_NAMES_KEY].split(" ")) == 3  # C, H, O
 
-        data = AtomicData.to_AtomicDataDict(nequip_dataset[0].to("cpu"))
+        data_idx = 0
+        data = AtomicData.to_AtomicDataDict(nequip_dataset[data_idx].to("cpu"))
         deploy_pred = deploy_mod(data)[AtomicDataDict.TOTAL_ENERGY_KEY]
-        assert torch.allclose(train_pred.to("cpu"), deploy_pred, atol=1e-7)
+        assert torch.allclose(train_pred, deploy_pred, atol=1e-7)
 
         # now test info
+        # hack for old version
+        if sys.version_info[1] > 6:
+            text = {"text": True}
+        else:
+            text = {}
         retcode = subprocess.run(
             ["nequip-deploy", "info", str(deployed_path)],
-            text=True,
             stdout=subprocess.PIPE,
+            **text,
         )
         retcode.check_returncode()
         # Try to load extract config
         config = yaml.load(retcode.stdout, Loader=yaml.Loader)
         del config
+
+        # Finally, try to load in ASE
+        calc = NequIPCalculator.from_deployed_model(
+            deployed_path,
+            device="cpu",
+            species_to_type_name={s: s for s in ("C", "H", "O")},
+        )
+        # use .get() so it's not transformed
+        atoms = nequip_dataset.get(data_idx).to_ase()
+        atoms.calc = calc
+        ase_forces = atoms.get_potential_energy()
+        assert torch.allclose(train_pred, torch.as_tensor(ase_forces), atol=1e-7)

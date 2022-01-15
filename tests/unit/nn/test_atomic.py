@@ -34,7 +34,13 @@ def model(float_tolerance, request):
             ),
             "shift": (
                 PerSpeciesScaleShift,
-                dict(field="e", out_field="shifted"),
+                dict(
+                    field="e",
+                    out_field="shifted",
+                    scales=1.0,
+                    shifts=0.0,
+                    arguments_in_dataset_units=False,
+                ),
             ),
             "sum": (
                 AtomwiseReduce,
@@ -52,7 +58,7 @@ def batches(float_tolerance, nequip_dataset):
     return b
 
 
-def test_per_specie_shift(nequip_dataset, batches, model):
+def test_per_species_shift(nequip_dataset, batches, model):
     batch1, batch2, batch12 = batches
     result1 = model(batch1)
     result2 = model(batch2)

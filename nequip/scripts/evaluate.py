@@ -18,6 +18,7 @@ from nequip.scripts.train import default_config, _set_global_options
 from nequip.utils import load_file, instantiate
 from nequip.train.loss import Loss
 from nequip.train.metrics import Metrics
+from nequip.scripts.logger import set_up_script_logger
 
 
 def main(args=None, running_as_script: bool = True):
@@ -70,7 +71,7 @@ def main(args=None, running_as_script: bool = True):
     )
     parser.add_argument(
         "--batch-size",
-        help="Batch size to use. Larger is usually faster on GPU.",
+        help="Batch size to use. Larger is usually faster on GPU. If you run out of memory, lower this.",
         type=int,
         default=50,
     )
@@ -144,18 +145,7 @@ def main(args=None, running_as_script: bool = True):
         device = torch.device(args.device)
 
     if running_as_script:
-        # Configure the root logger so stuff gets printed
-        root_logger = logging.getLogger()
-        root_logger.setLevel(logging.CRITICAL)
-        root_logger.handlers = [
-            logging.StreamHandler(sys.stderr),
-            logging.StreamHandler(sys.stdout),
-        ]
-        root_logger.handlers[0].setLevel(logging.INFO)
-        root_logger.handlers[1].setLevel(logging.CRITICAL)
-        if args.log is not None:
-            root_logger.addHandler(logging.FileHandler(args.log, mode="w"))
-            root_logger.handlers[-1].setLevel(logging.INFO)
+        set_up_script_logger(args.log)
     logger = logging.getLogger("nequip-evaluate")
     logger.setLevel(logging.INFO)
 
@@ -169,7 +159,11 @@ def main(args=None, running_as_script: bool = True):
     logger.info("Loading model... ")
     model_from_training: bool = False
     try:
-        model, _ = load_deployed_model(args.model, device=device)
+        model, _ = load_deployed_model(
+            args.model,
+            device=device,
+            set_global_options=True,  # don't warn that setting
+        )
         logger.info("loaded deployed model.")
     except ValueError:  # its not a deployed model
         model, _ = Trainer.load_model_from_training_session(
@@ -190,12 +184,14 @@ def main(args=None, running_as_script: bool = True):
     if model_from_training:
         # Use the model config, regardless of dataset config
         global_config = args.model.parent / "config.yaml"
+        global_config = Config.from_file(str(global_config), defaults=default_config)
+        _set_global_options(global_config)
+        del global_config
     else:
-        # use dataset config
-        global_config = args.dataset_config
-    global_config = Config.from_file(str(global_config), defaults=default_config)
-    _set_global_options(global_config)
-    del global_config
+        # the global settings for a deployed model are set by
+        # set_global_options in the call to load_deployed_model
+        # above
+        pass
 
     dataset_is_validation: bool = False
     # Currently, pytorch_geometric prints some status messages to stdout while loading the dataset
@@ -217,7 +213,11 @@ def main(args=None, running_as_script: bool = True):
 
     # Determine the test set
     # this makes no sense if a dataset is given seperately
-    if train_idcs is not None and dataset_is_from_training:
+    if (
+        args.test_indexes is None
+        and train_idcs is not None
+        and dataset_is_from_training
+    ):
         # we know the train and val, get the rest
         all_idcs = set(range(len(dataset)))
         # set operations
@@ -238,6 +238,12 @@ def main(args=None, running_as_script: bool = True):
             logger.info(
                 "WARNING: using the automatic test set ^^^ but not computing metrics, is this really what you wanted to do?",
             )
+    elif args.test_indexes is None:
+        # Default to all frames
+        test_idcs = torch.arange(dataset.len())
+        logger.info(
+            f"Using all frames from the specified test dataset, yielding a test set size of {len(test_idcs)} frames.",
+        )
     else:
         # load from file
         test_idcs = load_file(
@@ -327,7 +333,7 @@ def main(args=None, running_as_script: bool = True):
                     metrics(out, batch)
                     display_bar.set_description_str(
                         " | ".join(
-                            f"{k} = {v:4.2f}"
+                            f"{k} = {v:4.4f}"
                             for k, v in metrics.flatten_metrics(
                                 metrics.current_result()
                             )[0].items()

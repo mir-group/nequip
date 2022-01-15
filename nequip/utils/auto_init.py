@@ -89,8 +89,10 @@ def instantiate(
     prefix_list = [builder.__name__] if inspect.isclass(builder) else []
     if isinstance(prefix, str):
         prefix_list += [prefix]
-    else:
+    elif isinstance(prefix, list):
         prefix_list += prefix
+    else:
+        raise ValueError(f"prefix has the wrong type {type(prefix)}")
 
     # detect the input parameters needed from params
     config = Config.from_class(builder, remove_kwargs=remove_kwargs)
@@ -234,3 +236,67 @@ def instantiate(
         ) from e
 
     return instance, final_optional_args
+
+
+def get_w_prefix(
+    key: List[str],
+    *kwargs,
+    arg_dicts: List[dict] = [],
+    prefix: Optional[Union[str, List[str]]] = [],
+):
+    """
+    act as the get function and try to search for the value key from arg_dicts
+    """
+
+    # detect the input parameters needed from params
+    config = Config(config={}, allow_list=[key])
+
+    # sort out all possible prefixes
+    if isinstance(prefix, str):
+        prefix_list = [prefix]
+    elif isinstance(prefix, list):
+        prefix_list = prefix
+    else:
+        raise ValueError(f"prefix is with a wrong type {type(prefix)}")
+
+    if not isinstance(arg_dicts, list):
+        arg_dicts = [arg_dicts]
+
+    # extract all the parameters that has the pattern prefix_variable
+    # debug container to record all the variable name transformation
+    key_mapping = {}
+    for idx, arg_dict in enumerate(arg_dicts[::-1]):
+        # fetch paratemeters that directly match the name
+        _keys = config.update(arg_dict)
+        key_mapping[idx] = {k: k for k in _keys}
+        # fetch paratemeters that match prefix + "_" + name
+        for idx, prefix_str in enumerate(prefix_list):
+            _keys = config.update_w_prefix(
+                arg_dict,
+                prefix=prefix_str,
+            )
+            key_mapping[idx].update(_keys)
+
+    # for logging only, remove the overlapped keys
+    num_dicts = len(arg_dicts)
+    if num_dicts > 1:
+        for id_dict in range(num_dicts - 1):
+            higher_priority_keys = []
+            for id_higher in range(id_dict + 1, num_dicts):
+                higher_priority_keys += list(key_mapping[id_higher].keys())
+            key_mapping[id_dict] = {
+                k: v
+                for k, v in key_mapping[id_dict].items()
+                if k not in higher_priority_keys
+            }
+
+    # debug info
+    logging.debug(f"search for {key} with prefix {prefix}")
+    for t in key_mapping:
+        for k, v in key_mapping[t].items():
+            string = f" {str(t):>10.10}_args :  {k:>50s}"
+            if k != v:
+                string += f" <- {v:>50s}"
+            logging.debug(string)
+
+    return config.get(key, *kwargs)

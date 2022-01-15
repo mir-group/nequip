@@ -1,14 +1,9 @@
 """
 Config tests
 """
-
-
-import numpy as np
 import pytest
 import tempfile
-import torch
 
-from os import remove
 from os.path import isdir
 
 from nequip.utils.output import Output

@@ -6,7 +6,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Most recent change on the bottom.
 
-## [Unreleased]
+
+## [Unreleased] - 0.5.1
+### Added
+- `NequIPCalculator` can now be built via a `nequip_calculator()` function. This adds a minimal compatibility with [vibes](https://gitlab.com/vibes-developers/vibes/)
+- Added `avg_num_neighbors: auto` option
+- Asynchronous IO: during training, models are written asynchronously.
+- `dataset_seed` to separately control randomness used to select training data (and their order). Enable this with environment variable `NEQUIP_ASYNC_IO=true`.
+- The types may now be specified with a simpler `chemical_symbols` option
+- Equivariance testing reports per-field errors
+- `--equivariance-test n` tests equivariance on `n` frames from the training dataset
+
+### Changed
+- All fields now have consistant [N, dim] shaping
+- Changed default `seed` and `dataset_seed` in example YAMLs
+- Equivariance testing can only use training frames now
+
+### Fixed
+- Equivariance testing no longer unintentionally skips translation
+- Correct cat dim for all registered per-graph fields
+- `PerSpeciesScaleShift` now correctly outputs when scales, but not shifts, are enabled— previously it was broken and would only output updated values when both were enabled.
+## [0.5.0] - 2021-11-24
+### Changed
+- Allow e3nn 0.4.*, which changes the default normalization of `TensorProduct`s; this change _should_ not affect typical NequIP networks
+- Deployed are now frozen on load, rather than compile
+
+### Fixed
+- `load_deployed_model` respects global JIT settings
+
+## [0.4.0] - not released
 ### Added
 - Support for `e3nn`'s `soft_one_hot_linspace` as radial bases
 - Support for parallel dataloader workers with `dataloader_num_workers`
@@ -20,21 +48,40 @@ Most recent change on the bottom.
 - Normalize total energy loss by the number of atoms via PerAtomLoss
 - Model builder to initialize training from previous checkpoint
 - Better error when instantiation fails
+- Rename `npz_keys` to `include_keys`
+- Allow user to register `graph_fields`, `node_fields`, and `edge_fields` via yaml
+- Deployed models save the e3nn and torch versions they were created with
 
 ### Changed
+- Update example.yaml to use wandb by default, to only use 100 epochs of training, to set a very large batch logging frequency and to change Validation_loss to validation_loss
 - Name processed datasets based on a hash of their parameters to ensure only valid cached data is used
 - Do not use TensorFloat32 by default on Ampere GPUs until we understand it better
 - No atomic numbers in networks
 - `dataset_energy_std`/`dataset_energy_mean` to `dataset_total_energy_*`
+- `nequip.dynamics` -> `nequip.ase`
+- update example.yaml and full.yaml with better defaults, new loss function, and switched to toluene-ccsd(t) as example 
+data
+- `use_sc` defaults to `True`
+- `register_fields` is now in `nequip.data`
+- Default total energy scaling is changed from global mode to per species mode.
+- Renamed `trainable_global_rescale_scale` to `global_rescale_scale_trainble`
+- Renamed `trainable_global_rescale_shift` to `global_rescale_shift_trainble`
+- Renamed `PerSpeciesScaleShift_` to `per_species_rescale`
+- Change default and allowed values of `metrics_key` from `loss` to `validation_loss`. The old default `loss` will no longer be accepted.
+- Renamed `per_species_rescale_trainable` to `per_species_rescale_scales_trainable` and `per_species_rescale_shifts_trainable`
 
 ### Fixed
 - The first 20 epochs/calls of inference are no longer painfully slow for recompilation
 - Set global options like TF32, dtype in `nequip-evaluate`
+- Avoid possilbe race condition in caching of processed datasets across multiple training runs
 
 ### Removed
 - Removed `allowed_species`
 - Removed `--update-config`; start a new training and load old state instead
 - Removed dependency on `pytorch_geometric`
+- `nequip-train` no longer prints the full config, which can be found in the training dir as `config.yaml`.
+- `nequip.datasets.AspirinDataset` & `nequip.datasets.WaterDataset`
+- Dependency on `pytorch_scatter`
 
 ## [0.3.3] - 2021-08-11
 ### Added

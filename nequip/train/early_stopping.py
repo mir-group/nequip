@@ -1,6 +1,6 @@
 from collections import OrderedDict
 from copy import deepcopy
-from typing import Mapping, Optional, cast
+from typing import Mapping
 
 
 class EarlyStopping:
@@ -79,7 +79,7 @@ class EarlyStopping:
                 self.counters[key] += 1
                 debug_args = f"EarlyStopping: {self.counters[key]} / {pat}"
                 if self.counters[key] >= pat:
-                    stop_args += " {key} has not reduced for {pat} epochs"
+                    stop_args += f" {key} has not reduced for {pat} epochs"
                     stop = True
             else:
                 self.minimums[key] = value

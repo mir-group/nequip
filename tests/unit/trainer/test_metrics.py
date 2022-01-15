@@ -1,4 +1,4 @@
-import inspect
+# flake8: noqa
 import pytest
 import torch
 from nequip.data import AtomicDataDict
@@ -41,7 +41,7 @@ class TestMetrics:
 
 class TestWeight:
     @pytest.mark.parametrize("per_comp", [True, False])
-    def test_per_specie(self, data, per_comp):
+    def test_per_species(self, data, per_comp):
 
         pred, ref = data
 
@@ -65,7 +65,7 @@ class TestWeight:
         w_contb = w_loss(pred, ref)
         contb = loss(pred, ref)
 
-        # first half data are specie 1
+        # first half data are species 1
         loss_ref_0 = torch.square(pred["forces"][5:] - ref["forces"][5:])
         loss_ref_1 = torch.square(pred["forces"][:5] - ref["forces"][:5])
         if per_comp:
@@ -96,7 +96,7 @@ class TestWeight:
 @pytest.fixture(scope="class", params=metrics_tests)
 def metrics(request):
     """"""
-    coeffs = request.param
+    coeffs = request.param  # noqa
     instance = Metrics(components=request.param)
     yield instance
 

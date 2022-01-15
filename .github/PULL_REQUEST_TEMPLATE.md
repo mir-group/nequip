@@ -24,8 +24,9 @@ Resolves: #???
 <!-- Put an `x` in all the boxes that apply. If you're unsure about any of
      these, don't hesitate to ask. We're here to help! -->
 - [ ] My code follows the code style of this project and has been formatted using `black`.
-- [ ] I have updated the documentation (if relevant).
+- [ ] All new and existing tests passed, including on GPU (if relevant).
 - [ ] I have added tests that cover my changes (if relevant).
-- [ ] All new and existing tests passed.
-- [ ] `example.yaml` (and other relevant `configs/`) have been updated with new or changed options.
+- [ ] The option documentation (`docs/options`) has been updated with new or changed options.
 - [ ] I have updated `CHANGELOG.md`.
+- [ ] I have updated the documentation (if relevant).
+

@@ -169,11 +169,13 @@ class Metrics:
                 params = {}
                 if per_species:
                     # TO DO, this needs OneHot component. will need to be decoupled
-                    params = {"accumulate_by": pred[AtomicDataDict.ATOM_TYPE_KEY]}
+                    params = {
+                        "accumulate_by": pred[AtomicDataDict.ATOM_TYPE_KEY].squeeze(-1)
+                    }
                 if per_atom:
                     if N is None:
-                        N = torch.bincount(ref[AtomicDataDict.BATCH_KEY])
-                    error_N = error / N.unsqueeze(-1)
+                        N = torch.bincount(ref[AtomicDataDict.BATCH_KEY]).unsqueeze(-1)
+                    error_N = error / N
                 else:
                     error_N = error
 
@@ -229,7 +231,10 @@ class Metrics:
                     if type_names is None:
                         type_names = [i for i in range(len(value))]
                     for id_ele, v in enumerate(value):
-                        flat_dict[f"{type_names[id_ele]}_{item_name}"] = v.item()
+                        if type_names is not None:
+                            flat_dict[f"{type_names[id_ele]}_{item_name}"] = v.item()
+                        else:
+                            flat_dict[f"{id_ele}_{item_name}"] = v.item()
 
                     flat_dict[f"all_{item_name}"] = value.mean().item()
                 else:

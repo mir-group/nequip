@@ -1,11 +1,16 @@
-from typing import Union, Sequence, Set
+from typing import Union, Optional, List
 
 import torch
 from e3nn import o3
-from e3nn.util.test import assert_equivariant
+from e3nn.util.test import equivariance_error, FLOAT_TOLERANCE
 
 from nequip.nn import GraphModuleMixin
-from nequip.data import AtomicData, AtomicDataDict
+from nequip.data import (
+    AtomicData,
+    AtomicDataDict,
+    _NODE_FIELDS,
+    _EDGE_FIELDS,
+)
 
 
 PERMUTATION_FLOAT_TOLERANCE = {torch.float32: 1e-5, torch.float64: 1e-10}
@@ -18,107 +23,34 @@ def _inverse_permutation(perm):
     return inv
 
 
-_DEFAULT_NODE_PERMUTE_FIELDS: Set[str] = {
-    AtomicDataDict.POSITIONS_KEY,
-    AtomicDataDict.WEIGHTS_KEY,
-    AtomicDataDict.NODE_FEATURES_KEY,
-    AtomicDataDict.NODE_ATTRS_KEY,
-    AtomicDataDict.ATOMIC_NUMBERS_KEY,
-    AtomicDataDict.ATOM_TYPE_KEY,
-    AtomicDataDict.FORCE_KEY,
-    AtomicDataDict.PER_ATOM_ENERGY_KEY,
-    AtomicDataDict.BATCH_KEY,
-}
-_DEFAULT_EDGE_PERMUTE_FIELDS: Set[str] = {
-    AtomicDataDict.EDGE_CELL_SHIFT_KEY,
-    AtomicDataDict.EDGE_VECTORS_KEY,
-    AtomicDataDict.EDGE_LENGTH_KEY,
-    AtomicDataDict.EDGE_ATTRS_KEY,
-    AtomicDataDict.EDGE_EMBEDDING_KEY,
-}
-_NODE_PERMUTE_FIELDS: Set[str] = set(_DEFAULT_NODE_PERMUTE_FIELDS)
-_EDGE_PERMUTE_FIELDS: Set[str] = set(_DEFAULT_EDGE_PERMUTE_FIELDS)
-
-
-def register_fields(
-    node_permute_fields: Sequence[str] = [], edge_permute_fields: Sequence[str] = []
-) -> None:
-    r"""Register a field as having specific properties for testing purposes.
-
-    See ``assert_permutation_equivariant``.
-
-    Args:
-        node_permute_fields: fields that are equivariant to node permutations.
-        edge_permute_fields: fields that are equivariant to edge permutations.
-    """
-    node_permute_fields: set = set(node_permute_fields)
-    edge_permute_fields: set = set(edge_permute_fields)
-    assert node_permute_fields.isdisjoint(
-        edge_permute_fields
-    ), "Fields cannot be both node and edge equivariant"
-    assert (_NODE_PERMUTE_FIELDS.union(_EDGE_PERMUTE_FIELDS)).isdisjoint(
-        node_permute_fields.union(edge_permute_fields)
-    ), "Cannot reregister a field that has already been registered"
-    _NODE_PERMUTE_FIELDS.update(node_permute_fields)
-    _EDGE_PERMUTE_FIELDS.update(edge_permute_fields)
-
-
-def deregister_fields(*fields: Sequence[str]) -> None:
-    r"""Deregister a field registered with ``register_fields``.
-
-    Silently ignores fields that were never registered to begin with.
-
-    Args:
-        *fields: fields to deregister.
-    """
-    for f in fields:
-        assert f not in _DEFAULT_EDGE_PERMUTE_FIELDS, "Cannot deregister built-in field"
-        assert f not in _DEFAULT_NODE_PERMUTE_FIELDS, "Cannot deregister built-in field"
-        _NODE_PERMUTE_FIELDS.discard(f)
-        _EDGE_PERMUTE_FIELDS.discard(f)
-
-
 def assert_permutation_equivariant(
     func: GraphModuleMixin,
     data_in: AtomicDataDict.Type,
-    extra_node_permute_fields: Sequence[str] = [],
-    extra_edge_permute_fields: Sequence[str] = [],
+    tolerance: Optional[float] = None,
 ):
     r"""Test the permutation equivariance of ``func``.
 
-    Standard fields are assumed to be equivariant to node or edge permutations according to their standard interpretions; all other fields are assumed to be invariant to all permutations. Non-standard fields can be registered as node/edge permutation equivariant using ``register_fields``, or can be provided directly in the
-    ``extra_node_permute_fields`` and ``extra_edge_permute_fields`` arguments.
+    Standard fields are assumed to be equivariant to node or edge permutations according to their standard interpretions; all other fields are assumed to be invariant to all permutations. Non-standard fields can be registered as node/edge permutation equivariant using ``register_fields``.
 
     Raises ``AssertionError`` if issues are found.
 
     Args:
         func: the module or model to test
         data_in: the example input data to test with
-        extra_node_permute_fields: names of non-standard fields that should be equivariant to permutations of the *node* ordering
-        extra_edge_permute_fields: names of non-standard fields that should be equivariant to permutations of the *edge* ordering
     """
     # Prevent pytest from showing this function in the traceback
     # __tracebackhide__ = True
 
-    atol = PERMUTATION_FLOAT_TOLERANCE[torch.get_default_dtype()]
+    if tolerance is None:
+        atol = PERMUTATION_FLOAT_TOLERANCE[torch.get_default_dtype()]
+    else:
+        atol = tolerance
 
     data_in = data_in.copy()
     device = data_in[AtomicDataDict.POSITIONS_KEY].device
 
-    # instead of doing fragile shape checks, just do a list of fields that permute
-    extra_node_permute_fields: Set[str] = set(extra_node_permute_fields)
-    extra_edge_permute_fields: Set[str] = set(extra_edge_permute_fields)
-    assert extra_edge_permute_fields.isdisjoint(
-        extra_node_permute_fields
-    ), "A field cannot be both edge and node permutation equivariant"
-    assert _EDGE_PERMUTE_FIELDS.isdisjoint(
-        extra_node_permute_fields
-    ), "Some member of extra_node_permute_fields is registered as an edge permutation equivariant"
-    assert _NODE_PERMUTE_FIELDS.isdisjoint(
-        extra_edge_permute_fields
-    ), "Some member of extra_edge_permute_fields is registered as an node permutation equivariant"
-    node_permute_fields = _NODE_PERMUTE_FIELDS.union(extra_node_permute_fields)
-    edge_permute_fields = _EDGE_PERMUTE_FIELDS.union(extra_edge_permute_fields)
+    node_permute_fields = _NODE_FIELDS
+    edge_permute_fields = _EDGE_FIELDS
 
     # Make permutations and make sure they are not identities
     n_node: int = len(data_in[AtomicDataDict.POSITIONS_KEY])
@@ -192,11 +124,13 @@ def assert_permutation_equivariant(
 
 def assert_AtomicData_equivariant(
     func: GraphModuleMixin,
-    data_in: Union[AtomicData, AtomicDataDict.Type],
-    extra_node_permute_fields: Sequence[str] = [],
-    extra_edge_permute_fields: Sequence[str] = [],
+    data_in: Union[
+        AtomicData, AtomicDataDict.Type, List[Union[AtomicData, AtomicDataDict.Type]]
+    ],
+    permutation_tolerance: Optional[float] = None,
+    o3_tolerance: Optional[float] = None,
     **kwargs,
-):
+) -> str:
     r"""Test the rotation, translation, parity, and permutation equivariance of ``func``.
 
     For details on permutation testing, see ``assert_permutation_equivariant``.
@@ -206,38 +140,43 @@ def assert_AtomicData_equivariant(
 
     Args:
         func: the module or model to test
-        data_in: the example input data to test with
-        extra_node_permute_fields: see ``assert_permutation_equivariant``
-        extra_edge_permute_fields: see ``assert_permutation_equivariant``
+        data_in: the example input data(s) to test with. Only the first is used for permutation testing.
         **kwargs: passed to ``e3nn.util.test.assert_equivariant``
 
     Returns:
-        Information on equivariance error from ``e3nn.util.test.assert_equivariant``
+        A string description of the errors.
     """
     # Prevent pytest from showing this function in the traceback
     __tracebackhide__ = True
 
-    if not isinstance(data_in, dict):
-        data_in = AtomicData.to_AtomicDataDict(data_in)
+    if not isinstance(data_in, list):
+        data_in = [data_in]
+    data_in = [AtomicData.to_AtomicDataDict(d) for d in data_in]
 
     # == Test permutation of graph nodes ==
-    assert_permutation_equivariant(
-        func,
-        data_in,
-        extra_node_permute_fields=extra_node_permute_fields,
-        extra_edge_permute_fields=extra_edge_permute_fields,
-    )
+    # TODO: since permutation is distinct, run only on one.
+    assert_permutation_equivariant(func, data_in[0], tolerance=permutation_tolerance)
 
     # == Test rotation, parity, and translation using e3nn ==
     irreps_in = {k: None for k in AtomicDataDict.ALLOWED_KEYS}
-    irreps_in.update(
-        {
-            AtomicDataDict.POSITIONS_KEY: "cartesian_points",
-            AtomicDataDict.CELL_KEY: "3x1o",
-        }
-    )
     irreps_in.update(func.irreps_in)
-    irreps_in = {k: v for k, v in irreps_in.items() if k in data_in}
+    irreps_in = {k: v for k, v in irreps_in.items() if k in data_in[0]}
+    irreps_out = func.irreps_out.copy()
+    # for certain things, we don't care what the given irreps are...
+    # make sure that we test correctly for equivariance:
+    for irps in (irreps_in, irreps_out):
+        if AtomicDataDict.POSITIONS_KEY in irps:
+            # it should always have been 1o vectors
+            # since that's actually a valid Irreps
+            assert o3.Irreps(irps[AtomicDataDict.POSITIONS_KEY]) == o3.Irreps("1o")
+            irps[AtomicDataDict.POSITIONS_KEY] = "cartesian_points"
+        if AtomicDataDict.CELL_KEY in irps:
+            prev_cell_irps = irps[AtomicDataDict.CELL_KEY]
+            assert prev_cell_irps is None or o3.Irreps(prev_cell_irps) == o3.Irreps(
+                "3x1o"
+            )
+            # must be this to actually rotate it
+            irps[AtomicDataDict.CELL_KEY] = "3x1o"
 
     def wrapper(*args):
         arg_dict = {k: v for k, v in zip(irreps_in, args)}
@@ -254,25 +193,76 @@ def assert_AtomicData_equivariant(
             cell = arg_dict[AtomicDataDict.CELL_KEY]
             assert cell.shape[-2:] == (3, 3)
             arg_dict[AtomicDataDict.CELL_KEY] = cell.reshape(cell.shape[:-2] + (9,))
-        return [output[k] for k in func.irreps_out]
+        return [output[k] for k in irreps_out]
 
-    data_in = AtomicData.to_AtomicDataDict(data_in)
-    # cell is a special case
-    if AtomicDataDict.CELL_KEY in data_in:
-        # flatten
-        cell = data_in[AtomicDataDict.CELL_KEY]
-        assert cell.shape[-2:] == (3, 3)
-        data_in[AtomicDataDict.CELL_KEY] = cell.reshape(cell.shape[:-2] + (9,))
+    # prepare input data
+    for d in data_in:
+        # cell is a special case
+        if AtomicDataDict.CELL_KEY in d:
+            # flatten
+            cell = d[AtomicDataDict.CELL_KEY]
+            assert cell.shape[-2:] == (3, 3)
+            d[AtomicDataDict.CELL_KEY] = cell.reshape(cell.shape[:-2] + (9,))
 
-    args_in = [data_in[k] for k in irreps_in]
+    errs = [
+        equivariance_error(
+            wrapper,
+            args_in=[d[k] for k in irreps_in],
+            irreps_in=list(irreps_in.values()),
+            irreps_out=list(irreps_out.values()),
+            **kwargs,
+        )
+        for d in data_in
+    ]
 
-    return assert_equivariant(
-        wrapper,
-        args_in=args_in,
-        irreps_in=list(irreps_in.values()),
-        irreps_out=list(func.irreps_out.values()),
-        **kwargs,
-    )
+    # take max across errors
+    errs = {k: torch.max(torch.vstack([e[k] for e in errs]), dim=0)[0] for k in errs[0]}
+
+    if o3_tolerance is None:
+        o3_tolerance = FLOAT_TOLERANCE[torch.get_default_dtype()]
+    anerr = next(iter(errs.values()))
+    if isinstance(anerr, float) or anerr.ndim == 0:
+        # old e3nn doesn't report which key
+        problems = {k: v for k, v in errs.items() if v > o3_tolerance}
+
+        def _describe(errors):
+            return "\n".join(
+                "(parity_k={:d}, did_translate={}) -> max error={:.3e}".format(
+                    int(k[0]),
+                    bool(k[1]),
+                    float(v),
+                )
+                for k, v in errors.items()
+            )
+
+        if len(problems) > 0:
+            raise AssertionError(
+                "Equivariance test failed for cases:" + _describe(problems)
+            )
+
+        return _describe(errs)
+    else:
+        # it's newer and tells us which is which
+        all_errs = []
+        for case, err in errs.items():
+            for key, this_err in zip(irreps_out.keys(), err):
+                all_errs.append(case + (key, this_err))
+        problems = [e for e in all_errs if e[-1] > o3_tolerance]
+
+        def _describe(errors):
+            return "\n".join(
+                "   (parity_k={:1d}, did_translate={:5}, field={:20}) -> max error={:.3e}".format(
+                    int(k[0]), str(bool(k[1])), str(k[2]), float(k[3])
+                )
+                for k in errors
+            )
+
+        if len(problems) > 0:
+            raise AssertionError(
+                "Equivariance test failed for cases:\n" + _describe(problems)
+            )
+
+        return _describe(all_errs)
 
 
 _DEBUG_HOOKS = None

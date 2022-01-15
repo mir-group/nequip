@@ -1,7 +1,8 @@
+import inspect
 import logging
 
 import torch.nn
-from torch_scatter import scatter
+from torch_runstats.scatter import scatter, scatter_mean
 
 from nequip.data import AtomicDataDict
 from nequip.utils import instantiate_from_cls_name
@@ -73,7 +74,7 @@ class PerAtomLoss(SimpleLoss):
         # zero the nan entries
         has_nan = self.ignore_nan and torch.isnan(ref[key].sum())
         N = torch.bincount(ref[AtomicDataDict.BATCH_KEY])
-        N = N.reshape(pred[key].shape)
+        N = N.reshape((-1, 1))
         if has_nan:
             not_nan = (ref[key] == ref[key]).int()
             loss = (
@@ -125,14 +126,14 @@ class PerSpeciesLoss(SimpleLoss):
 
         reduce_dims = tuple(i + 1 for i in range(len(per_atom_loss.shape) - 1))
 
+        spe_idx = pred[AtomicDataDict.ATOM_TYPE_KEY].squeeze(-1)
         if has_nan:
             if len(reduce_dims) > 0:
                 per_atom_loss = per_atom_loss.sum(dim=reduce_dims)
 
-            spe_idx = pred[AtomicDataDict.ATOM_TYPE_KEY]
-            per_species_loss = scatter(per_atom_loss, spe_idx, reduce="sum", dim=0)
+            per_species_loss = scatter(per_atom_loss, spe_idx, dim=0)
 
-            N = scatter(not_nan, spe_idx, reduce="sum", dim=0)
+            N = scatter(not_nan, spe_idx, dim=0)
             N = N.sum(reduce_dims)
             N = 1.0 / N
             N_species = ((N == N).int()).sum()
@@ -145,12 +146,9 @@ class PerSpeciesLoss(SimpleLoss):
                 per_atom_loss = per_atom_loss.mean(dim=reduce_dims)
 
             # offset species index by 1 to use 0 for nan
-            spe_idx = pred[AtomicDataDict.ATOM_TYPE_KEY]
             _, inverse_species_index = torch.unique(spe_idx, return_inverse=True)
 
-            per_species_loss = scatter(
-                per_atom_loss, inverse_species_index, reduce="mean", dim=0
-            )
+            per_species_loss = scatter_mean(per_atom_loss, inverse_species_index, dim=0)
 
             return per_species_loss.mean()
 
@@ -163,16 +161,17 @@ def find_loss_function(name: str, params):
     """
 
     wrapper_list = dict(
-        PerSpecies=PerSpeciesLoss,
-        PerAtom=PerAtomLoss,
+        perspecies=PerSpeciesLoss,
+        peratom=PerAtomLoss,
     )
 
     if isinstance(name, str):
         for key in wrapper_list:
-            if name.startswith(key):
+            if name.lower().startswith(key):
                 logging.debug(f"create loss instance {wrapper_list[key]}")
                 return wrapper_list[key](name[len(key) :], params)
-
+        return SimpleLoss(name, params)
+    elif inspect.isclass(name):
         return SimpleLoss(name, params)
     elif callable(name):
         return name

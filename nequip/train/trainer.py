@@ -10,13 +10,11 @@ make an interface with ray
 import sys
 import inspect
 import logging
-import yaml
 from copy import deepcopy
 from os.path import isfile
-from time import perf_counter, gmtime, strftime
-from typing import Callable, Optional, Union, Tuple
+from time import perf_counter
+from typing import Callable, Optional, Union, Tuple, List
 from pathlib import Path
-
 
 if sys.version_info[1] >= 7:
     import contextlib
@@ -39,8 +37,11 @@ from nequip.utils import (
     save_file,
     load_file,
     atomic_write,
+    finish_all_writes,
+    atomic_write_group,
     dtype_from_name,
 )
+from nequip.utils.git import get_commit
 from nequip.model import model_from_config
 
 from .loss import Loss, LossStat
@@ -132,7 +133,8 @@ class Trainer:
     Args:
         model: neural network model
 
-        seed (int): random see number
+        seed (int): random seed number
+        dataset_seed (int): random seed for dataset operations
 
         loss_coeffs (dict): dictionary to store coefficient and loss functions
 
@@ -171,14 +173,13 @@ class Trainer:
     Additional Attributes:
 
         init_keys (list): list of parameters needed to reconstruct this instance
-        device : torch device
         dl_train (DataLoader): training data
         dl_val (DataLoader): test data
         iepoch (int): # of epoches ran
         stop_arg (str): reason why the training stops
         batch_mae (float): the mae of the latest batch
         mae_dict (dict): all loss, mae of the latest validation
-        best_val_metrics (float): current best validation mae
+        best_metrics (float): current best validation mae
         best_epoch (float): current best epoch
         best_model_path (str): path to save the best model
         last_model_path (str): path to save the latest model
@@ -214,10 +215,13 @@ class Trainer:
         self,
         model,
         model_builders: Optional[list] = [],
+        device: str = "cuda" if torch.cuda.is_available() else "cpu",
         seed: Optional[int] = None,
+        dataset_seed: Optional[int] = None,
         loss_coeffs: Union[dict, str] = AtomicDataDict.TOTAL_ENERGY_KEY,
+        train_on_keys: Optional[List[str]] = None,
         metrics_components: Optional[Union[dict, str]] = None,
-        metrics_key: str = ABBREV.get(LOSS_KEY, LOSS_KEY),
+        metrics_key: str = f"{VALIDATION}_" + ABBREV.get(LOSS_KEY, LOSS_KEY),
         early_stopping_conds: Optional[EarlyStopping] = None,
         early_stopping: Optional[Callable] = None,
         early_stopping_kwargs: Optional[dict] = None,
@@ -275,8 +279,12 @@ class Trainer:
             "metrics_initialization.csv", propagate=False
         )
         self.batch_log = {
-            TRAIN: output.open_logfile("metrics_batch_train.csv", propagate=False),
-            VALIDATION: output.open_logfile("metrics_batch_val.csv", propagate=False),
+            TRAIN: output.open_logfile(
+                f"metrics_batch_{ABBREV[TRAIN]}.csv", propagate=False
+            ),
+            VALIDATION: output.open_logfile(
+                f"metrics_batch_{ABBREV[VALIDATION]}.csv", propagate=False
+            ),
         }
 
         # add filenames if not defined
@@ -289,8 +297,12 @@ class Trainer:
             torch.manual_seed(seed)
             np.random.seed(seed)
 
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.dataset_rng = torch.Generator()
+        if dataset_seed is not None:
+            self.dataset_rng.manual_seed(dataset_seed)
+
         self.logger.info(f"Torch device: {self.device}")
+        self.torch_device = torch.device(self.device)
 
         # sort out all the other parameters
         # for samplers, optimizer and scheduler
@@ -300,9 +312,20 @@ class Trainer:
         self.early_stopping_kwargs = deepcopy(early_stopping_kwargs)
 
         # initialize training states
-        self.best_val_metrics = float("inf")
+        self.best_metrics = float("inf")
         self.best_epoch = 0
         self.iepoch = -1 if self.report_init_validation else 0
+
+        self.loss, _ = instantiate(
+            builder=Loss,
+            prefix="loss",
+            positional_args=dict(coeffs=self.loss_coeffs),
+            all_args=self.kwargs,
+        )
+        self.loss_stat = LossStat(self.loss)
+        self.train_on_keys = self.loss.keys
+        if train_on_keys is not None:
+            assert set(train_on_keys) == set(self.train_on_keys)
 
         self.init()
 
@@ -357,9 +380,9 @@ class Trainer:
                 new_dict = {}
                 for k, v in item.items():
                     if (
-                        k.startswith(VALIDATION)
-                        or k.startswith(TRAIN)
-                        or k in ["LR", "wall"]
+                        k.lower().startswith(VALIDATION)
+                        or k.lower().startswith(TRAIN)
+                        or k.lower() in ["lr", "wall"]
                     ):
                         new_dict[k] = item[k]
                     else:
@@ -375,13 +398,12 @@ class Trainer:
                 use_num_updates=self.ema_use_num_updates,
             )
 
-        self.loss, _ = instantiate(
-            builder=Loss,
-            prefix="loss",
-            positional_args=dict(coeffs=self.loss_coeffs),
-            all_args=self.kwargs,
-        )
-        self.loss_stat = LossStat(self.loss)
+        if hasattr(self.model, "irreps_out"):
+            for key in self.train_on_keys:
+                if key not in self.model.irreps_out:
+                    raise RuntimeError(
+                        "Loss function include fields that are not predicted by the model"
+                    )
 
     @property
     def init_keys(self):
@@ -439,17 +461,18 @@ class Trainer:
                 if item is not None:
                     dictionary["state_dict"][key] = item.state_dict()
             dictionary["state_dict"]["rng_state"] = torch.get_rng_state()
+            dictionary["state_dict"]["dataset_rng_state"] = self.dataset_rng.get_state()
             if torch.cuda.is_available():
                 dictionary["state_dict"]["cuda_rng_state"] = torch.cuda.get_rng_state(
-                    device=self.device
+                    device=self.torch_device
                 )
 
         if training_progress:
             dictionary["progress"] = {}
             for key in ["iepoch", "best_epoch"]:
                 dictionary["progress"][key] = self.__dict__.get(key, -1)
-            dictionary["progress"]["best_val_metrics"] = self.__dict__.get(
-                "best_val_metrics", float("inf")
+            dictionary["progress"]["best_metrics"] = self.__dict__.get(
+                "best_metrics", float("inf")
             )
             dictionary["progress"]["stop_arg"] = self.__dict__.get("stop_arg", None)
 
@@ -463,17 +486,28 @@ class Trainer:
         for code in [e3nn, nequip, torch]:
             dictionary[f"{code.__name__}_version"] = code.__version__
 
+        codes_for_git = {"e3nn", "nequip"}
+        for builder in self.model_builders:
+            if not isinstance(builder, str):
+                continue
+            builder = builder.split(".")
+            if len(builder) > 1:
+                # it's not a single name which is from nequip
+                codes_for_git.add(builder[0])
+        dictionary["code_versions"] = {code: get_commit(code) for code in codes_for_git}
+
         return dictionary
 
-    def save_config(self) -> None:
+    def save_config(self, blocking: bool = True) -> None:
         save_file(
             item=self.as_dict(state_dict=False, training_progress=False),
             supported_formats=dict(yaml=["yaml"]),
             filename=self.config_path,
             enforced_format=None,
+            blocking=blocking,
         )
 
-    def save(self, filename: Optional[str] = None, format=None):
+    def save(self, filename: Optional[str] = None, format=None, blocking: bool = True):
         """save the file as filename
 
         Args:
@@ -500,11 +534,11 @@ class Trainer:
             supported_formats=dict(torch=["pth", "pt"], yaml=["yaml"], json=["json"]),
             filename=filename,
             enforced_format=format,
+            blocking=blocking,
         )
         logger.debug(f"Saved trainer to {filename}")
 
-        self.save_config()
-        self.save_model(self.last_model_path)
+        self.save_model(self.last_model_path, blocking=blocking)
         logger.debug(f"Saved last model to to {self.last_model_path}")
 
         return filename
@@ -538,10 +572,10 @@ class Trainer:
         append (bool): if True, append the old model files and append the same logfile
         """
 
-        d = deepcopy(dictionary)
+        dictionary = deepcopy(dictionary)
 
         for code in [e3nn, nequip, torch]:
-            version = d.get(f"{code.__name__}_version", None)
+            version = dictionary.get(f"{code.__name__}_version", None)
             if version is not None and version != code.__version__:
                 logging.warning(
                     "Loading a pickled model created with different library version(s) may cause issues."
@@ -551,14 +585,14 @@ class Trainer:
 
         # update the restart and append option
         if append is not None:
-            d["append"] = append
+            dictionary["append"] = append
 
         model = None
         iepoch = -1
-        if "model" in d:
-            model = d.pop("model")
-        elif "progress" in d:
-            progress = d["progress"]
+        if "model" in dictionary:
+            model = dictionary.pop("model")
+        elif "progress" in dictionary:
+            progress = dictionary["progress"]
 
             # load the model from file
             iepoch = progress["iepoch"]
@@ -569,15 +603,17 @@ class Trainer:
                 raise AttributeError("model weights & bias are not saved")
 
             model, _ = Trainer.load_model_from_training_session(
-                traindir=load_path.parent, model_name=load_path.name
+                traindir=load_path.parent,
+                model_name=load_path.name,
+                config_dictionary=dictionary,
             )
             logging.debug(f"Reload the model from {load_path}")
 
-            d.pop("progress")
+            dictionary.pop("progress")
 
-        state_dict = d.pop("state_dict", None)
+        state_dict = dictionary.pop("state_dict", None)
 
-        trainer = cls(model=model, **d)
+        trainer = cls(model=model, **dictionary)
 
         if state_dict is not None and trainer.model is not None:
             logging.debug("Reload optimizer and scheduler states")
@@ -588,15 +624,16 @@ class Trainer:
             trainer._initialized = True
 
             torch.set_rng_state(state_dict["rng_state"])
+            trainer.dataset_rng.set_state(state_dict["dataset_rng_state"])
             if torch.cuda.is_available():
                 torch.cuda.set_rng_state(state_dict["cuda_rng_state"])
 
-        if "progress" in d:
-            trainer.best_val_metrics = progress["best_val_metrics"]
+        if "progress" in dictionary:
+            trainer.best_metrics = progress["best_metrics"]
             trainer.best_epoch = progress["best_epoch"]
             stop_arg = progress.pop("stop_arg", None)
         else:
-            trainer.best_val_metrics = float("inf")
+            trainer.best_metrics = float("inf")
             trainer.best_epoch = 0
             stop_arg = None
         trainer.iepoch = iepoch
@@ -612,12 +649,18 @@ class Trainer:
 
     @staticmethod
     def load_model_from_training_session(
-        traindir, model_name="best_model.pth", device="cpu"
+        traindir,
+        model_name="best_model.pth",
+        device="cpu",
+        config_dictionary: Optional[dict] = None,
     ) -> Tuple[torch.nn.Module, Config]:
         traindir = str(traindir)
         model_name = str(model_name)
 
-        config = Config.from_file(traindir + "/config.yaml")
+        if config_dictionary is not None:
+            config = Config.from_dict(config_dictionary)
+        else:
+            config = Config.from_file(traindir + "/config.yaml")
 
         if config.get("compile_model", False):
             model = torch.jit.load(traindir + "/" + model_name, map_location=device)
@@ -629,7 +672,10 @@ class Trainer:
             if model is not None:
                 # TODO: this is not exactly equivalent to building with
                 # this set as default dtype... does it matter?
-                model.to(device=device, dtype=dtype_from_name(config.default_dtype))
+                model.to(
+                    device=torch.device(device),
+                    dtype=dtype_from_name(config.default_dtype),
+                )
                 model_state_dict = torch.load(
                     traindir + "/" + model_name, map_location=device
                 )
@@ -641,7 +687,7 @@ class Trainer:
         if self.model is None:
             return
 
-        self.model.to(self.device)
+        self.model.to(self.torch_device)
         self.init_objects()
 
         self._initialized = True
@@ -651,7 +697,7 @@ class Trainer:
             self.metrics_components = []
             for key, func in self.loss.funcs.items():
                 params = {
-                    "PerSpecies": type(func).__name__.startswith("PerSpecies"),
+                    "PerSpecies": type(func).__name__.lower().startswith("perspecies"),
                 }
                 self.metrics_components.append((key, "mae", params))
                 self.metrics_components.append((key, "rmse", params))
@@ -664,10 +710,12 @@ class Trainer:
         )
 
         if not (
-            self.metrics_key.startswith(VALIDATION)
-            or self.metrics_key.startswith(TRAIN)
+            self.metrics_key.lower().startswith(VALIDATION)
+            or self.metrics_key.lower().startswith(TRAIN)
         ):
-            self.metrics_key = f"{VALIDATION}_{self.metrics_key}"
+            raise RuntimeError(
+                f"metrics_key should start with either {VALIDATION} or {TRAIN}"
+            )
 
     def train(self):
 
@@ -682,24 +730,17 @@ class Trainer:
                 )
             )
 
-        if self.iepoch == (-1 if self.report_init_validation else 0):
-            d = self.as_dict()
-            for key in list(d.keys()):
-                if not isinstance(d[key], (float, int, str, list, tuple)):
-                    d[key] = repr(d[key])
-
-            d["start_time"] = strftime("%a, %d %b %Y %H:%M:%S", gmtime())
-
-            self.log_dictionary(d, name="Initialization")
-
         for callback in self.init_callbacks:
             callback(self)
 
         self.init_log()
         self.wall = perf_counter()
 
-        if self.iepoch == -1:
-            self.save()
+        with atomic_write_group():
+            if self.iepoch == -1:
+                self.save()
+            if self.iepoch in [-1, 0]:
+                self.save_config()
 
         self.init_metrics()
 
@@ -714,6 +755,7 @@ class Trainer:
         self.final_log()
 
         self.save()
+        finish_all_writes()
 
     def batch_step(self, data, validation=False):
         # no need to have gradients from old steps taking up memory
@@ -725,7 +767,7 @@ class Trainer:
             self.model.train()
 
         # Do any target rescaling
-        data = data.to(self.device)
+        data = data.to(self.torch_device)
         data = AtomicData.to_AtomicDataDict(data)
 
         if hasattr(self.model, "unscale"):
@@ -814,9 +856,9 @@ class Trainer:
 
     def reset_metrics(self):
         self.loss_stat.reset()
-        self.loss_stat.to(self.device)
+        self.loss_stat.to(self.torch_device)
         self.metrics.reset()
-        self.metrics.to(self.device)
+        self.metrics.to(self.torch_device)
 
     def epoch_step(self):
 
@@ -859,22 +901,13 @@ class Trainer:
         for callback in self.end_of_epoch_callbacks:
             callback(self)
 
-    def log_dictionary(self, dictionary: dict, name: str = ""):
-        """
-        dump the keys and values of a dictionary
-        """
-
-        logger = self.logger
-        logger.info(f"* {name}")
-        logger.info(yaml.dump(dictionary))
-
     def end_of_batch_log(self, batch_type: str):
         """
         store all the loss/mae of each batch
         """
 
         mat_str = f"{self.iepoch+1:5d}, {self.ibatch+1:5d}"
-        log_str = f"{self.iepoch+1:5d} {self.ibatch+1:5d}"
+        log_str = f"  {self.iepoch+1:5d} {self.ibatch+1:5d}"
 
         header = "epoch, batch"
         log_header = "# Epoch batch"
@@ -884,11 +917,12 @@ class Trainer:
             mat_str += f", {value:16.5g}"
             header += f", {name}"
             log_str += f" {value:12.3g}"
-            log_header += f" {name:>12s}"
+            log_header += f" {name:>12.12}"
 
         # append details from metrics
         metrics, skip_keys = self.metrics.flatten_metrics(
             metrics=self.batch_metrics,
+            # TO DO, how about chemical to symbol
             type_names=self.model.config.get("type_names")
             if hasattr(self.model, "config")
             else None,
@@ -899,7 +933,7 @@ class Trainer:
             header += f", {key}"
             if key not in skip_keys:
                 log_str += f" {value:12.3g}"
-                log_header += f" {key:>12s}"
+                log_header += f" {key:>12.12}"
 
         batch_logger = logging.getLogger(self.batch_log[batch_type])
 
@@ -923,36 +957,36 @@ class Trainer:
         """
         save model and trainer details
         """
+        with atomic_write_group():
+            current_metrics = self.mae_dict[self.metrics_key]
+            if current_metrics < self.best_metrics:
+                self.best_metrics = current_metrics
+                self.best_epoch = self.iepoch
 
-        val_metrics = self.mae_dict[self.metrics_key]
-        if val_metrics < self.best_val_metrics:
-            self.best_val_metrics = val_metrics
-            self.best_epoch = self.iepoch
+                self.save_ema_model(self.best_model_path, blocking=False)
 
-            self.save_ema_model(self.best_model_path)
+                self.logger.info(
+                    f"! Best model {self.best_epoch:8d} {self.best_metrics:8.3f}"
+                )
 
-            self.logger.info(
-                f"! Best model {self.best_epoch:8d} {self.best_val_metrics:8.3f}"
-            )
+            if (self.iepoch + 1) % self.log_epoch_freq == 0:
+                self.save(blocking=False)
 
-        if (self.iepoch + 1) % self.log_epoch_freq == 0:
-            self.save()
+            if (
+                self.save_checkpoint_freq > 0
+                and (self.iepoch + 1) % self.save_checkpoint_freq == 0
+            ):
+                ckpt_path = self.output.generate_file(f"ckpt{self.iepoch+1}.pth")
+                self.save_model(ckpt_path, blocking=False)
 
-        if (
-            self.save_checkpoint_freq > 0
-            and (self.iepoch + 1) % self.save_checkpoint_freq == 0
-        ):
-            ckpt_path = self.output.generate_file(f"ckpt{self.iepoch+1}.pth")
-            self.save_model(ckpt_path)
+            if (
+                self.save_ema_checkpoint_freq > 0
+                and (self.iepoch + 1) % self.save_ema_checkpoint_freq == 0
+            ):
+                ckpt_path = self.output.generate_file(f"ckpt_ema_{self.iepoch+1}.pth")
+                self.save_ema_model(ckpt_path, blocking=False)
 
-        if (
-            self.save_ema_checkpoint_freq > 0
-            and (self.iepoch + 1) % self.save_ema_checkpoint_freq == 0
-        ):
-            ckpt_path = self.output.generate_file(f"ckpt_ema_{self.iepoch+1}.pth")
-            self.save_ema_model(ckpt_path)
-
-    def save_ema_model(self, path):
+    def save_ema_model(self, path, blocking: bool = True):
 
         if self.use_ema:
             # If using EMA, store the EMA validation model
@@ -964,11 +998,10 @@ class Trainer:
             cm = contextlib.nullcontext()
 
         with cm:
-            self.save_model(path)
+            self.save_model(path, blocking=blocking)
 
-    def save_model(self, path):
-        self.save_config()
-        with atomic_write(path) as write_to:
+    def save_model(self, path, blocking: bool = True):
+        with atomic_write(path, blocking=blocking, binary=True) as write_to:
             if isinstance(self.model, torch.jit.ScriptModule):
                 torch.jit.save(self.model, write_to)
             else:
@@ -982,7 +1015,7 @@ class Trainer:
 
     def final_log(self):
 
-        self.logger.info(f"! Stop training for eaching {self.stop_arg}")
+        self.logger.info(f"! Stop training: {self.stop_arg}")
         wall = perf_counter() - self.wall
         self.logger.info(f"Wall time: {wall}")
 
@@ -1026,7 +1059,7 @@ class Trainer:
                 mat_str += f", {value:16.5g}"
                 header += f", {category}_{key}"
                 log_str[category] += f" {value:12.3g}"
-                log_header[category] += f" {key:>12s}"
+                log_header[category] += f" {key:>12.12}"
                 self.mae_dict[f"{category}_{key}"] = value
 
             # append details from metrics
@@ -1035,7 +1068,7 @@ class Trainer:
                 header += f", {category}_{key}"
                 if key not in skip_keys:
                     log_str[category] += f" {value:12.3g}"
-                    log_header[category] += f" {key:>12s}"
+                    log_header[category] += f" {key:>12.12}"
                 self.mae_dict[f"{category}_{key}"] = value
 
         if self.iepoch == 0:
@@ -1052,9 +1085,16 @@ class Trainer:
             self.logger.info("! Train      " + log_str[TRAIN])
             self.logger.info("! Validation " + log_str[VALIDATION])
         else:
+            self.logger.info("\n\n  Initialization     " + log_header[VALIDATION])
             self.logger.info("! Initial Validation " + log_str[VALIDATION])
 
+        wall = perf_counter() - self.wall
+        self.logger.info(f"Wall time: {wall}")
+
     def __del__(self):
+
+        if not self._initialized:
+            return
 
         logger = self.logger
         for hdl in logger.handlers:
@@ -1090,7 +1130,7 @@ class Trainer:
                     )
 
                 if self.train_val_split == "random":
-                    idcs = torch.randperm(total_n)
+                    idcs = torch.randperm(total_n, generator=self.dataset_rng)
                 elif self.train_val_split == "sequential":
                     idcs = torch.arange(total_n)
                 else:
@@ -1106,10 +1146,12 @@ class Trainer:
                 if self.n_val > len(validation_dataset):
                     raise ValueError("Not enough data in dataset for requested n_train")
                 if self.train_val_split == "random":
-                    self.train_idcs = torch.randperm(len(dataset))[: self.n_train]
-                    self.val_idcs = torch.randperm(len(validation_dataset))[
-                        : self.n_val
-                    ]
+                    self.train_idcs = torch.randperm(
+                        len(dataset), generator=self.dataset_rng
+                    )[: self.n_train]
+                    self.val_idcs = torch.randperm(
+                        len(validation_dataset), generator=self.dataset_rng
+                    )[: self.n_val]
                 elif self.train_val_split == "sequential":
                     self.train_idcs = torch.arange(self.n_train)
                     self.val_idcs = torch.arange(self.n_val)
@@ -1129,7 +1171,6 @@ class Trainer:
         # https://pytorch.org/tutorials/recipes/recipes/tuning_guide.html#enable-async-data-loading-and-augmentation
         dl_kwargs = dict(
             batch_size=self.batch_size,
-            shuffle=self.shuffle,
             exclude_keys=self.exclude_keys,
             num_workers=self.dataloader_num_workers,
             # keep stuff around in memory
@@ -1137,9 +1178,17 @@ class Trainer:
                 self.dataloader_num_workers > 0 and self.max_epochs > 1
             ),
             # PyTorch recommends this for GPU since it makes copies much faster
-            pin_memory=(self.device != torch.device("cpu")),
+            pin_memory=(self.torch_device != torch.device("cpu")),
             # avoid getting stuck
             timeout=(10 if self.dataloader_num_workers > 0 else 0),
+            # use the right randomness
+            generator=self.dataset_rng,
         )
-        self.dl_train = DataLoader(dataset=self.dataset_train, **dl_kwargs)
+        self.dl_train = DataLoader(
+            dataset=self.dataset_train,
+            shuffle=self.shuffle,  # training should shuffle
+            **dl_kwargs,
+        )
+        # validation, on the other hand, shouldn't shuffle
+        # we still pass the generator just to be safe
         self.dl_val = DataLoader(dataset=self.dataset_val, **dl_kwargs)
