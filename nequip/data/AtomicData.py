@@ -427,12 +427,16 @@ class AtomicData(Data):
             **add_fields,
         )
 
-    def to_ase(self) -> Union[List[ase.Atoms], ase.Atoms]:
+    def to_ase(self, type_mapper=None) -> Union[List[ase.Atoms], ase.Atoms]:
         """Build a (list of) ``ase.Atoms`` object(s) from an ``AtomicData`` object.
 
         For each unique batch number provided in ``AtomicDataDict.BATCH_KEY``,
         an ``ase.Atoms`` object is created. If ``AtomicDataDict.BATCH_KEY`` does not
         exist in self, a single ``ase.Atoms`` object is created.
+
+        Args:
+            type_mapper: if provided, will be used to map ``ATOM_TYPES`` back into
+                elements, if the configuration of the ``type_mapper`` allows.
 
         Returns:
             A list of ``ase.Atoms`` objects if ``AtomicDataDict.BATCH_KEY`` is in self
@@ -445,6 +449,8 @@ class AtomicData(Data):
             )
         if AtomicDataDict.ATOMIC_NUMBERS_KEY in self:
             atomic_nums = self.atomic_numbers
+        elif type_mapper is not None and type_mapper.has_chemical_symbols:
+            atomic_nums = type_mapper.untransform(self[AtomicDataDict.ATOM_TYPE_KEY])
         else:
             warnings.warn(
                 "AtomicData.to_ase(): self didn't contain atomic numbers... using atom_type as atomic numbers instead, but this means the chemical symbols in ASE (outputs) will be wrong"
