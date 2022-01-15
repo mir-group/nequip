@@ -125,8 +125,8 @@ def _process_dict(kwargs, ignore_fields=[]):
             else:
                 kwargs[k] = torch.as_tensor(v)
         elif isinstance(v, list):
-            ele = np.array(v).reshape([-1])[0]
-            if isinstance(ele, float):
+            ele_dtype = np.array(v).dtype
+            if np.issubdtype(ele_dtype, np.floating):
                 kwargs[k] = torch.as_tensor(v, dtype=torch.get_default_dtype())
             else:
                 kwargs[k] = torch.as_tensor(v)
