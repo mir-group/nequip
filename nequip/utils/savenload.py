@@ -10,6 +10,7 @@ import tempfile
 from pathlib import Path
 import shutil
 import os
+import yaml
 
 
 # accumulate writes to group for renaming
