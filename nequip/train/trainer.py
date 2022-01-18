@@ -1002,10 +1002,10 @@ class Trainer:
 
     def save_model(self, path, blocking: bool = True):
         with atomic_write(path, blocking=blocking, binary=True) as write_to:
-            # if isinstance(self.model, torch.jit.ScriptModule):
-            #     torch.jit.save(self.model, write_to)
-            # else:
-            torch.save(self.model.state_dict(), write_to)
+            if isinstance(self.model, torch.jit.ScriptModule):
+                torch.jit.save(self.model, write_to)
+            else:
+                torch.save(self.model.state_dict(), write_to)
 
     def init_log(self):
         if self.iepoch > 0:
