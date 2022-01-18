@@ -156,9 +156,15 @@ def PerSpeciesRescale(
             # Both computed from dataset
             arguments_in_dataset_units = True
         elif len(str_names) == 1:
-            assert config[
-                module_prefix + "arguments_in_dataset_units"
-            ], "Requested to set either the shifts or scales of the per_species_rescale using dataset values, but chose to provide the other in non-dataset units. Please give the explictly specified shifts/scales in dataset units and set per_species_rescale_arguments_in_dataset_units"
+            if None in [scales, shifts]:
+                # if the one that isnt str is null, it's just disabled
+                # that has no units
+                # so it's ok to have just one and to be in dataset units
+                arguments_in_dataset_units = True
+            else:
+                assert config[
+                    module_prefix + "_arguments_in_dataset_units"
+                ], "Requested to set either the shifts or scales of the per_species_rescale using dataset values, but chose to provide the other in non-dataset units. Please give the explictly specified shifts/scales in dataset units and set per_species_rescale_arguments_in_dataset_units"
 
         # = Compute shifts and scales =
         computed_stats = _compute_stats(
