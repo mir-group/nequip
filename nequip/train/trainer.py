@@ -329,10 +329,18 @@ class Trainer:
             assert set(train_on_keys) == set(self.train_on_keys)
 
         self._init_callbacks = [load_callable(callback) for callback in init_callbacks]
-        self._end_of_epoch_callbacks = [load_callable(callback) for callback in end_of_epoch_callbacks]
-        self._end_of_batch_callbacks = [load_callable(callback) for callback in end_of_batch_callbacks]
-        self._end_of_train_callbacks = [load_callable(callback) for callback in end_of_train_callbacks]
-        self._final_callbacks = [load_callable(callback) for callback in final_callbacks]
+        self._end_of_epoch_callbacks = [
+            load_callable(callback) for callback in end_of_epoch_callbacks
+        ]
+        self._end_of_batch_callbacks = [
+            load_callable(callback) for callback in end_of_batch_callbacks
+        ]
+        self._end_of_train_callbacks = [
+            load_callable(callback) for callback in end_of_train_callbacks
+        ]
+        self._final_callbacks = [
+            load_callable(callback) for callback in final_callbacks
+        ]
 
         self.init()
 
@@ -669,24 +677,22 @@ class Trainer:
         else:
             config = Config.from_file(traindir + "/config.yaml")
 
-        if config.get("compile_model", False):
-            model = torch.jit.load(traindir + "/" + model_name, map_location=device)
-        else:
-            model = model_from_config(
-                config=config,
-                initialize=False,
+        model = model_from_config(
+            config=config,
+            initialize=False,
+        )
+        if model is not None:  # TODO: why would it be?
+            # TODO: this is not exactly equivalent to building with
+            # this set as default dtype... does it matter?
+            model.to(
+                device=torch.device(device),
+                dtype=dtype_from_name(config.default_dtype),
             )
-            if model is not None:
-                # TODO: this is not exactly equivalent to building with
-                # this set as default dtype... does it matter?
-                model.to(
-                    device=torch.device(device),
-                    dtype=dtype_from_name(config.default_dtype),
-                )
-                model_state_dict = torch.load(
-                    traindir + "/" + model_name, map_location=device
-                )
-                model.load_state_dict(model_state_dict)
+            model_state_dict = torch.load(
+                traindir + "/" + model_name, map_location=device
+            )
+            model.load_state_dict(model_state_dict)
+
         return model, config
 
     def init(self):

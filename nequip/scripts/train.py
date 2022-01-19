@@ -26,7 +26,6 @@ default_config = dict(
     run_name="NequIP",
     wandb=False,
     wandb_project="NequIP",
-    compile_model=False,
     model_builders=[
         "EnergyModel",
         "PerSpeciesRescale",
