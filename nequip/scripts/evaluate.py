@@ -29,8 +29,8 @@ def main(args=None, running_as_script: bool = True):
 
             The model, metrics, dataset, etc. can specified in individual YAML config files, or a training session can be indicated with `--train-dir`.
             In order of priority, the global settings (dtype, TensorFloat32, etc.) are taken from:
-              (1) the model config (for a training session), 
-              (2) the dataset config (for a deployed model), 
+              (1) the model config (for a training session),
+              (2) the dataset config (for a deployed model),
               or (3) the defaults.
 
             Prints only the final result in `name = num` format to stdout; all other information is `logging.debug`ed to stderr.
