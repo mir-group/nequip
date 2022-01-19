@@ -343,6 +343,9 @@ class Trainer:
             self._remove_from_model_input = self._remove_from_model_input.union(
                 AtomicDataDict.ALL_ENERGY_KEYS
             )
+        if kwargs.get("_override_allow_truth_label_inputs", False):
+            # needed for unit testing models
+            self._remove_from_model_input = set()
 
         # load all callbacks
         self._init_callbacks = [load_callable(callback) for callback in init_callbacks]
