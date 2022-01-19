@@ -328,6 +328,12 @@ class Trainer:
         if train_on_keys is not None:
             assert set(train_on_keys) == set(self.train_on_keys)
 
+        self._init_callbacks = [load_callable(callback) for callback in init_callbacks]
+        self._end_of_epoch_callbacks = [load_callable(callback) for callback in end_of_epoch_callbacks]
+        self._end_of_batch_callbacks = [load_callable(callback) for callback in end_of_batch_callbacks]
+        self._end_of_train_callbacks = [load_callable(callback) for callback in end_of_train_callbacks]
+        self._final_callbacks = [load_callable(callback) for callback in final_callbacks]
+
         self.init()
 
     def init_objects(self):
@@ -731,8 +737,8 @@ class Trainer:
                 )
             )
 
-        for callback in self.init_callbacks:
-            load_callable(callback)(self)
+        for callback in self._init_callbacks:
+            callback(self)
 
         self.init_log()
         self.wall = perf_counter()
@@ -750,8 +756,8 @@ class Trainer:
             self.epoch_step()
             self.end_of_epoch_save()
 
-        for callback in self.final_callbacks:
-            load_callable(callback)(self)
+        for callback in self._final_callbacks:
+            callback(self)
 
         self.final_log()
 
@@ -883,14 +889,14 @@ class Trainer:
                         validation=(category == VALIDATION),
                     )
                     self.end_of_batch_log(batch_type=category)
-                    for callback in self.end_of_batch_callbacks:
-                        load_callable(callback)(self)
+                    for callback in self._end_of_batch_callbacks:
+                        callback(self)
                 self.metrics_dict[category] = self.metrics.current_result()
                 self.loss_dict[category] = self.loss_stat.current_result()
 
                 if category == TRAIN:
-                    for callback in self.end_of_train_callbacks:
-                        load_callable(callback)(self)
+                    for callback in self._end_of_train_callbacks:
+                        callback(self)
 
         self.iepoch += 1
 
@@ -899,8 +905,8 @@ class Trainer:
         if self.lr_scheduler_name == "ReduceLROnPlateau":
             self.lr_sched.step(metrics=self.mae_dict[self.metrics_key])
 
-        for callback in self.end_of_epoch_callbacks:
-            load_callable(callback)(self)
+        for callback in self._end_of_epoch_callbacks:
+            callback(self)
 
     def end_of_batch_log(self, batch_type: str):
         """
