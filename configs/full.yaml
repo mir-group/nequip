@@ -133,7 +133,7 @@ wandb: false                                                                    
 wandb_project: toluene-example                                                     # project name used in wandb
 wandb_watch: false
 # see https://docs.wandb.ai/ref/python/watch
-# wandb_watch:
+# wandb_watch_kwargs:
 #   log: all
 #   log_freq: 1
 #   log_graph: true
