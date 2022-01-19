@@ -1,6 +1,7 @@
 """ Train a network."""
 import logging
 import argparse
+import warnings
 
 # This is a weird hack to avoid Intel MKL issues on the cluster when this is called as a subprocess of a process that has itself initialized PyTorch.
 # Since numpy gets imported later anyway for dataset stuff, this shouldn't affect performance.
@@ -175,8 +176,8 @@ def fresh_start(config):
 
     logging.info("Successfully built the network...")
 
-    if config.compile_model:
-        raise ValueError("the `compile_model` option has been removed")
+    # by doing this here we check also any keys custom builders may have added
+    _check_old_keys(config)
 
     # Equivar test
     if config.equivariance_test > 0:
@@ -265,6 +266,17 @@ def restart(config):
     trainer.set_dataset(dataset, validation_dataset)
 
     return trainer
+
+
+def _check_old_keys(config) -> None:
+    """check ``config`` for old/depricated keys and emit corresponding errors/warnings"""
+    # compile_model
+    k = "compile_model"
+    if k in config:
+        if config[k]:
+            raise ValueError("the `compile_model` option has been removed")
+        else:
+            warnings.warn("the `compile_model` option has been removed")
 
 
 if __name__ == "__main__":
