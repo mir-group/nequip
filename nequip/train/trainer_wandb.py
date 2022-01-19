@@ -16,8 +16,6 @@ class TrainerWandB(Trainer):
         if not self._initialized:
             return
 
-        wandb_watch = self.kwargs.get("wandb_watch", False)
-        if wandb_watch is not False:
-            if wandb_watch is True:
-                wandb_watch = {}
-            wandb.watch(self.model, **wandb_watch)
+        if self.kwargs.get("wandb_watch", False):
+            wandb_watch_kwargs = self.kwargs.get("wandb_watch_kwargs", {})
+            wandb.watch(self.model, **wandb_watch_kwargs)
