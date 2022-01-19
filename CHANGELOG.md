@@ -11,6 +11,9 @@ Most recent change on the bottom.
 ### Fixed
 - Handle one of `per_species_shifts`/`scales` being `null` when the other is a dataset statistc
 
+### Removed
+- `compile_model`
+
 ## [0.5.1] - 2022-01-13
 ### Added
 - `NequIPCalculator` can now be built via a `nequip_calculator()` function. This adds a minimal compatibility with [vibes](https://gitlab.com/vibes-developers/vibes/)
