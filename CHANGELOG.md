@@ -20,6 +20,7 @@ Most recent change on the bottom.
 ### Fixed
 - Handle one of `per_species_shifts`/`scales` being `null` when the other is a dataset statistc
 - `include_frames` now works with ASE datasets
+- no training data labels in input_data
 
 ### Removed
 - `compile_model`

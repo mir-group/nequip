@@ -88,15 +88,7 @@ def RescaleEnergyEtc(
     # == Build the model ==
     return RescaleOutput(
         model=model,
-        scale_keys=[
-            k
-            for k in (
-                AtomicDataDict.TOTAL_ENERGY_KEY,
-                AtomicDataDict.PER_ATOM_ENERGY_KEY,
-                AtomicDataDict.FORCE_KEY,
-            )
-            if k in model.irreps_out
-        ],
+        scale_keys=[k for k in AtomicDataDict.ALL_ENERGY_KEYS if k in model.irreps_out],
         scale_by=global_scale,
         shift_keys=[
             k for k in (AtomicDataDict.TOTAL_ENERGY_KEY,) if k in model.irreps_out
