@@ -1,31 +1,23 @@
-""" Nequip.train.trainer
-
-Todo:
-
-isolate the loss function from the training procedure
-enable wandb resume
-make an interface with ray
-
-"""
-
 import wandb
 
 from .trainer import Trainer
 
 
 class TrainerWandB(Trainer):
-    """Class to train a model to minimize forces"""
-
-    def __init__(self, **kwargs):
-        Trainer.__init__(self, **kwargs)
+    """Trainer class that adds WandB features"""
 
     def end_of_epoch_log(self):
         Trainer.end_of_epoch_log(self)
         wandb.log(self.mae_dict)
 
-    def init_model(self):
+    def init(self):
+        super().init()
 
-        Trainer.init_model(self)
+        if not self._initialized:
+            return
 
-        # TODO: test and re-enable this
-        # wandb.watch(self.model)
+        wandb_watch = self.kwargs.get("wandb_watch", False)
+        if wandb_watch is not False:
+            if wandb_watch is True:
+                wandb_watch = {}
+            wandb.watch(self.model, **wandb_watch)

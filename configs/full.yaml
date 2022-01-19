@@ -131,6 +131,12 @@ chemical_symbols:
 # logging
 wandb: false                                                                       # we recommend using wandb for logging, we'll turn it off here as it's optional
 wandb_project: toluene-example                                                     # project name used in wandb
+wandb_watch: false
+# see https://docs.wandb.ai/ref/python/watch
+# wandb_watch:
+#   log: all
+#   log_freq: 1
+#   log_graph: true
 
 verbose: info                                                                      # the same as python logging, e.g. warning, info, debug, error. case insensitive
 log_batch_freq: 1                                                                  # batch frequency, how often to print training errors withinin the same epoch
