@@ -18,7 +18,6 @@ l_max: 1                                                                        
 parity: true                                                                      # whether to include features with odd mirror parity
 num_features: 32                                                                  # the multiplicity of the features
 nonlinearity_type: gate                                                           # may be 'gate' or 'norm', 'gate' is recommended
-resnet: false                                                                     # set true to make interaction block a resnet-style update
 
 # scalar nonlinearities to use — available options are silu, ssp (shifted softplus), tanh, and abs.
 # Different nonlinearities are specified for e (even) and o (odd) parity;

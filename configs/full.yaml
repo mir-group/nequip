@@ -36,6 +36,7 @@ num_features: 32                                                                
 
 nonlinearity_type: gate                                                           # may be 'gate' or 'norm', 'gate' is recommended
 resnet: false                                                                     # set true to make interaction block a resnet-style update
+                                                                                  # the resnet update will only be applied when the input and output irreps of the layer are the same
 
 # scalar nonlinearities to use — available options are silu, ssp (shifted softplus), tanh, and abs.
 # Different nonlinearities are specified for e (even) and o (odd) parity;
