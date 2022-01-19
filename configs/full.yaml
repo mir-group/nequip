@@ -121,8 +121,7 @@ chemical_symbols:
 # logging
 wandb: false                                                                       # we recommend using wandb for logging, we'll turn it off here as it's optional
 wandb_project: toluene-example                                                     # project name used in wandb
-wandb_resume: true                                                                 # if true and restart is true, wandb run data will be restarted and updated.
-                                                                                   # if false, a new wandb run will be generated
+
 verbose: info                                                                      # the same as python logging, e.g. warning, info, debug, error. case insensitive
 log_batch_freq: 1                                                                  # batch frequency, how often to print training errors withinin the same epoch
 log_epoch_freq: 1                                                                  # epoch frequency, how often to print and save the model
