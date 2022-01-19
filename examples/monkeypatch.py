@@ -5,8 +5,6 @@ and modify it to save and output the features after the first
 convolution for later analysis.
 """
 
-from typing import Optional
-
 import torch
 
 from nequip.utils import Config, find_first_of_type

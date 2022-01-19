@@ -268,7 +268,7 @@ class SequentialGraphNetwork(GraphModuleMixin, torch.nn.Sequential):
             before: the module to insert before
         """
 
-        if before is None == after is None:
+        if (before is None) is (after is None):
             raise ValueError("Only one of before or after argument needs to be defined")
         elif before is None:
             insert_location = after
@@ -328,7 +328,7 @@ class SequentialGraphNetwork(GraphModuleMixin, torch.nn.Sequential):
             after: the name of the module to insert after
             before: the name of the module to insert before
         """
-        if before is None == after is None:
+        if (before is None) is (after is None):
             raise ValueError("Only one of before or after argument needs to be defined")
         elif before is None:
             insert_location = after

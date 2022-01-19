@@ -29,12 +29,14 @@ setup(
         "numpy",
         "ase",
         "tqdm",
-        "torch>=1.8,<1.10",  # torch.fx added in 1.8
-        "e3nn==0.3.5",
+        "torch>=1.8,<1.11",  # torch.fx added in 1.8
+        "e3nn>=0.3.5,<0.5.0",
         "pyyaml",
         "contextlib2;python_version<'3.7'",  # backport of nullcontext
+        'contextvars;python_version<"3.7"',  # backport of contextvars for savenload
         "typing_extensions;python_version<'3.8'",  # backport of Final
         "torch-runstats>=0.2.0",
+        "torch-ema>=0.3.0",
         "scikit_learn",  # for GaussianProcess for per-species statistics
     ],
     zip_safe=True,

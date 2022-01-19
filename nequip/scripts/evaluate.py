@@ -71,7 +71,7 @@ def main(args=None, running_as_script: bool = True):
     )
     parser.add_argument(
         "--batch-size",
-        help="Batch size to use. Larger is usually faster on GPU.",
+        help="Batch size to use. Larger is usually faster on GPU. If you run out of memory, lower this.",
         type=int,
         default=50,
     )
@@ -159,7 +159,11 @@ def main(args=None, running_as_script: bool = True):
     logger.info("Loading model... ")
     model_from_training: bool = False
     try:
-        model, _ = load_deployed_model(args.model, device=device)
+        model, _ = load_deployed_model(
+            args.model,
+            device=device,
+            set_global_options=True,  # don't warn that setting
+        )
         logger.info("loaded deployed model.")
     except ValueError:  # its not a deployed model
         model, _ = Trainer.load_model_from_training_session(
@@ -180,12 +184,14 @@ def main(args=None, running_as_script: bool = True):
     if model_from_training:
         # Use the model config, regardless of dataset config
         global_config = args.model.parent / "config.yaml"
+        global_config = Config.from_file(str(global_config), defaults=default_config)
+        _set_global_options(global_config)
+        del global_config
     else:
-        # use dataset config
-        global_config = args.dataset_config
-    global_config = Config.from_file(str(global_config), defaults=default_config)
-    _set_global_options(global_config)
-    del global_config
+        # the global settings for a deployed model are set by
+        # set_global_options in the call to load_deployed_model
+        # above
+        pass
 
     dataset_is_validation: bool = False
     # Currently, pytorch_geometric prints some status messages to stdout while loading the dataset
@@ -315,10 +321,13 @@ def main(args=None, running_as_script: bool = True):
 
             with torch.no_grad():
                 # Write output
+                # TODO: make sure don't keep appending to existing file
                 if output is not None:
                     ase.io.write(
                         output,
-                        AtomicData.from_AtomicDataDict(out).to(device="cpu").to_ase(),
+                        AtomicData.from_AtomicDataDict(out)
+                        .to(device="cpu")
+                        .to_ase(type_mapper=dataset.type_mapper),
                         format="extxyz",
                         append=True,
                     )
@@ -327,7 +336,7 @@ def main(args=None, running_as_script: bool = True):
                     metrics(out, batch)
                     display_bar.set_description_str(
                         " | ".join(
-                            f"{k} = {v:4.2f}"
+                            f"{k} = {v:4.4f}"
                             for k, v in metrics.flatten_metrics(
                                 metrics.current_result()
                             )[0].items()

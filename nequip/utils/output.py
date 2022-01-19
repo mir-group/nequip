@@ -1,4 +1,3 @@
-import datetime
 import inspect
 import logging
 import sys
@@ -6,7 +5,6 @@ import sys
 from logging import FileHandler, StreamHandler
 from os import makedirs
 from os.path import abspath, relpath, isfile, isdir
-from time import time
 from typing import Optional
 
 from .config import Config
@@ -54,7 +52,7 @@ class Output:
 
         # open root folder for storing
         # if folder exists and not append, the folder name and filename will be updated
-        self.root = set_if_none(root, f".")
+        self.root = set_if_none(root, ".")
         self.run_name = run_name
         self.workdir = f"{self.root}/{self.run_name}"
 

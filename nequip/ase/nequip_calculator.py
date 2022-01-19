@@ -10,6 +10,11 @@ from nequip.data.transforms import TypeMapper
 import nequip.scripts.deploy
 
 
+def nequip_calculator(model, **kwargs):
+    """Build ASE Calculator directly from deployed model."""
+    return NequIPCalculator.from_deployed_model(model, **kwargs)
+
+
 class NequIPCalculator(Calculator):
     """NequIP ASE Calculator.
 
@@ -46,11 +51,14 @@ class NequIPCalculator(Calculator):
         model_path,
         device: Union[str, torch.device] = "cpu",
         species_to_type_name: Optional[Dict[str, str]] = None,
+        set_global_options: Union[str, bool] = "warn",
         **kwargs
     ):
         # load model
         model, metadata = nequip.scripts.deploy.load_deployed_model(
-            model_path=model_path, device=device
+            model_path=model_path,
+            device=device,
+            set_global_options=set_global_options,
         )
         r_max = float(metadata[nequip.scripts.deploy.R_MAX_KEY])
 

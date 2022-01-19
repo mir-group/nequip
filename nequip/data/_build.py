@@ -38,7 +38,7 @@ def dataset_from_config(config, prefix: str = "dataset") -> AtomicDataset:
             module_name = ".".join(config_dataset.split(".")[:-1])
             class_name = ".".join(config_dataset.split(".")[-1:])
             class_name = getattr(import_module(module_name), class_name)
-        except Exception as e:
+        except Exception:
             # ^ TODO: don't catch all Exception
             # default class defined in nequip.data or nequip.dataset
             dataset_name = config_dataset.lower()
@@ -72,11 +72,7 @@ def dataset_from_config(config, prefix: str = "dataset") -> AtomicDataset:
     type_mapper, _ = instantiate(TypeMapper, prefix=prefix, optional_args=config)
 
     # Register fields:
-    register_fields(
-        node_fields=config.get("node_fields", []),
-        edge_fields=config.get("edge_fields", []),
-        graph_fields=config.get("graph_fields", []),
-    )
+    instantiate(register_fields, all_args=config)
 
     instance, _ = instantiate(
         class_name,

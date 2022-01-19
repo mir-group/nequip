@@ -1,5 +1,4 @@
 import logging
-from numpy.core.fromnumeric import diagonal
 import torch
 import numpy as np
 from typing import Optional
@@ -7,23 +6,16 @@ from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import DotProduct, Kernel, Hyperparameter
 
 
-def solver(
-    X,
-    y,
-    alpha: Optional[float] = 0.1,
-    max_iteration: Optional[int] = 20,
-    regressor: Optional[str] = "NormalizedGaussianProcess",
-):
-
+def solver(X, y, regressor: Optional[str] = "NormalizedGaussianProcess", **kwargs):
     if regressor == "GaussianProcess":
-        return gp(X, y, alpha, max_iteration)
+        return gp(X, y, **kwargs)
     elif regressor == "NormalizedGaussianProcess":
-        return normalized_gp(X, y, alpha, max_iteration)
+        return normalized_gp(X, y, **kwargs)
     else:
         raise NotImplementedError(f"{regressor} is not implemented")
 
 
-def normalized_gp(X, y, alpha, max_iteration):
+def normalized_gp(X, y, **kwargs):
     feature_rms = 1.0 / np.sqrt(np.average(X ** 2, axis=0))
     feature_rms = np.nan_to_num(feature_rms, 1)
     y_mean = torch.sum(y) / torch.sum(X)
@@ -32,34 +24,40 @@ def normalized_gp(X, y, alpha, max_iteration):
         y - (torch.sum(X, axis=1) * y_mean).reshape(y.shape),
         NormalizedDotProduct,
         {"diagonal_elements": feature_rms},
-        alpha,
-        max_iteration,
+        **kwargs,
     )
     return mean + y_mean, std
 
 
-def gp(X, y, alpha, max_iteration):
+def gp(X, y, **kwargs):
     return base_gp(
-        X,
-        y,
-        DotProduct,
-        {"sigma_0": 0, "sigma_0_bounds": "fixed"},
-        alpha,
-        max_iteration,
+        X, y, DotProduct, {"sigma_0": 0, "sigma_0_bounds": "fixed"}, **kwargs
     )
 
 
-def base_gp(X, y, kernel, kernel_kwargs, alpha, max_iteration):
+def base_gp(
+    X,
+    y,
+    kernel,
+    kernel_kwargs,
+    alpha: Optional[float] = 0.1,
+    max_iteration: int = 20,
+    stride: Optional[int] = None,
+):
 
     if len(y.shape) == 1:
         y = y.reshape([-1, 1])
+
+    if stride is not None:
+        X = X[::stride]
+        y = y[::stride]
 
     not_fit = True
     iteration = 0
     mean = None
     std = None
     while not_fit:
-        logging.debug("GP fitting iteration", iteration, alpha)
+        logging.debug(f"GP fitting iteration {iteration} {alpha}")
         try:
             _kernel = kernel(**kernel_kwargs)
             gpr = GaussianProcessRegressor(kernel=_kernel, random_state=0, alpha=alpha)
@@ -88,10 +86,10 @@ def base_gp(X, y, kernel, kernel_kwargs, alpha, max_iteration):
         except Exception as e:
             logging.info(f"GP fitting failed for alpha={alpha} and {e.args}")
             if alpha == 0 or alpha is None:
-                logging.info(f"try a None zero alpha")
+                logging.info("try a non-zero alpha")
                 not_fit = False
                 raise ValueError(
-                    f"Please set the {alpha} to none zero value. \n"
+                    f"Please set the {alpha} to non-zero value. \n"
                     "The dataset energy is rank deficient to be solved with GP"
                 )
             else:
@@ -99,9 +97,9 @@ def base_gp(X, y, kernel, kernel_kwargs, alpha, max_iteration):
                 iteration += 1
                 logging.debug(f"           increase alpha to {alpha}")
 
-            if iteration >= max_iteration or not_fit == False:
+            if iteration >= max_iteration or not_fit is False:
                 raise ValueError(
-                    f"Please set the per species shift and scale to zeros and ones. \n"
+                    "Please set the per species shift and scale to zeros and ones. \n"
                     "The dataset energy is to diverge to be solved with GP"
                 )
 
@@ -112,8 +110,6 @@ class NormalizedDotProduct(Kernel):
     r"""Dot-Product kernel.
     .. math::
         k(x_i, x_j) = x_i \cdot A \cdot x_j
-    The DotProduct kernel is commonly combined with exponentiation.
-
     """
 
     def __init__(self, diagonal_elements):

@@ -123,7 +123,10 @@ def PerSpeciesRescale(
     scales = config.get(
         module_prefix + "_scales",
         f"dataset_{AtomicDataDict.FORCE_KEY}_rms"
-        if AtomicDataDict.FORCE_KEY in config["train_on_keys"]
+        # if `train_on_keys` isn't provided, assume conservatively
+        # that we aren't "training" on anything (i.e. take the
+        # most general defaults)
+        if AtomicDataDict.FORCE_KEY in config.get("train_on_keys", [])
         else f"dataset_per_atom_{AtomicDataDict.TOTAL_ENERGY_KEY}_std",
     )
     shifts = config.get(
@@ -153,9 +156,15 @@ def PerSpeciesRescale(
             # Both computed from dataset
             arguments_in_dataset_units = True
         elif len(str_names) == 1:
-            assert config[
-                module_prefix + "arguments_in_dataset_units"
-            ], "Requested to set either the shifts or scales of the per_species_rescale using dataset values, but chose to provide the other in non-dataset units. Please give the explictly specified shifts/scales in dataset units and set per_species_rescale_arguments_in_dataset_units"
+            if None in [scales, shifts]:
+                # if the one that isnt str is null, it's just disabled
+                # that has no units
+                # so it's ok to have just one and to be in dataset units
+                arguments_in_dataset_units = True
+            else:
+                assert config[
+                    module_prefix + "_arguments_in_dataset_units"
+                ], "Requested to set either the shifts or scales of the per_species_rescale using dataset values, but chose to provide the other in non-dataset units. Please give the explictly specified shifts/scales in dataset units and set per_species_rescale_arguments_in_dataset_units"
 
         # = Compute shifts and scales =
         computed_stats = _compute_stats(
@@ -169,17 +178,17 @@ def PerSpeciesRescale(
             s = scales
             scales = computed_stats[str_names.index(scales)]
             logging.debug(f"Replace string {s} to {scales}")
-        elif isinstance(scales, list):
+        elif isinstance(scales, (list, float)):
             scales = torch.as_tensor(scales)
 
         if isinstance(shifts, str):
             s = shifts
             shifts = computed_stats[str_names.index(shifts)]
             logging.debug(f"Replace string {s} to {shifts}")
-        elif isinstance(shifts, list):
+        elif isinstance(shifts, (list, float)):
             shifts = torch.as_tensor(shifts)
 
-        if scales.min() < RESCALE_THRESHOLD:
+        if scales is not None and torch.min(scales) < RESCALE_THRESHOLD:
             raise ValueError(
                 f"Per species energy scaling was very low: {scales}. Maybe try setting {module_prefix}_scales = 1."
             )
@@ -204,8 +213,8 @@ def PerSpeciesRescale(
         shifts=shifts,
         scales=scales,
     )
-    if arguments_in_dataset_units is not None:
-        params["arguments_in_dataset_units"] = arguments_in_dataset_units
+
+    params["arguments_in_dataset_units"] = arguments_in_dataset_units
     model.insert_from_parameters(
         before="total_energy_sum",
         name=module_prefix,

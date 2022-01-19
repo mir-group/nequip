@@ -1,4 +1,3 @@
-from attr import fields
 import numpy as np
 import pytest
 import tempfile
@@ -8,7 +7,6 @@ from os.path import isdir, isfile
 
 from ase.data import chemical_symbols
 from ase.io import write
-from torch.functional import _return_counts
 
 from nequip.data import (
     AtomicDataDict,
@@ -66,6 +64,15 @@ def npz_dataset(npz_data, temp_data):
 def root():
     with tempfile.TemporaryDirectory(prefix="datasetroot") as path:
         yield path
+
+
+def test_type_mapper():
+    tm = TypeMapper(chemical_symbol_to_type={"C": 1, "H": 0})
+    atomic_numbers = torch.as_tensor([1, 1, 6, 1, 6, 6, 6])
+    atom_types = tm.transform(atomic_numbers)
+    assert atom_types[0] == 0
+    untransformed = tm.untransform(atom_types)
+    assert torch.equal(untransformed, atomic_numbers)
 
 
 class TestInit:
@@ -212,7 +219,9 @@ class TestPerSpeciesStatistics:
         # get species count per graph
         Ns = []
         for i in range(npz_dataset.len()):
-            Ns.append(torch.bincount(npz_dataset[i][AtomicDataDict.ATOM_TYPE_KEY]))
+            Ns.append(
+                torch.bincount(npz_dataset[i][AtomicDataDict.ATOM_TYPE_KEY].view(-1))
+            )
         n_spec = max(len(e) for e in Ns)
         N = torch.zeros(len(Ns), n_spec)
         for i in range(len(Ns)):
@@ -236,7 +245,11 @@ class TestPerSpeciesStatistics:
             modes=["per_species_mean_std"],
             kwargs={
                 AtomicDataDict.TOTAL_ENERGY_KEY
-                + "per_species_mean_std": {"alpha": alpha, "regressor": regressor}
+                + "per_species_mean_std": {
+                    "alpha": alpha,
+                    "regressor": regressor,
+                    "stride": 1,
+                }
             },
         )
 

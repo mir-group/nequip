@@ -4,7 +4,7 @@ NequIP is an open-source code for building E(3)-equivariant interatomic potentia
 
 [![Documentation Status](https://readthedocs.org/projects/nequip/badge/?version=latest)](https://nequip.readthedocs.io/en/latest/?badge=latest)
 
-![nequip](./nequip.png)
+![nequip](./logo.png)
 
 **PLEASE NOTE:** the NequIP code is under active development and is still in beta versions 0.x.x. In general changes to the patch version (the third number) indicate backward compatible beta releases, but please be aware that file formats and APIs may change. Bug reports are also welcomed in the GitHub issues!
 
@@ -13,16 +13,9 @@ NequIP is an open-source code for building E(3)-equivariant interatomic potentia
 NequIP requires:
 
 * Python >= 3.6
-* PyTorch >= 1.8, < 1.10
+* PyTorch >= 1.8, <=1.10.*. PyTorch can be installed following the [instructions from their documentation](https://pytorch.org/get-started/locally/). Note that neither `torchvision` nor `torchaudio`, included in the default install command, are needed for NequIP.
 
 To install:
-
-* Run `pip install packaging` (temporary)
-
-* Install our fork of [`pytorch_ema`](https://github.com/Linux-cpp-lisp/pytorch_ema) for using an Exponential Moving Average on the weights: 
-```bash
-$ pip install "git+https://github.com/Linux-cpp-lisp/pytorch_ema@context_manager#egg=torch_ema"
-```
 
 * We use [Weights&Biases](https://wandb.ai) to keep track of experiments. This is not a strict requirement — you can use our package without it — but it may make your life easier. If you want to use it, create an account [here](https://wandb.ai) and install the Python package:
 
@@ -40,7 +33,7 @@ pip install .
 
 ### Installation Issues
 
-The easiest way to check if your installation is working is to train a toy model:
+The easiest way to check if your installation is working is to train a **toy** model:
 ```bash
 $ nequip-train configs/minimal.yaml
 ```
@@ -59,6 +52,10 @@ pytest tests/
 
 Note: the integration tests have hung in the past on certain systems that have GPUs. If this happens to you, please report it along with information on your software environment in the [Issues](https://github.com/mir-group/nequip/issues)!
 
+## Tutorial 
+
+The best way to learn how to use NequIP is through the [Colab Tutorial](https://bit.ly/mrs-nequip). This will run entirely on Google Hardware, you will not need to install anything, but can instead simply run it in your browser. 
+
 ## Usage
 
 **! PLEASE NOTE:** the first few training epochs/calls to a NequIP model can be painfully slow. This is expected behaviour as the [profile-guided optimization of TorchScript models](https://program-transformations.github.io/slides/pytorch_neurips.pdf) takes a number of calls to warm up before optimizing the model. This occurs regardless of whether the entire model is compiled because many core components from e3nn are compiled and optimized through TorchScript.
@@ -72,10 +69,10 @@ $ nequip-train configs/example.yaml
 ```
 
 A number of example configuration files are provided:
- - [`configs/minimal.yaml`](configs/minimal.yaml): A minimal example of training a toy model on force data.
- - [`configs/minimal_eng.yaml`](configs/minimal_eng.yaml): The same, but for a toy model that predicts and trains on only energy labels.
- - [`configs/example.yaml`](configs/example.yaml): Training a more realistic model on forces and energies. Start here for real models.
- - [`configs/full.yaml`](configs/full.yaml): A complete configuration file containing all available options along with documenting comments.
+ - [`configs/minimal.yaml`](configs/minimal.yaml): A minimal example of training a **toy** model on force data.
+ - [`configs/minimal_eng.yaml`](configs/minimal_eng.yaml): The same, but for a **toy** model that predicts and trains on only energy labels.
+ - [`configs/example.yaml`](configs/example.yaml): Training a more realistic model on forces and energies. **Start here for real models!**
+ - [`configs/full.yaml`](configs/full.yaml): A complete configuration file containing all available options along with documenting comments. This file is **for reference**, `example.yaml` is the right starting point for a project.
 
 Training runs can be restarted using `append: true` flag in the yaml file. This this `append: true` flag, training starts fresh when `root/run_name` does not exist or restarts. All `nequip-*` commands accept the `--help` option to show their call signatures and options.
 
@@ -103,8 +100,6 @@ For more details on this command, please run `nequip-deploy --help`.
 
 ### Using models in Python
 
-Both deployed and undeployed models can be used in Python code; for details, see the end of the [Developer's tutorial](https://deepnote.com/project/2412ca93-7ad1-4458-972c-5d5add5a667e) mentioned again below.
-
 An ASE calculator is also provided in `nequip.dynamics`.
 
 ### LAMMPS Integration 
@@ -123,17 +118,11 @@ The result is an optimized model file that has no Python dependency and can be u
 
 ```
 pair_style	nequip
-pair_coeff	* * deployed.pth
+pair_coeff	* * deployed.pth <NequIP type for LAMMPS type 1> <NequIP type for LAMMPS type 2> ...
 ```
 
 For installation instructions, please see the [`pair_nequip` repository](https://github.com/mir-group/pair_nequip).
 
-
-## Developer's tutorial 
-
-A more in-depth introduction to the internals of NequIP can be found in the [tutorial notebook](https://deepnote.com/project/2412ca93-7ad1-4458-972c-5d5add5a667e). This notebook discusses theoretical background as well as the Python interfaces that can be used to train and call models.
-
-Please note that for most common usecases, including customized models, the `nequip-*` commands should be prefered for training models.
 
 ## References & citing
 
@@ -156,9 +145,11 @@ NequIP is being developed by:
 
 under the guidance of [Boris Kozinsky at Harvard](https://bkoz.seas.harvard.edu/).
 
-## Contact & questions
+## Contact, questions, and contributing
 
 If you have questions, please don't hesitate to reach out at batzner[at]g[dot]harvard[dot]edu. 
 
 If you find a bug or have a proposal for a feature, please post it in the [Issues](https://github.com/mir-group/nequip/issues).
 If you have a question, topic, or issue that isn't obviously one of those, try our [GitHub Disucssions](https://github.com/mir-group/nequip/discussions).
+
+If you want to contribute to the code, please read [`CONTRIBUTING.md`](CONTRIBUTING.md).

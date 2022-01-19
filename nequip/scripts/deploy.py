@@ -21,11 +21,12 @@ import ase.data
 
 from e3nn.util.jit import script
 
-import nequip
 from nequip.train import Trainer
 
 CONFIG_KEY: Final[str] = "config"
 NEQUIP_VERSION_KEY: Final[str] = "nequip_version"
+TORCH_VERSION_KEY: Final[str] = "torch_version"
+E3NN_VERSION_KEY: Final[str] = "e3nn_version"
 R_MAX_KEY: Final[str] = "r_max"
 N_SPECIES_KEY: Final[str] = "n_species"
 TYPE_NAMES_KEY: Final[str] = "type_names"
@@ -49,11 +50,14 @@ def _compile_for_deploy(model):
     if not isinstance(model, torch.jit.ScriptModule):
         model = script(model)
 
-    return torch.jit.freeze(model)
+    return model
 
 
 def load_deployed_model(
-    model_path: Union[pathlib.Path, str], device: Union[str, torch.device] = "cpu"
+    model_path: Union[pathlib.Path, str],
+    device: Union[str, torch.device] = "cpu",
+    freeze: bool = True,
+    set_global_options: Union[str, bool] = "warn",
 ) -> Tuple[torch.jit.ScriptModule, Dict[str, str]]:
     r"""Load a deployed model.
 
@@ -65,6 +69,7 @@ def load_deployed_model(
     """
     metadata = {k: "" for k in _ALL_METADATA_KEYS}
     try:
+        # TODO: use .to()? instead of map_location
         model = torch.jit.load(model_path, map_location=device, _extra_files=metadata)
     except RuntimeError as e:
         raise ValueError(
@@ -75,19 +80,42 @@ def load_deployed_model(
         raise ValueError(
             f"{model_path} does not seem to be a deployed NequIP model file"
         )
-    # Remove missing metadata
-    for k in metadata:
-        # TODO: some better semver based checking of versions here, or something
-        if metadata[k] == "":
-            warnings.warn(
-                f"Metadata key `{k}` wasn't present in the saved model; this may indicate compatability issues."
-            )
     # Confirm its TorchScript
     assert isinstance(model, torch.jit.ScriptModule)
     # Make sure we're in eval mode
     model.eval()
+    # Freeze on load:
+    if freeze and hasattr(model, "training"):
+        # hasattr is how torch checks whether model is unfrozen
+        # only freeze if already unfrozen
+        model = torch.jit.freeze(model)
     # Everything we store right now is ASCII, so decode for printing
     metadata = {k: v.decode("ascii") for k, v in metadata.items()}
+    # Set up global settings:
+    assert set_global_options in (True, False, "warn")
+    if set_global_options:
+        # Set TF32 support
+        # See https://pytorch.org/docs/stable/notes/cuda.html#tensorfloat-32-tf32-on-ampere-devices
+        if torch.cuda.is_available() and metadata[TF32_KEY] != "":
+            allow_tf32 = bool(int(metadata[TF32_KEY]))
+            if torch.torch.backends.cuda.matmul.allow_tf32 is not allow_tf32:
+                # Update setting
+                if set_global_options == "warn":
+                    warnings.warn(
+                        "Loaded model had a different value for allow_tf32 than was currently set; changing the GLOBAL setting!"
+                    )
+                torch.backends.cuda.matmul.allow_tf32 = allow_tf32
+                torch.backends.cudnn.allow_tf32 = allow_tf32
+
+        # JIT bailout
+        if metadata[JIT_BAILOUT_KEY] != "":
+            jit_bailout: int = int(metadata[JIT_BAILOUT_KEY])
+            # no way to get current value, so assume we are overwriting it
+            if set_global_options == "warn":
+                warnings.warn(
+                    "Loaded model had a different value for _jit_bailout_depth than was currently set; changing the GLOBAL setting!"
+                )
+            torch._C._jit_set_bailout_depth(jit_bailout)
     return model, metadata
 
 
@@ -95,7 +123,12 @@ def main(args=None):
     parser = argparse.ArgumentParser(
         description="Deploy and view information about previously deployed NequIP models."
     )
-    subparsers = parser.add_subparsers(dest="command", required=True, title="commands")
+    # backward compat for 3.6
+    if sys.version_info[1] > 6:
+        required = {"required": True}
+    else:
+        required = {}
+    subparsers = parser.add_subparsers(dest="command", title="commands", **required)
     info_parser = subparsers.add_parser(
         "info", help="Get information from a deployed model file"
     )
@@ -123,7 +156,7 @@ def main(args=None):
     logging.basicConfig(level=logging.INFO)
 
     if args.command == "info":
-        model, metadata = load_deployed_model(args.model_path)
+        model, metadata = load_deployed_model(args.model_path, set_global_options=False)
         del model
         config = metadata.pop(CONFIG_KEY)
         metadata_str = "\n".join("  %s: %s" % e for e in metadata.items())
@@ -152,7 +185,10 @@ def main(args=None):
         config = yaml.load(config_str, Loader=yaml.Loader)
 
         # Deploy
-        metadata: dict = {NEQUIP_VERSION_KEY: nequip.__version__}
+        metadata: dict = {}
+        for code in ["e3nn", "nequip", "torch"]:
+            metadata[code + "_version"] = config[code + "_version"]
+
         metadata[R_MAX_KEY] = str(float(config["r_max"]))
         if "allowed_species" in config:
             # This is from before the atomic number updates

@@ -13,6 +13,11 @@ type_names
     | Type: NoneType
     | Default: ``None``
 
+chemical_symbols
+^^^^^^^^^^^^^^^^
+    | Type: NoneType
+    | Default: ``None``
+
 chemical_symbol_to_type
 ^^^^^^^^^^^^^^^^^^^^^^^
     | Type: NoneType
