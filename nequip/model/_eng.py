@@ -30,26 +30,23 @@ def SimpleIrrepsConfig(config):
         "irreps_edge_sh",
         "conv_to_output_hidden_irreps_out",
     ]
-    # check for overlap
-    is_simple: bool = False
-    if any(k in config for k in simple_irreps_keys):
-        is_simple = True
-        if any(k in config for k in real_irreps_keys):
-            raise ValueError(
-                f"Cannot specify irreps using the simple and full option styles at the same time--- the sets of options {simple_irreps_keys} and {real_irreps_keys} are mutually exclusive."
-            )
-    if is_simple:
+    has_simple: bool = any(k in config for k in simple_irreps_keys)
+    has_full: bool = any(k in config for k in real_irreps_keys)
+    assert has_simple or has_full
+
+    update = {}
+    if has_simple:
         # nothing to do if not
-        lmax = config.pop("l_max")
-        parity = config.pop("parity")
-        num_features = config.pop("num_features")
-        config["chemical_embedding_irreps_out"] = repr(
+        lmax = config["l_max"]
+        parity = config["parity"]
+        num_features = config["num_features"]
+        update["chemical_embedding_irreps_out"] = repr(
             o3.Irreps([(num_features, (0, 1))])  # n scalars
         )
-        config["irreps_edge_sh"] = repr(
+        update["irreps_edge_sh"] = repr(
             o3.Irreps.spherical_harmonics(lmax=lmax, p=-1 if parity else 1)
         )
-        config["feature_irreps_hidden"] = repr(
+        update["feature_irreps_hidden"] = repr(
             o3.Irreps(
                 [
                     (num_features, (l, p))
@@ -58,10 +55,24 @@ def SimpleIrrepsConfig(config):
                 ]
             )
         )
-        config["conv_to_output_hidden_irreps_out"] = repr(
+        update["conv_to_output_hidden_irreps_out"] = repr(
             # num_features // 2  scalars
             o3.Irreps([(max(1, num_features // 2), (0, 1))])
         )
+
+    # check update is consistant with config
+    # (this is necessary since it is not possible
+    #  to delete keys from config, so instead of
+    #  making simple and full styles mutually
+    #  exclusive, we just insist that if full
+    #  and simple are provided, full must be
+    #  consistant with simple)
+    for k, v in update.items():
+        if k in config:
+            assert (
+                config[k] == v
+            ), f"For key {k}, the full irreps options had value `{config[k]}` inconsistant with the value derived from the simple irreps options `{v}`"
+        config[k] = v
 
 
 def EnergyModel(
