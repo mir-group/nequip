@@ -177,10 +177,7 @@ def fresh_start(config):
     logging.info("Successfully built the network...")
 
     if config.compile_model:
-        raise ValueError("Compile_mode is not available for training")
-        # Warning("Compile_mode is not recommended for training")
-        # final_model = e3nn.util.jit.script(final_model)
-        # logging.info("Successfully compiled model...")
+        raise ValueError("the `compile_model` option has been removed")
 
     # Equivar test
     if config.equivariance_test > 0:
