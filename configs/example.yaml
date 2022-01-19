@@ -14,10 +14,9 @@ default_dtype: float32                                                          
 # network
 r_max: 4.0                                                                        # cutoff radius in length units, here Angstrom, this is an important hyperparamter to scan
 num_layers: 4                                                                     # number of interaction blocks, we find 4-6 to work best
-chemical_embedding_irreps_out: 32x0e                                              # irreps for the chemical embedding of species
-feature_irreps_hidden: 32x0o + 32x0e + 32x1o + 32x1e                              # irreps used for hidden features, here we go up to lmax=1, with even and odd parities; for more accurate but slower networks, use l=2 or higher, smaller number of features is faster
-irreps_edge_sh: 0e + 1o                                                           # irreps of the spherical harmonics used for edges. If a single integer, indicates the full SH up to L_max=that_integer
-conv_to_output_hidden_irreps_out: 16x0e                                           # irreps used in hidden layer of output block
+l_max: 1                                                                          # the maximum irrep order (rotation order) for the network's features
+parity: true                                                                      # whether to include features with odd mirror parity
+num_features: 32                                                                  # the multiplicity of the features
 nonlinearity_type: gate                                                           # may be 'gate' or 'norm', 'gate' is recommended
 resnet: false                                                                     # set true to make interaction block a resnet-style update
 

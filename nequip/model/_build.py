@@ -65,7 +65,7 @@ def model_from_config(
 
     model = None
 
-    for builder_i, builder in enumerate(builders):
+    for builder in builders:
         pnames = inspect.signature(builder).parameters
         params = {}
         if "initialize" in pnames:
@@ -85,18 +85,18 @@ def model_from_config(
                 )
             params["dataset"] = dataset
         if "model" in pnames:
-            if builder_i == 0:
+            if model is None:
                 raise RuntimeError(
-                    f"Builder {builder.__name__} asked for the model as an input, but it's the first builder so there is no model to provide"
+                    f"Builder {builder.__name__} asked for the model as an input, but no previous builder has returned a model"
                 )
             params["model"] = model
         else:
-            if builder_i > 0:
+            if model is not None:
                 raise RuntimeError(
-                    f"All model_builders but the first one must take the model as an argument; {builder.__name__} doesn't"
+                    f"All model_builders after the first one that returns a model must take the model as an argument; {builder.__name__} doesn't"
                 )
         model = builder(**params)
-        if not isinstance(model, GraphModuleMixin):
+        if model is not None and not isinstance(model, GraphModuleMixin):
             raise TypeError(
                 f"Builder {builder.__name__} didn't return a GraphModuleMixin, got {type(model)} instead"
             )
