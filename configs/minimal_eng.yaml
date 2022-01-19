@@ -5,14 +5,15 @@ seed: 0
 
 # network
 model_builders:
+  - SimpleIrrepsConfig
   - EnergyModel
   - PerSpeciesRescale
   - RescaleEnergyEtc
 num_basis: 8
 r_max: 4.0
-irreps_edge_sh: 0e + 1o
-conv_to_output_hidden_irreps_out: 16x0o + 16x0e + 16x1o + 16x1e + 16x2o + 16x2e
-feature_irreps_hidden: 16x0o + 16x0e 
+l_max: 2
+parity: true
+num_features: 16
 
 # data set
 # the keys used need to be stated at least once in key_mapping, npz_fixed_field_keys or npz_keys
