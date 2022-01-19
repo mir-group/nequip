@@ -8,6 +8,13 @@ Most recent change on the bottom.
 
 
 ## [Unreleased] - 0.5.2
+### Added
+- Model builders may now process only the configuration
+- Allow irreps to optionally be specified through the simplified keys `l_max`, `parity`, and `num_features`
+
+### Changed
+- `minimal.yaml`, `minimal_eng.yaml`, and `example.yaml` now use the simplified irreps options `l_max`, `parity`, and `num_features`
+
 ### Fixed
 - Handle one of `per_species_shifts`/`scales` being `null` when the other is a dataset statistc
 

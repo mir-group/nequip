@@ -28,6 +28,7 @@ default_config = dict(
     wandb=False,
     wandb_project="NequIP",
     model_builders=[
+        "SimpleIrrepsConfig",
         "EnergyModel",
         "PerSpeciesRescale",
         "ForceOutput",

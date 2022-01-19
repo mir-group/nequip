@@ -1,18 +1,31 @@
+# !! PLEASE NOTE: `minimal_eng.yaml` is meant as a _minimal_ example of a tiny, fast
+#                 training that can be used to verify your nequip install,
+#                 the syntax of your configuration edits, etc.
+#                 These are NOT recommended hyperparameters for real applications!
+#                 Please see `example.yaml` for a reasonable starting point.
+
 # general
 root: results/aspirin
 run_name: minimal_eng
-seed: 0
+seed: 123
+dataset_seed: 456
 
 # network
+# The default is to build a model with forces, so we need to specify
+# `model_builders` to get one without forces. This list is the default,
+# except without the `ForceOutput` builder that makes a force+energy
+# model out of an energy model:
 model_builders:
-  - EnergyModel
-  - PerSpeciesRescale
-  - RescaleEnergyEtc
+  - SimpleIrrepsConfig  # make configuration easier
+  - EnergyModel         # the core nequip model
+  - PerSpeciesRescale   # per-species/per-atom shift & scaling
+  - RescaleEnergyEtc    # global scaling
+# options for the model:
 num_basis: 8
 r_max: 4.0
-irreps_edge_sh: 0e + 1o
-conv_to_output_hidden_irreps_out: 16x0o + 16x0e + 16x1o + 16x1e + 16x2o + 16x2e
-feature_irreps_hidden: 16x0o + 16x0e 
+l_max: 2
+parity: true
+num_features: 16
 
 # data set
 # the keys used need to be stated at least once in key_mapping, npz_fixed_field_keys or npz_keys
