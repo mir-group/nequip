@@ -36,6 +36,7 @@ from nequip.utils import (
     instantiate,
     save_file,
     load_file,
+    load_callable,
     atomic_write,
     finish_all_writes,
     atomic_write_group,
@@ -326,6 +327,20 @@ class Trainer:
         self.train_on_keys = self.loss.keys
         if train_on_keys is not None:
             assert set(train_on_keys) == set(self.train_on_keys)
+
+        self._init_callbacks = [load_callable(callback) for callback in init_callbacks]
+        self._end_of_epoch_callbacks = [
+            load_callable(callback) for callback in end_of_epoch_callbacks
+        ]
+        self._end_of_batch_callbacks = [
+            load_callable(callback) for callback in end_of_batch_callbacks
+        ]
+        self._end_of_train_callbacks = [
+            load_callable(callback) for callback in end_of_train_callbacks
+        ]
+        self._final_callbacks = [
+            load_callable(callback) for callback in final_callbacks
+        ]
 
         self.init()
 
@@ -662,24 +677,22 @@ class Trainer:
         else:
             config = Config.from_file(traindir + "/config.yaml")
 
-        if config.get("compile_model", False):
-            model = torch.jit.load(traindir + "/" + model_name, map_location=device)
-        else:
-            model = model_from_config(
-                config=config,
-                initialize=False,
+        model = model_from_config(
+            config=config,
+            initialize=False,
+        )
+        if model is not None:  # TODO: why would it be?
+            # TODO: this is not exactly equivalent to building with
+            # this set as default dtype... does it matter?
+            model.to(
+                device=torch.device(device),
+                dtype=dtype_from_name(config.default_dtype),
             )
-            if model is not None:
-                # TODO: this is not exactly equivalent to building with
-                # this set as default dtype... does it matter?
-                model.to(
-                    device=torch.device(device),
-                    dtype=dtype_from_name(config.default_dtype),
-                )
-                model_state_dict = torch.load(
-                    traindir + "/" + model_name, map_location=device
-                )
-                model.load_state_dict(model_state_dict)
+            model_state_dict = torch.load(
+                traindir + "/" + model_name, map_location=device
+            )
+            model.load_state_dict(model_state_dict)
+
         return model, config
 
     def init(self):
@@ -730,7 +743,7 @@ class Trainer:
                 )
             )
 
-        for callback in self.init_callbacks:
+        for callback in self._init_callbacks:
             callback(self)
 
         self.init_log()
@@ -749,7 +762,7 @@ class Trainer:
             self.epoch_step()
             self.end_of_epoch_save()
 
-        for callback in self.final_callbacks:
+        for callback in self._final_callbacks:
             callback(self)
 
         self.final_log()
@@ -882,13 +895,13 @@ class Trainer:
                         validation=(category == VALIDATION),
                     )
                     self.end_of_batch_log(batch_type=category)
-                    for callback in self.end_of_batch_callbacks:
+                    for callback in self._end_of_batch_callbacks:
                         callback(self)
                 self.metrics_dict[category] = self.metrics.current_result()
                 self.loss_dict[category] = self.loss_stat.current_result()
 
                 if category == TRAIN:
-                    for callback in self.end_of_train_callbacks:
+                    for callback in self._end_of_train_callbacks:
                         callback(self)
 
         self.iepoch += 1
@@ -898,7 +911,7 @@ class Trainer:
         if self.lr_scheduler_name == "ReduceLROnPlateau":
             self.lr_sched.step(metrics=self.mae_dict[self.metrics_key])
 
-        for callback in self.end_of_epoch_callbacks:
+        for callback in self._end_of_epoch_callbacks:
             callback(self)
 
     def end_of_batch_log(self, batch_type: str):
@@ -1002,10 +1015,7 @@ class Trainer:
 
     def save_model(self, path, blocking: bool = True):
         with atomic_write(path, blocking=blocking, binary=True) as write_to:
-            if isinstance(self.model, torch.jit.ScriptModule):
-                torch.jit.save(self.model, write_to)
-            else:
-                torch.save(self.model.state_dict(), write_to)
+            torch.save(self.model.state_dict(), write_to)
 
     def init_log(self):
         if self.iepoch > 0:

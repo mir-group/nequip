@@ -37,7 +37,7 @@ class ConvNetLayer(GraphModuleMixin, torch.nn.Module):
         convolution=InteractionBlock,
         convolution_kwargs: dict = {},
         num_layers: int = 3,
-        resnet: bool = True,
+        resnet: bool = False,
         nonlinearity_type: str = "gate",
         nonlinearity_scalars: Dict[int, Callable] = {"e": "ssp", "o": "tanh"},
         nonlinearity_gates: Dict[int, Callable] = {"e": "ssp", "o": "abs"},

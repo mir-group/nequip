@@ -118,6 +118,7 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
         irreps_in={},
     ):
         super().__init__()
+        self.num_types = num_types
         self.field = field
         self.out_field = f"shifted_{field}" if out_field is None else out_field
         self._init_irreps(
@@ -173,11 +174,13 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
         if self.arguments_in_dataset_units and rescale_module.has_scale:
             logging.debug(
                 f"PerSpeciesScaleShift's arguments were in dataset units; rescaling:\n"
-                f"Original scales {self.scales} shifts: {self.shifts}"
+                f"Original scales {self.scales if self.has_scales else 'n/a'} shifts: {self.shifts if self.has_shifts else 'n/a'}"
             )
             with torch.no_grad():
                 if self.has_scales:
                     self.scales.div_(rescale_module.scale_by)
                 if self.has_shifts:
                     self.shifts.div_(rescale_module.scale_by)
-            logging.debug(f"New scales {self.scales} shifts: {self.shifts}")
+            logging.debug(
+                f"New scales {self.scales if self.has_scales else 'n/a'} shifts: {self.shifts if self.has_shifts else 'n/a'}"
+            )

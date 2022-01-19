@@ -33,6 +33,7 @@ setup(
         "e3nn>=0.4.4,<0.5.0",
         "pyyaml",
         "contextlib2;python_version<'3.7'",  # backport of nullcontext
+        'contextvars;python_version<"3.7"',  # backport of contextvars for savenload
         "typing_extensions;python_version<'3.8'",  # backport of Final
         "torch-runstats>=0.2.0",
         "torch-ema>=0.3.0",

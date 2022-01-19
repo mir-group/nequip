@@ -88,7 +88,7 @@ class AtomicInMemoryDataset(AtomicDataset):
         force_fixed_keys: List[str] = [],
         extra_fixed_fields: Dict[str, Any] = {},
         include_frames: Optional[List[int]] = None,
-        type_mapper: TypeMapper = None,
+        type_mapper: Optional[TypeMapper] = None,
     ):
         # TO DO, this may be simplified
         # See if a subclass defines some inputs

@@ -6,6 +6,7 @@ from .auto_init import (
 from .savenload import (
     save_file,
     load_file,
+    load_callable,
     atomic_write,
     finish_all_writes,
     atomic_write_group,
@@ -21,6 +22,7 @@ __all__ = [
     get_w_prefix,
     save_file,
     load_file,
+    load_callable,
     atomic_write,
     finish_all_writes,
     atomic_write_group,

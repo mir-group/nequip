@@ -18,7 +18,7 @@ from nequip.scripts.train import default_config, _set_global_options
 from nequip.utils import load_file, instantiate
 from nequip.train.loss import Loss
 from nequip.train.metrics import Metrics
-from nequip.scripts.logger import set_up_script_logger
+from ._logger import set_up_script_logger
 
 
 def main(args=None, running_as_script: bool = True):
@@ -321,10 +321,13 @@ def main(args=None, running_as_script: bool = True):
 
             with torch.no_grad():
                 # Write output
+                # TODO: make sure don't keep appending to existing file
                 if output is not None:
                     ase.io.write(
                         output,
-                        AtomicData.from_AtomicDataDict(out).to(device="cpu").to_ase(),
+                        AtomicData.from_AtomicDataDict(out)
+                        .to(device="cpu")
+                        .to_ase(type_mapper=dataset.type_mapper),
                         format="extxyz",
                         append=True,
                     )
