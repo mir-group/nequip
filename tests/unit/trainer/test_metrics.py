@@ -99,10 +99,3 @@ def metrics(request):
     coeffs = request.param  # noqa
     instance = Metrics(components=request.param)
     yield instance
-
-
-# @pytest.fixture(scope="class")
-# def w_loss():
-#     """"""
-#     instance = Metrics(coeffs=metrics_tests[-1], atomic_weight_on=True)
-#     yield instance

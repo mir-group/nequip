@@ -13,7 +13,6 @@ else:
 # == Define allowed keys as constants ==
 # The positions of the atoms in the system
 POSITIONS_KEY: Final[str] = "pos"
-WEIGHTS_KEY: Final[str] = "weights"
 
 # The [2, n_edge] index tensor giving center -> neighbor relations
 EDGE_INDEX_KEY: Final[str] = "edge_index"
