@@ -18,7 +18,7 @@ from nequip.scripts.train import default_config, _set_global_options
 from nequip.utils import load_file, instantiate
 from nequip.train.loss import Loss
 from nequip.train.metrics import Metrics
-from nequip.scripts.logger import set_up_script_logger
+from ._logger import set_up_script_logger
 
 
 def main(args=None, running_as_script: bool = True):
