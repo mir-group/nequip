@@ -158,6 +158,7 @@ def main(args=None, running_as_script: bool = True):
     # Load model:
     logger.info("Loading model... ")
     model_from_training: bool = False
+    loaded_deployed_model: bool = False
     try:
         model, _ = load_deployed_model(
             args.model,
@@ -165,7 +166,14 @@ def main(args=None, running_as_script: bool = True):
             set_global_options=True,  # don't warn that setting
         )
         logger.info("loaded deployed model.")
+        loaded_deployed_model = True
     except ValueError:  # its not a deployed model
+        loaded_deployed_model = False
+    # we don't do this in the `except:` block to avoid "during handing of this exception another exception"
+    # chains if there is an issue loading the training session model. This makes the error messages more
+    # comprehensible:
+    if not loaded_deployed_model:
+        # load a training session model
         model, _ = Trainer.load_model_from_training_session(
             traindir=args.model.parent, model_name=args.model.name
         )
