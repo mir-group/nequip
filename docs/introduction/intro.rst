@@ -1,4 +1,4 @@
-Introduction to NequIP
-======================
+Overview
+========
 
 TODO

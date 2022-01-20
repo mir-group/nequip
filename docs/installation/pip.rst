@@ -1,2 +1,2 @@
-Installation via PIP
-====================
+via PIP
+=======

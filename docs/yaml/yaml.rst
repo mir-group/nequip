@@ -1,4 +1,4 @@
-Guide of YAML input
-===================
+YAML input
+==========
 
 TODO

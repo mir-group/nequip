@@ -1,4 +1,4 @@
-Installation via GIT
-====================
+via GIT
+=======
 
 TODO
