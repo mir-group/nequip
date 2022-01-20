@@ -1,0 +1,7 @@
+Installation
+============
+
+ .. toctree::
+
+    pip
+    git
