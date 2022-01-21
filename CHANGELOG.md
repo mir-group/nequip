@@ -12,6 +12,7 @@ Most recent change on the bottom.
 - Model builders may now process only the configuration
 - Allow irreps to optionally be specified through the simplified keys `l_max`, `parity`, and `num_features`
 - `wandb.watch` via `wandb_watch` option
+- Allow polynomial cutoff _p_ values besides 6.0
 
 ### Changed
 - `minimal.yaml`, `minimal_eng.yaml`, and `example.yaml` now use the simplified irreps options `l_max`, `parity`, and `num_features`
