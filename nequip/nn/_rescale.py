@@ -1,5 +1,4 @@
 from typing import Sequence, List, Union
-from rdflib import Graph
 
 import torch
 
