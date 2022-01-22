@@ -325,10 +325,30 @@ class Trainer:
             all_args=self.kwargs,
         )
         self.loss_stat = LossStat(self.loss)
+
+        # what do we train on?
         self.train_on_keys = self.loss.keys
         if train_on_keys is not None:
             assert set(train_on_keys) == set(self.train_on_keys)
+        self._remove_from_model_input = set(self.train_on_keys)
+        if (
+            len(
+                self._remove_from_model_input.intersection(
+                    AtomicDataDict.ALL_ENERGY_KEYS
+                )
+            )
+            > 0
+        ):
+            # if we are training on _any_ of the energy quantities (energy, force, partials, stress, etc.)
+            # then none of them should be fed into the model
+            self._remove_from_model_input = self._remove_from_model_input.union(
+                AtomicDataDict.ALL_ENERGY_KEYS
+            )
+        if kwargs.get("_override_allow_truth_label_inputs", False):
+            # needed for unit testing models
+            self._remove_from_model_input = set()
 
+        # load all callbacks
         self._init_callbacks = [load_callable(callback) for callback in init_callbacks]
         self._end_of_epoch_callbacks = [
             load_callable(callback) for callback in end_of_epoch_callbacks
@@ -801,7 +821,11 @@ class Trainer:
 
         # Run model
         # We make a shallow copy of the input dict in case the model modifies it
-        input_data = data_unscaled.copy()
+        input_data = {
+            k: v
+            for k, v in data_unscaled.items()
+            if k not in self._remove_from_model_input
+        }
         out = self.model(input_data)
         del input_data
 
