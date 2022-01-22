@@ -119,11 +119,7 @@ class RescaleOutput(GraphModuleMixin, torch.nn.Module):
         for mod in self.inner_model.modules():
             if isinstance(mod, GraphModuleMixin):
                 callback = getattr(mod, "update_for_rescale", None)
-                contain_related_keys = False
-                for out_key in mod.irreps_out:
-                    if out_key in self.related_keys:
-                        contain_related_keys = True
-                if contain_related_keys and callable(callback):
+                if callable(callback):
                     # It gets the `RescaleOutput` as an argument,
                     # since that contains all relevant information
                     callback(self)
