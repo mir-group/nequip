@@ -94,6 +94,7 @@ def RescaleEnergyEtc(
             k for k in (AtomicDataDict.TOTAL_ENERGY_KEY,) if k in model.irreps_out
         ],
         shift_by=global_shift,
+        related_keys=AtomicDataDict.ALL_ENERGY_KEYS+[AtomicDataDict.PER_ATOM_ENERGY_KEY],
         shift_trainable=config.get(f"{module_prefix}_shift_trainable", False),
         scale_trainable=config.get(f"{module_prefix}_scale_trainable", False),
     )
