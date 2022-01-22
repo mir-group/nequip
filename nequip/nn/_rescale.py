@@ -1,4 +1,5 @@
 from typing import Sequence, List, Union
+from rdflib import Graph
 
 import torch
 
@@ -15,10 +16,11 @@ class RescaleOutput(GraphModuleMixin, torch.nn.Module):
     Args:
         model : GraphModuleMixin
             The model whose outputs are to be rescaled.
-        scale : list of keys, default []
+        scale_keys : list of keys, default []
             Which fields to rescale.
-        shift : list of keys, default []
+        shift_keys : list of keys, default []
             Which fields to shift after rescaling.
+        related_keys: list of keys that could be contingent to this rescale
         scale_by : floating or Tensor, default 1.
             The scaling factor by which to multiply fields in ``scale``.
         shift_by : floating or Tensor, default 0.
@@ -40,6 +42,7 @@ class RescaleOutput(GraphModuleMixin, torch.nn.Module):
         model: GraphModuleMixin,
         scale_keys: Union[Sequence[str], str] = [],
         shift_keys: Union[Sequence[str], str] = [],
+        related_keys: Union[Sequence[str], str] = [],
         scale_by=None,
         shift_by=None,
         shift_trainable: bool = False,
@@ -47,6 +50,7 @@ class RescaleOutput(GraphModuleMixin, torch.nn.Module):
         irreps_in: dict = {},
     ):
         super().__init__()
+
         self.model = model
         scale_keys = [scale_keys] if isinstance(scale_keys, str) else scale_keys
         shift_keys = [shift_keys] if isinstance(shift_keys, str) else shift_keys
@@ -74,6 +78,7 @@ class RescaleOutput(GraphModuleMixin, torch.nn.Module):
 
         self.scale_keys = list(scale_keys)
         self.shift_keys = list(shift_keys)
+        self.related_keys = set(related_keys).union(set(scale_keys), set(shift_keys))
 
         self.has_scale = scale_by is not None
         self.scale_trainble = scale_trainable
@@ -110,15 +115,26 @@ class RescaleOutput(GraphModuleMixin, torch.nn.Module):
         # Finally, we tell all the modules in the model that there is rescaling
         # This allows them to update parameters, like physical constants with units,
         # that need to be scaled
-        #
+
         # Note that .modules() walks the full tree, including self
-        for mod in self.model.modules():
+        for mod in self.inner_model.modules():
             if isinstance(mod, GraphModuleMixin):
                 callback = getattr(mod, "update_for_rescale", None)
-                if callable(callback):
+                contain_related_keys = False
+                for out_key in mod.irreps_out:
+                    if out_key in self.related_keys:
+                        contain_related_keys = True
+                if contain_related_keys and callable(callback):
                     # It gets the `RescaleOutput` as an argument,
                     # since that contains all relevant information
                     callback(self)
+
+    @property
+    def inner_model(self):
+        inner_model = self.model
+        while isinstance(inner_model, RescaleOutput):
+            inner_model = inner_model.model
+        return inner_model
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
         data = self.model(data)

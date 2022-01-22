@@ -44,6 +44,7 @@ from nequip.utils import (
 )
 from nequip.utils.git import get_commit
 from nequip.model import model_from_config
+from nequip.nn import RescaleOutput
 
 from .loss import Loss, LossStat
 from .metrics import Metrics
@@ -701,6 +702,13 @@ class Trainer:
             return
 
         self.model.to(self.torch_device)
+
+        self.rescale_layers = []
+        outer_layer = self.model
+        while hasattr(outer_layer, "unscale"):
+            self.rescale_layers.append(outer_layer)
+            outer_layer = getattr(outer_layer, "model", None)
+
         self.init_objects()
 
         self._initialized = True
@@ -783,14 +791,13 @@ class Trainer:
         data = data.to(self.torch_device)
         data = AtomicData.to_AtomicDataDict(data)
 
-        if hasattr(self.model, "unscale"):
+        data_unscaled = data
+        for layer in self.rescale_layers:
             # This means that self.model is RescaleOutputs
             # this will normalize the targets
             # in validation (eval mode), it does nothing
             # in train mode, if normalizes the targets
-            data_unscaled = self.model.unscale(data)
-        else:
-            data_unscaled = data
+            data_unscaled = layer.unscale(data)
 
         # Run model
         # We make a shallow copy of the input dict in case the model modifies it
@@ -826,16 +833,18 @@ class Trainer:
                 self.lr_sched.step(self.iepoch + self.ibatch / self.n_batches)
 
         with torch.no_grad():
-            if hasattr(self.model, "unscale"):
+            if len(self.rescale_layers) > 0:
                 if validation:
-                    # loss function always needs to be in normalized unit
-                    scaled_out = self.model.unscale(out, force_process=True)
-                    _data_unscaled = self.model.unscale(data, force_process=True)
-                    loss, loss_contrib = self.loss(pred=scaled_out, ref=_data_unscaled)
+                    for layer in self.rescale_layers:
+                        # loss function always needs to be in normalized unit
+                        scaled_out = layer.unscale(out, force_process=True)
+                        _data_unscaled = layer.unscale(data, force_process=True)
+                        loss, loss_contrib = self.loss(pred=scaled_out, ref=_data_unscaled)
                 else:
                     # If we are in training mode, we need to bring the prediction
                     # into real units
-                    out = self.model.scale(out, force_process=True)
+                    for layer in self.rescale_layers.reverse():
+                        out = layer.scale(out, force_process=True)
             elif validation:
                 loss, loss_contrib = self.loss(pred=out, ref=data_unscaled)
 
