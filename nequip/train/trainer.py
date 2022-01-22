@@ -44,7 +44,6 @@ from nequip.utils import (
 )
 from nequip.utils.git import get_commit
 from nequip.model import model_from_config
-from nequip.nn import RescaleOutput
 
 from .loss import Loss, LossStat
 from .metrics import Metrics
