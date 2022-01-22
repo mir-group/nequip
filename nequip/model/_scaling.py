@@ -63,11 +63,11 @@ def RescaleEnergyEtc(
         if isinstance(global_scale, str):
             s = global_scale
             global_scale = computed_stats[str_names.index(global_scale)]
-            logging.debug(f"Replace string {s} to {global_scale}")
+            logging.info(f"Replace string {s} to {global_scale}")
         if isinstance(global_shift, str):
             s = global_shift
             global_shift = computed_stats[str_names.index(global_shift)]
-            logging.debug(f"Replace string {s} to {global_shift}")
+            logging.info(f"Replace string {s} to {global_shift}")
 
         if isinstance(global_scale, float) and global_scale < RESCALE_THRESHOLD:
             raise ValueError(
@@ -170,14 +170,14 @@ def PerSpeciesRescale(
         if isinstance(scales, str):
             s = scales
             scales = computed_stats[str_names.index(scales)]
-            logging.debug(f"Replace string {s} to {scales}")
+            logging.info(f"Replace string {s} to {scales}")
         elif isinstance(scales, (list, float)):
             scales = torch.as_tensor(scales)
 
         if isinstance(shifts, str):
             s = shifts
             shifts = computed_stats[str_names.index(shifts)]
-            logging.debug(f"Replace string {s} to {shifts}")
+            logging.info(f"Replace string {s} to {shifts}")
         elif isinstance(shifts, (list, float)):
             shifts = torch.as_tensor(shifts)
 
@@ -216,7 +216,7 @@ def PerSpeciesRescale(
         params=params,
     )
 
-    logging.debug(f"Atomic outputs are scaled by: {scales}, shifted by {shifts}.")
+    logging.info(f"Atomic outputs are scaled by: {scales}, shifted by {shifts}.")
 
     # == Build the model ==
     return model
