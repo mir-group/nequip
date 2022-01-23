@@ -1,5 +1,5 @@
 import logging
-from typing import List, Optional
+from typing import List, Optional, Union
 
 import torch
 
@@ -11,25 +11,44 @@ RESCALE_THRESHOLD = 1e-6
 
 
 def RescaleEnergyEtc(
+    model: GraphModuleMixin, config, dataset: AtomicDataset, initialize: bool
+):
+
+    return GeneralRescale(
+        model=model,
+        config=config,
+        dataset=dataset,
+        initialize=initialize,
+        module_prefix="global_rescale",
+        default_global_scale=f"dataset_{AtomicDataDict.FORCE_KEY}_rms"
+        if AtomicDataDict.FORCE_KEY in model.irreps_out
+        else f"dataset_{AtomicDataDict.TOTAL_ENERGY_KEY}_std",
+        default_global_shift=None,
+        default_scale_keys=AtomicDataDict.ALL_ENERGY_KEYS,
+        default_shift_keys=AtomicDataDict.TOTAL_ENERGY_KEY,
+        default_related_keys=[AtomicDataDict.PER_ATOM_ENERGY_KEY],
+    )
+
+
+def GeneralRescale(
     model: GraphModuleMixin,
     config,
     dataset: AtomicDataset,
     initialize: bool,
+    module_prefix: str,
+    default_scale: Union[str, float, list],
+    default_shift: Union[str, float, list],
+    default_scale_keys: list,
+    default_shift_keys: list,
+    default_related_keys: list,
 ):
     """Add global rescaling for energy(-based quantities).
 
     If ``initialize`` is false, doesn't compute statistics.
     """
 
-    module_prefix = "global_rescale"
-
-    global_scale = config.get(
-        f"{module_prefix}_scale",
-        f"dataset_{AtomicDataDict.FORCE_KEY}_rms"
-        if AtomicDataDict.FORCE_KEY in model.irreps_out
-        else f"dataset_{AtomicDataDict.TOTAL_ENERGY_KEY}_std",
-    )
-    global_shift = config.get(f"{module_prefix}_shift", None)
+    global_scale = config.get(f"{module_prefix}_scale", default_scale)
+    global_shift = config.get(f"{module_prefix}_shift", default_shift)
 
     if global_shift is not None:
         logging.warning(
@@ -88,13 +107,11 @@ def RescaleEnergyEtc(
     # == Build the model ==
     return RescaleOutput(
         model=model,
-        scale_keys=[k for k in AtomicDataDict.ALL_ENERGY_KEYS if k in model.irreps_out],
+        scale_keys=[k for k in default_scale_keys if k in model.irreps_out],
         scale_by=global_scale,
-        shift_keys=[
-            k for k in (AtomicDataDict.TOTAL_ENERGY_KEY,) if k in model.irreps_out
-        ],
+        shift_keys=[k for k in default_shift_keys if k in model.irreps_out],
         shift_by=global_shift,
-        related_keys=AtomicDataDict.ALL_ENERGY_KEYS+[AtomicDataDict.PER_ATOM_ENERGY_KEY],
+        related_keys=default_related_keys,
         shift_trainable=config.get(f"{module_prefix}_shift_trainable", False),
         scale_trainable=config.get(f"{module_prefix}_scale_trainable", False),
     )
