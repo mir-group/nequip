@@ -116,7 +116,7 @@ class RescaleOutput(GraphModuleMixin, torch.nn.Module):
         # that need to be scaled
 
         # Note that .modules() walks the full tree, including self
-        for mod in self.inner_model.modules():
+        for mod in self.inner_model().modules():
             if isinstance(mod, GraphModuleMixin):
                 callback = getattr(mod, "update_for_rescale", None)
                 if callable(callback):
@@ -124,12 +124,12 @@ class RescaleOutput(GraphModuleMixin, torch.nn.Module):
                     # since that contains all relevant information
                     callback(self)
 
-    @property
     def inner_model(self):
-        inner_model = self.model
-        while isinstance(inner_model, RescaleOutput):
-            inner_model = inner_model.model
-        return inner_model
+        model = self.model
+        while isinstance(model, RescaleOutput) and hasattr(model, "model"):
+            print(type(model))
+            model = model.model
+        return model
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
         data = self.model(data)
