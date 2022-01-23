@@ -20,10 +20,10 @@ def RescaleEnergyEtc(
         dataset=dataset,
         initialize=initialize,
         module_prefix="global_rescale",
-        default_global_scale=f"dataset_{AtomicDataDict.FORCE_KEY}_rms"
+        default_scale=f"dataset_{AtomicDataDict.FORCE_KEY}_rms"
         if AtomicDataDict.FORCE_KEY in model.irreps_out
         else f"dataset_{AtomicDataDict.TOTAL_ENERGY_KEY}_std",
-        default_global_shift=None,
+        default_shift=None,
         default_scale_keys=AtomicDataDict.ALL_ENERGY_KEYS,
         default_shift_keys=AtomicDataDict.TOTAL_ENERGY_KEY,
         default_related_keys=[AtomicDataDict.PER_ATOM_ENERGY_KEY],
