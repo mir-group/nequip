@@ -866,7 +866,7 @@ class Trainer:
                 else:
                     # If we are in training mode, we need to bring the prediction
                     # into real units
-                    for layer in self.rescale_layers.reverse():
+                    for layer in self.rescale_layers[::-1]:
                         out = layer.scale(out, force_process=True)
             elif validation:
                 loss, loss_contrib = self.loss(pred=out, ref=data_unscaled)
