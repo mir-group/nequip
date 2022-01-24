@@ -2,8 +2,7 @@ import torch
 
 
 @torch.jit.script
-def _poly_cutoff(x: torch.Tensor, factor: float) -> torch.Tensor:
-    p: float = 6.0
+def _poly_cutoff(x: torch.Tensor, factor: float, p: float = 6.0) -> torch.Tensor:
     x = x * factor
 
     out = 1.0
@@ -31,10 +30,6 @@ class PolynomialCutoff(torch.nn.Module):
             Power used in envelope function
         """
         super().__init__()
-        if p != 6:
-            raise NotImplementedError(
-                "p values other than 6 not currently supported for simplicity; if you need this please file an issue."
-            )
         self.p = p
         self._factor = 1.0 / r_max
 
@@ -44,4 +39,4 @@ class PolynomialCutoff(torch.nn.Module):
 
         x: torch.Tensor, input distance
         """
-        return _poly_cutoff(x, self._factor)
+        return _poly_cutoff(x, self._factor, p=self.p)

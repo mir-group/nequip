@@ -253,8 +253,8 @@ class AtomicInMemoryDataset(AtomicDataset):
             num_examples = next(iter(num_examples))
 
             include_frames = self.include_frames
-            if self.include_frames is None:
-                include_frames = list(range(num_examples))
+            if include_frames is None:
+                include_frames = range(num_examples)
 
             # Make AtomicData from it:
             if AtomicDataDict.EDGE_INDEX_KEY in all_keys:
@@ -856,7 +856,7 @@ class ASEDataset(AtomicInMemoryDataset):
                 [
                     AtomicData.from_ase(atoms=atoms_list[i], **kwargs)
                     if i in self.include_frames
-                    else None
+                    else None  # in-memory dataset will ignore this later, but needed for indexing to work out
                     for i in range(len(atoms_list))
                 ],
             )
