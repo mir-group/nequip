@@ -26,7 +26,8 @@ def RescaleEnergyEtc(
         default_shift=None,
         default_scale_keys=AtomicDataDict.ALL_ENERGY_KEYS,
         default_shift_keys=AtomicDataDict.TOTAL_ENERGY_KEY,
-        default_related_keys=[AtomicDataDict.PER_ATOM_ENERGY_KEY],
+        default_related_scale_keys=[AtomicDataDict.PER_ATOM_ENERGY_KEY],
+        default_related_shift_keys=[],
     )
 
 
@@ -40,7 +41,8 @@ def GlobalRescale(
     default_shift: Union[str, float, list],
     default_scale_keys: list,
     default_shift_keys: list,
-    default_related_keys: list,
+    default_related_scale_keys: list,
+    default_related_shift_keys: list,
 ):
     """Add global rescaling for energy(-based quantities).
 
@@ -111,7 +113,8 @@ def GlobalRescale(
         scale_by=global_scale,
         shift_keys=[k for k in default_shift_keys if k in model.irreps_out],
         shift_by=global_shift,
-        related_keys=default_related_keys,
+        related_scale_keys=default_related_scale_keys,
+        related_shift_keys=default_related_shift_keys,
         shift_trainable=config.get(f"{module_prefix}_shift_trainable", False),
         scale_trainable=config.get(f"{module_prefix}_scale_trainable", False),
     )
