@@ -197,6 +197,9 @@ class StressOutput(GraphModuleMixin, torch.nn.Module):
         self.irreps_out[AtomicDataDict.STRESS_KEY] = "3x1o"
         self.irreps_out[AtomicDataDict.VIRIAL_KEY] = "3x1o"
 
+        # for torchscript compat
+        self.register_buffer("_empty", torch.Tensor())
+
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
         # TODO: does any of this make sense without PBC? check it
         # Make the cell per-batch
@@ -213,6 +216,8 @@ class StressOutput(GraphModuleMixin, torch.nn.Module):
             data[AtomicDataDict.CELL_KEY] = orig_cell.view(-1, 3, 3).expand(
                 num_batch, 3, 3
             )
+        else:
+            orig_cell = self._empty  # torchscript
         # Add the displacements
         # the GradientOutput will make them require grad
         # See SchNetPack code:
@@ -259,6 +264,8 @@ class StressOutput(GraphModuleMixin, torch.nn.Module):
             data[AtomicDataDict.CELL_KEY] = cell + torch.bmm(
                 cell, symmetric_displacement
             )
+        else:
+            cell = self._empty  # torchscript
 
         # Call model and get gradients
         data = self.energy_model(data)
@@ -297,6 +304,8 @@ class StressOutput(GraphModuleMixin, torch.nn.Module):
             stress = virial / volume.view(-1, 1, 1)
             data[AtomicDataDict.STRESS_KEY] = stress
             data[AtomicDataDict.CELL_KEY] = orig_cell
+        else:
+            stress = self._empty  # torchscript
 
         # Remove helper
         del data["_displacement"]
