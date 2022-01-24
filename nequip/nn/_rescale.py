@@ -19,7 +19,8 @@ class RescaleOutput(GraphModuleMixin, torch.nn.Module):
             Which fields to rescale.
         shift_keys : list of keys, default []
             Which fields to shift after rescaling.
-        related_keys: list of keys that could be contingent to this rescale
+        related_scale_keys: list of keys that could be contingent to this rescale
+        related_shift_keys: list of keys that could be contingent to this rescale
         scale_by : floating or Tensor, default 1.
             The scaling factor by which to multiply fields in ``scale``.
         shift_by : floating or Tensor, default 0.
@@ -30,6 +31,8 @@ class RescaleOutput(GraphModuleMixin, torch.nn.Module):
 
     scale_keys: List[str]
     shift_keys: List[str]
+    related_scale_keys: List[str]
+    related_shift_keys: List[str]
     scale_trainble: bool
     rescale_trainable: bool
 
@@ -41,7 +44,8 @@ class RescaleOutput(GraphModuleMixin, torch.nn.Module):
         model: GraphModuleMixin,
         scale_keys: Union[Sequence[str], str] = [],
         shift_keys: Union[Sequence[str], str] = [],
-        related_keys: Union[Sequence[str], str] = [],
+        related_shift_keys: Union[Sequence[str], str] = [],
+        related_scale_keys: Union[Sequence[str], str] = [],
         scale_by=None,
         shift_by=None,
         shift_trainable: bool = False,
@@ -77,7 +81,8 @@ class RescaleOutput(GraphModuleMixin, torch.nn.Module):
 
         self.scale_keys = list(scale_keys)
         self.shift_keys = list(shift_keys)
-        self.related_keys = set(related_keys).union(set(scale_keys), set(shift_keys))
+        self.related_scale_keys = set(related_scale_keys).union(scale_keys)
+        self.related_shift_keys = set(related_shift_keys).union(shift_keys)
 
         self.has_scale = scale_by is not None
         self.scale_trainble = scale_trainable
