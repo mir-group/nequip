@@ -127,7 +127,6 @@ class RescaleOutput(GraphModuleMixin, torch.nn.Module):
     def inner_model(self):
         model = self.model
         while isinstance(model, RescaleOutput) and hasattr(model, "model"):
-            print(type(model))
             model = model.model
         return model
 
