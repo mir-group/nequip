@@ -195,6 +195,7 @@ class StressOutput(GraphModuleMixin, torch.nn.Module):
         )
         self.irreps_out[AtomicDataDict.FORCE_KEY] = "1o"
         self.irreps_out[AtomicDataDict.STRESS_KEY] = "3x1o"
+        self.irreps_out[AtomicDataDict.VIRIAL_KEY] = "3x1o"
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
         # TODO: does any of this make sense without PBC? check it
@@ -203,9 +204,15 @@ class StressOutput(GraphModuleMixin, torch.nn.Module):
 
         batch = data[AtomicDataDict.BATCH_KEY]
         num_batch: int = int(batch.max().cpu().item()) + 1
+        pos = data[AtomicDataDict.POSITIONS_KEY]
 
-        orig_cell = data[AtomicDataDict.CELL_KEY]
-        data[AtomicDataDict.CELL_KEY] = orig_cell.view(-1, 3, 3).expand(num_batch, 3, 3)
+        has_cell: bool = AtomicDataDict.CELL_KEY in data
+
+        if has_cell:
+            orig_cell = data[AtomicDataDict.CELL_KEY]
+            data[AtomicDataDict.CELL_KEY] = orig_cell.view(-1, 3, 3).expand(
+                num_batch, 3, 3
+            )
         # Add the displacements
         # the GradientOutput will make them require grad
         # See SchNetPack code:
@@ -217,8 +224,8 @@ class StressOutput(GraphModuleMixin, torch.nn.Module):
         # https://pure.mpg.de/rest/items/item_2085135_9/component/file_2156800/content
         displacement = torch.zeros(
             (num_batch, 3, 3),
-            dtype=data[AtomicDataDict.CELL_KEY].dtype,
-            device=data[AtomicDataDict.CELL_KEY].device,
+            dtype=pos.dtype,
+            device=pos.device,
         )
         displacement.requires_grad_(True)
         data["_displacement"] = displacement
@@ -234,22 +241,24 @@ class StressOutput(GraphModuleMixin, torch.nn.Module):
         # take advantage of this understanding and not rely on
         # the invariance here:
         symmetric_displacement = 0.5 * (displacement + displacement.transpose(-1, -2))
-        pos = data[AtomicDataDict.POSITIONS_KEY]
         did_pos_req_grad: bool = pos.requires_grad
         pos.requires_grad_(True)
         # bmm is natom in batch
         data[AtomicDataDict.POSITIONS_KEY] = pos + torch.bmm(
             pos.unsqueeze(-2), symmetric_displacement[batch]
         ).squeeze(-2)
-        cell = data[AtomicDataDict.CELL_KEY]
-        # bmm is num_batch in batch
-        # here we apply the distortion to the cell as well
-        # this is critical also for the correctness
-        # if we didn't symmetrize the distortion, since without this
-        # there would then be an infinitesimal rotation of the positions
-        # but not cell, and it thus wouldn't be global and have
-        # no effect due to equivariance/invariance.
-        data[AtomicDataDict.CELL_KEY] = cell + torch.bmm(cell, symmetric_displacement)
+        if has_cell:
+            cell = data[AtomicDataDict.CELL_KEY]
+            # bmm is num_batch in batch
+            # here we apply the distortion to the cell as well
+            # this is critical also for the correctness
+            # if we didn't symmetrize the distortion, since without this
+            # there would then be an infinitesimal rotation of the positions
+            # but not cell, and it thus wouldn't be global and have
+            # no effect due to equivariance/invariance.
+            data[AtomicDataDict.CELL_KEY] = cell + torch.bmm(
+                cell, symmetric_displacement
+            )
 
         # Call model and get gradients
         data = self.energy_model(data)
@@ -268,22 +277,26 @@ class StressOutput(GraphModuleMixin, torch.nn.Module):
         forces = torch.neg(forces)
         data[AtomicDataDict.FORCE_KEY] = forces
 
-        # Rescale stress tensor
-        # See https://github.com/atomistic-machine-learning/schnetpack/blob/master/src/schnetpack/atomistic/output_modules.py#L180
-        # First dim is batch, second is vec, third is xyz
-        volume = torch.einsum(
-            "zi,zi->z",
-            cell[:, 0, :],
-            torch.cross(cell[:, 1, :], cell[:, 2, :], dim=1),
-        ).unsqueeze(-1)
-
-        stress = grads[1]
-        if stress is None:
+        # Store virial
+        virial = grads[1]
+        if virial is None:
             # condition needed to unwrap optional for torchscript
-            assert False, "failed to compute stress autograd"
-        stress = stress / volume.view(-1, 1, 1)
-        data[AtomicDataDict.STRESS_KEY] = stress
-        data[AtomicDataDict.CELL_KEY] = orig_cell
+            assert False, "failed to compute virial autograd"
+        data[AtomicDataDict.VIRIAL_KEY] = virial
+
+        if has_cell:
+            # ^ can only scale by cell volume if we have one...:
+            # Rescale stress tensor
+            # See https://github.com/atomistic-machine-learning/schnetpack/blob/master/src/schnetpack/atomistic/output_modules.py#L180
+            # First dim is batch, second is vec, third is xyz
+            volume = torch.einsum(
+                "zi,zi->z",
+                cell[:, 0, :],
+                torch.cross(cell[:, 1, :], cell[:, 2, :], dim=1),
+            ).unsqueeze(-1)
+            stress = virial / volume.view(-1, 1, 1)
+            data[AtomicDataDict.STRESS_KEY] = stress
+            data[AtomicDataDict.CELL_KEY] = orig_cell
 
         # Remove helper
         del data["_displacement"]

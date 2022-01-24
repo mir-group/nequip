@@ -186,14 +186,17 @@ def assert_AtomicData_equivariant(
             # must be this to actually rotate it
             irps[AtomicDataDict.CELL_KEY] = "3x1o"
 
-    irreps_in.pop(AtomicDataDict.STRESS_KEY, None)
-    if AtomicDataDict.STRESS_KEY in irreps_out:
+    stress_keys = (AtomicDataDict.STRESS_KEY, AtomicDataDict.VIRIAL_KEY)
+    for k in stress_keys:
+        irreps_in.pop(k, None)
+    if any(k in irreps_out for k in stress_keys):
         from e3nn.io import CartesianTensor
 
         stress_cart_tensor = CartesianTensor("ij=ji")  # stress is symmetric
         stress_rtp = stress_cart_tensor.reduced_tensor_products().to(device, dtype)
         # symmetric 3x3 cartesian tensor as irreps
-        irreps_out[AtomicDataDict.STRESS_KEY] = stress_cart_tensor
+        for k in stress_keys:
+            irreps_out[k] = stress_cart_tensor
 
     def wrapper(*args):
         arg_dict = {k: v for k, v in zip(irreps_in, args)}
@@ -214,10 +217,9 @@ def assert_AtomicData_equivariant(
                 output[key] = val.reshape(val.shape[:-2] + (9,))
         # stress is also a special case,
         # we need it to be decomposed into irreps for equivar testing
-        if AtomicDataDict.STRESS_KEY in output:
-            output[AtomicDataDict.STRESS_KEY] = stress_cart_tensor.from_cartesian(
-                output[AtomicDataDict.STRESS_KEY], rtp=stress_rtp
-            )
+        for k in stress_keys:
+            if k in output:
+                output[k] = stress_cart_tensor.from_cartesian(output[k], rtp=stress_rtp)
         return [output[k] for k in irreps_out]
 
     # prepare input data
