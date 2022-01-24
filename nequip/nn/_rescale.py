@@ -124,7 +124,8 @@ class RescaleOutput(GraphModuleMixin, torch.nn.Module):
                     # since that contains all relevant information
                     callback(self)
 
-    def inner_model(self):
+    def get_inner_model(self):
+        """Get the outermost child module that is not another ``RescaleOutput``"""
         model = self.model
         while isinstance(model, RescaleOutput) and hasattr(model, "model"):
             model = model.model
