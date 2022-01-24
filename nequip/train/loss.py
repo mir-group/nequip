@@ -14,7 +14,6 @@ class Loss:
 
     Args:
         coeffs (dict, str): keys with coefficient and loss function name
-        weight (bool): if True, the results will be weighted with the key: AtomicDataDict.WEIGHTS_KEY+key
 
     Example input dictionaries
 

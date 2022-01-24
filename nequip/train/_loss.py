@@ -10,8 +10,6 @@ from nequip.utils import instantiate_from_cls_name
 
 class SimpleLoss:
     """wrapper to compute weighted loss function
-    if atomic_weight_on is True, the loss function will search for
-    AtomicDataDict.WEIGHTS_KEY+key in the reference data.
 
     Args:
 
