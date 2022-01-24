@@ -201,8 +201,6 @@ class StressOutput(GraphModuleMixin, torch.nn.Module):
         self.register_buffer("_empty", torch.Tensor())
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
-        # TODO: does any of this make sense without PBC? check it
-        # Make the cell per-batch
         data = AtomicDataDict.with_batch(data)
 
         batch = data[AtomicDataDict.BATCH_KEY]
@@ -213,11 +211,13 @@ class StressOutput(GraphModuleMixin, torch.nn.Module):
 
         if has_cell:
             orig_cell = data[AtomicDataDict.CELL_KEY]
-            data[AtomicDataDict.CELL_KEY] = orig_cell.view(-1, 3, 3).expand(
-                num_batch, 3, 3
-            )
+            # Make the cell per-batch
+            cell = orig_cell.view(-1, 3, 3).expand(num_batch, 3, 3)
+            data[AtomicDataDict.CELL_KEY] = cell
         else:
-            orig_cell = self._empty  # torchscript
+            # torchscript
+            orig_cell = self._empty
+            cell = self._empty
         # Add the displacements
         # the GradientOutput will make them require grad
         # See SchNetPack code:
@@ -252,8 +252,8 @@ class StressOutput(GraphModuleMixin, torch.nn.Module):
         data[AtomicDataDict.POSITIONS_KEY] = pos + torch.bmm(
             pos.unsqueeze(-2), symmetric_displacement[batch]
         ).squeeze(-2)
+        # we only displace the cell if we have one:
         if has_cell:
-            cell = data[AtomicDataDict.CELL_KEY]
             # bmm is num_batch in batch
             # here we apply the distortion to the cell as well
             # this is critical also for the correctness
@@ -264,8 +264,6 @@ class StressOutput(GraphModuleMixin, torch.nn.Module):
             data[AtomicDataDict.CELL_KEY] = cell + torch.bmm(
                 cell, symmetric_displacement
             )
-        else:
-            cell = self._empty  # torchscript
 
         # Call model and get gradients
         data = self.energy_model(data)
@@ -291,6 +289,7 @@ class StressOutput(GraphModuleMixin, torch.nn.Module):
             assert False, "failed to compute virial autograd"
         data[AtomicDataDict.VIRIAL_KEY] = virial
 
+        # we only compute the stress (1/V * virial) if we have a cell whose volume we can compute
         if has_cell:
             # ^ can only scale by cell volume if we have one...:
             # Rescale stress tensor
