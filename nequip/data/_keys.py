@@ -46,6 +46,7 @@ ALL_ENERGY_KEYS: Final[List[str]] = [
     TOTAL_ENERGY_KEY,
     FORCE_KEY,
     PARTIAL_FORCE_KEY,
+    STRESS_KEY,
 ]
 
 BATCH_KEY: Final[str] = "batch"
