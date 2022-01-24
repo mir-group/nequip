@@ -14,7 +14,7 @@ def RescaleEnergyEtc(
     model: GraphModuleMixin, config, dataset: AtomicDataset, initialize: bool
 ):
 
-    return GeneralRescale(
+    return GlobalRescale(
         model=model,
         config=config,
         dataset=dataset,
@@ -30,7 +30,7 @@ def RescaleEnergyEtc(
     )
 
 
-def GeneralRescale(
+def GlobalRescale(
     model: GraphModuleMixin,
     config,
     dataset: AtomicDataset,
