@@ -12,13 +12,13 @@ To install:
 
     pip install wandb
 
- * Install NequIP::
+ * Install the latest stable NequIP::
 
+    pip install https://github.com/mir-group/nequip/archive/main.zip
 
-    git clone https://github.com/mir-group/nequip.git
-    cd nequip
-    pip install . 
+To install previous versions of NequIP, please clone the repository from GitHub and check out the appropriate tag (for example ``v0.3.3`` for version 0.3.3).
 
+To install the current **unstable** development version of NequIP, please clone our repository and check out the ``develop`` branch.
 
 Installation Issues
 -------------------
