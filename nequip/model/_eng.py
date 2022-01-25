@@ -34,16 +34,20 @@ def SimpleIrrepsConfig(config, prefix: Optional[str] = None):
 
     prefix = "" if prefix is None else f"{prefix}_"
 
-    has_simple: bool = any(f"{prefix}{k}" in config for k in simple_irreps_keys)
-    has_full: bool = any(f"{prefix}{k}" in config for k in real_irreps_keys)
+    has_simple: bool = any(
+        (f"{prefix}{k}" in config) or (k in config) for k in simple_irreps_keys
+    )
+    has_full: bool = any(
+        (f"{prefix}{k}" in config) or (k in config) for k in real_irreps_keys
+    )
     assert has_simple or has_full
 
     update = {}
     if has_simple:
         # nothing to do if not
-        lmax = config[f"{prefix}l_max"]
-        parity = config[f"{prefix}parity"]
-        num_features = config[f"{prefix}num_features"]
+        lmax = config.get(f"{prefix}l_max", config["l_max"])
+        parity = config.get(f"{prefix}parity", config["parity"])
+        num_features = config.get(f"{prefix}num_features", config["num_features"])
         update[f"{prefix}chemical_embedding_irreps_out"] = repr(
             o3.Irreps([(num_features, (0, 1))])  # n scalars
         )
