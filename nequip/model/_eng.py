@@ -41,9 +41,9 @@ def SimpleIrrepsConfig(config, prefix: Optional[str] = None):
     update = {}
     if has_simple:
         # nothing to do if not
-        lmax = config.get(f"{prefix}l_max", config["l_max"])
-        parity = config.get(f"{prefix}parity", config["parity"])
-        num_features = config.get(f"{prefix}num_features", config["num_features"])
+        lmax = config[f"{prefix}l_max"]
+        parity = config[f"{prefix}parity"]
+        num_features = config[f"{prefix}num_features"]
         update[f"{prefix}chemical_embedding_irreps_out"] = repr(
             o3.Irreps([(num_features, (0, 1))])  # n scalars
         )
@@ -71,21 +71,12 @@ def SimpleIrrepsConfig(config, prefix: Optional[str] = None):
     #  exclusive, we just insist that if full
     #  and simple are provided, full must be
     #  consistant with simple)
-    if len(prefix) == "":
-        for k, v in update.items():
-            if k in config:
-                assert (
-                    config[k] == v
-                ), f"For key {k}, the full irreps options had value `{config[k]}` inconsistant with the value derived from the simple irreps options `{v}`"
-            config[k] = v
-    else:
-        for k, v in update.items():
-            if k in config and config[k] != v:
-                Warning(
-                    f"For key {k}, the simple irreps options {v} is overrode by full irreps `{config[k]}`"
-                )
-            else:
-                config[k] = v
+    for k, v in update.items():
+        if k in config:
+            assert (
+                config[k] == v
+            ), f"For key {k}, the full irreps options had value `{config[k]}` inconsistant with the value derived from the simple irreps options `{v}`"
+        config[k] = v
 
 
 def EnergyModel(
