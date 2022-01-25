@@ -19,7 +19,7 @@ from nequip.nn.embedding import (
 from . import builder_utils
 
 
-def SimpleIrrepsConfig(config):
+def SimpleIrrepsConfig(config, prefix: Optional[str] = None):
     """Builder that pre-processes options to allow "simple" configuration of irreps."""
 
     # We allow some simpler parameters to be provided, but if they are,
@@ -32,61 +32,61 @@ def SimpleIrrepsConfig(config):
         "conv_to_output_hidden_irreps_out",
     ]
 
-    # search for prefix
-    prefixes = set()
-    for key in config.keys():
-        for simple_key in simple_irreps_keys:
-            if key.endswith(simple_key):
-                prefixes.update((key[: -len(simple_key)],))
-        for real_key in real_irreps_keys:
-            if key.endswith(real_key):
-                prefixes.update((key[: -len(real_key)],))
+    prefix = "" if prefix is None else f"{prefix}_"
 
-    for prefix in prefixes:
-
-        has_simple: bool = any(f"{prefix}{k}" in config for k in simple_irreps_keys)
-        has_full: bool = any(f"{prefix}{k}" in config for k in real_irreps_keys)
+    has_simple: bool = any(f"{prefix}{k}" in config for k in simple_irreps_keys)
+    has_full: bool = any(f"{prefix}{k}" in config for k in real_irreps_keys)
+    if prefix == "":
         assert has_simple or has_full
 
-        update = {}
-        if has_simple:
-            # nothing to do if not
-            lmax = config.get(f"{prefix}l_max", config["l_max"])
-            parity = config.get(f"{prefix}parity", config["parity"])
-            num_features = config.get(f"{prefix}num_features", config["num_features"])
-            update[f"{prefix}chemical_embedding_irreps_out"] = repr(
-                o3.Irreps([(num_features, (0, 1))])  # n scalars
+    update = {}
+    if has_simple:
+        # nothing to do if not
+        lmax = config.get(f"{prefix}l_max", config["l_max"])
+        parity = config.get(f"{prefix}parity", config["parity"])
+        num_features = config.get(f"{prefix}num_features", config["num_features"])
+        update[f"{prefix}chemical_embedding_irreps_out"] = repr(
+            o3.Irreps([(num_features, (0, 1))])  # n scalars
+        )
+        update[f"{prefix}irreps_edge_sh"] = repr(
+            o3.Irreps.spherical_harmonics(lmax=lmax, p=-1 if parity else 1)
+        )
+        update[f"{prefix}feature_irreps_hidden"] = repr(
+            o3.Irreps(
+                [
+                    (num_features, (l, p))
+                    for p in ((1, -1) if parity else (1,))
+                    for l in range(lmax + 1)
+                ]
             )
-            update[f"{prefix}irreps_edge_sh"] = repr(
-                o3.Irreps.spherical_harmonics(lmax=lmax, p=-1 if parity else 1)
-            )
-            update[f"{prefix}feature_irreps_hidden"] = repr(
-                o3.Irreps(
-                    [
-                        (num_features, (l, p))
-                        for p in ((1, -1) if parity else (1,))
-                        for l in range(lmax + 1)
-                    ]
-                )
-            )
-            update[f"{prefix}conv_to_output_hidden_irreps_out"] = repr(
-                # num_features // 2  scalars
-                o3.Irreps([(max(1, num_features // 2), (0, 1))])
-            )
+        )
+        update[f"{prefix}conv_to_output_hidden_irreps_out"] = repr(
+            # num_features // 2  scalars
+            o3.Irreps([(max(1, num_features // 2), (0, 1))])
+        )
 
-        # check update is consistant with config
-        # (this is necessary since it is not possible
-        #  to delete keys from config, so instead of
-        #  making simple and full styles mutually
-        #  exclusive, we just insist that if full
-        #  and simple are provided, full must be
-        #  consistant with simple)
+    # check update is consistant with config
+    # (this is necessary since it is not possible
+    #  to delete keys from config, so instead of
+    #  making simple and full styles mutually
+    #  exclusive, we just insist that if full
+    #  and simple are provided, full must be
+    #  consistant with simple)
+    if len(prefix) == "":
         for k, v in update.items():
             if k in config:
                 assert (
                     config[k] == v
                 ), f"For key {k}, the full irreps options had value `{config[k]}` inconsistant with the value derived from the simple irreps options `{v}`"
             config[k] = v
+    else:
+        for k, v in update.items():
+            if k in config and config[k] != v:
+                Warning(
+                    f"For key {k}, the simple irreps options {v} is overrode by full irreps `{config[k]}`"
+                )
+            else:
+                config[k] = v
 
 
 def EnergyModel(
