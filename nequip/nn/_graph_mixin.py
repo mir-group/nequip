@@ -190,7 +190,7 @@ class SequentialGraphNetwork(GraphModuleMixin, torch.nn.Sequential):
 
             instance, _ = instantiate(
                 builder=builder,
-                prefix=[name] + params.get("other_prefix", []),
+                prefix=name,
                 positional_args=(
                     dict(
                         irreps_in=(
@@ -244,7 +244,7 @@ class SequentialGraphNetwork(GraphModuleMixin, torch.nn.Sequential):
         """
         instance, _ = instantiate(
             builder=builder,
-            prefix=[name] + params.get("other_prefix", []),
+            prefix=name,
             positional_args=(dict(irreps_in=self[-1].irreps_out)),
             optional_args=params,
             all_args=shared_params,
@@ -295,7 +295,7 @@ class SequentialGraphNetwork(GraphModuleMixin, torch.nn.Sequential):
             assert AtomicDataDict._irreps_compatible(
                 module_list[idx - 1].irreps_out, module.irreps_in
             )
-        if len(module_list) - 1 > idx:
+        if len(module_list) > idx:
             assert AtomicDataDict._irreps_compatible(
                 module_list[idx + 1].irreps_in, module.irreps_out
             )
@@ -317,7 +317,6 @@ class SequentialGraphNetwork(GraphModuleMixin, torch.nn.Sequential):
         params: Dict[str, Any] = {},
         after: Optional[str] = None,
         before: Optional[str] = None,
-        prefix: Optional[Sequence[str]] = [],
     ) -> None:
         r"""Build a module from parameters and insert it after ``after``.
 
@@ -340,7 +339,7 @@ class SequentialGraphNetwork(GraphModuleMixin, torch.nn.Sequential):
             idx += 1
         instance, _ = instantiate(
             builder=builder,
-            prefix=[name] + params.get("other_prefix", []),
+            prefix=name,
             positional_args=(dict(irreps_in=self[idx].irreps_out)),
             optional_args=params,
             all_args=shared_params,
