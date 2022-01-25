@@ -81,8 +81,8 @@ class RescaleOutput(GraphModuleMixin, torch.nn.Module):
 
         self.scale_keys = list(scale_keys)
         self.shift_keys = list(shift_keys)
-        self.related_scale_keys = set(related_scale_keys).union(scale_keys)
-        self.related_shift_keys = set(related_shift_keys).union(shift_keys)
+        self.related_scale_keys = list(set(related_scale_keys).union(scale_keys))
+        self.related_shift_keys = list(set(related_shift_keys).union(shift_keys))
 
         self.has_scale = scale_by is not None
         self.scale_trainble = scale_trainable
