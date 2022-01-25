@@ -36,8 +36,7 @@ def SimpleIrrepsConfig(config, prefix: Optional[str] = None):
 
     has_simple: bool = any(f"{prefix}{k}" in config for k in simple_irreps_keys)
     has_full: bool = any(f"{prefix}{k}" in config for k in real_irreps_keys)
-    if prefix == "":
-        assert has_simple or has_full
+    assert has_simple or has_full
 
     update = {}
     if has_simple:
