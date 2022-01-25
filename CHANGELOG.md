@@ -24,6 +24,7 @@ Most recent change on the bottom.
 - Handle one of `per_species_shifts`/`scales` being `null` when the other is a dataset statistc
 - `include_frames` now works with ASE datasets
 - no training data labels in input_data
+- Average number of neighbors no longer crashes sometimes when not all nodes have neighbors (small cutoffs)
 
 ### Removed
 - `compile_model`
