@@ -14,6 +14,7 @@ Most recent change on the bottom.
 - `wandb.watch` via `wandb_watch` option
 - Allow polynomial cutoff _p_ values besides 6.0
 - `nequip-evaluate` now sets a default `r_max` taken from the model for the dataset config
+- Support multiple rescale layers in trainer
 
 ### Changed
 - `minimal.yaml`, `minimal_eng.yaml`, and `example.yaml` now use the simplified irreps options `l_max`, `parity`, and `num_features`
