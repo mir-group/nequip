@@ -1,5 +1,5 @@
 import logging
-from typing import List, Optional
+from typing import List, Optional, Union
 
 import torch
 
@@ -11,25 +11,46 @@ RESCALE_THRESHOLD = 1e-6
 
 
 def RescaleEnergyEtc(
+    model: GraphModuleMixin, config, dataset: AtomicDataset, initialize: bool
+):
+
+    return GlobalRescale(
+        model=model,
+        config=config,
+        dataset=dataset,
+        initialize=initialize,
+        module_prefix="global_rescale",
+        default_scale=f"dataset_{AtomicDataDict.FORCE_KEY}_rms"
+        if AtomicDataDict.FORCE_KEY in model.irreps_out
+        else f"dataset_{AtomicDataDict.TOTAL_ENERGY_KEY}_std",
+        default_shift=None,
+        default_scale_keys=AtomicDataDict.ALL_ENERGY_KEYS,
+        default_shift_keys=AtomicDataDict.TOTAL_ENERGY_KEY,
+        default_related_scale_keys=[AtomicDataDict.PER_ATOM_ENERGY_KEY],
+        default_related_shift_keys=[],
+    )
+
+
+def GlobalRescale(
     model: GraphModuleMixin,
     config,
     dataset: AtomicDataset,
     initialize: bool,
+    module_prefix: str,
+    default_scale: Union[str, float, list],
+    default_shift: Union[str, float, list],
+    default_scale_keys: list,
+    default_shift_keys: list,
+    default_related_scale_keys: list,
+    default_related_shift_keys: list,
 ):
     """Add global rescaling for energy(-based quantities).
 
     If ``initialize`` is false, doesn't compute statistics.
     """
 
-    module_prefix = "global_rescale"
-
-    global_scale = config.get(
-        f"{module_prefix}_scale",
-        f"dataset_{AtomicDataDict.FORCE_KEY}_rms"
-        if AtomicDataDict.FORCE_KEY in model.irreps_out
-        else f"dataset_{AtomicDataDict.TOTAL_ENERGY_KEY}_std",
-    )
-    global_shift = config.get(f"{module_prefix}_shift", None)
+    global_scale = config.get(f"{module_prefix}_scale", default_scale)
+    global_shift = config.get(f"{module_prefix}_shift", default_shift)
 
     if global_shift is not None:
         logging.warning(
@@ -63,11 +84,11 @@ def RescaleEnergyEtc(
         if isinstance(global_scale, str):
             s = global_scale
             global_scale = computed_stats[str_names.index(global_scale)]
-            logging.debug(f"Replace string {s} to {global_scale}")
+            logging.info(f"Replace string {s} to {global_scale}")
         if isinstance(global_shift, str):
             s = global_shift
             global_shift = computed_stats[str_names.index(global_shift)]
-            logging.debug(f"Replace string {s} to {global_shift}")
+            logging.info(f"Replace string {s} to {global_shift}")
 
         if isinstance(global_scale, float) and global_scale < RESCALE_THRESHOLD:
             raise ValueError(
@@ -88,20 +109,12 @@ def RescaleEnergyEtc(
     # == Build the model ==
     return RescaleOutput(
         model=model,
-        scale_keys=[
-            k
-            for k in (
-                AtomicDataDict.TOTAL_ENERGY_KEY,
-                AtomicDataDict.PER_ATOM_ENERGY_KEY,
-                AtomicDataDict.FORCE_KEY,
-            )
-            if k in model.irreps_out
-        ],
+        scale_keys=[k for k in default_scale_keys if k in model.irreps_out],
         scale_by=global_scale,
-        shift_keys=[
-            k for k in (AtomicDataDict.TOTAL_ENERGY_KEY,) if k in model.irreps_out
-        ],
+        shift_keys=[k for k in default_shift_keys if k in model.irreps_out],
         shift_by=global_shift,
+        related_scale_keys=default_related_scale_keys,
+        related_shift_keys=default_related_shift_keys,
         shift_trainable=config.get(f"{module_prefix}_shift_trainable", False),
         scale_trainable=config.get(f"{module_prefix}_scale_trainable", False),
     )
@@ -177,14 +190,14 @@ def PerSpeciesRescale(
         if isinstance(scales, str):
             s = scales
             scales = computed_stats[str_names.index(scales)]
-            logging.debug(f"Replace string {s} to {scales}")
+            logging.info(f"Replace string {s} to {scales}")
         elif isinstance(scales, (list, float)):
             scales = torch.as_tensor(scales)
 
         if isinstance(shifts, str):
             s = shifts
             shifts = computed_stats[str_names.index(shifts)]
-            logging.debug(f"Replace string {s} to {shifts}")
+            logging.info(f"Replace string {s} to {shifts}")
         elif isinstance(shifts, (list, float)):
             shifts = torch.as_tensor(shifts)
 
@@ -223,7 +236,7 @@ def PerSpeciesRescale(
         params=params,
     )
 
-    logging.debug(f"Atomic outputs are scaled by: {scales}, shifted by {shifts}.")
+    logging.info(f"Atomic outputs are scaled by: {scales}, shifted by {shifts}.")
 
     # == Build the model ==
     return model

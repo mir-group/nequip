@@ -110,6 +110,8 @@ def test_metrics(nequip_dataset, BENCHMARK_ROOT, conffile, builder):
         true_config["max_epochs"] = 2
         # We just don't add rescaling:
         true_config["model_builders"] = [builder]
+        # We need truth labels as inputs for these fake testing models
+        true_config["_override_allow_truth_label_inputs"] = True
 
         config_path = tmpdir + "/conf.yaml"
         with open(config_path, "w+") as fp:
@@ -226,6 +228,8 @@ def test_requeue(nequip_dataset, BENCHMARK_ROOT, conffile):
         true_config["default_dtype"] = dtype
         # We just don't add rescaling:
         true_config["model_builders"] = [builder]
+        # We need truth labels as inputs for these fake testing models
+        true_config["_override_allow_truth_label_inputs"] = True
 
         for irun in range(3):
 
