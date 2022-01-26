@@ -170,7 +170,6 @@ def main(args=None, running_as_script: bool = True):
 
     # Load model:
     logger.info("Loading model... ")
-    model_from_training: bool = False
     loaded_deployed_model: bool = False
     model_r_max = None
     try:
@@ -180,6 +179,9 @@ def main(args=None, running_as_script: bool = True):
             set_global_options=True,  # don't warn that setting
         )
         logger.info("loaded deployed model.")
+        # the global settings for a deployed model are set by
+        # set_global_options in the call to load_deployed_model
+        # above
         model_r_max = float(metadata[R_MAX_KEY])
         loaded_deployed_model = True
     except ValueError:  # its not a deployed model
@@ -188,11 +190,15 @@ def main(args=None, running_as_script: bool = True):
     # chains if there is an issue loading the training session model. This makes the error messages more
     # comprehensible:
     if not loaded_deployed_model:
+        # Use the model config, regardless of dataset config
+        global_config = args.model.parent / "config.yaml"
+        global_config = Config.from_file(str(global_config), defaults=default_config)
+        _set_global_options(global_config)
+        del global_config
         # load a training session model
         model, model_config = Trainer.load_model_from_training_session(
             traindir=args.model.parent, model_name=args.model.name
         )
-        model_from_training = True
         model = model.to(device)
         logger.info("loaded model from training session")
         model_r_max = model_config["r_max"]
@@ -209,19 +215,6 @@ def main(args=None, running_as_script: bool = True):
         raise RuntimeError(
             f"Dataset config has r_max={dataset_config['r_max']}, but model has r_max={model_r_max}!"
         )
-
-    # set global options
-    if model_from_training:
-        # Use the model config, regardless of dataset config
-        global_config = args.model.parent / "config.yaml"
-        global_config = Config.from_file(str(global_config), defaults=default_config)
-        _set_global_options(global_config)
-        del global_config
-    else:
-        # the global settings for a deployed model are set by
-        # set_global_options in the call to load_deployed_model
-        # above
-        pass
 
     dataset_is_validation: bool = False
     # Currently, pytorch_geometric prints some status messages to stdout while loading the dataset
