@@ -536,13 +536,17 @@ class AtomicData(Data):
             for key in extra_fields:
                 if key in _NODE_FIELDS:
                     # mask it
-                    mol.arrays[key] = self[key][mask].cpu().numpy()
+                    mol.arrays[key] = (
+                        self[key][mask].cpu().numpy().reshape(mask.sum(), -1)
+                    )
                 elif key in _EDGE_FIELDS:
-                    mol.info[key] = self[key][edge_mask].cpu().numpy()
+                    mol.info[key] = (
+                        self[key][edge_mask].cpu().numpy().reshape(edge_mask.sum(), -1)
+                    )
                 elif key == AtomicDataDict.EDGE_INDEX_KEY:
                     mol.info[key] = self[key][:, edge_mask].cpu().numpy()
                 elif key in _GRAPH_FIELDS:
-                    mol.info[key] = self[key][batch_idx].cpu().numpy()
+                    mol.info[key] = self[key][batch_idx].cpu().numpy().reshape(-1)
                 else:
                     raise RuntimeError(
                         f"Extra field `{key}` isn't registered as node/edge/graph"
