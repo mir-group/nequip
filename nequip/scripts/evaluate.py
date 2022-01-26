@@ -90,7 +90,7 @@ def main(args=None, running_as_script: bool = True):
     )
     parser.add_argument(
         "--output-fields",
-        help="Extra fields to write to the `--output`.",
+        help="Extra fields (names comma separated with no spaces) to write to the `--output`.",
         type=str,
         default="",
     )
