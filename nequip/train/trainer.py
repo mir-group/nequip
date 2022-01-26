@@ -816,7 +816,7 @@ class Trainer:
             # this will normalize the targets
             # in validation (eval mode), it does nothing
             # in train mode, if normalizes the targets
-            data_unscaled = layer.unscale(data)
+            data_unscaled = layer.unscale(data_unscaled)
 
         # Run model
         # We make a shallow copy of the input dict in case the model modifies it
