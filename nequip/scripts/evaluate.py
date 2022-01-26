@@ -146,9 +146,11 @@ def main(args=None, running_as_script: bool = True):
     if args.output is not None:
         if args.output.suffix != ".xyz":
             raise ValueError("Only .xyz format for `--output` is supported.")
-        args.output_fields = args.output_fields.split(",")
-        assert len(args.output_fields) > 0
+        args.output_fields = [e for e in args.output_fields.split(",") if e != ""]
         output_type = "xyz"
+    else:
+        assert args.output_fields == ""
+        args.output_fields = []
 
     if args.device is None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
