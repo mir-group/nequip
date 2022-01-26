@@ -856,19 +856,24 @@ class Trainer:
                 self.lr_sched.step(self.iepoch + self.ibatch / self.n_batches)
 
         with torch.no_grad():
-            if validation:
-                scaled_out = out
-                _data_unscaled = data
-                for layer in self.rescale_layers:
-                    # loss function always needs to be in normalized unit
-                    scaled_out = layer.unscale(scaled_out, force_process=True)
-                    _data_unscaled = layer.unscale(_data_unscaled, force_process=True)
-                loss, loss_contrib = self.loss(pred=scaled_out, ref=_data_unscaled)
-            else:
-                # If we are in training mode, we need to bring the prediction
-                # into real units
-                for layer in self.rescale_layers[::-1]:
-                    out = layer.scale(out, force_process=True)
+            if len(self.rescale_layers) > 0:
+                if validation:
+                    scaled_out = out
+                    _data_unscaled = data
+                    for layer in self.rescale_layers:
+                        # loss function always needs to be in normalized unit
+                        scaled_out = layer.unscale(scaled_out, force_process=True)
+                        _data_unscaled = layer.unscale(
+                            _data_unscaled, force_process=True
+                        )
+                    loss, loss_contrib = self.loss(pred=scaled_out, ref=_data_unscaled)
+                else:
+                    # If we are in training mode, we need to bring the prediction
+                    # into real units
+                    for layer in self.rescale_layers[::-1]:
+                        out = layer.scale(out, force_process=True)
+            elif validation:
+                loss, loss_contrib = self.loss(pred=out, ref=data_unscaled)
 
             # save metrics stats
             self.batch_losses = self.loss_stat(loss, loss_contrib)
