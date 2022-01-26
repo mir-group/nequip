@@ -16,6 +16,7 @@ Most recent change on the bottom.
 - `nequip-evaluate` now sets a default `r_max` taken from the model for the dataset config
 - Support multiple rescale layers in trainer
 - `AtomicData.to_ase` supports arbitrary fields
+- `nequip-evaluate` can now output arbitrary fields to an XYZ file
 
 ### Changed
 - `minimal.yaml`, `minimal_eng.yaml`, and `example.yaml` now use the simplified irreps options `l_max`, `parity`, and `num_features`

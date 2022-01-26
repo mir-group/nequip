@@ -1,3 +1,4 @@
+from typing import Optional
 import sys
 import argparse
 import logging
@@ -83,9 +84,15 @@ def main(args=None, running_as_script: bool = True):
     )
     parser.add_argument(
         "--output",
-        help="XYZ file to write out the test set and model predicted forces, energies, etc. to.",
+        help="ExtXYZ (.xyz) file to write out the test set and model predictions to.",
         type=Path,
         default=None,
+    )
+    parser.add_argument(
+        "--output-fields",
+        help="Extra fields to write to the `--output`.",
+        type=str,
+        default="",
     )
     parser.add_argument(
         "--log",
@@ -135,9 +142,13 @@ def main(args=None, running_as_script: bool = True):
         )
     if args.model is None:
         raise ValueError("--model or --train-dir must be provided")
+    output_type: Optional[str] = None
     if args.output is not None:
         if args.output.suffix != ".xyz":
-            raise ValueError("Only extxyz format for `--output` is supported.")
+            raise ValueError("Only .xyz format for `--output` is supported.")
+        args.output_fields = args.output_fields.split(",")
+        assert len(args.output_fields) > 0
+        output_type = "xyz"
 
     if args.device is None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -320,7 +331,7 @@ def main(args=None, running_as_script: bool = True):
                 )
             )
 
-        if args.output is not None:
+        if output_type is not None:
             output = context_stack.enter_context(open(args.output, "w"))
         else:
             output = None
@@ -338,16 +349,20 @@ def main(args=None, running_as_script: bool = True):
 
             with torch.no_grad():
                 # Write output
-                # TODO: make sure don't keep appending to existing file
-                if output is not None:
+                if output_type == "xyz":
+                    # append to the file
                     ase.io.write(
                         output,
                         AtomicData.from_AtomicDataDict(out)
                         .to(device="cpu")
-                        .to_ase(type_mapper=dataset.type_mapper),
+                        .to_ase(
+                            type_mapper=dataset.type_mapper,
+                            extra_fields=args.output_fields,
+                        ),
                         format="extxyz",
                         append=True,
                     )
+
                 # Accumulate metrics
                 if do_metrics:
                     metrics(out, batch)
