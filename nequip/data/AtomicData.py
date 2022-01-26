@@ -206,7 +206,9 @@ class AtomicData(Data):
         **kwargs: other data, optional.
     """
 
-    def __init__(self, irreps: Dict[str, e3nn.o3.Irreps] = {}, **kwargs):
+    def __init__(
+        self, irreps: Dict[str, e3nn.o3.Irreps] = {}, _validate: bool = True, **kwargs
+    ):
 
         # empty init needed by get_example
         if len(kwargs) == 0 and len(irreps) == 0:
@@ -214,47 +216,49 @@ class AtomicData(Data):
             return
 
         # Check the keys
-        AtomicDataDict.validate_keys(kwargs)
-        _process_dict(kwargs)
+        if _validate:
+            AtomicDataDict.validate_keys(kwargs)
+            _process_dict(kwargs)
 
         super().__init__(num_nodes=len(kwargs["pos"]), **kwargs)
 
-        # Validate shapes
-        assert self.pos.dim() == 2 and self.pos.shape[1] == 3
-        assert self.edge_index.dim() == 2 and self.edge_index.shape[0] == 2
-        if "edge_cell_shift" in self and self.edge_cell_shift is not None:
-            assert self.edge_cell_shift.shape == (self.num_edges, 3)
-            assert self.edge_cell_shift.dtype == self.pos.dtype
-        if "cell" in self and self.cell is not None:
-            assert (self.cell.shape == (3, 3)) or (
-                self.cell.dim() == 3 and self.cell.shape[1:] == (3, 3)
-            )
-            assert self.cell.dtype == self.pos.dtype
-        if "node_features" in self and self.node_features is not None:
-            assert self.node_features.shape[0] == self.num_nodes
-            assert self.node_features.dtype == self.pos.dtype
-        if "node_attrs" in self and self.node_attrs is not None:
-            assert self.node_attrs.shape[0] == self.num_nodes
-            assert self.node_attrs.dtype == self.pos.dtype
-
-        if (
-            AtomicDataDict.ATOMIC_NUMBERS_KEY in self
-            and self.atomic_numbers is not None
-        ):
-            assert self.atomic_numbers.dtype in _TORCH_INTEGER_DTYPES
-        if "batch" in self and self.batch is not None:
-            assert self.batch.dim() == 2 and self.batch.shape[0] == self.num_nodes
-            # Check that there are the right number of cells
+        if _validate:
+            # Validate shapes
+            assert self.pos.dim() == 2 and self.pos.shape[1] == 3
+            assert self.edge_index.dim() == 2 and self.edge_index.shape[0] == 2
+            if "edge_cell_shift" in self and self.edge_cell_shift is not None:
+                assert self.edge_cell_shift.shape == (self.num_edges, 3)
+                assert self.edge_cell_shift.dtype == self.pos.dtype
             if "cell" in self and self.cell is not None:
-                cell = self.cell.view(-1, 3, 3)
-                assert cell.shape[0] == self.batch.max() + 1
+                assert (self.cell.shape == (3, 3)) or (
+                    self.cell.dim() == 3 and self.cell.shape[1:] == (3, 3)
+                )
+                assert self.cell.dtype == self.pos.dtype
+            if "node_features" in self and self.node_features is not None:
+                assert self.node_features.shape[0] == self.num_nodes
+                assert self.node_features.dtype == self.pos.dtype
+            if "node_attrs" in self and self.node_attrs is not None:
+                assert self.node_attrs.shape[0] == self.num_nodes
+                assert self.node_attrs.dtype == self.pos.dtype
 
-        # Validate irreps
-        # __*__ is the only way to hide from torch_geometric
-        self.__irreps__ = AtomicDataDict._fix_irreps_dict(irreps)
-        for field, irreps in self.__irreps__:
-            if irreps is not None:
-                assert self[field].shape[-1] == irreps.dim
+            if (
+                AtomicDataDict.ATOMIC_NUMBERS_KEY in self
+                and self.atomic_numbers is not None
+            ):
+                assert self.atomic_numbers.dtype in _TORCH_INTEGER_DTYPES
+            if "batch" in self and self.batch is not None:
+                assert self.batch.dim() == 2 and self.batch.shape[0] == self.num_nodes
+                # Check that there are the right number of cells
+                if "cell" in self and self.cell is not None:
+                    cell = self.cell.view(-1, 3, 3)
+                    assert cell.shape[0] == self.batch.max() + 1
+
+            # Validate irreps
+            # __*__ is the only way to hide from torch_geometric
+            self.__irreps__ = AtomicDataDict._fix_irreps_dict(irreps)
+            for field, irreps in self.__irreps__:
+                if irreps is not None:
+                    assert self[field].shape[-1] == irreps.dim
 
     @classmethod
     def from_points(
@@ -579,7 +583,8 @@ class AtomicData(Data):
 
     @classmethod
     def from_AtomicDataDict(cls, data: AtomicDataDict.Type):
-        return cls(**data)
+        # it's an AtomicDataDict, so don't validate-- assume valid:
+        return cls(_validate=False, **data)
 
     @property
     def irreps(self):
