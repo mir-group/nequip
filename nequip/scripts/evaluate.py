@@ -204,7 +204,7 @@ def main(args=None, running_as_script: bool = True):
         str(args.dataset_config), defaults={"r_max": model_r_max}
     )
     if dataset_config["r_max"] != model_r_max:
-        logger.warn(
+        raise RuntimeError(
             f"Dataset config has r_max={dataset_config['r_max']}, but model has r_max={model_r_max}!"
         )
 
