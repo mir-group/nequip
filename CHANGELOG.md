@@ -27,6 +27,7 @@ Most recent change on the bottom.
 - `include_frames` now works with ASE datasets
 - no training data labels in input_data
 - Average number of neighbors no longer crashes sometimes when not all nodes have neighbors (small cutoffs)
+- Handle field registrations correctly in `nequip-evaluate`
 
 ### Removed
 - `compile_model`
