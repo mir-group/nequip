@@ -19,8 +19,9 @@ from nequip.nn.embedding import (
 from . import builder_utils
 
 
-def SimpleIrrepsConfig(config):
+def SimpleIrrepsConfig(config, prefix: Optional[str] = None):
     """Builder that pre-processes options to allow "simple" configuration of irreps."""
+
     # We allow some simpler parameters to be provided, but if they are,
     # they have to be correct and not overridden
     simple_irreps_keys = ["l_max", "parity", "num_features"]
@@ -30,23 +31,30 @@ def SimpleIrrepsConfig(config):
         "irreps_edge_sh",
         "conv_to_output_hidden_irreps_out",
     ]
-    has_simple: bool = any(k in config for k in simple_irreps_keys)
-    has_full: bool = any(k in config for k in real_irreps_keys)
+
+    prefix = "" if prefix is None else f"{prefix}_"
+
+    has_simple: bool = any(
+        (f"{prefix}{k}" in config) or (k in config) for k in simple_irreps_keys
+    )
+    has_full: bool = any(
+        (f"{prefix}{k}" in config) or (k in config) for k in real_irreps_keys
+    )
     assert has_simple or has_full
 
     update = {}
     if has_simple:
         # nothing to do if not
-        lmax = config["l_max"]
-        parity = config["parity"]
-        num_features = config["num_features"]
-        update["chemical_embedding_irreps_out"] = repr(
+        lmax = config.get(f"{prefix}l_max", config["l_max"])
+        parity = config.get(f"{prefix}parity", config["parity"])
+        num_features = config.get(f"{prefix}num_features", config["num_features"])
+        update[f"{prefix}chemical_embedding_irreps_out"] = repr(
             o3.Irreps([(num_features, (0, 1))])  # n scalars
         )
-        update["irreps_edge_sh"] = repr(
+        update[f"{prefix}irreps_edge_sh"] = repr(
             o3.Irreps.spherical_harmonics(lmax=lmax, p=-1 if parity else 1)
         )
-        update["feature_irreps_hidden"] = repr(
+        update[f"{prefix}feature_irreps_hidden"] = repr(
             o3.Irreps(
                 [
                     (num_features, (l, p))
@@ -55,7 +63,7 @@ def SimpleIrrepsConfig(config):
                 ]
             )
         )
-        update["conv_to_output_hidden_irreps_out"] = repr(
+        update[f"{prefix}conv_to_output_hidden_irreps_out"] = repr(
             # num_features // 2  scalars
             o3.Irreps([(max(1, num_features // 2), (0, 1))])
         )
