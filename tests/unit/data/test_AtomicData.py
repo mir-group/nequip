@@ -10,9 +10,19 @@ import ase.geometry
 from ase.calculators.singlepoint import SinglePointCalculator
 
 from nequip.data import AtomicData, AtomicDataDict
-from nequip.data.AtomicData import neighbor_list_and_relative_vec
+from nequip.data._neighbors import (  # noqa: F401
+    neighbor_list_and_relative_vec,
+    _HAS_FREUD,
+    _USE_FREUD,
+)
 
-# skip_ase = pytest.mark.skipif(not has_ase, reason="ASE library is not installed")
+
+@pytest.fixture(
+    scope="module", autouse=True, params=([True, False] if _HAS_FREUD else [False])
+)
+def use_freud(request):
+    global _USE_FREUD
+    _USE_FREUD = request.param
 
 
 def test_from_ase(CuFcc):
@@ -84,15 +94,36 @@ def test_edges_missing():
         _ = AtomicData.from_ase(atoms, r_max=2.5)
 
 
-def test_periodic_edge():
+@pytest.mark.parametrize("supercell", [1, 4])
+def test_periodic_edge(supercell):
     atoms = ase.build.bulk("Cu", "fcc")
     dist = np.linalg.norm(atoms.cell[0])
+    atoms = atoms * ((supercell,) * 3)
     data = AtomicData.from_ase(atoms, r_max=1.05 * dist)
     edge_vecs = data.get_edge_vectors()
     assert edge_vecs.shape == (12, 3)  # 12 neighbors in close-packed bulk
     assert torch.allclose(
         edge_vecs.norm(dim=-1), torch.as_tensor(dist, dtype=torch.get_default_dtype())
     )
+
+
+def test_freud_nl():
+    supercell = 4
+    atoms = ase.build.bulk("Cu", "fcc")
+    dist = np.linalg.norm(atoms.cell[0])
+    atoms = atoms * ((supercell,) * 3)
+    global _USE_FREUD
+    old_use_freud = _USE_FREUD
+    _USE_FREUD = False
+    data_baseline = AtomicData.from_ase(atoms, r_max=1.05 * dist)
+    _USE_FREUD = True
+    data_freud = AtomicData.from_ase(atoms, r_max=1.05 * dist)
+    _USE_FREUD = old_use_freud
+    for key in data_baseline.keys:
+        if key == AtomicDataDict.EDGE_INDEX_KEY:
+            assert edge_index_set_equiv(data_baseline[key], data_freud[key])
+        else:
+            assert torch.allclose(data_baseline[key], data_freud[key])
 
 
 def test_without_nodes(CH3CHO):
@@ -122,16 +153,27 @@ def test_positions_grad(periodic, CH3CHO, CuFcc):
     else:
         atoms, data = CH3CHO
 
-    data.pos.requires_grad_(True)
-    assert data.get_edge_vectors().requires_grad
-
-    torch.autograd.grad(data.get_edge_vectors().sum(), data.pos, create_graph=True)
-
+    old_req_grad = data.pos.requires_grad
     if periodic:
-        # Test grad cell
-        data.cell.requires_grad_(True)
+        old_req_grad_cell = data.cell.requires_grad
+    try:
+        data.pos.requires_grad_(True)
         assert data.get_edge_vectors().requires_grad
-        torch.autograd.grad(data.get_edge_vectors().sum(), data.cell, create_graph=True)
+
+        torch.autograd.grad(data.get_edge_vectors().sum(), data.pos, create_graph=True)
+
+        if periodic:
+            # Test grad cell
+            data.cell.requires_grad_(True)
+            assert data.get_edge_vectors().requires_grad
+            torch.autograd.grad(
+                data.get_edge_vectors().sum(), data.cell, create_graph=True
+            )
+    finally:
+        # restore original state
+        data.pos.requires_grad_(old_req_grad)
+        if periodic:
+            data.cell.requires_grad_(old_req_grad_cell)
 
 
 def test_some_periodic():
@@ -232,9 +274,11 @@ def H2(float_tolerance):
     return atoms, data
 
 
-@pytest.fixture(scope="session")
-def CuFcc(float_tolerance):
+@pytest.fixture(scope="session", params=[1, 4])
+def CuFcc(request, float_tolerance):
+    supercell = request.param
     atoms = ase.build.bulk("Cu", "fcc", a=3.6, cubic=True)
+    atoms = atoms * ((supercell,) * 3)
     atoms.calc = SinglePointCalculator(
         atoms, **{"forces": np.random.random((len(atoms), 3))}
     )

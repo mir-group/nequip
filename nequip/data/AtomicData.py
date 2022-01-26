@@ -5,7 +5,7 @@ Authors: Albert Musaelian
 
 import warnings
 from copy import deepcopy
-from typing import Union, Tuple, Dict, Optional, List, Set, Sequence
+from typing import Union, Dict, Optional, List, Set, Sequence
 from collections.abc import Mapping
 
 import numpy as np
@@ -20,9 +20,7 @@ import e3nn.o3
 from . import AtomicDataDict
 from ._util import _TORCH_INTEGER_DTYPES
 from nequip.utils.torch_geometric import Data
-
-# A type representing ASE-style periodic boundary condtions, which can be partial (the tuple case)
-PBC = Union[bool, Tuple[bool, bool, bool]]
+from ._neighbors import neighbor_list_and_relative_vec, PBC
 
 
 _DEFAULT_LONG_FIELDS: Set[str] = {
@@ -594,116 +592,3 @@ class AtomicData(Data):
         new_dict["irreps"] = self.__irreps__
 
         return type(self)(**new_dict)
-
-
-def neighbor_list_and_relative_vec(
-    pos,
-    r_max,
-    self_interaction=False,
-    strict_self_interaction=True,
-    cell=None,
-    pbc=False,
-):
-    """Create neighbor list and neighbor vectors based on radial cutoff.
-
-    Create neighbor list (``edge_index``) and relative vectors
-    (``edge_attr``) based on radial cutoff.
-
-    Edges are given by the following convention:
-    - ``edge_index[0]`` is the *source* (convolution center).
-    - ``edge_index[1]`` is the *target* (neighbor).
-
-    Thus, ``edge_index`` has the same convention as the relative vectors:
-    :math:`\\vec{r}_{source, target}`
-
-    If the input positions are a tensor with ``requires_grad == True``,
-    the output displacement vectors will be correctly attached to the inputs
-    for autograd.
-
-    All outputs are Tensors on the same device as ``pos``; this allows future
-    optimization of the neighbor list on the GPU.
-
-    Args:
-        pos (shape [N, 3]): Positional coordinate; Tensor or numpy array. If Tensor, must be on CPU.
-        r_max (float): Radial cutoff distance for neighbor finding.
-        cell (numpy shape [3, 3]): Cell for periodic boundary conditions. Ignored if ``pbc == False``.
-        pbc (bool or 3-tuple of bool): Whether the system is periodic in each of the three cell dimensions.
-        self_interaction (bool): Whether or not to include same periodic image self-edges in the neighbor list.
-        strict_self_interaction (bool): Whether to include *any* self interaction edges in the graph, even if the two
-            instances of the atom are in different periodic images. Defaults to True, should be True for most applications.
-
-    Returns:
-        edge_index (torch.tensor shape [2, num_edges]): List of edges.
-        edge_cell_shift (torch.tensor shape [num_edges, 3]): Relative cell shift
-            vectors. Returned only if cell is not None.
-        cell (torch.Tensor [3, 3]): the cell as a tensor on the correct device.
-            Returned only if cell is not None.
-    """
-    if isinstance(pbc, bool):
-        pbc = (pbc,) * 3
-
-    # Either the position or the cell may be on the GPU as tensors
-    if isinstance(pos, torch.Tensor):
-        temp_pos = pos.detach().cpu().numpy()
-        out_device = pos.device
-        out_dtype = pos.dtype
-    else:
-        temp_pos = np.asarray(pos)
-        out_device = torch.device("cpu")
-        out_dtype = torch.get_default_dtype()
-
-    # Right now, GPU tensors require a round trip
-    if out_device.type != "cpu":
-        warnings.warn(
-            "Currently, neighborlists require a round trip to the CPU. Please pass CPU tensors if possible."
-        )
-
-    # Get a cell on the CPU no matter what
-    if isinstance(cell, torch.Tensor):
-        temp_cell = cell.detach().cpu().numpy()
-        cell_tensor = cell.to(device=out_device, dtype=out_dtype)
-    elif cell is not None:
-        temp_cell = np.asarray(cell)
-        cell_tensor = torch.as_tensor(temp_cell, device=out_device, dtype=out_dtype)
-    else:
-        # ASE will "complete" this correctly.
-        temp_cell = np.zeros((3, 3), dtype=temp_pos.dtype)
-        cell_tensor = torch.as_tensor(temp_cell, device=out_device, dtype=out_dtype)
-
-    # ASE dependent part
-    temp_cell = ase.geometry.complete_cell(temp_cell)
-
-    first_idex, second_idex, shifts = ase.neighborlist.primitive_neighbor_list(
-        "ijS",
-        pbc,
-        temp_cell,
-        temp_pos,
-        cutoff=float(r_max),
-        self_interaction=strict_self_interaction,  # we want edges from atom to itself in different periodic images!
-        use_scaled_positions=False,
-    )
-
-    # Eliminate true self-edges that don't cross periodic boundaries
-    if not self_interaction:
-        bad_edge = first_idex == second_idex
-        bad_edge &= np.all(shifts == 0, axis=1)
-        keep_edge = ~bad_edge
-        if not np.any(keep_edge):
-            raise ValueError(
-                "After eliminating self edges, no edges remain in this system."
-            )
-        first_idex = first_idex[keep_edge]
-        second_idex = second_idex[keep_edge]
-        shifts = shifts[keep_edge]
-
-    # Build output:
-    edge_index = torch.vstack(
-        (torch.LongTensor(first_idex), torch.LongTensor(second_idex))
-    ).to(device=out_device)
-
-    shifts = torch.as_tensor(
-        shifts,
-        dtype=out_dtype,
-        device=out_device,
-    )
-    return edge_index, shifts, cell_tensor
