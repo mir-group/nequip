@@ -16,8 +16,8 @@ import e3nn
 import e3nn.util.jit
 
 from nequip.model import model_from_config
-from nequip.utils import Config
-from nequip.data import dataset_from_config
+from nequip.utils import Config, instantiate
+from nequip.data import dataset_from_config, register_fields
 from nequip.utils.test import assert_AtomicData_equivariant, set_irreps_debug
 from nequip.utils import load_file, dtype_from_name
 from ._logger import set_up_script_logger
@@ -129,6 +129,9 @@ def _set_global_options(config):
         torch.autograd.set_detect_anomaly(True)
 
     e3nn.set_optimization_defaults(**config.get("e3nn_optimization_defaults", {}))
+
+    # Register fields:
+    instantiate(register_fields, all_args=config)
 
 
 def fresh_start(config):
