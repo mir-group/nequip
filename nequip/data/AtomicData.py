@@ -426,7 +426,11 @@ class AtomicData(Data):
             **add_fields,
         )
 
-    def to_ase(self, type_mapper=None) -> Union[List[ase.Atoms], ase.Atoms]:
+    def to_ase(
+        self,
+        type_mapper=None,
+        extra_fields: List[str] = [],
+    ) -> Union[List[ase.Atoms], ase.Atoms]:
         """Build a (list of) ``ase.Atoms`` object(s) from an ``AtomicData`` object.
 
         For each unique batch number provided in ``AtomicDataDict.BATCH_KEY``,
@@ -436,12 +440,18 @@ class AtomicData(Data):
         Args:
             type_mapper: if provided, will be used to map ``ATOM_TYPES`` back into
                 elements, if the configuration of the ``type_mapper`` allows.
+            extra_fields: fields other than those handled explicitly (currently
+                those defining the structure as well as energy, per-atom energy,
+                and forces) to include in the output object. Per-atom (per-node)
+                quantities will be included in ``arrays``; per-graph and per-edge
+                quantities will be included in ``info``.
 
         Returns:
             A list of ``ase.Atoms`` objects if ``AtomicDataDict.BATCH_KEY`` is in self
             and is not None. Otherwise, a single ``ase.Atoms`` object is returned.
         """
         positions = self.pos
+        edge_index = self[AtomicDataDict.EDGE_INDEX_KEY]
         if positions.device != torch.device("cpu"):
             raise TypeError(
                 "Explicitly move this `AtomicData` to CPU using `.to()` before calling `to_ase()`."
@@ -463,6 +473,21 @@ class AtomicData(Data):
         force = getattr(self, AtomicDataDict.FORCE_KEY, None)
         do_calc = energy is not None or force is not None
 
+        assert (
+            len(
+                set(extra_fields).intersection(
+                    [  # exclude those that are special for ASE and that we process seperately
+                        AtomicDataDict.POSITIONS_KEY,
+                        AtomicDataDict.CELL_KEY,
+                        AtomicDataDict.PBC_KEY,
+                        AtomicDataDict.ATOMIC_NUMBERS_KEY,
+                    ]
+                    + AtomicDataDict.ALL_ENERGY_KEYS
+                )
+            )
+            == 0
+        ), "Cannot specify typical keys as `extra_fields` for atoms output"
+
         if cell is not None:
             cell = cell.view(-1, 3, 3)
         if pbc is not None:
@@ -480,8 +505,11 @@ class AtomicData(Data):
             if batch is not None:
                 mask = batch == batch_idx
                 mask = mask.view(-1)
+                # if both ends of the edge are in the batch, the edge is in the batch
+                edge_mask = mask[edge_index[0]] & mask[edge_index[1]]
             else:
                 mask = slice(None)
+                edge_mask = slice(None)
 
             mol = ase.Atoms(
                 numbers=atomic_nums[mask].view(-1),  # must be flat for ASE
@@ -499,6 +527,22 @@ class AtomicData(Data):
                 if force is not None:
                     fields["forces"] = force[mask].cpu().numpy()
                 mol.calc = SinglePointCalculator(mol, **fields)
+
+            # add other information
+            for key in extra_fields:
+                if key in _NODE_FIELDS:
+                    # mask it
+                    mol.arrays[key] = self[key][mask].cpu().numpy()
+                elif key in _EDGE_FIELDS:
+                    mol.info[key] = self[key][edge_mask].cpu().numpy()
+                elif key == AtomicDataDict.EDGE_INDEX_KEY:
+                    mol.info[key] = self[key][:, edge_mask].cpu().numpy()
+                elif key in _GRAPH_FIELDS:
+                    mol.info[key] = self[key][batch_idx].cpu().numpy()
+                else:
+                    raise RuntimeError(
+                        f"Extra field `{key}` isn't registered as node/edge/graph"
+                    )
 
             batch_atoms.append(mol)
 
