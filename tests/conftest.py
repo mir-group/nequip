@@ -58,7 +58,7 @@ def temp_data(float_tolerance):
 def CH3CHO(CH3CHO_no_typemap) -> Tuple[Atoms, AtomicData]:
     atoms, data = CH3CHO_no_typemap
     tm = TypeMapper(chemical_symbol_to_type={"C": 0, "O": 1, "H": 2})
-    data = tm(data)
+    data = tm(data.clone())  # copy
     return atoms, data
 
 
