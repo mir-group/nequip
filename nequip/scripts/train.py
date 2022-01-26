@@ -20,7 +20,7 @@ from nequip.utils import Config
 from nequip.data import dataset_from_config
 from nequip.utils.test import assert_AtomicData_equivariant, set_irreps_debug
 from nequip.utils import load_file, dtype_from_name
-from ._logger import set_up_script_logger
+from nequip.scripts._logger import set_up_script_logger
 
 default_config = dict(
     root="./",
