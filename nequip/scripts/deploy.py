@@ -21,7 +21,9 @@ import ase.data
 
 from e3nn.util.jit import script
 
+from nequip.scripts.train import _set_global_options
 from nequip.train import Trainer
+from nequip.utils import Config
 
 CONFIG_KEY: Final[str] = "config"
 NEQUIP_VERSION_KEY: Final[str] = "nequip_version"
@@ -171,6 +173,11 @@ def main(args=None):
             raise ValueError(
                 f"{args.out_dir} is a directory, but a path to a file for the deployed model must be given"
             )
+
+        # load config
+        config = Config.from_file(str(args.train_dir / "config.yaml"))
+        _set_global_options(config)
+
         # -- load model --
         model, _ = Trainer.load_model_from_training_session(
             args.train_dir, model_name="best_model.pth", device="cpu"
@@ -179,10 +186,6 @@ def main(args=None):
         # -- compile --
         model = _compile_for_deploy(model)
         logging.info("Compiled & optimized model.")
-
-        # load config
-        config_str = (args.train_dir / "config.yaml").read_text()
-        config = yaml.load(config_str, Loader=yaml.Loader)
 
         # Deploy
         metadata: dict = {}
