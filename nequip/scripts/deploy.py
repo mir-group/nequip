@@ -209,7 +209,7 @@ def main(args=None):
 
         metadata[JIT_BAILOUT_KEY] = str(config["_jit_bailout_depth"])
         metadata[TF32_KEY] = str(int(config["allow_tf32"]))
-        metadata[CONFIG_KEY] = config_str
+        metadata[CONFIG_KEY] = (args.train_dir / "config.yaml").read_text()
 
         metadata = {k: v.encode("ascii") for k, v in metadata.items()}
         torch.jit.save(model, args.out_file, _extra_files=metadata)
