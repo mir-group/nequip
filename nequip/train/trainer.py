@@ -324,9 +324,43 @@ class Trainer:
             all_args=self.kwargs,
         )
         self.loss_stat = LossStat(self.loss)
+
+        # what do we train on?
         self.train_on_keys = self.loss.keys
         if train_on_keys is not None:
             assert set(train_on_keys) == set(self.train_on_keys)
+        self._remove_from_model_input = set(self.train_on_keys)
+        if (
+            len(
+                self._remove_from_model_input.intersection(
+                    AtomicDataDict.ALL_ENERGY_KEYS
+                )
+            )
+            > 0
+        ):
+            # if we are training on _any_ of the energy quantities (energy, force, partials, stress, etc.)
+            # then none of them should be fed into the model
+            self._remove_from_model_input = self._remove_from_model_input.union(
+                AtomicDataDict.ALL_ENERGY_KEYS
+            )
+        if kwargs.get("_override_allow_truth_label_inputs", False):
+            # needed for unit testing models
+            self._remove_from_model_input = set()
+
+        # load all callbacks
+        self._init_callbacks = [load_callable(callback) for callback in init_callbacks]
+        self._end_of_epoch_callbacks = [
+            load_callable(callback) for callback in end_of_epoch_callbacks
+        ]
+        self._end_of_batch_callbacks = [
+            load_callable(callback) for callback in end_of_batch_callbacks
+        ]
+        self._end_of_train_callbacks = [
+            load_callable(callback) for callback in end_of_train_callbacks
+        ]
+        self._final_callbacks = [
+            load_callable(callback) for callback in final_callbacks
+        ]
 
         self.init()
 
@@ -663,24 +697,22 @@ class Trainer:
         else:
             config = Config.from_file(traindir + "/config.yaml")
 
-        if config.get("compile_model", False):
-            model = torch.jit.load(traindir + "/" + model_name, map_location=device)
-        else:
-            model = model_from_config(
-                config=config,
-                initialize=False,
+        model = model_from_config(
+            config=config,
+            initialize=False,
+        )
+        if model is not None:  # TODO: why would it be?
+            # TODO: this is not exactly equivalent to building with
+            # this set as default dtype... does it matter?
+            model.to(
+                device=torch.device(device),
+                dtype=dtype_from_name(config.default_dtype),
             )
-            if model is not None:
-                # TODO: this is not exactly equivalent to building with
-                # this set as default dtype... does it matter?
-                model.to(
-                    device=torch.device(device),
-                    dtype=dtype_from_name(config.default_dtype),
-                )
-                model_state_dict = torch.load(
-                    traindir + "/" + model_name, map_location=device
-                )
-                model.load_state_dict(model_state_dict)
+            model_state_dict = torch.load(
+                traindir + "/" + model_name, map_location=device
+            )
+            model.load_state_dict(model_state_dict)
+
         return model, config
 
     def init(self):
@@ -689,6 +721,13 @@ class Trainer:
             return
 
         self.model.to(self.torch_device)
+
+        self.rescale_layers = []
+        outer_layer = self.model
+        while hasattr(outer_layer, "unscale"):
+            self.rescale_layers.append(outer_layer)
+            outer_layer = getattr(outer_layer, "model", None)
+
         self.init_objects()
 
         self._initialized = True
@@ -731,8 +770,8 @@ class Trainer:
                 )
             )
 
-        for callback in self.init_callbacks:
-            load_callable(callback)(self)
+        for callback in self._init_callbacks:
+            callback(self)
 
         self.init_log()
         self.wall = perf_counter()
@@ -750,8 +789,8 @@ class Trainer:
             self.epoch_step()
             self.end_of_epoch_save()
 
-        for callback in self.final_callbacks:
-            load_callable(callback)(self)
+        for callback in self._final_callbacks:
+            callback(self)
 
         self.final_log()
 
@@ -771,18 +810,21 @@ class Trainer:
         data = data.to(self.torch_device)
         data = AtomicData.to_AtomicDataDict(data)
 
-        if hasattr(self.model, "unscale"):
+        data_unscaled = data
+        for layer in self.rescale_layers:
             # This means that self.model is RescaleOutputs
             # this will normalize the targets
             # in validation (eval mode), it does nothing
             # in train mode, if normalizes the targets
-            data_unscaled = self.model.unscale(data)
-        else:
-            data_unscaled = data
+            data_unscaled = layer.unscale(data_unscaled)
 
         # Run model
         # We make a shallow copy of the input dict in case the model modifies it
-        input_data = data_unscaled.copy()
+        input_data = {
+            k: v
+            for k, v in data_unscaled.items()
+            if k not in self._remove_from_model_input
+        }
         out = self.model(input_data)
         del input_data
 
@@ -814,16 +856,22 @@ class Trainer:
                 self.lr_sched.step(self.iepoch + self.ibatch / self.n_batches)
 
         with torch.no_grad():
-            if hasattr(self.model, "unscale"):
+            if len(self.rescale_layers) > 0:
                 if validation:
-                    # loss function always needs to be in normalized unit
-                    scaled_out = self.model.unscale(out, force_process=True)
-                    _data_unscaled = self.model.unscale(data, force_process=True)
+                    scaled_out = out
+                    _data_unscaled = data
+                    for layer in self.rescale_layers:
+                        # loss function always needs to be in normalized unit
+                        scaled_out = layer.unscale(scaled_out, force_process=True)
+                        _data_unscaled = layer.unscale(
+                            _data_unscaled, force_process=True
+                        )
                     loss, loss_contrib = self.loss(pred=scaled_out, ref=_data_unscaled)
                 else:
                     # If we are in training mode, we need to bring the prediction
                     # into real units
-                    out = self.model.scale(out, force_process=True)
+                    for layer in self.rescale_layers[::-1]:
+                        out = layer.scale(out, force_process=True)
             elif validation:
                 loss, loss_contrib = self.loss(pred=out, ref=data_unscaled)
 
@@ -883,14 +931,14 @@ class Trainer:
                         validation=(category == VALIDATION),
                     )
                     self.end_of_batch_log(batch_type=category)
-                    for callback in self.end_of_batch_callbacks:
-                        load_callable(callback)(self)
+                    for callback in self._end_of_batch_callbacks:
+                        callback(self)
                 self.metrics_dict[category] = self.metrics.current_result()
                 self.loss_dict[category] = self.loss_stat.current_result()
 
                 if category == TRAIN:
-                    for callback in self.end_of_train_callbacks:
-                        load_callable(callback)(self)
+                    for callback in self._end_of_train_callbacks:
+                        callback(self)
 
         self.iepoch += 1
 
@@ -899,8 +947,8 @@ class Trainer:
         if self.lr_scheduler_name == "ReduceLROnPlateau":
             self.lr_sched.step(metrics=self.mae_dict[self.metrics_key])
 
-        for callback in self.end_of_epoch_callbacks:
-            load_callable(callback)(self)
+        for callback in self._end_of_epoch_callbacks:
+            callback(self)
 
     def end_of_batch_log(self, batch_type: str):
         """
@@ -1003,10 +1051,7 @@ class Trainer:
 
     def save_model(self, path, blocking: bool = True):
         with atomic_write(path, blocking=blocking, binary=True) as write_to:
-            if isinstance(self.model, torch.jit.ScriptModule):
-                torch.jit.save(self.model, write_to)
-            else:
-                torch.save(self.model.state_dict(), write_to)
+            torch.save(self.model.state_dict(), write_to)
 
     def init_log(self):
         if self.iepoch > 0:

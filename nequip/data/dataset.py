@@ -88,7 +88,7 @@ class AtomicInMemoryDataset(AtomicDataset):
         force_fixed_keys: List[str] = [],
         extra_fixed_fields: Dict[str, Any] = {},
         include_frames: Optional[List[int]] = None,
-        type_mapper: TypeMapper = None,
+        type_mapper: Optional[TypeMapper] = None,
     ):
         # TO DO, this may be simplified
         # See if a subclass defines some inputs
@@ -253,8 +253,8 @@ class AtomicInMemoryDataset(AtomicDataset):
             num_examples = next(iter(num_examples))
 
             include_frames = self.include_frames
-            if self.include_frames is None:
-                include_frames = list(range(num_examples))
+            if include_frames is None:
+                include_frames = range(num_examples)
 
             # Make AtomicData from it:
             if AtomicDataDict.EDGE_INDEX_KEY in all_keys:
@@ -850,6 +850,8 @@ class ASEDataset(AtomicInMemoryDataset):
             return (
                 [
                     AtomicData.from_ase(atoms=atoms_list[i], **kwargs)
-                    for i in self.include_frames
+                    if i in self.include_frames
+                    else None  # in-memory dataset will ignore this later, but needed for indexing to work out
+                    for i in range(len(atoms_list))
                 ],
             )

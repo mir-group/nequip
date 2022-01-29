@@ -13,12 +13,12 @@ import torch
 from nequip.utils import Config
 from nequip.data import AtomicData, Collater, dataset_from_config
 from nequip.train import Trainer
-from nequip.scripts.deploy import load_deployed_model
+from nequip.scripts.deploy import load_deployed_model, R_MAX_KEY
 from nequip.scripts.train import default_config, _set_global_options
 from nequip.utils import load_file, instantiate
 from nequip.train.loss import Loss
 from nequip.train.metrics import Metrics
-from nequip.scripts.logger import set_up_script_logger
+from ._logger import set_up_script_logger
 
 
 def main(args=None, running_as_script: bool = True):
@@ -158,27 +158,44 @@ def main(args=None, running_as_script: bool = True):
     # Load model:
     logger.info("Loading model... ")
     model_from_training: bool = False
+    loaded_deployed_model: bool = False
+    model_r_max = None
     try:
-        model, _ = load_deployed_model(
+        model, metadata = load_deployed_model(
             args.model,
             device=device,
             set_global_options=True,  # don't warn that setting
         )
         logger.info("loaded deployed model.")
+        model_r_max = float(metadata[R_MAX_KEY])
+        loaded_deployed_model = True
     except ValueError:  # its not a deployed model
-        model, _ = Trainer.load_model_from_training_session(
+        loaded_deployed_model = False
+    # we don't do this in the `except:` block to avoid "during handing of this exception another exception"
+    # chains if there is an issue loading the training session model. This makes the error messages more
+    # comprehensible:
+    if not loaded_deployed_model:
+        # load a training session model
+        model, model_config = Trainer.load_model_from_training_session(
             traindir=args.model.parent, model_name=args.model.name
         )
         model_from_training = True
         model = model.to(device)
         logger.info("loaded model from training session")
+        model_r_max = model_config["r_max"]
     model.eval()
 
     # Load a config file
     logger.info(
         f"Loading {'original ' if dataset_is_from_training else ''}dataset...",
     )
-    config = Config.from_file(str(args.dataset_config))
+    dataset_config = Config.from_file(
+        str(args.dataset_config), defaults={"r_max": model_r_max}
+    )
+    if dataset_config["r_max"] != model_r_max:
+        logger.warn(
+            f"Dataset config has r_max={dataset_config['r_max']}, but model has r_max={model_r_max}!"
+        )
 
     # set global options
     if model_from_training:
@@ -200,11 +217,11 @@ def main(args=None, running_as_script: bool = True):
     with contextlib.redirect_stdout(sys.stderr):
         try:
             # Try to get validation dataset
-            dataset = dataset_from_config(config, prefix="validation_dataset")
+            dataset = dataset_from_config(dataset_config, prefix="validation_dataset")
             dataset_is_validation = True
         except KeyError:
             # Get shared train + validation dataset
-            dataset = dataset_from_config(config)
+            dataset = dataset_from_config(dataset_config)
     logger.info(
         f"Loaded {'validation_' if dataset_is_validation else ''}dataset specified in {args.dataset_config.name}.",
     )
@@ -321,10 +338,13 @@ def main(args=None, running_as_script: bool = True):
 
             with torch.no_grad():
                 # Write output
+                # TODO: make sure don't keep appending to existing file
                 if output is not None:
                     ase.io.write(
                         output,
-                        AtomicData.from_AtomicDataDict(out).to(device="cpu").to_ase(),
+                        AtomicData.from_AtomicDataDict(out)
+                        .to(device="cpu")
+                        .to_ase(type_mapper=dataset.type_mapper),
                         format="extxyz",
                         append=True,
                     )

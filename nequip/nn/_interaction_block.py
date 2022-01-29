@@ -144,7 +144,7 @@ class InteractionBlock(GraphModuleMixin, torch.nn.Module):
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
         """
-        Evaluate interaction Block with ResNet.
+        Evaluate interaction Block with ResNet (self-connection).
 
         :param node_input:
         :param node_attr:

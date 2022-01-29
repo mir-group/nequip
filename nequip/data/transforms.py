@@ -69,6 +69,11 @@ class TypeMapper:
             for sym, type in self.chemical_symbol_to_type.items():
                 Z_to_index[ase.data.atomic_numbers[sym] - self._min_Z] = type
             self._Z_to_index = Z_to_index
+            self._index_to_Z = torch.zeros(
+                size=(len(self.chemical_symbol_to_type),), dtype=torch.long
+            )
+            for sym, type_idx in self.chemical_symbol_to_type.items():
+                self._index_to_Z[type_idx] = ase.data.atomic_numbers[sym]
             self._valid_set = set(valid_atomic_numbers)
         # check
         if type_names is None:
@@ -117,3 +122,11 @@ class TypeMapper:
             )
 
         return self._Z_to_index[atomic_numbers - self._min_Z]
+
+    def untransform(self, atom_types):
+        """Transform atom types back into atomic numbers"""
+        return self._index_to_Z[atom_types]
+
+    @property
+    def has_chemical_symbols(self) -> bool:
+        return self.chemical_symbol_to_type is not None

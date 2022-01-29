@@ -13,7 +13,6 @@ else:
 # == Define allowed keys as constants ==
 # The positions of the atoms in the system
 POSITIONS_KEY: Final[str] = "pos"
-WEIGHTS_KEY: Final[str] = "weights"
 
 # The [2, n_edge] index tensor giving center -> neighbor relations
 EDGE_INDEX_KEY: Final[str] = "edge_index"
@@ -35,10 +34,18 @@ NODE_FEATURES_KEY: Final[str] = "node_features"
 NODE_ATTRS_KEY: Final[str] = "node_attrs"
 ATOMIC_NUMBERS_KEY: Final[str] = "atomic_numbers"
 ATOM_TYPE_KEY: Final[str] = "atom_types"
+
 PER_ATOM_ENERGY_KEY: Final[str] = "atomic_energy"
 TOTAL_ENERGY_KEY: Final[str] = "total_energy"
 FORCE_KEY: Final[str] = "forces"
 PARTIAL_FORCE_KEY: Final[str] = "partial_forces"
+
+ALL_ENERGY_KEYS: Final[List[str]] = [
+    PER_ATOM_ENERGY_KEY,
+    TOTAL_ENERGY_KEY,
+    FORCE_KEY,
+    PARTIAL_FORCE_KEY,
+]
 
 BATCH_KEY: Final[str] = "batch"
 

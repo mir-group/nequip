@@ -24,9 +24,11 @@ def add_avg_num_neighbors(
         ann = dataset.statistics(
             fields=[
                 lambda data: (
-                    torch.unique(
-                        data[AtomicDataDict.EDGE_INDEX_KEY][0], return_counts=True
-                    )[1],
+                    torch.bincount(
+                        data[AtomicDataDict.EDGE_INDEX_KEY][0],
+                        # make sure we have the right number of counts even if some nodes have no neighbors
+                        minlength=len(data[AtomicDataDict.POSITIONS_KEY]),
+                    ),
                     "node",
                 )
             ],

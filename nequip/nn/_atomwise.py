@@ -171,14 +171,19 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
         return data
 
     def update_for_rescale(self, rescale_module):
+        if hasattr(rescale_module, "related_scale_keys"):
+            if self.out_field not in rescale_module.related_scale_keys:
+                return
         if self.arguments_in_dataset_units and rescale_module.has_scale:
             logging.debug(
                 f"PerSpeciesScaleShift's arguments were in dataset units; rescaling:\n"
-                f"Original scales {self.scales} shifts: {self.shifts}"
+                f"Original scales {self.scales if self.has_scales else 'n/a'} shifts: {self.shifts if self.has_shifts else 'n/a'}"
             )
             with torch.no_grad():
                 if self.has_scales:
                     self.scales.div_(rescale_module.scale_by)
                 if self.has_shifts:
                     self.shifts.div_(rescale_module.scale_by)
-            logging.debug(f"New scales {self.scales} shifts: {self.shifts}")
+            logging.debug(
+                f"New scales {self.scales if self.has_scales else 'n/a'} shifts: {self.shifts if self.has_shifts else 'n/a'}"
+            )
