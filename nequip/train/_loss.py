@@ -6,6 +6,7 @@ from torch_runstats.scatter import scatter, scatter_mean
 
 from nequip.data import AtomicDataDict
 from nequip.utils import instantiate_from_cls_name
+from nequip.utils.savenload import load_callable
 
 
 class SimpleLoss:
@@ -164,6 +165,10 @@ def find_loss_function(name: str, params):
     )
 
     if isinstance(name, str):
+        try:
+            return load_callable(name)
+        except:
+            logging.debug(f"{name} is not a callable")
         for key in wrapper_list:
             if name.lower().startswith(key):
                 logging.debug(f"create loss instance {wrapper_list[key]}")
