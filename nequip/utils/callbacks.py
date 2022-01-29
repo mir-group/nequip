@@ -88,10 +88,10 @@ def linear_regression(trainer):
             input_data = data_unscaled.copy()
             out = trainer.model(input_data)
 
-            atom_types = input_data[AtomicDataDict.ATOM_TYPE_KEY]
+            atom_types = input_data[AtomicDataDict.ATOM_TYPE_KEY].view(-1)
             N = bincount(
                 atom_types,
-                input_data[AtomicDataDict.BATCH_KEY],
+                input_data[AtomicDataDict.BATCH_KEY].view(-1),
                 minlength=num_types,
             )
 

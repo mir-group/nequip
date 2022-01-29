@@ -2,6 +2,7 @@
 utilities that involve file searching and operations (i.e. save/load)
 """
 from typing import Union, List, Tuple, Optional, Callable
+import yaml
 import sys
 import logging
 import contextlib
