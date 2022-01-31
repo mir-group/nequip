@@ -13,6 +13,7 @@ import ase.neighborlist
 import ase
 from ase.calculators.singlepoint import SinglePointCalculator, SinglePointDFTCalculator
 from ase.calculators.calculator import all_properties as ase_all_properties
+from ase.stress import voigt_6_to_full_3x3_stress
 
 import torch
 import e3nn.o3
@@ -417,6 +418,18 @@ class AtomicData(Data):
         # cell and pbc in kwargs can override the ones stored in atoms
         cell = kwargs.pop("cell", atoms.get_cell())
         pbc = kwargs.pop("pbc", atoms.pbc)
+
+        # handle ASE-style 6 element Voigt order stress
+        for key in (AtomicDataDict.STRESS_KEY, AtomicDataDict.VIRIAL_KEY):
+            if key in add_fields:
+                if add_fields[key].shape == (3, 3):
+                    # it's already 3x3, do nothing else
+                    pass
+                elif add_fields[key].shape == (6,):
+                    # it's Voigt order
+                    add_fields[key] = voigt_6_to_full_3x3_stress(add_fields[key])
+                else:
+                    raise RuntimeError(f"bad shape for {key}")
 
         return cls.from_points(
             pos=atoms.positions,
