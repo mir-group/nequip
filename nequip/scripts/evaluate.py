@@ -247,13 +247,13 @@ def main(args=None, running_as_script: bool = True):
         if dataset_is_validation:
             test_idcs = list(all_idcs - val_idcs)
             logger.info(
-                f"Using origial validation dataset minus validation set frames, yielding a test set size of {len(test_idcs)} frames.",
+                f"Using origial validation dataset ({len(dataset)} frames) minus validation set frames ({len(val_idcs)} frames), yielding a test set size of {len(test_idcs)} frames.",
             )
         else:
             test_idcs = list(all_idcs - train_idcs - val_idcs)
             assert set(test_idcs).isdisjoint(train_idcs)
             logger.info(
-                f"Using origial training dataset minus training and validation frames, yielding a test set size of {len(test_idcs)} frames.",
+                f"Using origial training dataset ({len(dataset)} frames) minus training ({len(train_idcs)} frames) and validation frames ({len(val_idcs)} frames), yielding a test set size of {len(test_idcs)} frames.",
             )
         # No matter what it should be disjoint from validation:
         assert set(test_idcs).isdisjoint(val_idcs)
