@@ -17,6 +17,7 @@ Most recent change on the bottom.
 - Support multiple rescale layers in trainer
 - `AtomicData.to_ase` supports arbitrary fields
 - `nequip-evaluate` can now output arbitrary fields to an XYZ file
+- `nequip-evaluate` reports which frame in the original dataset was used as input for each output frame
 
 ### Changed
 - `minimal.yaml`, `minimal_eng.yaml`, and `example.yaml` now use the simplified irreps options `l_max`, `parity`, and `num_features`

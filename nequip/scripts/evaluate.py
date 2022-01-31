@@ -12,7 +12,7 @@ import ase.io
 import torch
 
 from nequip.utils import Config
-from nequip.data import AtomicData, Collater, dataset_from_config
+from nequip.data import AtomicData, Collater, dataset_from_config, register_fields
 from nequip.train import Trainer
 from nequip.scripts.deploy import load_deployed_model, R_MAX_KEY
 from nequip.scripts.train import default_config, _set_global_options
@@ -20,6 +20,10 @@ from nequip.utils import load_file, instantiate
 from nequip.train.loss import Loss
 from nequip.train.metrics import Metrics
 from ._logger import set_up_script_logger
+
+
+ORIGINAL_DATASET_INDEX_KEY: str = "original_dataset_index"
+register_fields(graph_fields=[ORIGINAL_DATASET_INDEX_KEY])
 
 
 def main(args=None, running_as_script: bool = True):
@@ -146,7 +150,9 @@ def main(args=None, running_as_script: bool = True):
     if args.output is not None:
         if args.output.suffix != ".xyz":
             raise ValueError("Only .xyz format for `--output` is supported.")
-        args.output_fields = [e for e in args.output_fields.split(",") if e != ""]
+        args.output_fields = [e for e in args.output_fields.split(",") if e != ""] + [
+            ORIGINAL_DATASET_INDEX_KEY
+        ]
         output_type = "xyz"
     else:
         assert args.output_fields == ""
@@ -332,10 +338,10 @@ def main(args=None, running_as_script: bool = True):
             output = None
 
         while True:
-            datas = [
-                dataset[int(idex)]
-                for idex in test_idcs[batch_i * batch_size : (batch_i + 1) * batch_size]
+            this_batch_test_indexes = test_idcs[
+                batch_i * batch_size : (batch_i + 1) * batch_size
             ]
+            datas = [dataset[int(idex)] for idex in this_batch_test_indexes]
             if len(datas) == 0:
                 break
             batch = c.collate(datas)
@@ -345,6 +351,10 @@ def main(args=None, running_as_script: bool = True):
             with torch.no_grad():
                 # Write output
                 if output_type == "xyz":
+                    # add test frame to the output:
+                    out[ORIGINAL_DATASET_INDEX_KEY] = torch.LongTensor(
+                        this_batch_test_indexes
+                    )
                     # append to the file
                     ase.io.write(
                         output,
