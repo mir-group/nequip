@@ -12,8 +12,6 @@ import ase.io
 
 import torch
 
-from e3nn import o3
-
 from nequip.data import AtomicDataDict
 
 from test_train import ConstFactorModel, IdentityModel  # noqa
