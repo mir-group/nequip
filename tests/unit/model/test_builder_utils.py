@@ -12,7 +12,8 @@ from nequip.model.builder_utils import add_avg_num_neighbors
 
 
 @pytest.mark.parametrize("r_max", [3.0, 2.0, 1.1])
-def test_avg_num_neighbors(molecules, temp_data, r_max):
+@pytest.mark.parametrize("subset", [False, True])
+def test_avg_num_neighbors(molecules, temp_data, r_max, subset):
     with tempfile.NamedTemporaryFile(suffix=".xyz") as fp:
         for atoms in molecules:
             # Reverse the atoms so the one without neighbors ends up at the end
@@ -28,6 +29,13 @@ def test_avg_num_neighbors(molecules, temp_data, r_max):
             ase_args=dict(format="extxyz"),
             type_mapper=TypeMapper(chemical_symbol_to_type={"H": 0, "C": 1, "O": 2}),
         )
+
+    if subset:
+        old_nequip_dataset = nequip_dataset  # noqa
+        nequip_dataset = nequip_dataset.index_select(
+            torch.randperm(len(nequip_dataset))[: len(nequip_dataset) // 2]
+        )
+
     # test basic options
     annkey = "avg_num_neighbors"
     config = {annkey: 3}
