@@ -9,7 +9,6 @@ import argparse
 import pathlib
 import logging
 import warnings
-import yaml
 
 # This is a weird hack to avoid Intel MKL issues on the cluster when this is called as a subprocess of a process that has itself initialized PyTorch.
 # Since numpy gets imported later anyway for dataset stuff, this shouldn't affect performance.
@@ -21,7 +20,9 @@ import ase.data
 
 from e3nn.util.jit import script
 
+from nequip.scripts.train import _set_global_options
 from nequip.train import Trainer
+from nequip.utils import Config
 
 CONFIG_KEY: Final[str] = "config"
 NEQUIP_VERSION_KEY: Final[str] = "nequip_version"
@@ -171,6 +172,11 @@ def main(args=None):
             raise ValueError(
                 f"{args.out_dir} is a directory, but a path to a file for the deployed model must be given"
             )
+
+        # load config
+        config = Config.from_file(str(args.train_dir / "config.yaml"))
+        _set_global_options(config)
+
         # -- load model --
         model, _ = Trainer.load_model_from_training_session(
             args.train_dir, model_name="best_model.pth", device="cpu"
@@ -179,10 +185,6 @@ def main(args=None):
         # -- compile --
         model = _compile_for_deploy(model)
         logging.info("Compiled & optimized model.")
-
-        # load config
-        config_str = (args.train_dir / "config.yaml").read_text()
-        config = yaml.load(config_str, Loader=yaml.Loader)
 
         # Deploy
         metadata: dict = {}
@@ -206,7 +208,7 @@ def main(args=None):
 
         metadata[JIT_BAILOUT_KEY] = str(config["_jit_bailout_depth"])
         metadata[TF32_KEY] = str(int(config["allow_tf32"]))
-        metadata[CONFIG_KEY] = config_str
+        metadata[CONFIG_KEY] = (args.train_dir / "config.yaml").read_text()
 
         metadata = {k: v.encode("ascii") for k, v in metadata.items()}
         torch.jit.save(model, args.out_file, _extra_files=metadata)

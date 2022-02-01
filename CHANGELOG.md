@@ -15,6 +15,9 @@ Most recent change on the bottom.
 - Allow polynomial cutoff _p_ values besides 6.0
 - `nequip-evaluate` now sets a default `r_max` taken from the model for the dataset config
 - Support multiple rescale layers in trainer
+- `AtomicData.to_ase` supports arbitrary fields
+- `nequip-evaluate` can now output arbitrary fields to an XYZ file
+- `nequip-evaluate` reports which frame in the original dataset was used as input for each output frame
 
 ### Changed
 - `minimal.yaml`, `minimal_eng.yaml`, and `example.yaml` now use the simplified irreps options `l_max`, `parity`, and `num_features`
@@ -25,6 +28,7 @@ Most recent change on the bottom.
 - `include_frames` now works with ASE datasets
 - no training data labels in input_data
 - Average number of neighbors no longer crashes sometimes when not all nodes have neighbors (small cutoffs)
+- Handle field registrations correctly in `nequip-evaluate`
 
 ### Removed
 - `compile_model`
