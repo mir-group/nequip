@@ -13,7 +13,7 @@ import ase.neighborlist
 import ase
 from ase.calculators.singlepoint import SinglePointCalculator, SinglePointDFTCalculator
 from ase.calculators.calculator import all_properties as ase_all_properties
-from ase.stress import voigt_6_to_full_3x3_stress
+from ase.stress import voigt_6_to_full_3x3_stress, full_3x3_to_voigt_6_stress
 
 import torch
 import e3nn.o3
@@ -52,6 +52,7 @@ _DEFAULT_EDGE_FIELDS: Set[str] = {
 _DEFAULT_GRAPH_FIELDS: Set[str] = {
     AtomicDataDict.TOTAL_ENERGY_KEY,
     AtomicDataDict.STRESS_KEY,
+    AtomicDataDict.VIRIAL_KEY,
     AtomicDataDict.PBC_KEY,
     AtomicDataDict.CELL_KEY,
 }
@@ -489,7 +490,15 @@ class AtomicData(Data):
         energy = getattr(self, AtomicDataDict.TOTAL_ENERGY_KEY, None)
         energies = getattr(self, AtomicDataDict.PER_ATOM_ENERGY_KEY, None)
         force = getattr(self, AtomicDataDict.FORCE_KEY, None)
-        do_calc = energy is not None or force is not None
+        do_calc = any(
+            k in self
+            for k in [
+                AtomicDataDict.TOTAL_ENERGY_KEY,
+                AtomicDataDict.FORCE_KEY,
+                AtomicDataDict.PER_ATOM_ENERGY_KEY,
+                AtomicDataDict.STRESS_KEY,
+            ]
+        )
 
         assert (
             len(
@@ -499,8 +508,11 @@ class AtomicData(Data):
                         AtomicDataDict.CELL_KEY,
                         AtomicDataDict.PBC_KEY,
                         AtomicDataDict.ATOMIC_NUMBERS_KEY,
+                        AtomicDataDict.TOTAL_ENERGY_KEY,
+                        AtomicDataDict.FORCE_KEY,
+                        AtomicDataDict.PER_ATOM_ENERGY_KEY,
+                        AtomicDataDict.STRESS_KEY,
                     ]
-                    + AtomicDataDict.ALL_ENERGY_KEYS
                 )
             )
             == 0
@@ -544,6 +556,10 @@ class AtomicData(Data):
                     fields["energy"] = energy[batch_idx].cpu().numpy()
                 if force is not None:
                     fields["forces"] = force[mask].cpu().numpy()
+                if AtomicDataDict.STRESS_KEY in self:
+                    fields["stress"] = full_3x3_to_voigt_6_stress(
+                        self["stress"].view(-1, 3, 3)[batch_idx].cpu().numpy()
+                    )
                 mol.calc = SinglePointCalculator(mol, **fields)
 
             # add other information
