@@ -237,11 +237,14 @@ class TestPerSpeciesStatistics:
         else:
             ref_mean, ref_std, E = generate_E(N, 100, 0.5)
 
-        E_orig_order = torch.zeros_like(
-            npz_dataset.data[AtomicDataDict.TOTAL_ENERGY_KEY]
-        )
-        E_orig_order[npz_dataset._indices] = E.unsqueeze(-1)
-        npz_dataset.data[AtomicDataDict.TOTAL_ENERGY_KEY] = E_orig_order
+        if subset:
+            E_orig_order = torch.zeros_like(
+                npz_dataset.data[AtomicDataDict.TOTAL_ENERGY_KEY]
+            )
+            E_orig_order[npz_dataset._indices] = E.unsqueeze(-1)
+            npz_dataset.data[AtomicDataDict.TOTAL_ENERGY_KEY] = E_orig_order
+        else:
+            npz_dataset.data[AtomicDataDict.TOTAL_ENERGY_KEY] = E
 
         ref_res2 = torch.square(
             torch.matmul(N, ref_mean.reshape([-1, 1])) - E.reshape([-1, 1])
