@@ -285,6 +285,16 @@ class Trainer:
 
         if self.horovod and hvd.rank() != 0:
             self.logfile = "/dev/null"
+            self.epoch_log = "/dev/null"
+            self.init_epoch_log = "/dev/null"
+            self.batch_log = {
+                TRAIN: "/dev/null",
+                VALIDATION: "/dev/null",
+            }
+            self.best_model_path = "/dev/null"
+            self.last_model_path = "/dev/null"
+            self.trainer_save_path = "/dev/null"
+            self.config_path = "/dev/null"
         else:
             output = Output.get_output(dict(**_local_kwargs, **kwargs))
             self.output = output
@@ -813,6 +823,9 @@ class Trainer:
         self.init_metrics()
 
         if self.horovod:
+            for k, v in self.model.state_dict().items():
+                if not v.is_contiguous():
+                    print(k)
             hvd.broadcast_parameters(self.model.state_dict(), root_rank=0)
             hvd.broadcast_optimizer_state(self.optim, root_rank=0)
 
@@ -831,7 +844,7 @@ class Trainer:
 
     def batch_step(self, data, validation=False):
         # no need to have gradients from old steps taking up memory
-        self.optim.zero_grad(set_to_none=True)
+        self.optim.zero_grad()  # set_to_none=True)
 
         if validation:
             self.model.eval()
@@ -869,7 +882,7 @@ class Trainer:
             # Actually do an optimization step, since we're training:
             loss, loss_contrib = self.loss(pred=out, ref=data_unscaled)
             # see https://pytorch.org/tutorials/recipes/recipes/tuning_guide.html#use-parameter-grad-none-instead-of-model-zero-grad-or-optimizer-zero-grad
-            self.optim.zero_grad(set_to_none=True)
+            self.optim.zero_grad()  # set_to_none=True)
             loss.backward()
 
             # See https://stackoverflow.com/a/56069467
