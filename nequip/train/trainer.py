@@ -27,6 +27,11 @@ import e3nn
 import torch
 from torch_ema import ExponentialMovingAverage
 
+try:
+    import horovod.torch as hvd
+except ImportError:
+    pass
+
 import nequip
 from nequip.data import DataLoader, AtomicData, AtomicDataDict, AtomicDataset
 from nequip.utils import (
@@ -217,6 +222,7 @@ class Trainer:
         model,
         model_builders: Optional[list] = [],
         device: str = "cuda" if torch.cuda.is_available() else "cpu",
+        horovod: bool = False,
         seed: Optional[int] = None,
         dataset_seed: Optional[int] = None,
         loss_coeffs: Union[dict, str] = AtomicDataDict.TOTAL_ENERGY_KEY,
@@ -271,28 +277,37 @@ class Trainer:
 
         self.ema = None
 
-        output = Output.get_output(dict(**_local_kwargs, **kwargs))
-        self.output = output
+        # Initialize horovod
+        if self.horovod:
+            hvd.init()
+            # if torch.cuda.is_available():
+            #     torch.cuda.set_device(hvd.local_rank())
 
-        self.logfile = output.open_logfile("log", propagate=True)
-        self.epoch_log = output.open_logfile("metrics_epoch.csv", propagate=False)
-        self.init_epoch_log = output.open_logfile(
-            "metrics_initialization.csv", propagate=False
-        )
-        self.batch_log = {
-            TRAIN: output.open_logfile(
-                f"metrics_batch_{ABBREV[TRAIN]}.csv", propagate=False
-            ),
-            VALIDATION: output.open_logfile(
-                f"metrics_batch_{ABBREV[VALIDATION]}.csv", propagate=False
-            ),
-        }
+        if self.horovod and hvd.rank() != 0:
+            self.logfile = "/dev/null"
+        else:
+            output = Output.get_output(dict(**_local_kwargs, **kwargs))
+            self.output = output
 
-        # add filenames if not defined
-        self.best_model_path = output.generate_file("best_model.pth")
-        self.last_model_path = output.generate_file("last_model.pth")
-        self.trainer_save_path = output.generate_file("trainer.pth")
-        self.config_path = self.output.generate_file("config.yaml")
+            self.logfile = output.open_logfile("log", propagate=True)
+            self.epoch_log = output.open_logfile("metrics_epoch.csv", propagate=False)
+            self.init_epoch_log = output.open_logfile(
+                "metrics_initialization.csv", propagate=False
+            )
+            self.batch_log = {
+                TRAIN: output.open_logfile(
+                    f"metrics_batch_{ABBREV[TRAIN]}.csv", propagate=False
+                ),
+                VALIDATION: output.open_logfile(
+                    f"metrics_batch_{ABBREV[VALIDATION]}.csv", propagate=False
+                ),
+            }
+
+            # add filenames if not defined
+            self.best_model_path = output.generate_file("best_model.pth")
+            self.last_model_path = output.generate_file("last_model.pth")
+            self.trainer_save_path = output.generate_file("trainer.pth")
+            self.config_path = self.output.generate_file("config.yaml")
 
         if seed is not None:
             torch.manual_seed(seed)
@@ -366,6 +381,10 @@ class Trainer:
 
     def init_objects(self):
         # initialize optimizer
+        learning_rate = self.learning_rate
+        if self.horovod:
+            # "Scale the learning rate by the number of workers."
+            learning_rate *= hvd.size()
         self.optim, self.optimizer_kwargs = instantiate_from_cls_name(
             module=torch.optim,
             class_name=self.optimizer_name,
@@ -374,6 +393,11 @@ class Trainer:
             all_args=self.kwargs,
             optional_args=self.optimizer_kwargs,
         )
+        if self.horovod:
+            self.optim = hvd.DistributedOptimizer(
+                self.optim,
+                named_parameters=self.model.named_parameters(),
+            )
 
         self.max_gradient_norm = (
             float(self.max_gradient_norm)
@@ -534,6 +558,8 @@ class Trainer:
         return dictionary
 
     def save_config(self, blocking: bool = True) -> None:
+        if self.horovod and hvd.rank() != 0:
+            return
         save_file(
             item=self.as_dict(state_dict=False, training_progress=False),
             supported_formats=dict(yaml=["yaml"]),
@@ -550,6 +576,8 @@ class Trainer:
         filename (str): name of the file
         format (str): format of the file. yaml and json format will not save the weights.
         """
+        if self.horovod and hvd.rank() != 0:
+            return
 
         if filename is None:
             filename = self.trainer_save_path
@@ -783,6 +811,10 @@ class Trainer:
                 self.save_config()
 
         self.init_metrics()
+
+        if self.horovod:
+            hvd.broadcast_parameters(self.model.state_dict(), root_rank=0)
+            hvd.broadcast_optimizer_state(self.optim, root_rank=0)
 
         while not self.stop_cond:
 
@@ -1036,6 +1068,8 @@ class Trainer:
                 self.save_ema_model(ckpt_path, blocking=False)
 
     def save_ema_model(self, path, blocking: bool = True):
+        if self.horovod and hvd.rank() != 0:
+            return
 
         if self.use_ema:
             # If using EMA, store the EMA validation model
@@ -1050,6 +1084,8 @@ class Trainer:
             self.save_model(path, blocking=blocking)
 
     def save_model(self, path, blocking: bool = True):
+        if self.horovod and hvd.rank() != 0:
+            return
         with atomic_write(path, blocking=blocking, binary=True) as write_to:
             torch.save(self.model.state_dict(), write_to)
 

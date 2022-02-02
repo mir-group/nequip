@@ -12,6 +12,11 @@ from pathlib import Path
 
 import torch
 
+try:
+    import horovod.torch as hvd
+except ImportError:
+    pass
+
 import e3nn
 import e3nn.util.jit
 
@@ -42,6 +47,7 @@ default_config = dict(
     equivariance_test=False,
     grad_anomaly_mode=False,
     append=False,
+    horovod=False,
     _jit_bailout_depth=2,  # avoid 20 iters of pain, see https://github.com/pytorch/pytorch/issues/52286
 )
 
@@ -54,7 +60,7 @@ def main(args=None, running_as_script: bool = True):
         set_up_script_logger(config.get("log", None), config.verbose)
 
     found_restart_file = isdir(f"{config.root}/{config.run_name}")
-    if found_restart_file and not config.append:
+    if found_restart_file and not config.append and not config.horovod:
         raise RuntimeError(
             f"Training instance exists at {config.root}/{config.run_name}; "
             "either set append to True or use a different root or runname"
