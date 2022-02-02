@@ -2,7 +2,6 @@ import numpy as np
 import pytest
 import tempfile
 import torch
-
 from os.path import isdir, isfile
 
 from ase.data import chemical_symbols
@@ -192,9 +191,12 @@ class TestStatistics:
 class TestPerSpeciesStatistics:
     @pytest.mark.parametrize("fixed_field", [True, False])
     @pytest.mark.parametrize("mode", ["mean_std", "rms"])
-    def test_per_node_field(self, npz_dataset, fixed_field, mode):
+    @pytest.mark.parametrize("subset", [True, False])
+    def test_per_node_field(self, npz_dataset, fixed_field, mode, subset):
         # set up the transformer
-        npz_dataset = set_up_transformer(npz_dataset, not fixed_field, fixed_field)
+        npz_dataset = set_up_transformer(
+            npz_dataset, not fixed_field, fixed_field, subset
+        )
 
         (result,) = npz_dataset.statistics(
             [AtomicDataDict.BATCH_KEY],
@@ -205,14 +207,15 @@ class TestPerSpeciesStatistics:
     @pytest.mark.parametrize("alpha", [1e-10, 1e-6, 0.1, 0.5, 1])
     @pytest.mark.parametrize("fixed_field", [True, False])
     @pytest.mark.parametrize("full_rank", [True, False])
+    @pytest.mark.parametrize("subset", [True, False])
     @pytest.mark.parametrize(
         "regressor", ["NormalizedGaussianProcess", "GaussianProcess"]
     )
     def test_per_graph_field(
-        self, npz_dataset, alpha, fixed_field, full_rank, regressor
+        self, npz_dataset, alpha, fixed_field, full_rank, regressor, subset
     ):
 
-        npz_dataset = set_up_transformer(npz_dataset, full_rank, fixed_field)
+        npz_dataset = set_up_transformer(npz_dataset, full_rank, fixed_field, subset)
         if npz_dataset is None:
             return
 
@@ -234,7 +237,11 @@ class TestPerSpeciesStatistics:
         else:
             ref_mean, ref_std, E = generate_E(N, 100, 0.5)
 
-        npz_dataset.data[AtomicDataDict.TOTAL_ENERGY_KEY] = E
+        E_orig_order = torch.zeros_like(
+            npz_dataset.data[AtomicDataDict.TOTAL_ENERGY_KEY]
+        )
+        E_orig_order[npz_dataset._indices] = E.unsqueeze(-1)
+        npz_dataset.data[AtomicDataDict.TOTAL_ENERGY_KEY] = E_orig_order
 
         ref_res2 = torch.square(
             torch.matmul(N, ref_mean.reshape([-1, 1])) - E.reshape([-1, 1])
@@ -367,7 +374,7 @@ def generate_E(N, mean, std):
     return ref_mean, ref_std, (N * E).sum(axis=-1)
 
 
-def set_up_transformer(npz_dataset, full_rank, fixed_field):
+def set_up_transformer(npz_dataset, full_rank, fixed_field, subset):
 
     if full_rank:
 
@@ -405,4 +412,7 @@ def set_up_transformer(npz_dataset, full_rank, fixed_field):
                 chemical_symbols[n]: i for i, n in enumerate([1, ntype + 1])
             }
         )
-    return npz_dataset
+    if subset:
+        return npz_dataset.index_select(torch.randperm(len(npz_dataset)))
+    else:
+        return npz_dataset
