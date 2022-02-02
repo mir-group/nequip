@@ -353,6 +353,7 @@ class AtomicInMemoryDataset(AtomicDataset):
 
         if self._indices is not None:
             graph_selector = torch.as_tensor(self._indices)[::stride]
+            graph_selector, _ = torch.sort(graph_selector)
         else:
             graph_selector = torch.arange(0, self.len(), stride)
         num_graphs = len(graph_selector)
