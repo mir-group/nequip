@@ -277,11 +277,15 @@ class Trainer:
 
         self.ema = None
 
+        self.logger.info(f"Torch device: {self.device}")
+        self.torch_device = torch.device(self.device)
+
         # Initialize horovod
         if self.horovod:
             hvd.init()
-            # if torch.cuda.is_available():
-            #     torch.cuda.set_device(hvd.local_rank())
+            if torch.cuda.is_available() and self.torch_device.type == "cuda":
+                assert self.torch_device.index is None
+                torch.cuda.set_device(hvd.local_rank())
 
         if self.horovod and hvd.rank() != 0:
             # none of these are used, just here so they exist
@@ -327,9 +331,6 @@ class Trainer:
         self.dataset_rng = torch.Generator()
         if dataset_seed is not None:
             self.dataset_rng.manual_seed(dataset_seed)
-
-        self.logger.info(f"Torch device: {self.device}")
-        self.torch_device = torch.device(self.device)
 
         # sort out all the other parameters
         # for samplers, optimizer and scheduler
