@@ -990,6 +990,10 @@ class Trainer:
                     self.end_of_batch_log(batch_type=category)
                     for callback in self._end_of_batch_callbacks:
                         callback(self)
+
+                if self.horovod:
+                    self.metrics.gather()
+                    self.loss_stat.gather()
                 self.metrics_dict[category] = self.metrics.current_result()
                 self.loss_dict[category] = self.loss_stat.current_result()
 
@@ -999,6 +1003,7 @@ class Trainer:
 
         self.iepoch += 1
 
+        # no need to gather metrics again, since we just did above.
         self.end_of_epoch_log()
 
         if self.lr_scheduler_name == "ReduceLROnPlateau":
