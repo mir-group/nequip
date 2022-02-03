@@ -6,6 +6,11 @@ import yaml
 
 import torch
 
+try:
+    import horovod.torch as hvd
+except ImportError:
+    pass
+
 from nequip.data import AtomicDataDict
 from torch_runstats import RunningStats, Reduction
 
@@ -258,3 +263,23 @@ class Metrics:
                     for idx, v in enumerate(value.flatten()):
                         flat_dict[f"{item_name}_{idx}"] = v.item()
         return flat_dict, skip_keys
+
+    def gather(self):
+        """Use horovod to gather and accumulate state of this Metrics across nodes to rank 0."""
+        state = (
+            hvd.rank(),
+            {
+                k1: {k2: rs.get_state() for k2, rs in v1.items()}
+                for k1, v1 in self.running_stats.items()
+            },
+        )
+        states = hvd.allgather_object(state, name="gather_metrics")  # list of dict
+        if hvd.rank() == 0:
+            # accumulate on rank 0
+            for from_rank, state in states:
+                if from_rank == 0:
+                    # we already have this don't accumulate it
+                    continue
+                for k1, v1 in state.items():
+                    for k2, rs_state in v1.items():
+                        self.running_stats[k1][k2].accumulate_state(rs_state)
