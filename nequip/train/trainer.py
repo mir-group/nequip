@@ -284,6 +284,7 @@ class Trainer:
             #     torch.cuda.set_device(hvd.local_rank())
 
         if self.horovod and hvd.rank() != 0:
+            # none of these are used, just here so they exist
             self.logfile = "/dev/null"
             self.epoch_log = "/dev/null"
             self.init_epoch_log = "/dev/null"
@@ -893,12 +894,15 @@ class Trainer:
                 )
 
             self.optim.step()
-
+            # optim.step() means we are already sync'd in gradient weight
+            # so this is fine, and everyone can maintain it separately
             if self.use_ema:
                 self.ema.update()
 
             if self.lr_scheduler_name == "CosineAnnealingWarmRestarts":
                 self.lr_sched.step(self.iepoch + self.ibatch / self.n_batches)
+                if self.horovod:
+                    hvd.broadcast_optimizer_state(self.optim, root_rank=0)
 
         with torch.no_grad():
             if len(self.rescale_layers) > 0:
@@ -991,6 +995,8 @@ class Trainer:
 
         if self.lr_scheduler_name == "ReduceLROnPlateau":
             self.lr_sched.step(metrics=self.mae_dict[self.metrics_key])
+            if self.horovod:
+                hvd.broadcast_optimizer_state(self.optim, root_rank=0)
 
         for callback in self._end_of_epoch_callbacks:
             callback(self)
