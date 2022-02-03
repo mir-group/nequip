@@ -184,9 +184,6 @@ def fresh_start(config):
         # the cached dataset
         hvd.barrier()
 
-    if config.horovod:
-        hvd.barrier()
-
     # = Train/test split =
     trainer.set_dataset(dataset, validation_dataset)
 
