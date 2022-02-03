@@ -2,6 +2,7 @@
 import logging
 import argparse
 import warnings
+import os
 
 # This is a weird hack to avoid Intel MKL issues on the cluster when this is called as a subprocess of a process that has itself initialized PyTorch.
 # Since numpy gets imported later anyway for dataset stuff, this shouldn't affect performance.
@@ -177,6 +178,10 @@ def fresh_start(config):
     except KeyError:
         # It couldn't be found
         validation_dataset = None
+
+    # ensure that cached datasets are written out before allowing other ranks to load
+    # TODO: throw error in rank != 0 if non-cached datasets are loaded? add `_allow_process` kwarg to dataset_from_config
+    os.sync()
 
     if config.horovod and hvd.rank() == 0:
         # rank 0 reaches this barrier after loading the dataset, so it's processed
