@@ -165,6 +165,8 @@ def fresh_start(config):
     config.update(trainer.params)
 
     # = Load the dataset =
+    if config.horovod and hvd.rank() != 0:
+        hvd.barrier()
     dataset = dataset_from_config(config, prefix="dataset")
     logging.info(f"Successfully loaded the data set of type {dataset}...")
     try:
@@ -175,6 +177,15 @@ def fresh_start(config):
     except KeyError:
         # It couldn't be found
         validation_dataset = None
+
+    if config.horovod and hvd.rank() == 0:
+        # rank 0 reaches this barrier after loading the dataset, so it's processed
+        # then other ranks are allowed to proceed from the L169 barrier and load
+        # the cached dataset
+        hvd.barrier()
+
+    if config.horovod:
+        hvd.barrier()
 
     # = Train/test split =
     trainer.set_dataset(dataset, validation_dataset)

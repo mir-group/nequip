@@ -886,6 +886,9 @@ class Trainer:
             self.optim.zero_grad()  # set_to_none=True)
             loss.backward()
 
+            if self.horovod:
+                self.optim.synchronize()
+
             # See https://stackoverflow.com/a/56069467
             # Has to happen after .backward() so there are grads to clip
             if self.max_gradient_norm < float("inf"):
@@ -893,7 +896,12 @@ class Trainer:
                     self.model.parameters(), self.max_gradient_norm
                 )
 
-            self.optim.step()
+            if self.horovod:
+                # https://horovod.readthedocs.io/en/stable/api.html#horovod.torch.DistributedOptimizer
+                with self.optim.skip_synchronize():
+                    self.optim.step()
+            else:
+                self.optim.step()
             # optim.step() means we are already sync'd in gradient weight
             # so this is fine, and everyone can maintain it separately
             if self.use_ema:
