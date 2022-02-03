@@ -1293,11 +1293,37 @@ class Trainer:
             # use the right randomness
             generator=self.dataset_rng,
         )
+        if self.horovod:
+            # TODO: what do do with drop_tail??
+            train_sampler = torch.utils.data.distributed.DistributedSampler(
+                self.dataset_train,
+                num_replicas=hvd.size(),
+                rank=hvd.rank(),
+                shuffle=self.shuffle,
+                seed=self.dataset_seed,
+            )
+            val_sampler = torch.utils.data.distributed.DistributedSampler(
+                self.dataset_val,
+                num_replicas=hvd.size(),
+                rank=hvd.rank(),
+                shuffle=False,
+                seed=self.dataset_seed,
+            )
+        else:
+            if self.shuffle:
+                train_sampler = torch.utils.data.RandomSampler(
+                    self.dataset_train, generator=self.dataset_rng
+                )
+            else:
+                train_sampler = torch.utils.data.SequentialSampler(self.dataset_train)
+            val_sampler = torch.utils.data.SequentialSampler(self.dataset_train)
         self.dl_train = DataLoader(
             dataset=self.dataset_train,
-            shuffle=self.shuffle,  # training should shuffle
+            sampler=train_sampler,
             **dl_kwargs,
         )
         # validation, on the other hand, shouldn't shuffle
         # we still pass the generator just to be safe
-        self.dl_val = DataLoader(dataset=self.dataset_val, **dl_kwargs)
+        self.dl_val = DataLoader(
+            dataset=self.dataset_val, sampler=val_sampler, **dl_kwargs
+        )
