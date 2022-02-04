@@ -25,7 +25,7 @@ def RescaleEnergyEtc(
         else f"dataset_{AtomicDataDict.TOTAL_ENERGY_KEY}_std",
         default_shift=None,
         default_scale_keys=AtomicDataDict.ALL_ENERGY_KEYS,
-        default_shift_keys=AtomicDataDict.TOTAL_ENERGY_KEY,
+        default_shift_keys=[AtomicDataDict.TOTAL_ENERGY_KEY],
         default_related_scale_keys=[AtomicDataDict.PER_ATOM_ENERGY_KEY],
         default_related_shift_keys=[],
     )
