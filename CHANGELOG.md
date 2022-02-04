@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Most recent change on the bottom.
 
 
-## [Unreleased] - 0.5.2
+## [Unreleased] 
+
+## [0.5.2] - 2022-02-04
 ### Added
 - Model builders may now process only the configuration
 - Allow irreps to optionally be specified through the simplified keys `l_max`, `parity`, and `num_features`
