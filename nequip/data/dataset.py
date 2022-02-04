@@ -253,8 +253,8 @@ class AtomicInMemoryDataset(AtomicDataset):
             num_examples = next(iter(num_examples))
 
             include_frames = self.include_frames
-            if self.include_frames is None:
-                include_frames = list(range(num_examples))
+            if include_frames is None:
+                include_frames = range(num_examples)
 
             # Make AtomicData from it:
             if AtomicDataDict.EDGE_INDEX_KEY in all_keys:
@@ -353,6 +353,17 @@ class AtomicInMemoryDataset(AtomicDataset):
 
         if self._indices is not None:
             graph_selector = torch.as_tensor(self._indices)[::stride]
+            # note that self._indices is _not_ necessarily in order,
+            # while self.data --- which we take our arrays from ---
+            # is always in the original order.
+            # In particular, the values of `self.data.batch`
+            # are indexes in the ORIGINAL order
+            # thus we need graph level properties to also be in the original order
+            # so that batch values index into them correctly
+            # since self.data.batch is always sorted & contiguous
+            # (because of Batch.from_data_list)
+            # we sort it:
+            graph_selector, _ = torch.sort(graph_selector)
         else:
             graph_selector = torch.arange(0, self.len(), stride)
         num_graphs = len(graph_selector)
@@ -850,6 +861,8 @@ class ASEDataset(AtomicInMemoryDataset):
             return (
                 [
                     AtomicData.from_ase(atoms=atoms_list[i], **kwargs)
-                    for i in self.include_frames
+                    if i in self.include_frames
+                    else None  # in-memory dataset will ignore this later, but needed for indexing to work out
+                    for i in range(len(atoms_list))
                 ],
             )

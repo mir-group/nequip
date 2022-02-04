@@ -12,7 +12,11 @@ from torch_runstats import RunningStats, Reduction
 from ._loss import find_loss_function
 from ._key import ABBREV
 
-metrics_to_reduction = {"mae": Reduction.MEAN, "rmse": Reduction.RMS}
+metrics_to_reduction = {
+    "mae": Reduction.MEAN,
+    "mean": Reduction.MEAN,
+    "rmse": Reduction.RMS,
+}
 
 
 class Metrics:

@@ -28,7 +28,6 @@ minimal_config1 = dict(
     irreps_edge_sh="0e + 1o",
     r_max=4,
     feature_irreps_hidden="4x0e + 4x1o",
-    resnet=True,
     num_layers=2,
     num_basis=8,
     PolynomialCutoff_p=6,
@@ -47,7 +46,6 @@ minimal_config3 = dict(
     irreps_edge_sh="0e + 1o",
     r_max=4,
     feature_irreps_hidden="4x0e + 4x1o",
-    resnet=True,
     num_layers=2,
     num_basis=8,
     PolynomialCutoff_p=6,
@@ -58,7 +56,6 @@ minimal_config4 = dict(
     irreps_edge_sh="0e + 1o + 2e",
     r_max=4,
     feature_irreps_hidden="2x0e + 2x1o + 2x2e",
-    resnet=False,
     num_layers=2,
     num_basis=3,
     PolynomialCutoff_p=6,
@@ -80,8 +77,14 @@ def config(request):
 
 @pytest.fixture(
     params=[
-        (["EnergyModel", "ForceOutput"], AtomicDataDict.FORCE_KEY,),
-        (["EnergyModel"], AtomicDataDict.TOTAL_ENERGY_KEY,),
+        (
+            ["EnergyModel", "ForceOutput"],
+            AtomicDataDict.FORCE_KEY,
+        ),
+        (
+            ["EnergyModel"],
+            AtomicDataDict.TOTAL_ENERGY_KEY,
+        ),
     ]
 )
 def model(request, config):
@@ -133,7 +136,9 @@ class TestWorkflow:
         model_script = script(instance)
 
         assert torch.allclose(
-            instance(data)[out_field], model_script(data)[out_field], atol=1e-6,
+            instance(data)[out_field],
+            model_script(data)[out_field],
+            atol=1e-6,
         )
 
         # - Try saving, loading in another process, and running -
