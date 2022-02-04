@@ -106,6 +106,12 @@ def GlobalRescale(
         if global_scale is not None:
             global_scale = 1.0  # same,
 
+    error_string = "keys need to be a list"
+    assert isinstance(default_scale_keys, list), error_string
+    assert isinstance(default_shift_keys, list), error_string
+    assert isinstance(default_related_scale_keys, list), error_string
+    assert isinstance(default_related_shift_keys, list), error_string
+
     # == Build the model ==
     return RescaleOutput(
         model=model,
