@@ -25,7 +25,7 @@ def RescaleEnergyEtc(
         else f"dataset_{AtomicDataDict.TOTAL_ENERGY_KEY}_std",
         default_shift=None,
         default_scale_keys=AtomicDataDict.ALL_ENERGY_KEYS,
-        default_shift_keys=AtomicDataDict.TOTAL_ENERGY_KEY,
+        default_shift_keys=[AtomicDataDict.TOTAL_ENERGY_KEY],
         default_related_scale_keys=[AtomicDataDict.PER_ATOM_ENERGY_KEY],
         default_related_shift_keys=[],
     )
@@ -105,6 +105,12 @@ def GlobalRescale(
             global_shift = 0.0  # it has some kind of value
         if global_scale is not None:
             global_scale = 1.0  # same,
+
+    error_string = "keys need to be a list"
+    assert isinstance(default_scale_keys, list), error_string
+    assert isinstance(default_shift_keys, list), error_string
+    assert isinstance(default_related_scale_keys, list), error_string
+    assert isinstance(default_related_shift_keys, list), error_string
 
     # == Build the model ==
     return RescaleOutput(
