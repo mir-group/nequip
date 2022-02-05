@@ -62,6 +62,34 @@ def get_code_version(config):
     config["code_versions"] = {code: get_commit(code) for code in codes_for_git}
 
 
+def check_code_version(config):
+    for code in [e3nn, nequip, torch]:
+        commit = config.get(f"{code.__name__}_version", None)
+        if commit is not None and commit != code.__version__:
+            logging.warning(
+                "Loading a pickled model created with different library version(s) may cause issues."
+                f"current {code.__name__} verion: {code.__version__} "
+                f"vs  original version: {commit}"
+            )
+    codes_for_git = {"e3nn", "nequip"}
+    for builder in config["model_builders"]:
+        if not isinstance(builder, str):
+            continue
+        builder = builder.split(".")
+        if len(builder) > 1:
+            # it's not a single name which is from nequip
+            codes_for_git.add(builder[0])
+    for code in codes_for_git:
+        commit = (config.get("code_versions", {})).get(code, None)
+        curr_commit = get_commit(code)
+        if commit is not None and commit != curr_commit:
+            logging.warning(
+                "Loading a pickled model created with different git version(s) may cause issues."
+                f"current {code}'s git commit: {curr_commit} "
+                f"vs  original commit: {commit}"
+            )
+
+
 def main(args=None, running_as_script: bool = True):
 
     config = parse_command_line(args)
@@ -241,8 +269,6 @@ def restart(config):
     )
 
     # compare dictionary to config and update stop condition related arguments
-    # note, "rainer.pth"/dictionary also store code versions,
-    # which will not be stored in cofig and thus not checked here
     for k in config.keys():
         if config[k] != dictionary.get(k, ""):
             if k == "max_epochs":
@@ -255,6 +281,10 @@ def restart(config):
                 raise ValueError(
                     f'Key "{k}" is different in config and the result trainer.pth file. Please double check'
                 )
+
+    # note, "trainer.pth"/dictionary also store code versions,
+    # which will not be stored in config and thus not checked here
+    check_code_version(config)
 
     # recursive loop, if same type but different value
     # raise error

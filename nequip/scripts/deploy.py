@@ -20,7 +20,7 @@ import ase.data
 
 from e3nn.util.jit import script
 
-from nequip.scripts.train import _set_global_options
+from nequip.scripts.train import _set_global_options, check_code_version
 from nequip.train import Trainer
 from nequip.utils import Config
 
@@ -176,6 +176,8 @@ def main(args=None):
         # load config
         config = Config.from_file(str(args.train_dir / "config.yaml"))
         _set_global_options(config)
+
+        check_code_version(config)
 
         # -- load model --
         model, _ = Trainer.load_model_from_training_session(
