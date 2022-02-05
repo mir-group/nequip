@@ -353,6 +353,16 @@ class AtomicInMemoryDataset(AtomicDataset):
 
         if self._indices is not None:
             graph_selector = torch.as_tensor(self._indices)[::stride]
+            # note that self._indices is _not_ necessarily in order,
+            # while self.data --- which we take our arrays from ---
+            # is always in the original order.
+            # In particular, the values of `self.data.batch`
+            # are indexes in the ORIGINAL order
+            # thus we need graph level properties to also be in the original order
+            # so that batch values index into them correctly
+            # since self.data.batch is always sorted & contiguous
+            # (because of Batch.from_data_list)
+            # we sort it:
             graph_selector, _ = torch.sort(graph_selector)
         else:
             graph_selector = torch.arange(0, self.len(), stride)
