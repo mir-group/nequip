@@ -518,19 +518,6 @@ class Trainer:
             if hasattr(self, "config_save_path"):
                 dictionary["progress"]["config_save_path"] = self.config_save_path
 
-        for code in [e3nn, nequip, torch]:
-            dictionary[f"{code.__name__}_version"] = code.__version__
-
-        codes_for_git = {"e3nn", "nequip"}
-        for builder in self.model_builders:
-            if not isinstance(builder, str):
-                continue
-            builder = builder.split(".")
-            if len(builder) > 1:
-                # it's not a single name which is from nequip
-                codes_for_git.add(builder[0])
-        dictionary["code_versions"] = {code: get_commit(code) for code in codes_for_git}
-
         return dictionary
 
     def save_config(self, blocking: bool = True) -> None:
@@ -610,12 +597,29 @@ class Trainer:
         dictionary = deepcopy(dictionary)
 
         for code in [e3nn, nequip, torch]:
-            version = dictionary.get(f"{code.__name__}_version", None)
-            if version is not None and version != code.__version__:
+            commit = dictionary.get(f"{code.__name__}_version", None)
+            if commit is not None and commit != code.__version__:
                 logging.warning(
                     "Loading a pickled model created with different library version(s) may cause issues."
                     f"current {code.__name__} verion: {code.__version__} "
-                    f"vs  original version: {version}"
+                    f"vs  original version: {commit}"
+                )
+        codes_for_git = {"e3nn", "nequip"}
+        for builder in dictionary["model_builders"]:
+            if not isinstance(builder, str):
+                continue
+            builder = builder.split(".")
+            if len(builder) > 1:
+                # it's not a single name which is from nequip
+                codes_for_git.add(builder[0])
+        for code in codes_for_git:
+            commit = (dictionary.get("code_versions", {})).get(code, None)
+            curr_commit = get_commit(code)
+            if commit is not None and commit != curr_commit:
+                logging.warning(
+                    "Loading a pickled model created with different git version(s) may cause issues."
+                    f"current {code}'s git commit: {curr_commit} "
+                    f"vs  original commit: {commit}"
                 )
 
         # update the restart and append option

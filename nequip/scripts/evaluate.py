@@ -211,7 +211,9 @@ def main(args=None, running_as_script: bool = True):
     model.eval()
 
     # Load a config file
-    logger.info(f"Loading {'original ' if dataset_is_from_training else ''}dataset...",)
+    logger.info(
+        f"Loading {'original ' if dataset_is_from_training else ''}dataset...",
+    )
     dataset_config = Config.from_file(
         str(args.dataset_config), defaults={"r_max": model_r_max}
     )

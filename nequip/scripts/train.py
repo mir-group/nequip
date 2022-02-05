@@ -15,11 +15,13 @@ import torch
 import e3nn
 import e3nn.util.jit
 
+import nequip
 from nequip.model import model_from_config
 from nequip.utils import Config, instantiate
 from nequip.data import dataset_from_config, register_fields
-from nequip.utils.test import assert_AtomicData_equivariant, set_irreps_debug
 from nequip.utils import load_file, dtype_from_name
+from nequip.utils.git import get_commit
+from nequip.utils.test import assert_AtomicData_equivariant, set_irreps_debug
 from nequip.scripts._logger import set_up_script_logger
 
 default_config = dict(
@@ -46,9 +48,24 @@ default_config = dict(
 )
 
 
+def get_code_version(config):
+    for code in [e3nn, nequip, torch]:
+        config[f"{code.__name__}_version"] = code.__version__
+    codes_for_git = {"e3nn", "nequip"}
+    for builder in config["model_builders"]:
+        if not isinstance(builder, str):
+            continue
+        builder = builder.split(".")
+        if len(builder) > 1:
+            # it's not a single name which is from nequip
+            codes_for_git.add(builder[0])
+    config["code_versions"] = {code: get_commit(code) for code in codes_for_git}
+
+
 def main(args=None, running_as_script: bool = True):
 
     config = parse_command_line(args)
+    get_code_version(config)
 
     if running_as_script:
         set_up_script_logger(config.get("log", None), config.verbose)
@@ -224,6 +241,8 @@ def restart(config):
     )
 
     # compare dictionary to config and update stop condition related arguments
+    # note, "rainer.pth"/dictionary also store code versions,
+    # which will not be stored in cofig and thus not checked here
     for k in config.keys():
         if config[k] != dictionary.get(k, ""):
             if k == "max_epochs":
@@ -245,6 +264,8 @@ def restart(config):
     # dtype, etc.
     _set_global_options(config)
 
+    # note, the from_dict method will check whether the code version
+    # in trainer.pth is consistent and issue warnings
     if config.wandb:
         from nequip.train.trainer_wandb import TrainerWandB
         from nequip.utils.wandb import resume
