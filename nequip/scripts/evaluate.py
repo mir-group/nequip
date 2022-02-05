@@ -211,9 +211,7 @@ def main(args=None, running_as_script: bool = True):
     model.eval()
 
     # Load a config file
-    logger.info(
-        f"Loading {'original ' if dataset_is_from_training else ''}dataset...",
-    )
+    logger.info(f"Loading {'original ' if dataset_is_from_training else ''}dataset...",)
     dataset_config = Config.from_file(
         str(args.dataset_config), defaults={"r_max": model_r_max}
     )
@@ -232,7 +230,10 @@ def main(args=None, running_as_script: bool = True):
             dataset = dataset_from_config(dataset_config, prefix="validation_dataset")
             dataset_is_validation = True
         except KeyError:
+            pass
+        if not dataset_is_validation:
             # Get shared train + validation dataset
+            # prefix `dataset`
             dataset = dataset_from_config(dataset_config)
     logger.info(
         f"Loaded {'validation_' if dataset_is_validation else ''}dataset specified in {args.dataset_config.name}.",
