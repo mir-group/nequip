@@ -30,8 +30,9 @@ class PolynomialCutoff(torch.nn.Module):
             Power used in envelope function
         """
         super().__init__()
-        self.p = p
-        self._factor = 1.0 / r_max
+        assert p > 0.0
+        self.p = float(p)
+        self._factor = 1.0 / float(r_max)
 
     def forward(self, x):
         """
