@@ -11,11 +11,23 @@ from .git import get_commit
 _DEFAULT_VERSION_CODES = [torch, e3nn, nequip]
 _DEFAULT_COMMIT_CODES = ["e3nn", "nequip"]
 
-_CODE_VERSIONS_KEY = "code_versions"
-_CODE_COMMITS_KEY = "code_commits"
+CODE_COMMITS_KEY = "code_commits"
 
 
-def _get_code_versions(config) -> Tuple[dict, dict]:
+def get_config_code_versions(config) -> Tuple[dict, dict]:
+    code_versions = {}
+    for code in _DEFAULT_VERSION_CODES:
+        version = config.get(f"{code.__name__}_version", None)
+        if version is not None:
+            code_versions[code.__name__] = version
+    code_commits = config.get(CODE_COMMITS_KEY, {})
+    if len(code_commits) == 0:
+        # look for the old style
+        code_commits = config.get("code_versions", {})
+    return code_versions, code_commits
+
+
+def get_current_code_versions(config) -> Tuple[dict, dict]:
     code_versions = {}
     for code in _DEFAULT_VERSION_CODES:
         code_versions[code.__name__] = code.__version__
@@ -33,9 +45,9 @@ def _get_code_versions(config) -> Tuple[dict, dict]:
 
 
 def check_code_version(config, add_to_config: bool = False):
-    current_code_versions, current_code_commits = _get_code_versions(config)
+    current_code_versions, current_code_commits = get_current_code_versions(config)
+    code_versions, code_commits = get_config_code_versions(config)
 
-    code_versions = config.get(_CODE_VERSIONS_KEY, {})
     for code, version in code_versions.items():
         # we use .get just in case we recorded something in an old version we don't in a new one
         if version != current_code_versions.get(code, version):
@@ -45,7 +57,6 @@ def check_code_version(config, add_to_config: bool = False):
                 f"vs  original version: {version}"
             )
 
-    code_commits = config.get(_CODE_COMMITS_KEY, {})
     for code, commit in code_commits.items():
         # see why .get above
         if commit != current_code_commits.get(code, commit):
@@ -56,5 +67,6 @@ def check_code_version(config, add_to_config: bool = False):
             )
 
     if add_to_config:
-        config[_CODE_VERSIONS_KEY] = current_code_versions
-        config[_CODE_COMMITS_KEY] = current_code_commits
+        for code, version in code_versions.items():
+            config[f"{code}_version"] = version
+        config[CODE_COMMITS_KEY] = current_code_commits
