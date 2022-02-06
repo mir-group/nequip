@@ -23,11 +23,9 @@ else:
     import contextlib2 as contextlib
 
 import numpy as np
-import e3nn
 import torch
 from torch_ema import ExponentialMovingAverage
 
-import nequip
 from nequip.data import DataLoader, AtomicData, AtomicDataDict, AtomicDataset
 from nequip.utils import (
     Output,
@@ -42,7 +40,7 @@ from nequip.utils import (
     atomic_write_group,
     dtype_from_name,
 )
-from nequip.utils.git import get_commit
+from nequip.utils.versions import check_code_version
 from nequip.model import model_from_config
 
 from .loss import Loss, LossStat
@@ -595,32 +593,7 @@ class Trainer:
         """
 
         dictionary = deepcopy(dictionary)
-
-        for code in [e3nn, nequip, torch]:
-            commit = dictionary.get(f"{code.__name__}_version", None)
-            if commit is not None and commit != code.__version__:
-                logging.warning(
-                    "Loading a pickled model created with different library version(s) may cause issues."
-                    f"current {code.__name__} verion: {code.__version__} "
-                    f"vs  original version: {commit}"
-                )
-        codes_for_git = {"e3nn", "nequip"}
-        for builder in dictionary["model_builders"]:
-            if not isinstance(builder, str):
-                continue
-            builder = builder.split(".")
-            if len(builder) > 1:
-                # it's not a single name which is from nequip
-                codes_for_git.add(builder[0])
-        for code in codes_for_git:
-            commit = (dictionary.get("code_versions", {})).get(code, None)
-            curr_commit = get_commit(code)
-            if commit is not None and commit != curr_commit:
-                logging.warning(
-                    "Loading a pickled model created with different git version(s) may cause issues."
-                    f"current {code}'s git commit: {curr_commit} "
-                    f"vs  original commit: {commit}"
-                )
+        check_code_version(dictionary)
 
         # update the restart and append option
         if append is not None:
