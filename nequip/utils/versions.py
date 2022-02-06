@@ -67,6 +67,6 @@ def check_code_version(config, add_to_config: bool = False):
             )
 
     if add_to_config:
-        for code, version in code_versions.items():
+        for code, version in current_code_versions.items():
             config[f"{code}_version"] = version
         config[CODE_COMMITS_KEY] = current_code_commits
