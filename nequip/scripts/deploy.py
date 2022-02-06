@@ -20,14 +20,16 @@ import ase.data
 
 from e3nn.util.jit import script
 
-from nequip.scripts.train import _set_global_options, check_code_version
+from nequip.scripts.train import _set_global_options
 from nequip.train import Trainer
 from nequip.utils import Config
+from nequip.utils.versions import check_code_version, get_config_code_versions
 
 CONFIG_KEY: Final[str] = "config"
 NEQUIP_VERSION_KEY: Final[str] = "nequip_version"
 TORCH_VERSION_KEY: Final[str] = "torch_version"
 E3NN_VERSION_KEY: Final[str] = "e3nn_version"
+CODE_COMMITS_KEY: Final[str] = "code_commits"
 R_MAX_KEY: Final[str] = "r_max"
 N_SPECIES_KEY: Final[str] = "n_species"
 TYPE_NAMES_KEY: Final[str] = "type_names"
@@ -190,8 +192,11 @@ def main(args=None):
 
         # Deploy
         metadata: dict = {}
+        code_versions, code_commits = get_config_code_versions(config)
         for code in ["e3nn", "nequip", "torch"]:
-            metadata[code + "_version"] = config[code + "_version"]
+            metadata[code + "_version"] = code_versions[code]
+        if len(code_commits) > 0:
+            metadata[CODE_COMMITS_KEY] = code_commits
 
         metadata[R_MAX_KEY] = str(float(config["r_max"]))
         if "allowed_species" in config:
