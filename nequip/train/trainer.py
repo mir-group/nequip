@@ -283,6 +283,11 @@ class Trainer:
                 assert self.torch_device.index is None
                 torch.cuda.set_device(hvd.local_rank())
 
+            assert (
+                self.batch_size % hvd.size() == 0
+            ), "Batch size must be a multiple of the number of nodes"
+            self.batch_size //= hvd.size()
+
         if self.horovod and hvd.rank() != 0:
             # none of these are used, just here so they exist
             self.logfile = "/dev/null"
