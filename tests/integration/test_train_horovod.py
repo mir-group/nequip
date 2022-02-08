@@ -8,7 +8,7 @@ import os
 import numpy as np
 import torch
 
-from .test_train import LearningFactorModel
+from test_train import LearningFactorModel
 
 hvd = pytest.importorskip("horovod.torch")
 
@@ -19,7 +19,7 @@ hvd = pytest.importorskip("horovod.torch")
         "minimal.yaml",
     ],
 )
-@pytest.mark.parametrize("builder", [LearningFactorModel])
+@pytest.mark.parametrize("builder", [LearningFactorModel, None])
 def test_metrics(nequip_dataset, BENCHMARK_ROOT, conffile, builder):
 
     dtype = str(torch.get_default_dtype())[len("torch.") :]
@@ -43,9 +43,19 @@ def test_metrics(nequip_dataset, BENCHMARK_ROOT, conffile, builder):
             BENCHMARK_ROOT / "aspirin_ccsd-train.npz"
         )
         true_config["default_dtype"] = dtype
-        true_config["max_epochs"] = 2
-        # We just don't add rescaling:
-        true_config["model_builders"] = [builder]
+        true_config["device"] = device
+        true_config["batch_size"] = num_worker * 2
+        true_config["n_train"] = num_worker * 6
+        true_config["n_val"] = num_worker * 4
+        true_config["max_epochs"] = 3
+        true_config["seed"] = 950590
+        true_config["dataset_seed"] = 34345
+        # important so that both runs have the same presentation order
+        # in theory just the seeds should handle this, but who knows...
+        true_config["shuffle"] = False
+        if builder is not None:
+            # We just don't add rescaling:
+            true_config["model_builders"] = [builder]
         # We need truth labels as inputs for these fake testing models
         true_config["_override_allow_truth_label_inputs"] = True
 
@@ -69,7 +79,15 @@ def test_metrics(nequip_dataset, BENCHMARK_ROOT, conffile, builder):
 
         # == run horovod FIRST to make it have to process dataset ==
         retcode = subprocess.run(
-            ["horovodrun", "nequip-train", "conf_horovod.yaml"],
+            [
+                "horovodrun",
+                "-np",
+                str(num_worker),
+                "-H",
+                f"localhost:{num_worker}",
+                "nequip-train",
+                "conf_horovod.yaml",
+            ],
             cwd=tmpdir,
             env=env,
             stdout=subprocess.PIPE,
@@ -92,6 +110,7 @@ def test_metrics(nequip_dataset, BENCHMARK_ROOT, conffile, builder):
         outdir_horovod = f"{tmpdir}/{true_config['root']}/{run_name_horovod}/"
 
         # epoch metrics
+        # only epoch metrics are synced
         dat_true, dat_horovod = [
             np.genfromtxt(
                 f"{outdir}/metrics_epoch.csv",
@@ -102,4 +121,7 @@ def test_metrics(nequip_dataset, BENCHMARK_ROOT, conffile, builder):
             for outdir in (outdir_true, outdir_horovod)
         ]
 
-        assert np.allclose(dat_true, dat_horovod)
+        for key in dat_true.dtype.names:
+            if key in {"wall"}:
+                continue
+            assert np.allclose(dat_true[key], dat_horovod[key])
