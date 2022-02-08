@@ -7,7 +7,9 @@ from nequip.data import AtomicDataset, register_fields
 from nequip.utils import instantiate, get_w_prefix
 
 
-def dataset_from_config(config, prefix: str = "dataset") -> AtomicDataset:
+def dataset_from_config(
+    config, prefix: str = "dataset", force_use_cached: bool = False
+) -> AtomicDataset:
     """initialize database based on a config instance
 
     It needs dataset type name (case insensitive),
@@ -20,6 +22,7 @@ def dataset_from_config(config, prefix: str = "dataset") -> AtomicDataset:
 
     config (dict, nequip.utils.Config): dict/object that store all the parameters
     prefix (str): Optional. The prefix of all dataset parameters
+    force_use_cached (bool): Optional, default False. Whether to error if a cached dataset cannot be found.
 
     Return:
 
@@ -78,7 +81,10 @@ def dataset_from_config(config, prefix: str = "dataset") -> AtomicDataset:
     instance, _ = instantiate(
         class_name,
         prefix=prefix,
-        positional_args={"type_mapper": type_mapper},
+        positional_args={
+            "type_mapper": type_mapper,
+            "force_use_cached": force_use_cached,
+        },
         optional_args=config,
     )
 

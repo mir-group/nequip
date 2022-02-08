@@ -89,6 +89,7 @@ class AtomicInMemoryDataset(AtomicDataset):
         extra_fixed_fields: Dict[str, Any] = {},
         include_frames: Optional[List[int]] = None,
         type_mapper: Optional[TypeMapper] = None,
+        force_use_cached: bool = False,
     ):
         # TO DO, this may be simplified
         # See if a subclass defines some inputs
@@ -120,7 +121,9 @@ class AtomicInMemoryDataset(AtomicDataset):
         # Initialize the InMemoryDataset, which runs download and process
         # See https://pytorch-geometric.readthedocs.io/en/latest/notes/create_dataset.html#creating-in-memory-datasets
         # Then pre-process the data if disk files are not found
-        super().__init__(root=root, transform=type_mapper)
+        super().__init__(
+            root=root, transform=type_mapper, force_use_cached=force_use_cached
+        )
         if self.data is None:
             self.data, self.fixed_fields, include_frames = torch.load(
                 self.processed_paths[0]
@@ -145,7 +148,9 @@ class AtomicInMemoryDataset(AtomicDataset):
         pnames = list(inspect.signature(self.__init__).parameters)
         IGNORE_KEYS = {
             # the type mapper is applied after saving, not before, so doesn't matter to cache validity
-            "type_mapper"
+            "type_mapper",
+            # this parameter controls loading, doesn't affect dataset
+            "force_use_cached",
         }
         params = {
             k: getattr(self, k)
