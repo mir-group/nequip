@@ -274,8 +274,6 @@ class Trainer:
             _local_kwargs[key] = locals()[key]
 
         self.ema = None
-
-        self.logger.info(f"Torch device: {self.device}")
         self.torch_device = torch.device(self.device)
 
         # Initialize horovod
@@ -321,6 +319,8 @@ class Trainer:
             self.last_model_path = output.generate_file("last_model.pth")
             self.trainer_save_path = output.generate_file("trainer.pth")
             self.config_path = self.output.generate_file("config.yaml")
+
+        self.logger.info(f"Torch device: {self.device}")
 
         if seed is not None:
             torch.manual_seed(seed)
