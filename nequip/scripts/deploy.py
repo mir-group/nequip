@@ -23,11 +23,13 @@ from e3nn.util.jit import script
 from nequip.scripts.train import _set_global_options
 from nequip.train import Trainer
 from nequip.utils import Config
+from nequip.utils.versions import check_code_version, get_config_code_versions
 
 CONFIG_KEY: Final[str] = "config"
 NEQUIP_VERSION_KEY: Final[str] = "nequip_version"
 TORCH_VERSION_KEY: Final[str] = "torch_version"
 E3NN_VERSION_KEY: Final[str] = "e3nn_version"
+CODE_COMMITS_KEY: Final[str] = "code_commits"
 R_MAX_KEY: Final[str] = "r_max"
 N_SPECIES_KEY: Final[str] = "n_species"
 TYPE_NAMES_KEY: Final[str] = "type_names"
@@ -37,6 +39,8 @@ TF32_KEY: Final[str] = "allow_tf32"
 _ALL_METADATA_KEYS = [
     CONFIG_KEY,
     NEQUIP_VERSION_KEY,
+    TORCH_VERSION_KEY,
+    E3NN_VERSION_KEY,
     R_MAX_KEY,
     N_SPECIES_KEY,
     TYPE_NAMES_KEY,
@@ -177,6 +181,8 @@ def main(args=None):
         config = Config.from_file(str(args.train_dir / "config.yaml"))
         _set_global_options(config)
 
+        check_code_version(config)
+
         # -- load model --
         model, _ = Trainer.load_model_from_training_session(
             args.train_dir, model_name="best_model.pth", device="cpu"
@@ -188,8 +194,13 @@ def main(args=None):
 
         # Deploy
         metadata: dict = {}
-        for code in ["e3nn", "nequip", "torch"]:
-            metadata[code + "_version"] = config[code + "_version"]
+        code_versions, code_commits = get_config_code_versions(config)
+        for code, version in code_versions.items():
+            metadata[code + "_version"] = version
+        if len(code_commits) > 0:
+            metadata[CODE_COMMITS_KEY] = ";".join(
+                f"{k}={v}" for k, v in code_commits.items()
+            )
 
         metadata[R_MAX_KEY] = str(float(config["r_max"]))
         if "allowed_species" in config:
