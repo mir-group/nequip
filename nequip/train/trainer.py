@@ -823,7 +823,10 @@ class Trainer:
 
     def batch_step(self, data, validation=False):
         # no need to have gradients from old steps taking up memory
-        self.optim.zero_grad()  # set_to_none=True)
+        if self.horovod:
+            self.optim.zero_grad()
+        else:
+            self.optim.zero_grad(set_to_none=True)
 
         if validation:
             self.model.eval()
@@ -861,7 +864,10 @@ class Trainer:
             # Actually do an optimization step, since we're training:
             loss, loss_contrib = self.loss(pred=out, ref=data_unscaled)
             # see https://pytorch.org/tutorials/recipes/recipes/tuning_guide.html#use-parameter-grad-none-instead-of-model-zero-grad-or-optimizer-zero-grad
-            self.optim.zero_grad()  # set_to_none=True)
+            if self.horovod:
+                self.optim.zero_grad()
+            else:
+                self.optim.zero_grad(set_to_none=True)
             loss.backward()
 
             if self.horovod:
