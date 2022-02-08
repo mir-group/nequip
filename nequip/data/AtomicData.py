@@ -500,23 +500,20 @@ class AtomicData(Data):
             ]
         )
 
+        # exclude those that are special for ASE and that we process seperately
+        special_handling_keys = [
+            AtomicDataDict.POSITIONS_KEY,
+            AtomicDataDict.CELL_KEY,
+            AtomicDataDict.PBC_KEY,
+            AtomicDataDict.ATOMIC_NUMBERS_KEY,
+            AtomicDataDict.TOTAL_ENERGY_KEY,
+            AtomicDataDict.FORCE_KEY,
+            AtomicDataDict.PER_ATOM_ENERGY_KEY,
+            AtomicDataDict.STRESS_KEY,
+        ]
         assert (
-            len(
-                set(extra_fields).intersection(
-                    [  # exclude those that are special for ASE and that we process seperately
-                        AtomicDataDict.POSITIONS_KEY,
-                        AtomicDataDict.CELL_KEY,
-                        AtomicDataDict.PBC_KEY,
-                        AtomicDataDict.ATOMIC_NUMBERS_KEY,
-                        AtomicDataDict.TOTAL_ENERGY_KEY,
-                        AtomicDataDict.FORCE_KEY,
-                        AtomicDataDict.PER_ATOM_ENERGY_KEY,
-                        AtomicDataDict.STRESS_KEY,
-                    ]
-                )
-            )
-            == 0
-        ), "Cannot specify typical keys as `extra_fields` for atoms output"
+            len(set(extra_fields).intersection(special_handling_keys)) == 0
+        ), f"Cannot specify keys handled in special ways ({special_handling_keys}) as `extra_fields` for atoms output--- they are output by default"
 
         if cell is not None:
             cell = cell.view(-1, 3, 3)
