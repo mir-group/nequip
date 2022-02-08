@@ -30,7 +30,7 @@ class PolynomialCutoff(torch.nn.Module):
             Power used in envelope function
         """
         super().__init__()
-        assert p > 0.0
+        assert p >= 2.0
         self.p = float(p)
         self._factor = 1.0 / float(r_max)
 
