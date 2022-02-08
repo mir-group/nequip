@@ -24,8 +24,9 @@ import e3nn.util.jit
 from nequip.model import model_from_config
 from nequip.utils import Config, instantiate
 from nequip.data import dataset_from_config, register_fields
-from nequip.utils.test import assert_AtomicData_equivariant, set_irreps_debug
 from nequip.utils import load_file, dtype_from_name
+from nequip.utils.test import assert_AtomicData_equivariant, set_irreps_debug
+from nequip.utils.versions import check_code_version
 from nequip.scripts._logger import set_up_script_logger
 
 default_config = dict(
@@ -54,7 +55,6 @@ default_config = dict(
 
 
 def main(args=None, running_as_script: bool = True):
-
     config = parse_command_line(args)
 
     if running_as_script:
@@ -142,7 +142,8 @@ def _set_global_options(config):
 
 
 def fresh_start(config):
-
+    # we use add_to_config cause it's a fresh start and need to record it
+    check_code_version(config, add_to_config=True)
     _set_global_options(config)
 
     # = Make the trainer =
@@ -233,7 +234,6 @@ def fresh_start(config):
 
 
 def restart(config):
-
     # load the dictionary
     restart_file = f"{config.root}/{config.run_name}/trainer.pth"
     dictionary = load_file(
@@ -256,6 +256,10 @@ def restart(config):
                     f'Key "{k}" is different in config and the result trainer.pth file. Please double check'
                 )
 
+    # note, "trainer.pth"/dictionary also store code versions,
+    # which will not be stored in config and thus not checked here
+    check_code_version(config)
+
     # recursive loop, if same type but different value
     # raise error
 
@@ -264,6 +268,8 @@ def restart(config):
     # dtype, etc.
     _set_global_options(config)
 
+    # note, the from_dict method will check whether the code version
+    # in trainer.pth is consistent and issue warnings
     if config.wandb:
         from nequip.train.trainer_wandb import TrainerWandB
         from nequip.utils.wandb import resume

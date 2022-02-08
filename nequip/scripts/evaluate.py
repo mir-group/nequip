@@ -11,15 +11,12 @@ import ase.io
 
 import torch
 
-from nequip.utils import Config
 from nequip.data import AtomicData, Collater, dataset_from_config, register_fields
-from nequip.train import Trainer
 from nequip.scripts.deploy import load_deployed_model, R_MAX_KEY
-from nequip.scripts.train import default_config, _set_global_options
-from nequip.utils import load_file, instantiate
-from nequip.train.loss import Loss
-from nequip.train.metrics import Metrics
-from ._logger import set_up_script_logger
+from nequip.scripts._logger import set_up_script_logger
+from nequip.scripts.train import default_config, _set_global_options, check_code_version
+from nequip.train import Trainer, Loss, Metrics
+from nequip.utils import load_file, instantiate, Config
 
 
 ORIGINAL_DATASET_INDEX_KEY: str = "original_dataset_index"
@@ -200,7 +197,9 @@ def main(args=None, running_as_script: bool = True):
         global_config = args.model.parent / "config.yaml"
         global_config = Config.from_file(str(global_config), defaults=default_config)
         _set_global_options(global_config)
+        check_code_version(global_config)
         del global_config
+
         # load a training session model
         model, model_config = Trainer.load_model_from_training_session(
             traindir=args.model.parent, model_name=args.model.name
@@ -211,7 +210,9 @@ def main(args=None, running_as_script: bool = True):
     model.eval()
 
     # Load a config file
-    logger.info(f"Loading {'original ' if dataset_is_from_training else ''}dataset...",)
+    logger.info(
+        f"Loading {'original ' if dataset_is_from_training else ''}dataset...",
+    )
     dataset_config = Config.from_file(
         str(args.dataset_config), defaults={"r_max": model_r_max}
     )
