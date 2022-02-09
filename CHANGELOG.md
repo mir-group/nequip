@@ -8,6 +8,8 @@ Most recent change on the bottom.
 
 
 ## [Unreleased] - 0.5.3
+### Added
+- `nequip-evaluate --repeat` option
 
 ## [0.5.2] - 2022-02-04
 ### Added

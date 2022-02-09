@@ -78,6 +78,16 @@ def main(args=None, running_as_script: bool = True):
         default=50,
     )
     parser.add_argument(
+        "--repeat",
+        help=(
+            "Number of times to repeat evaluating the test dataset. "
+            "This can help compensate for CUDA nondeterminism, or can be used to evaluate error on models whose inference passes are intentionally nondeterministic. "
+            "Note that `--repeat`ed passes over the dataset will also be `--output`ed if an `--output` is specified."
+        ),
+        type=int,
+        default=1,
+    )
+    parser.add_argument(
         "--device",
         help="Device to run the model on. If not provided, defaults to CUDA if available and CPU otherwise.",
         type=str,
@@ -286,6 +296,8 @@ def main(args=None, running_as_script: bool = True):
         logger.info(
             f"Using provided test set indexes, yielding a test set size of {len(test_idcs)} frames.",
         )
+    test_idcs = torch.as_tensor(test_idcs, dtype=torch.long)
+    test_idcs = test_idcs.tile((args.repeat,))
 
     # Figure out what metrics we're actually computing
     if do_metrics:
