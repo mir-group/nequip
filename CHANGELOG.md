@@ -11,6 +11,9 @@ Most recent change on the bottom.
 ### Added
 - `nequip-evaluate --repeat` option
 
+### Changed
+- default value for `report_init_validation` is now `True`
+
 ## [0.5.2] - 2022-02-04
 ### Added
 - Model builders may now process only the configuration

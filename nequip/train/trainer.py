@@ -252,7 +252,7 @@ class Trainer:
         log_epoch_freq: int = 1,
         save_checkpoint_freq: int = -1,
         save_ema_checkpoint_freq: int = -1,
-        report_init_validation: bool = False,
+        report_init_validation: bool = True,
         verbose="INFO",
         **kwargs,
     ):
