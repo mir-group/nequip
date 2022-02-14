@@ -35,6 +35,7 @@ Examples:
 
 """
 import inspect
+import logging
 
 from copy import deepcopy
 from typing import Optional
@@ -64,6 +65,9 @@ class Config(object):
             config = {
                 key: value for key, value in config.items() if key not in exclude_keys
             }
+
+        object.__setattr__(self, "_initial_keys", frozenset(config.keys()))
+
         if defaults is not None:
             tmp = config
             config = defaults.copy()
@@ -280,8 +284,7 @@ class Config(object):
 
     @staticmethod
     def from_dict(dictionary: dict, defaults: dict = {}):
-        c = Config(defaults)
-        c.update(dictionary)
+        c = Config(dictionary, defaults=defaults)
         return c
 
     @staticmethod
@@ -353,6 +356,10 @@ class Config(object):
 
     load = from_file
 
-    def accessed_keys(self) -> set:
-        """Return a set of all keys that have been accessed."""
-        return frozenset(self._accessed_keys)
+    def warn_unused(self):
+        # = Warn about unused keys =
+        unused_keys = self._initial_keys - self._accessed_keys
+        if len(unused_keys) > 0:
+            logging.warn(
+                f"!!! Keys {', '.join('`%s`' % k for k in unused_keys)} appeared in the config but were not used. Please check if any of them have a typo or should have been used!!!"
+            )

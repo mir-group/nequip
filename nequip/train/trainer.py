@@ -770,6 +770,9 @@ class Trainer:
 
         self.init_metrics()
 
+        # we're done initializing things, so check:
+        self.config.warn_unused()
+
         while not self.stop_cond:
 
             self.epoch_step()

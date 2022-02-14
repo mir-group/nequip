@@ -155,9 +155,6 @@ def fresh_start(config):
 
         trainer = Trainer.from_config(model=None, config=config)
 
-    # record this for later warnings:
-    input_config_keys = frozenset(config.keys())
-
     # what is this
     # to update wandb data?
     config.update(trainer.params)
@@ -213,13 +210,6 @@ def fresh_start(config):
 
     # Store any updated config information in the trainer
     trainer.update_kwargs(config)
-
-    # = Warn about unused keys =
-    unused_keys = input_config_keys - config.accessed_keys()
-    if len(unused_keys) > 0:
-        logging.warn(
-            f"Keys {', '.join('`%s`' % k for k in unused_keys)} appeared in the config but were not used. Please check if any of them have a typo or should have been used!!!"
-        )
 
     return trainer
 
