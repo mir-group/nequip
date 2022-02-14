@@ -256,8 +256,8 @@ def main(args=None, running_as_script: bool = True):
     # this makes no sense if a dataset is given seperately
     if (
         args.test_indexes is None
-        and train_idcs is not None
         and dataset_is_from_training
+        and train_idcs is not None
     ):
         # we know the train and val, get the rest
         all_idcs = set(range(len(dataset)))
