@@ -88,6 +88,12 @@ def main(args=None, running_as_script: bool = True):
         default=1,
     )
     parser.add_argument(
+        "--use-deterministic-algorithms",
+        help="Try to have PyTorch use deterministic algorithms. Will probably fail on GPU/CUDA.",
+        type=bool,
+        default=False,
+    )
+    parser.add_argument(
         "--device",
         help="Device to run the model on. If not provided, defaults to CUDA if available and CPU otherwise.",
         type=str,
@@ -180,6 +186,12 @@ def main(args=None, running_as_script: bool = True):
         logger.info(
             "WARNING: please note that models running on CUDA are usually nondeterministc and that this manifests in the final test errors; for a _more_ deterministic result, please use `--device cpu`",
         )
+
+    if args.use_deterministic_algorithms:
+        logger.info(
+            "Telling PyTorch to try to use deterministic algorithms... please note that this will likely error on CUDA/GPU"
+        )
+        torch.use_deterministic_algorithms(True)
 
     # Load model:
     logger.info("Loading model... ")
