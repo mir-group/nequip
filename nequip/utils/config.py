@@ -353,5 +353,6 @@ class Config(object):
 
     load = from_file
 
-    def unused_keys(self) -> set:
-        return set(self.keys()) - self._accessed_keys
+    def accessed_keys(self) -> set:
+        """Return a set of all keys that have been accessed."""
+        return frozenset(self._accessed_keys)

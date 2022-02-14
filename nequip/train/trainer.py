@@ -255,7 +255,6 @@ class Trainer:
         report_init_validation: bool = False,
         verbose="INFO",
         config=None,
-        **kwargs,
     ):
         self._initialized = False
         logging.debug("* Initialize Trainer")
@@ -263,6 +262,7 @@ class Trainer:
         # store all init arguments
         self.model = model
 
+        # TODO: remove this?
         _local_kwargs = {}
         for key in self.init_keys:
             setattr(self, key, locals()[key])
@@ -320,7 +320,7 @@ class Trainer:
             builder=Loss,
             prefix="loss",
             positional_args=dict(coeffs=self.loss_coeffs),
-            all_args=self.kwargs,
+            all_args=self.config,
         )
         self.loss_stat = LossStat(self.loss)
 
@@ -342,7 +342,7 @@ class Trainer:
             self._remove_from_model_input = self._remove_from_model_input.union(
                 AtomicDataDict.ALL_ENERGY_KEYS
             )
-        if kwargs.get("_override_allow_truth_label_inputs", False):
+        if config.get("_override_allow_truth_label_inputs", False):
             # needed for unit testing models
             self._remove_from_model_input = set()
 
