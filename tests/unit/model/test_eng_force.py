@@ -3,7 +3,6 @@ import pytest
 import logging
 import tempfile
 import torch
-from os.path import isfile
 
 import numpy as np
 
@@ -12,7 +11,7 @@ from e3nn.util.jit import script
 
 from nequip.data import AtomicDataDict, AtomicData, Collater
 from nequip.data.transforms import TypeMapper
-from nequip.model import model_from_config, xavier_initialize_FCs
+from nequip.model import model_from_config, uniform_initialize_FCs
 from nequip.nn import GraphModuleMixin, AtomwiseLinear
 from nequip.utils.test import assert_AtomicData_equivariant
 
@@ -22,13 +21,13 @@ logging.basicConfig(level=logging.DEBUG)
 COMMON_CONFIG = {
     "num_types": 3,
     "types_names": ["H", "C", "O"],
+    "avg_num_neighbors": None,
 }
 r_max = 3
 minimal_config1 = dict(
     irreps_edge_sh="0e + 1o",
     r_max=4,
     feature_irreps_hidden="4x0e + 4x1o",
-    resnet=True,
     num_layers=2,
     num_basis=8,
     PolynomialCutoff_p=6,
@@ -47,7 +46,6 @@ minimal_config3 = dict(
     irreps_edge_sh="0e + 1o",
     r_max=4,
     feature_irreps_hidden="4x0e + 4x1o",
-    resnet=True,
     num_layers=2,
     num_basis=8,
     PolynomialCutoff_p=6,
@@ -58,7 +56,6 @@ minimal_config4 = dict(
     irreps_edge_sh="0e + 1o + 2e",
     r_max=4,
     feature_irreps_hidden="2x0e + 2x1o + 2x2e",
-    resnet=False,
     num_layers=2,
     num_basis=3,
     PolynomialCutoff_p=6,
@@ -127,7 +124,7 @@ class TestWorkflow:
 
         out_orig = instance(data)[out_field]
 
-        instance = xavier_initialize_FCs(instance, initialize=True)
+        instance = uniform_initialize_FCs(instance, initialize=True)
 
         out_unif = instance(data)[out_field]
         assert not torch.allclose(out_orig, out_unif)
@@ -139,7 +136,9 @@ class TestWorkflow:
         model_script = script(instance)
 
         assert torch.allclose(
-            instance(data)[out_field], model_script(data)[out_field], atol=1e-7
+            instance(data)[out_field],
+            model_script(data)[out_field],
+            atol=1e-6,
         )
 
         # - Try saving, loading in another process, and running -
@@ -224,6 +223,43 @@ class TestGradient:
                 numeric, analytical, rtol=5e-2
             )
 
+    def test_partial_forces(self, atomic_batch, device):
+        config = minimal_config1.copy()
+        config["model_builders"] = [
+            "EnergyModel",
+            "ForceOutput",
+        ]
+        partial_config = config.copy()
+        partial_config["model_builders"] = [
+            "EnergyModel",
+            "PartialForceOutput",
+        ]
+        model = model_from_config(config=config, initialize=True)
+        partial_model = model_from_config(config=partial_config, initialize=True)
+        model.to(device)
+        partial_model.to(device)
+        partial_model.load_state_dict(model.state_dict())
+        data = atomic_batch.to(device)
+        output = model(AtomicData.to_AtomicDataDict(data))
+        output_partial = partial_model(AtomicData.to_AtomicDataDict(data))
+        # everything should be the same
+        # including the
+        for k in output:
+            assert k != AtomicDataDict.PARTIAL_FORCE_KEY
+            assert k in output_partial
+            if output[k].is_floating_point():
+                assert torch.allclose(
+                    output[k],
+                    output_partial[k],
+                    atol=1e-6 if k == AtomicDataDict.FORCE_KEY else 1e-8,
+                )
+            else:
+                assert torch.equal(output[k], output_partial[k])
+        n_at = data[AtomicDataDict.POSITIONS_KEY].shape[0]
+        partial_forces = output_partial[AtomicDataDict.PARTIAL_FORCE_KEY]
+        assert partial_forces.shape == (n_at, n_at, 3)
+        # TODO check sparsity?
+
 
 class TestAutoGradient:
     def test_cross_frame_grad(self, config, nequip_dataset):
@@ -272,7 +308,7 @@ class TestCutoff:
         atoms2.positions += 40.0 + np.random.randn(3)
         atoms_both = atoms1.copy()
         atoms_both.extend(atoms2)
-        tm = TypeMapper(chemical_symbol_to_type={"H": 0, "C": 1, "O": 2})
+        tm = TypeMapper(chemical_symbols=["H", "C", "O"])
         data1 = tm(AtomicData.from_ase(atoms1, r_max=r_max))
         data2 = tm(AtomicData.from_ase(atoms2, r_max=r_max))
         data_both = tm(AtomicData.from_ase(atoms_both, r_max=r_max))

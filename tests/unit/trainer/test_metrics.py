@@ -1,4 +1,4 @@
-import inspect
+# flake8: noqa
 import pytest
 import torch
 from nequip.data import AtomicDataDict
@@ -96,13 +96,6 @@ class TestWeight:
 @pytest.fixture(scope="class", params=metrics_tests)
 def metrics(request):
     """"""
-    coeffs = request.param
+    coeffs = request.param  # noqa
     instance = Metrics(components=request.param)
     yield instance
-
-
-# @pytest.fixture(scope="class")
-# def w_loss():
-#     """"""
-#     instance = Metrics(coeffs=metrics_tests[-1], atomic_weight_on=True)
-#     yield instance

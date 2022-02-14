@@ -12,6 +12,7 @@ import numpy as np
 import ase.neighborlist
 import ase
 from ase.calculators.singlepoint import SinglePointCalculator, SinglePointDFTCalculator
+from ase.calculators.calculator import all_properties as ase_all_properties
 
 import torch
 import e3nn.o3
@@ -23,9 +24,15 @@ from nequip.utils.torch_geometric import Data
 # A type representing ASE-style periodic boundary condtions, which can be partial (the tuple case)
 PBC = Union[bool, Tuple[bool, bool, bool]]
 
+
+_DEFAULT_LONG_FIELDS: Set[str] = {
+    AtomicDataDict.EDGE_INDEX_KEY,
+    AtomicDataDict.ATOMIC_NUMBERS_KEY,
+    AtomicDataDict.ATOM_TYPE_KEY,
+    AtomicDataDict.BATCH_KEY,
+}
 _DEFAULT_NODE_FIELDS: Set[str] = {
     AtomicDataDict.POSITIONS_KEY,
-    AtomicDataDict.WEIGHTS_KEY,
     AtomicDataDict.NODE_FEATURES_KEY,
     AtomicDataDict.NODE_ATTRS_KEY,
     AtomicDataDict.ATOMIC_NUMBERS_KEY,
@@ -43,16 +50,20 @@ _DEFAULT_EDGE_FIELDS: Set[str] = {
 }
 _DEFAULT_GRAPH_FIELDS: Set[str] = {
     AtomicDataDict.TOTAL_ENERGY_KEY,
+    AtomicDataDict.PBC_KEY,
+    AtomicDataDict.CELL_KEY,
 }
 _NODE_FIELDS: Set[str] = set(_DEFAULT_NODE_FIELDS)
 _EDGE_FIELDS: Set[str] = set(_DEFAULT_EDGE_FIELDS)
 _GRAPH_FIELDS: Set[str] = set(_DEFAULT_GRAPH_FIELDS)
+_LONG_FIELDS: Set[str] = set(_DEFAULT_LONG_FIELDS)
 
 
 def register_fields(
     node_fields: Sequence[str] = [],
     edge_fields: Sequence[str] = [],
     graph_fields: Sequence[str] = [],
+    long_fields: Sequence[str] = [],
 ) -> None:
     r"""Register fields as being per-atom, per-edge, or per-frame.
 
@@ -65,12 +76,16 @@ def register_fields(
     graph_fields: set = set(graph_fields)
     allfields = node_fields.union(edge_fields, graph_fields)
     assert len(allfields) == len(node_fields) + len(edge_fields) + len(graph_fields)
-    assert (_NODE_FIELDS.union(_EDGE_FIELDS, _GRAPH_FIELDS)).isdisjoint(
-        allfields
-    ), "Cannot reregister a field that has already been registered"
     _NODE_FIELDS.update(node_fields)
     _EDGE_FIELDS.update(edge_fields)
     _GRAPH_FIELDS.update(graph_fields)
+    _LONG_FIELDS.update(long_fields)
+    if len(set.union(_NODE_FIELDS, _EDGE_FIELDS, _GRAPH_FIELDS)) < (
+        len(_NODE_FIELDS) + len(_EDGE_FIELDS) + len(_GRAPH_FIELDS)
+    ):
+        raise ValueError(
+            "At least one key was registered as more than one of node, edge, or graph!"
+        )
 
 
 def deregister_fields(*fields: Sequence[str]) -> None:
@@ -88,6 +103,77 @@ def deregister_fields(*fields: Sequence[str]) -> None:
         _NODE_FIELDS.discard(f)
         _EDGE_FIELDS.discard(f)
         _GRAPH_FIELDS.discard(f)
+
+
+def _process_dict(kwargs, ignore_fields=[]):
+    """Convert a dict of data into correct dtypes/shapes according to key"""
+    # Deal with _some_ dtype issues
+    for k, v in kwargs.items():
+        if k in ignore_fields:
+            continue
+
+        if k in _LONG_FIELDS:
+            # Any property used as an index must be long (or byte or bool, but those are not relevant for atomic scale systems)
+            # int32 would pass later checks, but is actually disallowed by torch
+            kwargs[k] = torch.as_tensor(v, dtype=torch.long)
+        elif isinstance(v, bool):
+            kwargs[k] = torch.as_tensor(v)
+        elif isinstance(v, np.ndarray):
+            if np.issubdtype(v.dtype, np.floating):
+                kwargs[k] = torch.as_tensor(v, dtype=torch.get_default_dtype())
+            else:
+                kwargs[k] = torch.as_tensor(v)
+        elif isinstance(v, list):
+            ele_dtype = np.array(v).dtype
+            if np.issubdtype(ele_dtype, np.floating):
+                kwargs[k] = torch.as_tensor(v, dtype=torch.get_default_dtype())
+            else:
+                kwargs[k] = torch.as_tensor(v)
+        elif np.issubdtype(type(v), np.floating):
+            # Force scalars to be tensors with a data dimension
+            # This makes them play well with irreps
+            kwargs[k] = torch.as_tensor(v, dtype=torch.get_default_dtype())
+        elif isinstance(v, torch.Tensor) and len(v.shape) == 0:
+            # ^ this tensor is a scalar; we need to give it
+            # a data dimension to play nice with irreps
+            kwargs[k] = v
+
+    if AtomicDataDict.BATCH_KEY in kwargs:
+        num_frames = kwargs[AtomicDataDict.BATCH_KEY].max() + 1
+    else:
+        num_frames = 1
+
+    for k, v in kwargs.items():
+        if k in ignore_fields:
+            continue
+
+        if len(v.shape) == 0:
+            kwargs[k] = v.unsqueeze(-1)
+            v = kwargs[k]
+
+        if k in set.union(_NODE_FIELDS, _EDGE_FIELDS) and len(v.shape) == 1:
+            kwargs[k] = v.unsqueeze(-1)
+            v = kwargs[k]
+
+        if (
+            k in _NODE_FIELDS
+            and AtomicDataDict.POSITIONS_KEY in kwargs
+            and v.shape[0] != kwargs[AtomicDataDict.POSITIONS_KEY].shape[0]
+        ):
+            raise ValueError(
+                f"{k} is a node field but has the wrong dimension {v.shape}"
+            )
+        elif (
+            k in _EDGE_FIELDS
+            and AtomicDataDict.EDGE_INDEX_KEY in kwargs
+            and v.shape[0] != kwargs[AtomicDataDict.EDGE_INDEX_KEY].shape[1]
+        ):
+            raise ValueError(
+                f"{k} is a edge field but has the wrong dimension {v.shape}"
+            )
+        elif k in _GRAPH_FIELDS:
+            if num_frames > 1 and v.shape[0] != num_frames:
+                raise ValueError(f"Wrong shape for graph property {k}")
 
 
 class AtomicData(Data):
@@ -120,7 +206,9 @@ class AtomicData(Data):
         **kwargs: other data, optional.
     """
 
-    def __init__(self, irreps: Dict[str, e3nn.o3.Irreps] = {}, **kwargs):
+    def __init__(
+        self, irreps: Dict[str, e3nn.o3.Irreps] = {}, _validate: bool = True, **kwargs
+    ):
 
         # empty init needed by get_example
         if len(kwargs) == 0 and len(irreps) == 0:
@@ -128,72 +216,49 @@ class AtomicData(Data):
             return
 
         # Check the keys
-        AtomicDataDict.validate_keys(kwargs)
-        # Deal with _some_ dtype issues
-        for k, v in kwargs.items():
-            if (
-                k == AtomicDataDict.EDGE_INDEX_KEY
-                or k == AtomicDataDict.ATOMIC_NUMBERS_KEY
-                or k == AtomicDataDict.ATOM_TYPE_KEY
-                or k == AtomicDataDict.BATCH_KEY
-            ):
-                # Any property used as an index must be long (or byte or bool, but those are not relevant for atomic scale systems)
-                # int32 would pass later checks, but is actually disallowed by torch
-                kwargs[k] = torch.as_tensor(v, dtype=torch.long)
-            elif isinstance(v, np.ndarray):
-                if np.issubdtype(v.dtype, np.floating):
-                    kwargs[k] = torch.as_tensor(v, dtype=torch.get_default_dtype())
-                else:
-                    kwargs[k] = torch.as_tensor(v)
-            elif np.issubdtype(type(v), np.floating):
-                # Force scalars to be tensors with a data dimension
-                # This makes them play well with irreps
-                kwargs[k] = torch.as_tensor(
-                    v, dtype=torch.get_default_dtype()
-                ).unsqueeze(-1)
-            elif isinstance(v, torch.Tensor) and len(v.shape) == 0:
-                # ^ this tensor is a scalar; we need to give it
-                # a data dimension to play nice with irreps
-                kwargs[k] = v.unsqueeze(-1)
+        if _validate:
+            AtomicDataDict.validate_keys(kwargs)
+            _process_dict(kwargs)
 
         super().__init__(num_nodes=len(kwargs["pos"]), **kwargs)
 
-        # Validate shapes
-        assert self.pos.dim() == 2 and self.pos.shape[1] == 3
-        assert self.edge_index.dim() == 2 and self.edge_index.shape[0] == 2
-        if "edge_cell_shift" in self and self.edge_cell_shift is not None:
-            assert self.edge_cell_shift.shape == (self.num_edges, 3)
-            assert self.edge_cell_shift.dtype == self.pos.dtype
-        if "cell" in self and self.cell is not None:
-            assert (self.cell.shape == (3, 3)) or (
-                self.cell.dim() == 3 and self.cell.shape[1:] == (3, 3)
-            )
-            assert self.cell.dtype == self.pos.dtype
-        if "node_features" in self and self.node_features is not None:
-            assert self.node_features.shape[0] == self.num_nodes
-            assert self.node_features.dtype == self.pos.dtype
-        if "node_attrs" in self and self.node_attrs is not None:
-            assert self.node_attrs.shape[0] == self.num_nodes
-            assert self.node_attrs.dtype == self.pos.dtype
-
-        if (
-            AtomicDataDict.ATOMIC_NUMBERS_KEY in self
-            and self.atomic_numbers is not None
-        ):
-            assert self.atomic_numbers.dtype in _TORCH_INTEGER_DTYPES
-        if "batch" in self and self.batch is not None:
-            assert self.batch.dim() == 1 and self.batch.shape[0] == self.num_nodes
-            # Check that there are the right number of cells
+        if _validate:
+            # Validate shapes
+            assert self.pos.dim() == 2 and self.pos.shape[1] == 3
+            assert self.edge_index.dim() == 2 and self.edge_index.shape[0] == 2
+            if "edge_cell_shift" in self and self.edge_cell_shift is not None:
+                assert self.edge_cell_shift.shape == (self.num_edges, 3)
+                assert self.edge_cell_shift.dtype == self.pos.dtype
             if "cell" in self and self.cell is not None:
-                cell = self.cell.view(-1, 3, 3)
-                assert cell.shape[0] == self.batch.max() + 1
+                assert (self.cell.shape == (3, 3)) or (
+                    self.cell.dim() == 3 and self.cell.shape[1:] == (3, 3)
+                )
+                assert self.cell.dtype == self.pos.dtype
+            if "node_features" in self and self.node_features is not None:
+                assert self.node_features.shape[0] == self.num_nodes
+                assert self.node_features.dtype == self.pos.dtype
+            if "node_attrs" in self and self.node_attrs is not None:
+                assert self.node_attrs.shape[0] == self.num_nodes
+                assert self.node_attrs.dtype == self.pos.dtype
 
-        # Validate irreps
-        # __*__ is the only way to hide from torch_geometric
-        self.__irreps__ = AtomicDataDict._fix_irreps_dict(irreps)
-        for field, irreps in self.__irreps__:
-            if irreps is not None:
-                assert self[field].shape[-1] == irreps.dim
+            if (
+                AtomicDataDict.ATOMIC_NUMBERS_KEY in self
+                and self.atomic_numbers is not None
+            ):
+                assert self.atomic_numbers.dtype in _TORCH_INTEGER_DTYPES
+            if "batch" in self and self.batch is not None:
+                assert self.batch.dim() == 2 and self.batch.shape[0] == self.num_nodes
+                # Check that there are the right number of cells
+                if "cell" in self and self.cell is not None:
+                    cell = self.cell.view(-1, 3, 3)
+                    assert cell.shape[0] == self.batch.max() + 1
+
+            # Validate irreps
+            # __*__ is the only way to hide from torch_geometric
+            self.__irreps__ = AtomicDataDict._fix_irreps_dict(irreps)
+            for field, irreps in self.__irreps__:
+                if irreps is not None:
+                    assert self[field].shape[-1] == irreps.dim
 
     @classmethod
     def from_points(
@@ -261,7 +326,14 @@ class AtomicData(Data):
         return cls(edge_index=edge_index, pos=torch.as_tensor(pos), **kwargs)
 
     @classmethod
-    def from_ase(cls, atoms, r_max, **kwargs):
+    def from_ase(
+        cls,
+        atoms,
+        r_max,
+        key_mapping: Optional[Dict[str, str]] = {},
+        include_keys: Optional[list] = [],
+        **kwargs,
+    ):
         """Build a ``AtomicData`` from an ``ase.Atoms`` object.
 
         Respects ``atoms``'s ``pbc`` and ``cell``.
@@ -276,73 +348,122 @@ class AtomicData(Data):
             r_max (float): neighbor cutoff radius.
             features (torch.Tensor shape [N, M], optional): per-atom M-dimensional feature vectors. If ``None`` (the
              default), uses a one-hot encoding of the species present in ``atoms``.
+            include_keys (list): list of additional keys to include in AtomicData aside from the ones defined in
+                 ase.calculators.calculator.all_properties. Optional
+            key_mapping (dict): rename ase property name to a new string name. Optional
             **kwargs (optional): other arguments for the ``AtomicData`` constructor.
 
         Returns:
             A ``AtomicData``.
         """
+        from nequip.ase import NequIPCalculator
+
+        assert "pos" not in kwargs
+
+        default_args = set(
+            [
+                "numbers",
+                "positions",
+            ]  # ase internal names for position and atomic_numbers
+            + ["pbc", "cell", "pos", "r_max"]  # arguments for from_points method
+            + list(kwargs.keys())
+        )
+        # the keys that are duplicated in kwargs are removed from the include_keys
+        include_keys = list(set(include_keys + ase_all_properties) - default_args)
+
+        km = {
+            "forces": AtomicDataDict.FORCE_KEY,
+            "energy": AtomicDataDict.TOTAL_ENERGY_KEY,
+        }
+        km.update(key_mapping)
+        key_mapping = km
+
         add_fields = {}
+
+        # Get info from atoms.arrays; lowest priority. copy first
+        add_fields = {
+            key_mapping.get(k, k): v
+            for k, v in atoms.arrays.items()
+            if k in include_keys
+        }
+
+        # Get info from atoms.info; second lowest priority.
+        add_fields.update(
+            {
+                key_mapping.get(k, k): v
+                for k, v in atoms.info.items()
+                if k in include_keys
+            }
+        )
+
         if atoms.calc is not None:
+
             if isinstance(
                 atoms.calc, (SinglePointCalculator, SinglePointDFTCalculator)
             ):
-                add_fields = deepcopy(atoms.calc.results)
-                if "forces" in add_fields:
-                    add_fields.pop("forces")
-                    add_fields[AtomicDataDict.FORCE_KEY] = atoms.get_forces()
-
-                if "free_energy" in add_fields and "energy" not in add_fields:
-                    add_fields[AtomicDataDict.TOTAL_ENERGY_KEY] = add_fields.pop(
-                        "free_energy"
-                    )
-                elif "energy" in add_fields:
-                    add_fields[AtomicDataDict.TOTAL_ENERGY_KEY] = add_fields.pop(
-                        "energy"
-                    )
-
-        if AtomicDataDict.FORCE_KEY not in add_fields:
-            # Get it from arrays
-            for k in ("force", "forces"):
-                if k in atoms.arrays:
-                    add_fields[AtomicDataDict.FORCE_KEY] = atoms.arrays[k]
-                    break
-
-        if AtomicDataDict.TOTAL_ENERGY_KEY not in add_fields:
-            # Get it from arrays
-            for k in ("energy", "energies"):
-                if k in atoms.arrays:
-                    add_fields[AtomicDataDict.TOTAL_ENERGY_KEY] = atoms.arrays[k]
-                    break
+                add_fields.update(
+                    {
+                        key_mapping.get(k, k): deepcopy(v)
+                        for k, v in atoms.calc.results.items()
+                        if k in include_keys
+                    }
+                )
+            elif isinstance(atoms.calc, NequIPCalculator):
+                pass  # otherwise the calculator breaks
+            else:
+                raise NotImplementedError(
+                    f"`from_ase` does not support calculator {atoms.calc}"
+                )
 
         add_fields[AtomicDataDict.ATOMIC_NUMBERS_KEY] = atoms.get_atomic_numbers()
+
+        # cell and pbc in kwargs can override the ones stored in atoms
+        cell = kwargs.pop("cell", atoms.get_cell())
+        pbc = kwargs.pop("pbc", atoms.pbc)
 
         return cls.from_points(
             pos=atoms.positions,
             r_max=r_max,
-            cell=atoms.get_cell(),
-            pbc=atoms.pbc,
+            cell=cell,
+            pbc=pbc,
             **kwargs,
             **add_fields,
         )
 
-    def to_ase(self) -> Union[List[ase.Atoms], ase.Atoms]:
+    def to_ase(
+        self,
+        type_mapper=None,
+        extra_fields: List[str] = [],
+    ) -> Union[List[ase.Atoms], ase.Atoms]:
         """Build a (list of) ``ase.Atoms`` object(s) from an ``AtomicData`` object.
 
         For each unique batch number provided in ``AtomicDataDict.BATCH_KEY``,
         an ``ase.Atoms`` object is created. If ``AtomicDataDict.BATCH_KEY`` does not
         exist in self, a single ``ase.Atoms`` object is created.
 
+        Args:
+            type_mapper: if provided, will be used to map ``ATOM_TYPES`` back into
+                elements, if the configuration of the ``type_mapper`` allows.
+            extra_fields: fields other than those handled explicitly (currently
+                those defining the structure as well as energy, per-atom energy,
+                and forces) to include in the output object. Per-atom (per-node)
+                quantities will be included in ``arrays``; per-graph and per-edge
+                quantities will be included in ``info``.
+
         Returns:
             A list of ``ase.Atoms`` objects if ``AtomicDataDict.BATCH_KEY`` is in self
             and is not None. Otherwise, a single ``ase.Atoms`` object is returned.
         """
         positions = self.pos
+        edge_index = self[AtomicDataDict.EDGE_INDEX_KEY]
         if positions.device != torch.device("cpu"):
             raise TypeError(
                 "Explicitly move this `AtomicData` to CPU using `.to()` before calling `to_ase()`."
             )
         if AtomicDataDict.ATOMIC_NUMBERS_KEY in self:
             atomic_nums = self.atomic_numbers
+        elif type_mapper is not None and type_mapper.has_chemical_symbols:
+            atomic_nums = type_mapper.untransform(self[AtomicDataDict.ATOM_TYPE_KEY])
         else:
             warnings.warn(
                 "AtomicData.to_ase(): self didn't contain atomic numbers... using atom_type as atomic numbers instead, but this means the chemical symbols in ASE (outputs) will be wrong"
@@ -352,8 +473,20 @@ class AtomicData(Data):
         cell = getattr(self, AtomicDataDict.CELL_KEY, None)
         batch = getattr(self, AtomicDataDict.BATCH_KEY, None)
         energy = getattr(self, AtomicDataDict.TOTAL_ENERGY_KEY, None)
+        energies = getattr(self, AtomicDataDict.PER_ATOM_ENERGY_KEY, None)
         force = getattr(self, AtomicDataDict.FORCE_KEY, None)
         do_calc = energy is not None or force is not None
+
+        # exclude those that are special for ASE and that we process seperately
+        special_handling_keys = [
+            AtomicDataDict.POSITIONS_KEY,
+            AtomicDataDict.CELL_KEY,
+            AtomicDataDict.PBC_KEY,
+            AtomicDataDict.ATOMIC_NUMBERS_KEY,
+        ] + AtomicDataDict.ALL_ENERGY_KEYS
+        assert (
+            len(set(extra_fields).intersection(special_handling_keys)) == 0
+        ), f"Cannot specify keys handled in special ways ({special_handling_keys}) as `extra_fields` for atoms output--- they are output by default"
 
         if cell is not None:
             cell = cell.view(-1, 3, 3)
@@ -371,11 +504,15 @@ class AtomicData(Data):
         for batch_idx in range(n_batches):
             if batch is not None:
                 mask = batch == batch_idx
+                mask = mask.view(-1)
+                # if both ends of the edge are in the batch, the edge is in the batch
+                edge_mask = mask[edge_index[0]] & mask[edge_index[1]]
             else:
                 mask = slice(None)
+                edge_mask = slice(None)
 
             mol = ase.Atoms(
-                numbers=atomic_nums[mask],
+                numbers=atomic_nums[mask].view(-1),  # must be flat for ASE
                 positions=positions[mask],
                 cell=cell[batch_idx] if cell is not None else None,
                 pbc=pbc[batch_idx] if pbc is not None else None,
@@ -383,11 +520,33 @@ class AtomicData(Data):
 
             if do_calc:
                 fields = {}
+                if energies is not None:
+                    fields["energies"] = energies[mask].cpu().numpy()
                 if energy is not None:
                     fields["energy"] = energy[batch_idx].cpu().numpy()
                 if force is not None:
                     fields["forces"] = force[mask].cpu().numpy()
                 mol.calc = SinglePointCalculator(mol, **fields)
+
+            # add other information
+            for key in extra_fields:
+                if key in _NODE_FIELDS:
+                    # mask it
+                    mol.arrays[key] = (
+                        self[key][mask].cpu().numpy().reshape(mask.sum(), -1)
+                    )
+                elif key in _EDGE_FIELDS:
+                    mol.info[key] = (
+                        self[key][edge_mask].cpu().numpy().reshape(edge_mask.sum(), -1)
+                    )
+                elif key == AtomicDataDict.EDGE_INDEX_KEY:
+                    mol.info[key] = self[key][:, edge_mask].cpu().numpy()
+                elif key in _GRAPH_FIELDS:
+                    mol.info[key] = self[key][batch_idx].cpu().numpy().reshape(-1)
+                else:
+                    raise RuntimeError(
+                        f"Extra field `{key}` isn't registered as node/edge/graph"
+                    )
 
             batch_atoms.append(mol)
 
@@ -424,22 +583,21 @@ class AtomicData(Data):
 
     @classmethod
     def from_AtomicDataDict(cls, data: AtomicDataDict.Type):
-        return cls(**data)
+        # it's an AtomicDataDict, so don't validate-- assume valid:
+        return cls(_validate=False, **data)
 
     @property
     def irreps(self):
         return self.__irreps__
 
     def __cat_dim__(self, key, value):
-        if key in (
-            AtomicDataDict.CELL_KEY,
-            AtomicDataDict.PBC_KEY,
-            AtomicDataDict.TOTAL_ENERGY_KEY,
-        ):
-            # the cell and PBC are graph-level properties and so need a new batch dimension
+        if key == AtomicDataDict.EDGE_INDEX_KEY:
+            return 1  # always cat in the edge dimension
+        elif key in _GRAPH_FIELDS:
+            # graph-level properties and so need a new batch dimension
             return None
         else:
-            return super().__cat_dim__(key, value)
+            return 0  # cat along node/edge dimension
 
     def without_nodes(self, which_nodes):
         """Return a copy of ``self`` with ``which_nodes`` removed.

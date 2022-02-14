@@ -21,6 +21,7 @@ class GradientOutput(GraphModuleMixin, torch.nn.Module):
         sign: either 1 or -1; the returned gradient is multiplied by this.
     """
     sign: float
+    skip: bool
 
     def __init__(
         self,
@@ -35,6 +36,8 @@ class GradientOutput(GraphModuleMixin, torch.nn.Module):
         assert sign in (1.0, -1.0)
         self.sign = sign
         self.of = of
+        self.skip = False
+
         # TO DO: maybe better to force using list?
         if isinstance(wrt, str):
             wrt = [wrt]
@@ -64,6 +67,10 @@ class GradientOutput(GraphModuleMixin, torch.nn.Module):
         )
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
+
+        if self.skip:
+            return self.func(data)
+
         # set req grad
         wrt_tensors = []
         old_requires_grad: List[bool] = []
@@ -97,3 +104,65 @@ class GradientOutput(GraphModuleMixin, torch.nn.Module):
             data[k].requires_grad_(req_grad)
 
         return data
+
+
+@compile_mode("unsupported")
+class PartialForceOutput(GraphModuleMixin, torch.nn.Module):
+    r"""Generate partial and total forces from an energy model.
+
+    Args:
+        func: the energy model
+        vectorize: the vectorize option to ``torch.autograd.functional.jacobian``,
+            false by default since it doesn't work well.
+    """
+    vectorize: bool
+
+    def __init__(
+        self,
+        func: GraphModuleMixin,
+        vectorize: bool = False,
+        vectorize_warnings: bool = False,
+    ):
+        super().__init__()
+        # TODO wrap:
+        self.func = func
+        self.vectorize = vectorize
+        if vectorize_warnings:
+            # See https://pytorch.org/docs/stable/generated/torch.autograd.functional.jacobian.html
+            torch._C._debug_only_display_vmap_fallback_warnings(True)
+
+        # check and init irreps
+        self._init_irreps(
+            irreps_in=func.irreps_in,
+            my_irreps_in={AtomicDataDict.PER_ATOM_ENERGY_KEY: Irreps("0e")},
+            irreps_out=func.irreps_out,
+        )
+        self.irreps_out[AtomicDataDict.PARTIAL_FORCE_KEY] = Irreps("1o")
+        self.irreps_out[AtomicDataDict.FORCE_KEY] = Irreps("1o")
+
+    def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
+        data = data.copy()
+        out_data = {}
+
+        def wrapper(pos: torch.Tensor) -> torch.Tensor:
+            """Wrapper from pos to atomic energy"""
+            nonlocal data, out_data
+            data[AtomicDataDict.POSITIONS_KEY] = pos
+            out_data = self.func(data)
+            return out_data[AtomicDataDict.PER_ATOM_ENERGY_KEY].squeeze(-1)
+
+        pos = data[AtomicDataDict.POSITIONS_KEY]
+
+        partial_forces = torch.autograd.functional.jacobian(
+            func=wrapper,
+            inputs=pos,
+            create_graph=self.training,  # needed to allow gradients of this output during training
+            vectorize=self.vectorize,
+        )
+        partial_forces = partial_forces.negative()
+        # output is [n_at, n_at, 3]
+
+        out_data[AtomicDataDict.PARTIAL_FORCE_KEY] = partial_forces
+        out_data[AtomicDataDict.FORCE_KEY] = partial_forces.sum(dim=0)
+
+        return out_data

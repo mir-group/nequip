@@ -20,7 +20,23 @@ class TypeMapper:
         self,
         type_names: Optional[List[str]] = None,
         chemical_symbol_to_type: Optional[Dict[str, int]] = None,
+        chemical_symbols: Optional[List[str]] = None,
     ):
+        if chemical_symbols is not None:
+            if chemical_symbol_to_type is not None:
+                raise ValueError(
+                    "Cannot provide both `chemical_symbols` and `chemical_symbol_to_type`"
+                )
+            # repro old, sane NequIP behaviour
+            # checks also for validity of keys
+            atomic_nums = [ase.data.atomic_numbers[sym] for sym in chemical_symbols]
+            # https://stackoverflow.com/questions/29876580/how-to-sort-a-list-according-to-another-list-python
+            chemical_symbols = [
+                e[1] for e in sorted(zip(atomic_nums, chemical_symbols))
+            ]
+            chemical_symbol_to_type = {k: i for i, k in enumerate(chemical_symbols)}
+            del chemical_symbols
+
         # Build from chem->type mapping, if provided
         self.chemical_symbol_to_type = chemical_symbol_to_type
         if self.chemical_symbol_to_type is not None:
@@ -53,11 +69,16 @@ class TypeMapper:
             for sym, type in self.chemical_symbol_to_type.items():
                 Z_to_index[ase.data.atomic_numbers[sym] - self._min_Z] = type
             self._Z_to_index = Z_to_index
+            self._index_to_Z = torch.zeros(
+                size=(len(self.chemical_symbol_to_type),), dtype=torch.long
+            )
+            for sym, type_idx in self.chemical_symbol_to_type.items():
+                self._index_to_Z[type_idx] = ase.data.atomic_numbers[sym]
             self._valid_set = set(valid_atomic_numbers)
         # check
         if type_names is None:
             raise ValueError(
-                "Neither chemical_symbol_to_type nor type_names was provided; one or the other is required"
+                "None of chemical_symbols, chemical_symbol_to_type, nor type_names was provided; exactly one is required"
             )
         # validate type names
         assert all(
@@ -79,7 +100,7 @@ class TypeMapper:
         elif AtomicDataDict.ATOMIC_NUMBERS_KEY in data:
             assert (
                 self.chemical_symbol_to_type is not None
-            ), "Atomic numbers provided but there is no chemical_symbol_to_type mapping!"
+            ), "Atomic numbers provided but there is no chemical_symbols/chemical_symbol_to_type mapping!"
             atomic_numbers = data[AtomicDataDict.ATOMIC_NUMBERS_KEY]
             del data[AtomicDataDict.ATOMIC_NUMBERS_KEY]
 
@@ -101,3 +122,11 @@ class TypeMapper:
             )
 
         return self._Z_to_index[atomic_numbers - self._min_Z]
+
+    def untransform(self, atom_types):
+        """Transform atom types back into atomic numbers"""
+        return self._index_to_Z[atom_types]
+
+    @property
+    def has_chemical_symbols(self) -> bool:
+        return self.chemical_symbol_to_type is not None

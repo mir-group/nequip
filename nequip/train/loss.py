@@ -14,7 +14,6 @@ class Loss:
 
     Args:
         coeffs (dict, str): keys with coefficient and loss function name
-        weight (bool): if True, the results will be weighted with the key: AtomicDataDict.WEIGHTS_KEY+key
 
     Example input dictionaries
 
@@ -46,6 +45,7 @@ class Loss:
         self.coeff_schedule = coeff_schedule
         self.coeffs = {}
         self.funcs = {}
+        self.keys = []
 
         mseloss = find_loss_function("MSELoss", {})
         if isinstance(coeffs, str):
@@ -94,6 +94,7 @@ class Loss:
 
         for key, coeff in self.coeffs.items():
             self.coeffs[key] = torch.as_tensor(coeff, dtype=torch.get_default_dtype())
+            self.keys += [key]
 
     def __call__(self, pred: dict, ref: dict):
 

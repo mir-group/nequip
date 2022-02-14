@@ -99,7 +99,7 @@ invariant_neurons
 resnet
 ^^^^^^
     | Type: bool
-    | Default: ``True``
+    | Default: ``False``
 
 nonlinearity_type
 ^^^^^^^^^^^^^^^^^

@@ -2,7 +2,6 @@ import numpy as np
 import logging
 import tempfile
 import inspect
-from torch._C import Value
 import yaml
 import hashlib
 from os.path import dirname, basename, abspath
@@ -12,7 +11,8 @@ import ase
 
 import torch
 
-from torch_scatter import scatter, scatter_std
+from torch_runstats.scatter import scatter_std, scatter_mean
+
 from nequip.utils.torch_geometric import Batch, Dataset
 from nequip.utils.torch_geometric.utils import download_url, extract_zip
 
@@ -25,9 +25,10 @@ from nequip.data import (
     _GRAPH_FIELDS,
 )
 from nequip.utils.batch_ops import bincount
-from nequip.utils.regressor import gp
-from ._util import _TORCH_INTEGER_DTYPES
+from nequip.utils.regressor import solver
+from nequip.utils.savenload import atomic_write
 from .transforms import TypeMapper
+from .AtomicData import _process_dict
 
 
 class AtomicDataset(Dataset):
@@ -76,6 +77,7 @@ class AtomicInMemoryDataset(AtomicDataset):
         force_fixed_keys (list, optional): keys to move from AtomicData to fixed_fields dictionary
         extra_fixed_fields (dict, optional): extra key that are not stored in data but needed for AtomicData initialization
         include_frames (list, optional): the frames to process with the constructor.
+        type_mapper (TypeMapper): the transformation to map atomic information to species index. Optional
     """
 
     def __init__(
@@ -86,7 +88,7 @@ class AtomicInMemoryDataset(AtomicDataset):
         force_fixed_keys: List[str] = [],
         extra_fixed_fields: Dict[str, Any] = {},
         include_frames: Optional[List[int]] = None,
-        type_mapper: TypeMapper = None,
+        type_mapper: Optional[TypeMapper] = None,
     ):
         # TO DO, this may be simplified
         # See if a subclass defines some inputs
@@ -251,8 +253,8 @@ class AtomicInMemoryDataset(AtomicDataset):
             num_examples = next(iter(num_examples))
 
             include_frames = self.include_frames
-            if self.include_frames is None:
-                include_frames = list(range(num_examples))
+            if include_frames is None:
+                include_frames = range(num_examples)
 
             # Make AtomicData from it:
             if AtomicDataDict.EDGE_INDEX_KEY in all_keys:
@@ -279,24 +281,22 @@ class AtomicInMemoryDataset(AtomicDataset):
         del fields
 
         # type conversion
-        for key, value in fixed_fields.items():
-            if isinstance(value, np.ndarray):
-                if np.issubdtype(value.dtype, np.floating):
-                    fixed_fields[key] = torch.as_tensor(
-                        value, dtype=torch.get_default_dtype()
-                    )
-                else:
-                    fixed_fields[key] = torch.as_tensor(value)
-            elif np.issubdtype(type(value), np.floating):
-                fixed_fields[key] = torch.as_tensor(
-                    value, dtype=torch.get_default_dtype()
-                )
+        _process_dict(fixed_fields, ignore_fields=["r_max"])
 
         logging.info(f"Loaded data: {data}")
 
-        torch.save((data, fixed_fields, self.include_frames), self.processed_paths[0])
-        with open(self.processed_paths[1], "w") as f:
+        # use atomic writes to avoid race conditions between
+        # different trainings that use the same dataset
+        # since those separate trainings should all produce the same results,
+        # it doesn't matter if they overwrite each others cached'
+        # datasets. It only matters that they don't simultaneously try
+        # to write the _same_ file, corrupting it.
+        with atomic_write(self.processed_paths[0], binary=True) as f:
+            torch.save((data, fixed_fields, self.include_frames), f)
+        with atomic_write(self.processed_paths[1], binary=False) as f:
             yaml.dump(self._get_parameters(), f)
+
+        logging.info("Cached processed data to disk")
 
         self.data = data
         self.fixed_fields = fixed_fields
@@ -353,6 +353,17 @@ class AtomicInMemoryDataset(AtomicDataset):
 
         if self._indices is not None:
             graph_selector = torch.as_tensor(self._indices)[::stride]
+            # note that self._indices is _not_ necessarily in order,
+            # while self.data --- which we take our arrays from ---
+            # is always in the original order.
+            # In particular, the values of `self.data.batch`
+            # are indexes in the ORIGINAL order
+            # thus we need graph level properties to also be in the original order
+            # so that batch values index into them correctly
+            # since self.data.batch is always sorted & contiguous
+            # (because of Batch.from_data_list)
+            # we sort it:
+            graph_selector, _ = torch.sort(graph_selector)
         else:
             graph_selector = torch.arange(0, self.len(), stride)
         num_graphs = len(graph_selector)
@@ -488,7 +499,7 @@ class AtomicInMemoryDataset(AtomicDataset):
                     batch=data_transformed[AtomicDataDict.BATCH_KEY],
                     atom_types=atom_types,
                     unbiased=unbiased,
-                    **algorithm_kwargs,
+                    algorithm_kwargs=algorithm_kwargs,
                 )
                 out.append(results)
 
@@ -547,7 +558,7 @@ class AtomicInMemoryDataset(AtomicDataset):
         atom_types: torch.Tensor,
         batch: torch.Tensor,
         unbiased: bool = True,
-        alpha: Optional[float] = 0.1,
+        algorithm_kwargs: Optional[dict] = {},
     ):
         """Compute "per-species" statistics.
 
@@ -555,7 +566,7 @@ class AtomicInMemoryDataset(AtomicDataset):
 
         For a per-node quantity, computes the expected statistic but for each type instead of over all nodes.
         """
-        N = bincount(atom_types, batch)
+        N = bincount(atom_types.squeeze(-1), batch)
         N = N[(N > 0).any(dim=1)]  # deal with non-contiguous batch indexes
 
         if arr_is_per == "graph":
@@ -567,17 +578,17 @@ class AtomicInMemoryDataset(AtomicDataset):
 
             N = N.type(torch.get_default_dtype())
 
-            return gp(N, arr, alpha=alpha)
+            return solver(N, arr, **algorithm_kwargs)
 
         elif arr_is_per == "node":
             arr = arr.type(torch.get_default_dtype())
 
             if ana_mode == "mean_std":
-                mean = scatter(arr, atom_types, reduce="mean", dim=0)
+                mean = scatter_mean(arr, atom_types, dim=0)
                 std = scatter_std(arr, atom_types, dim=0, unbiased=unbiased)
                 return mean, std
             elif ana_mode == "rms":
-                square = scatter(arr.square(), atom_types, reduce="mean", dim=0)
+                square = scatter_mean(arr.square(), atom_types, dim=0)
                 dims = len(square.shape) - 1
                 for i in range(dims):
                     square = square.mean(axis=-1)
@@ -591,12 +602,41 @@ class AtomicInMemoryDataset(AtomicDataset):
 class NpzDataset(AtomicInMemoryDataset):
     """Load data from an npz file.
 
-    To avoid loading unneeded data, keys are ignored by default unless they are in ``key_mapping``, ``npz_keys``, or ``npz_fixed_fields``.
+    To avoid loading unneeded data, keys are ignored by default unless they are in ``key_mapping``, ``include_keys``,
+    ``npz_fixed_fields`` or ``extra_fixed_fields``.
 
     Args:
-        file_name (str): file name of the npz file
-        key_mapping (Dict[str, str]): mapping of npz keys to ``AtomicData`` keys
-        force_fixed_keys (list): keys in the npz to treat as fixed quantities that don't change across examples. For example: cell, atomic_numbers
+        key_mapping (Dict[str, str]): mapping of npz keys to ``AtomicData`` keys. Optional
+        include_keys (list): the attributes to be processed and stored. Optional
+        npz_fixed_field_keys: the attributes that only have one instance but apply to all frames. Optional
+
+    Example: Given a npz file with 10 configurations, each with 14 atoms.
+
+        position: (10, 14, 3)
+        force: (10, 14, 3)
+        energy: (10,)
+        Z: (14)
+        user_label1: (10)        # per config
+        user_label2: (10, 14, 3) # per atom
+
+    The input yaml should be
+
+    ```yaml
+    dataset: npz
+    dataset_file_name: example.npz
+    include_keys:
+      - user_label1
+      - user_label2
+    npz_fixed_field_keys:
+      - cell
+      - atomic_numbers
+    key_mapping:
+      position: pos
+      force: forces
+      energy: total_energy
+      Z: atomic_numbers
+    ```
+
     """
 
     def __init__(
@@ -610,7 +650,7 @@ class NpzDataset(AtomicInMemoryDataset):
             "Z": AtomicDataDict.ATOMIC_NUMBERS_KEY,
             "atomic_number": AtomicDataDict.ATOMIC_NUMBERS_KEY,
         },
-        npz_keys: List[str] = [],
+        include_keys: List[str] = [],
         npz_fixed_field_keys: List[str] = [],
         file_name: Optional[str] = None,
         url: Optional[str] = None,
@@ -621,7 +661,7 @@ class NpzDataset(AtomicInMemoryDataset):
     ):
         self.key_mapping = key_mapping
         self.npz_fixed_field_keys = npz_fixed_field_keys
-        self.npz_keys = npz_keys
+        self.include_keys = include_keys
 
         super().__init__(
             file_name=file_name,
@@ -643,13 +683,18 @@ class NpzDataset(AtomicInMemoryDataset):
 
     # TODO: fixed fields?
     def get_data(self):
+
         data = np.load(self.raw_dir + "/" + self.raw_file_names[0], allow_pickle=True)
 
+        # only the keys explicitly mentioned in the yaml file will be parsed
         keys = set(list(self.key_mapping.keys()))
         keys.update(self.npz_fixed_field_keys)
-        keys.update(self.npz_keys)
+        keys.update(self.include_keys)
+        keys.update(list(self.extra_fixed_fields.keys()))
         keys = keys.intersection(set(list(data.keys())))
+
         mapped = {self.key_mapping.get(k, k): data[k] for k in keys}
+
         # TODO: generalize this?
         for intkey in (
             AtomicDataDict.ATOMIC_NUMBERS_KEY,
@@ -667,9 +712,53 @@ class NpzDataset(AtomicInMemoryDataset):
 
 
 class ASEDataset(AtomicInMemoryDataset):
-    """TODO
+    """
 
-    r_max and an override PBC can be specified in extra_fixed_fields
+    Args:
+        ase_args (dict): arguments for ase.io.read
+        include_keys (list): in addition to forces and energy, the keys that needs to
+             be parsed into dataset
+             The data stored in ase.atoms.Atoms.array has the lowest priority,
+             and it will be overrided by data in ase.atoms.Atoms.info
+             and ase.atoms.Atoms.calc.results. Optional
+        key_mapping (dict): rename some of the keys to the value str. Optional
+
+    Example: Given an atomic data stored in "H2.extxyz" that looks like below:
+
+    ```H2.extxyz
+    2
+    Properties=species:S:1:pos:R:3 energy=-10 user_label=2.0 pbc="F F F"
+     H       0.00000000       0.00000000       0.00000000
+     H       0.00000000       0.00000000       1.02000000
+    ```
+
+    The yaml input should be
+
+    ```
+    dataset: ase
+    dataset_file_name: H2.extxyz
+    ase_args:
+      format: extxyz
+    include_keys:
+      - user_label
+    key_mapping:
+      user_label: label0
+    chemical_symbols:
+      - H
+    ```
+
+    for VASP parser, the yaml input should be
+    ```
+    dataset: ase
+    dataset_file_name: OUTCAR
+    ase_args:
+      format: vasp-out
+    key_mapping:
+      free_energy: total_energy
+    chemical_symbols:
+      - H
+    ```
+
     """
 
     def __init__(
@@ -682,11 +771,16 @@ class ASEDataset(AtomicInMemoryDataset):
         extra_fixed_fields: Dict[str, Any] = {},
         include_frames: Optional[List[int]] = None,
         type_mapper: TypeMapper = None,
+        key_mapping: Optional[dict] = None,
+        include_keys: Optional[List[str]] = None,
     ):
 
         self.ase_args = dict(index=":")
         self.ase_args.update(getattr(type(self), "ASE_ARGS", dict()))
         self.ase_args.update(ase_args)
+
+        self.include_keys = include_keys
+        self.key_mapping = key_mapping
 
         super().__init__(
             file_name=file_name,
@@ -747,19 +841,28 @@ class ASEDataset(AtomicInMemoryDataset):
         return aseread(self.raw_dir + "/" + self.raw_file_names[0], **self.ase_args)
 
     def get_data(self):
+
         # Get our data
         atoms_list = self.get_atoms()
+
+        # skip the None arguments
+        kwargs = dict(
+            include_keys=self.include_keys,
+            key_mapping=self.key_mapping,
+        )
+        kwargs = {k: v for k, v in kwargs.items() if v is not None}
+        kwargs.update(self.extra_fixed_fields)
+
         if self.include_frames is None:
             return (
-                [
-                    AtomicData.from_ase(atoms=atoms, **self.extra_fixed_fields)
-                    for atoms in atoms_list
-                ],
+                [AtomicData.from_ase(atoms=atoms, **kwargs) for atoms in atoms_list],
             )
         else:
             return (
                 [
-                    AtomicData.from_ase(atoms=atoms_list[i], **self.extra_fixed_fields)
-                    for i in self.include_frames
+                    AtomicData.from_ase(atoms=atoms_list[i], **kwargs)
+                    if i in self.include_frames
+                    else None  # in-memory dataset will ignore this later, but needed for indexing to work out
+                    for i in range(len(atoms_list))
                 ],
             )

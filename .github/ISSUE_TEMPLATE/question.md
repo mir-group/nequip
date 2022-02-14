@@ -7,4 +7,4 @@ assignees: ''
 
 ---
 
-
+If this isn't an issue with the code or a request, please use our [GitHub Discussions](https://github.com/mir-group/nequip/discussions) instead.

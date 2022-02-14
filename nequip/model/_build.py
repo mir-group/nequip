@@ -1,28 +1,9 @@
-from typing import Optional, Union, Callable
 import inspect
-import yaml
+from typing import Optional
 
 from nequip.data import AtomicDataset
 from nequip.nn import GraphModuleMixin
-
-
-def _load_callable(obj: Union[str, Callable], prefix: Optional[str] = None) -> Callable:
-    """Load a callable from a name, or pass through a callable."""
-    if callable(obj):
-        pass
-    elif isinstance(obj, str):
-        if "." not in obj:
-            # It's an unqualified name
-            if prefix is not None:
-                obj = prefix + "." + obj
-            else:
-                # You can't have an unqualified name without a prefix
-                raise ValueError(f"Cannot load unqualified name {obj}.")
-        obj = yaml.load(f"!!python/name:{obj}", Loader=yaml.Loader)
-    else:
-        raise TypeError
-    assert callable(obj), f"{obj} isn't callable"
-    return obj
+from nequip.utils import load_callable
 
 
 def model_from_config(
@@ -59,13 +40,13 @@ def model_from_config(
 
     # Build
     builders = [
-        _load_callable(b, prefix="nequip.model")
+        load_callable(b, prefix="nequip.model")
         for b in config.get("model_builders", [])
     ]
 
     model = None
 
-    for builder_i, builder in enumerate(builders):
+    for builder in builders:
         pnames = inspect.signature(builder).parameters
         params = {}
         if "initialize" in pnames:
@@ -75,24 +56,28 @@ def model_from_config(
         if "dataset" in pnames:
             if "initialize" not in pnames:
                 raise ValueError("Cannot request dataset without requesting initialize")
-            if initialize and dataset is None:
+            if (
+                initialize
+                and pnames["dataset"].default == inspect.Parameter.empty
+                and dataset is None
+            ):
                 raise RuntimeError(
-                    f"Builder {builder.__name__} asked for the dataset, initialize is true, but no dataset was provided to `model_from_config`."
+                    f"Builder {builder.__name__} requires the dataset, initialize is true, but no dataset was provided to `model_from_config`."
                 )
             params["dataset"] = dataset
         if "model" in pnames:
-            if builder_i == 0:
+            if model is None:
                 raise RuntimeError(
-                    f"Builder {builder.__name__} asked for the model as an input, but it's the first builder so there is no model to provide"
+                    f"Builder {builder.__name__} asked for the model as an input, but no previous builder has returned a model"
                 )
             params["model"] = model
         else:
-            if builder_i > 0:
+            if model is not None:
                 raise RuntimeError(
-                    f"All model_builders but the first one must take the model as an argument; {builder.__name__} doesn't"
+                    f"All model_builders after the first one that returns a model must take the model as an argument; {builder.__name__} doesn't"
                 )
         model = builder(**params)
-        if not isinstance(model, GraphModuleMixin):
+        if model is not None and not isinstance(model, GraphModuleMixin):
             raise TypeError(
                 f"Builder {builder.__name__} didn't return a GraphModuleMixin, got {type(model)} instead"
             )

@@ -3,7 +3,7 @@ from typing import Optional, Dict, Callable
 
 import torch
 
-from torch_scatter import scatter
+from torch_runstats.scatter import scatter
 
 from e3nn import o3
 from e3nn.nn import FullyConnectedNet
@@ -144,7 +144,7 @@ class InteractionBlock(GraphModuleMixin, torch.nn.Module):
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
         """
-        Evaluate interaction Block with ResNet.
+        Evaluate interaction Block with ResNet (self-connection).
 
         :param node_input:
         :param node_attr:

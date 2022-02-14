@@ -10,20 +10,33 @@
 # if 'root'/'run_name' exists, 'root'/'run_name'_'year'-'month'-'day'-'hour'-'min'-'s' will be used instead.
 root: results/toluene
 run_name: example-run-toluene
-seed: 0                                                                           # random number seed for numpy and torch
+seed: 123
+dataset_seed: 456                                                                          # random number seed for numpy and torch
 append: true                                                                      # set true if a restarted run should append to the previous log file
 default_dtype: float32                                                            # type of float to use, e.g. float32 and float64
 allow_tf32: false                                                                 # whether to use TensorFloat32 if it is available
+# device:  cuda                                                                     # which device to use. Default: automatically detected cuda or "cpu"
 
 # network
 r_max: 4.0                                                                        # cutoff radius in length units, here Angstrom, this is an important hyperparamter to scan
 num_layers: 4                                                                     # number of interaction blocks, we find 4-6 to work best
-chemical_embedding_irreps_out: 32x0e                                              # irreps for the chemical embedding of species
-feature_irreps_hidden: 32x0o + 32x0e + 32x1o + 32x1e                              # irreps used for hidden features, here we go up to lmax=1, with even and odd parities; for more accurate but slower networks, use l=2 or higher, smaller number of features is faster
-irreps_edge_sh: 0e + 1o                                                           # irreps of the spherical harmonics used for edges. If a single integer, indicates the full SH up to L_max=that_integer
-conv_to_output_hidden_irreps_out: 16x0e                                           # irreps used in hidden layer of output block
+
+l_max: 1                                                                          # the maximum irrep order (rotation order) for the network's features
+parity: true                                                                      # whether to include features with odd mirror parity
+num_features: 32                                                                  # the multiplicity of the features
+
+# alternatively, the irreps of the features in various parts of the network can be specified directly:
+# the following options use e3nn irreps notation
+# either these four options, or the above three options, should be provided--- they cannot be mixed.
+# chemical_embedding_irreps_out: 32x0e                                              # irreps for the chemical embedding of species
+# feature_irreps_hidden: 32x0o + 32x0e + 32x1o + 32x1e                              # irreps used for hidden features, here we go up to lmax=1, with even and odd parities; for more accurate but slower networks, use l=2 or higher, smaller number of features is faster
+# irreps_edge_sh: 0e + 1o                                                           # irreps of the spherical harmonics used for edges. If a single integer, indicates the full SH up to L_max=that_integer
+# conv_to_output_hidden_irreps_out: 16x0e                                           # irreps used in hidden layer of output block
+
+
 nonlinearity_type: gate                                                           # may be 'gate' or 'norm', 'gate' is recommended
 resnet: false                                                                     # set true to make interaction block a resnet-style update
+                                                                                  # the resnet update will only be applied when the input and output irreps of the layer are the same
 
 # scalar nonlinearities to use — available options are silu, ssp (shifted softplus), tanh, and abs.
 # Different nonlinearities are specified for e (even) and o (odd) parity;
@@ -44,9 +57,8 @@ PolynomialCutoff_p: 6                                                           
 # radial network
 invariant_layers: 2                                                               # number of radial layers, usually 1-3 works best, smaller is faster
 invariant_neurons: 64                                                             # number of hidden neurons in radial function, smaller is faster
-avg_num_neighbors: null                                                           # number of neighbors to divide by, null => no normalization.
+avg_num_neighbors: auto                                                           # number of neighbors to divide by, null => no normalization.
 use_sc: true                                                                      # use self-connection or not, usually gives big improvement
-compile_model: false                                                              # whether to compile the constructed model to TorchScript
 
 # to specify different parameters for each convolutional layer, try examples below
 # layer1_use_sc: true                                                             # use "layer{i}_" prefix to specify parameters for only one of the layer,
@@ -54,7 +66,7 @@ compile_model: false                                                            
 #   invariant_neurons < InteractionBlock_invariant_neurons < layer{i}_invariant_neurons
 
 # data set
-# the keys used need to be stated at least once in key_mapping, npz_fixed_field_keys or npz_keys
+# the keys used need to be stated at least once in key_mapping, npz_fixed_field_keys or include_keys
 # key_mapping is used to map the key in the npz file to the NequIP default values (see data/_key.py)
 # all arrays are expected to have the shape of (nframe, natom, ?) except the fixed fields
 # note that if your data set uses pbc, you need to also pass an array that maps to the nequip "pbc" key
@@ -69,16 +81,39 @@ key_mapping:
 npz_fixed_field_keys:                                                              # fields that are repeated across different examples
   - atomic_numbers
 
-# A mapping of chemical species to type indexes is necessary if the dataset is provided with atomic numbers instead of type indexes.
-chemical_symbol_to_type:
-  H: 0
-  C: 1
+# # for extxyz file
+# dataset: ase
+# dataset_file_name: H2.extxyz
+# ase_args:
+#   format: extxyz
+# include_keys:
+#   - user_label
+# key_mapping:
+#   user_label: label0
+# 
+# # for VASP OUTCAR, the yaml input should be
+# dataset: ase
+# dataset_file_name: OUTCAR
+# ase_args:
+#   format: vasp-out
+# key_mapping:
+#   free_energy: total_energy
 
-# Alternatively, if the dataset has type indicess, the total number of types is all that is required:
+# A list of atomic types to be found in the data. The NequIP types will be named with the chemical symbols, and inputs with the correct atomic numbers will be mapped to the corresponding types.
+chemical_symbols:
+ - H
+ - C
+# Alternatively, you may explicitly specify which chemical species maps to which type in NequIP (type index; the name is still taken from the chemical symbol)
+# chemical_symbol_to_type:
+#   H: 0
+#   C: 1
+
+# Alternatively, if the dataset has type indices, you may give the names for the types in order:
+# (this also sets the number of types)
 # type_names:
-#   0: my_type
-#   1: atom
-#   2: thing
+#   - my_type
+#   - atom
+#   - thing
 
 # As an alternative option to npz, you can also pass data ase ASE Atoms-objects
 # This can often be easier to work with, simply make sure the ASE Atoms object
@@ -96,8 +131,13 @@ chemical_symbol_to_type:
 # logging
 wandb: false                                                                       # we recommend using wandb for logging, we'll turn it off here as it's optional
 wandb_project: toluene-example                                                     # project name used in wandb
-wandb_resume: true                                                                 # if true and restart is true, wandb run data will be restarted and updated.
-                                                                                   # if false, a new wandb run will be generated
+wandb_watch: false
+# see https://docs.wandb.ai/ref/python/watch
+# wandb_watch_kwargs:
+#   log: all
+#   log_freq: 1
+#   log_graph: true
+
 verbose: info                                                                      # the same as python logging, e.g. warning, info, debug, error. case insensitive
 log_batch_freq: 1                                                                  # batch frequency, how often to print training errors withinin the same epoch
 log_epoch_freq: 1                                                                  # epoch frequency, how often to print and save the model
@@ -112,19 +152,20 @@ batch_size: 5                                                                   
 max_epochs: 100000                                                                      # stop training after _ number of epochs, we set a very large number here, it won't take this long in practice and we will use early stopping instead
 train_val_split: random                                                            # can be random or sequential. if sequential, first n_train elements are training, next n_val are val, else random, usually random is the right choice
 shuffle: true                                                                      # If true, the data loader will shuffle the data, usually a good idea
-metrics_key: loss                                                                  # metrics used for scheduling and saving best model. Options: loss, or anything that appears in the validation batch step header, such as f_mae, f_rmse, e_mae, e_rmse
+metrics_key: validation_loss                                                        # metrics used for scheduling and saving best model. Options: `set`_`quantity`, set can be either "train" or "validation, "quantity" can be loss or anything that appears in the validation batch step header, such as f_mae, f_rmse, e_mae, e_rmse
 use_ema: true                                                                      # if true, use exponential moving average on weights for val/test, usually helps a lot with training, in particular for energy errors
 ema_decay: 0.99                                                                    # ema weight, typically set to 0.99 or 0.999
 ema_use_num_updates: true                                                          # whether to use number of updates when computing averages
+report_init_validation: false                                                      # if True, report the validation error for just initialized model
 
 # early stopping based on metrics values. 
 # LR, wall and any keys printed in the log file can be used. 
-# The key can start with Training or Validation. If not defined, the validation value will be used.
+# The key can start with Training or validation. If not defined, the validation value will be used.
 early_stopping_patiences:                                                          # stop early if a metric value stopped decreasing for n epochs
-  Validation_loss: 50
+  validation_loss: 50
 
 early_stopping_delta:                                                              # If delta is defined, a decrease smaller than delta will not be considered as a decrease
-  Validation_loss: 0.005
+  validation_loss: 0.005
 
 early_stopping_cumulative_delta: false                                             # If True, the minimum value recorded will not be updated when the decrease is smaller than delta
 
@@ -218,45 +259,66 @@ lr_scheduler_factor: 0.5
 # the default is to scale the energies and forces by scaling them by the force standard deviation and to shift the energy by its mean
 # in certain cases, it can be useful to have a trainable shift/scale and to also have species-dependent shifts/scales for each atom
 
-# if the PerSpeciesScaleShift is enabled in the model builder list
-# whether the shifts and scales are trainable
-PerSpeciesScaleShift_trainable: false
-# optional initial atomic energy shift for each species. in order of type. Defaults to zeros. 
-# Another option is to use "dataset_per_species_total_energy_mean", which automatically compute the per atom energy mean
-# but ^ this mode is not compatible with global_shift = "dataset_energy_mean"
-PerSpeciesScaleShift_shifts: 0.0
-# optional initial atomic energy scale for each species. in order of type. Defaults to ones.
-# Another option is to use "dataset_per_species_total_energy_std", which automatically compute the per atom energy mean
-# Another option is to use "dataset_per_species_forces_rms", which automatically compute the force rms for each species
-# but ^ this mode is not compatible with global_shift = "dataset_energy_mean"
-PerSpeciesScaleShift_scales: 1.0
-
-# # example block to do good per species shifting
-# # note, sigma needs to be tuned 4.0 works the best for aspirin dataset.
-# global_rescale_shift: null
-# global_rescale_scale: dataset_forces_rms
-# PerSpeciesScaleShift_trainable: true
-# PerSpeciesScaleShift_shifts: dataset_per_atom_total_energy_mean
-# PerSpeciesScaleShift_scales: dataset_per_atom_total_energy_std
-# PerSpeciesScaleShift_kwargs: 
+per_species_rescale_scales_trainable: false
+# whether the scales are trainable. Defaults to False. Optional
+per_species_rescale_shifts_trainable: false
+# whether the shifts are trainable. Defaults to False. Optional
+per_species_rescale_shifts: dataset_per_atom_total_energy_mean
+# initial atomic energy shift for each species. default to the mean of per atom energy. Optional
+# the value can be a constant float value, an array for each species, or a string
+# string option include: 
+# *  "dataset_per_atom_total_energy_mean", which computes the per atom average
+# *  "dataset_per_species_total_energy_mean", which automatically compute the per atom energy mean using a GP model
+per_species_rescale_scales: dataset_forces_rms
+# initial atomic energy scale for each species. Optional.
+# the value can be a constant float value, an array for each species, or a string
+# string option include: 
+# *  "dataset_per_atom_total_energy_std", which computes the per atom energy std
+# *  "dataset_per_species_total_energy_std", which uses the GP model uncertainty
+# *  "dataset_per_species_forces_rms", which compute the force rms for each species
+# If not provided, defaults to dataset_per_species_force_rms or dataset_per_atom_total_energy_std, depending on whether forces are being trained.
+# per_species_rescale_kwargs: 
 #   total_energy: 
 #     alpha: 0.1
+#     max_iteration: 20
+#     stride: 100
+# keywords for GP decomposition of per specie energy. Optional. Defaults to 0.1
+# per_species_rescale_arguments_in_dataset_units: True
+# if explicit numbers are given for the shifts/scales, this parameter must specify whether the given numbers are unitless shifts/scales or are in the units of the dataset. If ``True``, any global rescalings will correctly be applied to the per-species values.
 
-# global energy shift. When "dataset_total_energy_mean" (the default), the mean energy of the dataset. When None, disables the global shift. When a number, used directly.
-global_rescale_shift: dataset_total_energy_mean
+# global energy shift and scale
+# When "dataset_total_energy_mean", the mean energy of the dataset. When None, disables the global shift. When a number, used directly.
+# Warning: if this value is not None, the model is no longer size extensive
+global_rescale_shift: null
 
 # global energy scale. When "dataset_force_rms", the RMS of force components in the dataset. When "dataset_total_energy_std", the stdev of energies in the dataset. When null, disables the global scale. When a number, used directly.
 # If not provided, defaults to either dataset_force_rms or dataset_total_energy_std, depending on whether forces are being trained.
 global_rescale_scale: dataset_forces_rms
 
 # whether the shift of the final global energy rescaling should be trainable
-trainable_global_rescale_shift: false
+global_rescale_shift_trainable: false
 
 # whether the scale of the final global energy rescaling should be trainable
-trainable_global_rescale_scale: false
+global_rescale_scale_trainable: false
 
+# # full block needed for per specie rescale
+# global_rescale_shift: null
+# global_rescale_shift_trainable: false
+# global_rescale_scale: dataset_forces_rms
+# global_rescale_scale_trainable: false
+# per_species_rescale_trainable: true
+# per_species_rescale_shifts: dataset_per_atom_total_energy_mean
+# per_species_rescale_scales: dataset_per_atom_total_energy_std
+
+# # full block needed for global rescale
+# global_rescale_shift: dataset_total_energy_mean
+# global_rescale_shift_trainable: false
+# global_rescale_scale: dataset_forces_rms
+# global_rescale_scale_trainable: false
+# per_species_rescale_trainable: false
+# per_species_rescale_shifts: null
+# per_species_rescale_scales: null
 
 # Options for e3nn's set_optimization_defaults. A dict:
 # e3nn_optimization_defaults:
 #   explicit_backward: True
-

@@ -15,10 +15,12 @@ class RescaleOutput(GraphModuleMixin, torch.nn.Module):
     Args:
         model : GraphModuleMixin
             The model whose outputs are to be rescaled.
-        scale : list of keys, default []
+        scale_keys : list of keys, default []
             Which fields to rescale.
-        shift : list of keys, default []
+        shift_keys : list of keys, default []
             Which fields to shift after rescaling.
+        related_scale_keys: list of keys that could be contingent to this rescale
+        related_shift_keys: list of keys that could be contingent to this rescale
         scale_by : floating or Tensor, default 1.
             The scaling factor by which to multiply fields in ``scale``.
         shift_by : floating or Tensor, default 0.
@@ -29,24 +31,29 @@ class RescaleOutput(GraphModuleMixin, torch.nn.Module):
 
     scale_keys: List[str]
     shift_keys: List[str]
-    trainable_global_rescale_scale: bool
-    trainable_global_rescale_shift: bool
+    related_scale_keys: List[str]
+    related_shift_keys: List[str]
+    scale_trainble: bool
+    rescale_trainable: bool
 
-    _has_scale: bool
-    _has_shift: bool
+    has_scale: bool
+    has_shift: bool
 
     def __init__(
         self,
         model: GraphModuleMixin,
         scale_keys: Union[Sequence[str], str] = [],
         shift_keys: Union[Sequence[str], str] = [],
+        related_shift_keys: Union[Sequence[str], str] = [],
+        related_scale_keys: Union[Sequence[str], str] = [],
         scale_by=None,
         shift_by=None,
-        trainable_global_rescale_shift: bool = False,
-        trainable_global_rescale_scale: bool = False,
+        shift_trainable: bool = False,
+        scale_trainable: bool = False,
         irreps_in: dict = {},
     ):
         super().__init__()
+
         self.model = model
         scale_keys = [scale_keys] if isinstance(scale_keys, str) else scale_keys
         shift_keys = [shift_keys] if isinstance(shift_keys, str) else shift_keys
@@ -74,34 +81,36 @@ class RescaleOutput(GraphModuleMixin, torch.nn.Module):
 
         self.scale_keys = list(scale_keys)
         self.shift_keys = list(shift_keys)
+        self.related_scale_keys = list(set(related_scale_keys).union(scale_keys))
+        self.related_shift_keys = list(set(related_shift_keys).union(shift_keys))
 
-        self._has_scale = scale_by is not None
-        self.trainable_global_rescale_scale = trainable_global_rescale_scale
-        if self._has_scale:
+        self.has_scale = scale_by is not None
+        self.scale_trainble = scale_trainable
+        if self.has_scale:
             scale_by = torch.as_tensor(scale_by)
-            if self.trainable_global_rescale_scale:
+            if self.scale_trainble:
                 self.scale_by = torch.nn.Parameter(scale_by)
             else:
                 self.register_buffer("scale_by", scale_by)
-        elif self.trainable_global_rescale_scale:
+        elif self.scale_trainble:
             raise ValueError(
-                "Asked for a trainable_global_rescale_scale, but this RescaleOutput has no scaling (`scale_by = None`)"
+                "Asked for a scale_trainable, but this RescaleOutput has no scaling (`scale_by = None`)"
             )
         else:
             # register dummy for TorchScript
             self.register_buffer("scale_by", torch.Tensor())
 
-        self._has_shift = shift_by is not None
-        self.trainable_global_rescale_shift = trainable_global_rescale_shift
-        if self._has_shift:
+        self.has_shift = shift_by is not None
+        self.rescale_trainable = shift_trainable
+        if self.has_shift:
             shift_by = torch.as_tensor(shift_by)
-            if self.trainable_global_rescale_shift:
+            if self.rescale_trainable:
                 self.shift_by = torch.nn.Parameter(shift_by)
             else:
                 self.register_buffer("shift_by", shift_by)
-        elif self.trainable_global_rescale_shift:
+        elif self.rescale_trainable:
             raise ValueError(
-                "Asked for a trainable_global_rescale_shift, but this RescaleOutput has no shift (`shift_by = None`)"
+                "Asked for a shift_trainable, but this RescaleOutput has no shift (`shift_by = None`)"
             )
         else:
             # register dummy for TorchScript
@@ -110,9 +119,9 @@ class RescaleOutput(GraphModuleMixin, torch.nn.Module):
         # Finally, we tell all the modules in the model that there is rescaling
         # This allows them to update parameters, like physical constants with units,
         # that need to be scaled
-        #
+
         # Note that .modules() walks the full tree, including self
-        for mod in self.model.modules():
+        for mod in self.get_inner_model().modules():
             if isinstance(mod, GraphModuleMixin):
                 callback = getattr(mod, "update_for_rescale", None)
                 if callable(callback):
@@ -120,16 +129,23 @@ class RescaleOutput(GraphModuleMixin, torch.nn.Module):
                     # since that contains all relevant information
                     callback(self)
 
+    def get_inner_model(self):
+        """Get the outermost child module that is not another ``RescaleOutput``"""
+        model = self.model
+        while isinstance(model, RescaleOutput):
+            model = model.model
+        return model
+
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
         data = self.model(data)
         if self.training:
             return data
         else:
             # Scale then shift
-            if self._has_scale:
+            if self.has_scale:
                 for field in self.scale_keys:
                     data[field] = data[field] * self.scale_by
-            if self._has_shift:
+            if self.has_shift:
                 for field in self.shift_keys:
                     data[field] = data[field] + self.shift_by
             return data
@@ -154,11 +170,11 @@ class RescaleOutput(GraphModuleMixin, torch.nn.Module):
         if self.training and not force_process:
             return data
         else:
-            if self._has_scale:
+            if self.has_scale:
                 for field in self.scale_keys:
                     if field in data:
                         data[field] = data[field] * self.scale_by
-            if self._has_shift:
+            if self.has_shift:
                 for field in self.shift_keys:
                     if field in data:
                         data[field] = data[field] + self.shift_by
@@ -183,11 +199,11 @@ class RescaleOutput(GraphModuleMixin, torch.nn.Module):
         data = data.copy()
         if self.training or force_process:
             # To invert, -shift then divide by scale
-            if self._has_shift:
+            if self.has_shift:
                 for field in self.shift_keys:
                     if field in data:
                         data[field] = data[field] - self.shift_by
-            if self._has_scale:
+            if self.has_scale:
                 for field in self.scale_keys:
                     if field in data:
                         data[field] = data[field] / self.scale_by

@@ -1,29 +1,21 @@
-""" Nequip.train.trainer
-
-Todo:
-
-isolate the loss function from the training procedure
-enable wandb resume
-make an interface with ray
-
-"""
-
 import wandb
 
 from .trainer import Trainer
 
 
 class TrainerWandB(Trainer):
-    """Class to train a model to minimize forces"""
+    """Trainer class that adds WandB features"""
 
     def end_of_epoch_log(self):
         Trainer.end_of_epoch_log(self)
         wandb.log(self.mae_dict)
 
-    def init_model(self):
+    def init(self):
+        super().init()
 
-        Trainer.init_model(self)
+        if not self._initialized:
+            return
 
-        # TO DO, this will trigger pickel failure
-        # we may need to go back to state_dict method for saving
-        # wandb.watch(self.model)
+        if self.kwargs.get("wandb_watch", False):
+            wandb_watch_kwargs = self.kwargs.get("wandb_watch_kwargs", {})
+            wandb.watch(self.model, **wandb_watch_kwargs)

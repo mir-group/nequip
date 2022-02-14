@@ -15,7 +15,7 @@ from nequip.utils import Config
 from nequip.data import AtomicData, dataset_from_config
 from nequip.model import model_from_config
 from nequip.scripts.deploy import _compile_for_deploy
-from nequip.scripts.train import _set_global_options, default_config
+from nequip.scripts.train import _set_global_options, default_config, check_code_version
 
 
 def main(args=None):
@@ -71,6 +71,7 @@ def main(args=None):
 
     config = Config.from_file(args.config, defaults=default_config)
     _set_global_options(config)
+    check_code_version(config)
 
     # Load dataset to get something to benchmark on
     print("Loading dataset... ")
@@ -96,15 +97,15 @@ def main(args=None):
     # "Deploy" it
     model.eval()
     model = script(model)
-    # TODO!!: for now we just compile, but when
-    # https://github.com/pytorch/pytorch/issues/64957#issuecomment-918632252
-    # is resolved, then should be deploying again
-    print(
-        "WARNING: this is currently not using deployed model, just scripted, because of PyTorch bugs"
-    )
-    # model = _compile_for_deploy(model)  # TODO make this an option
+
+    model = _compile_for_deploy(model)
     # save and reload to avoid bugs
     with tempfile.NamedTemporaryFile() as f:
+        torch.jit.save(model, f.name)
+        model = torch.jit.load(f.name, map_location=device)
+        # freeze like in the LAMMPS plugin
+        model = torch.jit.freeze(model)
+        # and reload again just to avoid bugs
         torch.jit.save(model, f.name)
         model = torch.jit.load(f.name, map_location=device)
 
@@ -122,11 +123,7 @@ def main(args=None):
             activities=[
                 torch.profiler.ProfilerActivity.CPU,
             ]
-            + (
-                [torch.profiler.ProfilerActivity.CUDA]
-                if torch.cuda.is_available()
-                else []
-            ),
+            + ([torch.profiler.ProfilerActivity.CUDA] if device.type == "cuda" else []),
             schedule=torch.profiler.schedule(
                 wait=1, warmup=warmup, active=args.n, repeat=1
             ),

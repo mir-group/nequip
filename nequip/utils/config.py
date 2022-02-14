@@ -171,7 +171,10 @@ class Config(object):
         return self._items.pop(*args)
 
     def update_w_prefix(
-        self, dictionary: dict, prefix: str, allow_val_change=None,
+        self,
+        dictionary: dict,
+        prefix: str,
+        allow_val_change=None,
     ):
         """Mock of wandb.config function
 
@@ -198,7 +201,8 @@ class Config(object):
         for suffix in ["params", "kwargs"]:
             if f"{prefix}_{suffix}" in dictionary:
                 key3 = self.update(
-                    dictionary[f"{prefix}_{suffix}"], allow_val_change=allow_val_change,
+                    dictionary[f"{prefix}_{suffix}"],
+                    allow_val_change=allow_val_change,
                 )
                 keys.update({k: f"{prefix}_{suffix}.{k}" for k in key3})
         return keys
@@ -272,7 +276,12 @@ class Config(object):
             filename=filename,
             enforced_format=format,
         )
-        c = Config(dictionary, defaults=defaults)
+        return Config.from_dict(dictionary, defaults)
+
+    @staticmethod
+    def from_dict(dictionary: dict, defaults: dict = {}):
+        c = Config(defaults)
+        c.update(dictionary)
         return c
 
     @staticmethod

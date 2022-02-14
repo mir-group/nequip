@@ -1,6 +1,12 @@
 import pytest
 
-import contextlib
+import sys
+
+if sys.version_info[1] >= 7:
+    import contextlib
+else:
+    # has backport of nullcontext
+    import contextlib2 as contextlib
 
 import torch
 
@@ -14,14 +20,14 @@ from nequip.nn.embedding import OneHotAtomEncoding
 
 @pytest.mark.parametrize("scale_by", [0.77, 1.0, None])
 @pytest.mark.parametrize("shift_by", [0.0, 0.4443, None])
-@pytest.mark.parametrize("trainable_global_rescale_scale", [True, False])
-@pytest.mark.parametrize("trainable_global_rescale_shift", [True, False])
+@pytest.mark.parametrize("scale_trainable", [True, False])
+@pytest.mark.parametrize("shift_trainable", [True, False])
 def test_rescale(
     CH3CHO,
     scale_by,
     shift_by,
-    trainable_global_rescale_scale,
-    trainable_global_rescale_shift,
+    scale_trainable,
+    shift_trainable,
 ):
     _, data = CH3CHO
     oh = OneHotAtomEncoding(
@@ -31,9 +37,9 @@ def test_rescale(
 
     # some combinations are illegal and should raise
     build_with = contextlib.nullcontext()
-    if scale_by is None and trainable_global_rescale_scale:
+    if scale_by is None and scale_trainable:
         build_with = pytest.raises(ValueError)
-    elif shift_by is None and trainable_global_rescale_shift:
+    elif shift_by is None and shift_trainable:
         build_with = pytest.raises(ValueError)
 
     rescale = None
@@ -44,8 +50,8 @@ def test_rescale(
             shift_keys=AtomicDataDict.NODE_ATTRS_KEY,
             scale_by=scale_by,
             shift_by=shift_by,
-            trainable_global_rescale_scale=trainable_global_rescale_scale,
-            trainable_global_rescale_shift=trainable_global_rescale_shift,
+            scale_trainable=scale_trainable,
+            shift_trainable=shift_trainable,
         )
 
     if rescale is None:
