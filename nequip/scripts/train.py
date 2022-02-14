@@ -128,11 +128,6 @@ def _set_global_options(config):
     if config.grad_anomaly_mode:
         torch.autograd.set_detect_anomaly(True)
 
-    # this won't work for most of our models, but could be useful for computing metrics deterministically on CPU
-    use_det_algos = config.get("torch_use_deterministic_algorithms", False)
-    if use_det_algos:
-        torch.use_deterministic_algorithms(use_det_algos)
-
     e3nn.set_optimization_defaults(**config.get("e3nn_optimization_defaults", {}))
 
     # Register fields:
