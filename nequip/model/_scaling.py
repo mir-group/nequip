@@ -5,6 +5,7 @@ import torch
 
 from nequip.nn import RescaleOutput, GraphModuleMixin, PerSpeciesScaleShift
 from nequip.data import AtomicDataDict, AtomicDataset
+from nequip.data.transforms import TypeMapper
 
 
 RESCALE_THRESHOLD = 1e-6
@@ -242,7 +243,9 @@ def PerSpeciesRescale(
         params=params,
     )
 
-    logging.info(f"Atomic outputs are scaled by: {scales}, shifted by {shifts}.")
+    logging.info(
+        f"Atomic outputs are scaled by: {TypeMapper.format(scales, config.type_names)}, shifted by {TypeMapper.format(shifts, config.type_names)}."
+    )
 
     # == Build the model ==
     return model
