@@ -401,7 +401,8 @@ def main(args=None, running_as_script: bool = True):
                         " | ".join(
                             f"{k} = {v:4.4f}"
                             for k, v in metrics.flatten_metrics(
-                                metrics.current_result()
+                                metrics.current_result(),
+                                type_names=dataset.type_mapper.type_names,
                             )[0].items()
                         )
                     )
@@ -418,7 +419,10 @@ def main(args=None, running_as_script: bool = True):
         logger.critical(
             "\n".join(
                 f"{k:>20s} = {v:< 20f}"
-                for k, v in metrics.flatten_metrics(metrics.current_result())[0].items()
+                for k, v in metrics.flatten_metrics(
+                    metrics.current_result(),
+                    type_names=dataset.type_mapper.type_names,
+                )[0].items()
             )
         )
 

@@ -943,10 +943,7 @@ class Trainer:
         # append details from metrics
         metrics, skip_keys = self.metrics.flatten_metrics(
             metrics=self.batch_metrics,
-            # TO DO, how about chemical to symbol
-            type_names=self.model.config.get("type_names")
-            if hasattr(self.model, "config")
-            else None,
+            type_names=self.dataset_train.type_mapper.type_names,
         )
         for key, value in metrics.items():
 
@@ -1067,9 +1064,7 @@ class Trainer:
 
             met, skip_keys = self.metrics.flatten_metrics(
                 metrics=self.metrics_dict[category],
-                type_names=self.model.config.get("type_names")
-                if hasattr(self.model, "config")
-                else None,
+                type_names=self.dataset_train.type_mapper.type_names,
             )
 
             # append details from loss
