@@ -14,6 +14,9 @@ Most recent change on the bottom.
 ### Changed
 - default value for `report_init_validation` is now `True`
 
+### Fixed
+- error if both per-species and global shift are used together
+
 ## [0.5.2] - 2022-02-04
 ### Added
 - Model builders may now process only the configuration
