@@ -537,13 +537,18 @@ class AtomicInMemoryDataset(AtomicDataset):
         """
         # using unique_consecutive handles the non-contiguous selected batch index
         _, N = torch.unique_consecutive(batch, return_counts=True)
+        N = N.unsqueeze(-1)
+        assert N.ndim == 2
+        assert N.shape == (len(arr), 1)
+        assert arr.ndim == 2
+        data_dim = arr.shape[1]
+        arr = arr / N
+        assert arr.shape == (len(N), data_dim)
         if ana_mode == "mean_std":
-            arr = arr / N
             mean = torch.mean(arr)
             std = torch.std(arr, unbiased=unbiased)
             return mean, std
         elif ana_mode == "rms":
-            arr = arr / N
             return (torch.sqrt(torch.mean(arr.square())),)
         else:
             raise NotImplementedError(
