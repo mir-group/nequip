@@ -14,26 +14,6 @@ RESCALE_THRESHOLD = 1e-6
 def RescaleEnergyEtc(
     model: GraphModuleMixin, config, dataset: AtomicDataset, initialize: bool
 ):
-    # Check for common double shift mistake with defaults
-    if "PerSpeciesRescale" in config.get("model_builders", []):
-        # if the defaults are enabled, then we will get bad double shift
-        # THIS CHECK IS ONLY GOOD ENOUGH FOR EMITTING WARNINGS
-        has_global_shift = config.get("global_rescale_shift", None) is not None
-        k = "per_species_rescale_shifts"
-        if has_global_shift:
-            if k not in config:
-                # using default of per_atom shift
-                raise RuntimeError(
-                    "A global_rescale_shift was provided, but the default per-atom energy shift was not disabled."
-                )
-            else:
-                if config[k] is not None:
-                    logging.warn(
-                        "A global shift was enabled, but a per-species shift was _also_ enabled. Please make sure this is what you meant!"
-                    )
-
-        del has_global_shift, k
-
     return GlobalRescale(
         model=model,
         config=config,
@@ -172,6 +152,19 @@ def PerSpeciesRescale(
         module_prefix + "_shifts",
         f"dataset_per_atom_{AtomicDataDict.TOTAL_ENERGY_KEY}_mean",
     )
+
+    # Check for common double shift mistake with defaults
+    if "RescaleEnergyEtc" in config.get("model_builders", []):
+        # if the defaults are enabled, then we will get bad double shift
+        # THIS CHECK IS ONLY GOOD ENOUGH FOR EMITTING WARNINGS
+        has_global_shift = config.get("global_rescale_shift", None) is not None
+        if has_global_shift:
+            if shifts is not None:
+                # using default of per_atom shift
+                raise RuntimeError(
+                    "A global_rescale_shift was provided, but the default per-atom energy shift was not disabled."
+                )
+        del has_global_shift
 
     # = Determine what statistics need to be compute =\
     arguments_in_dataset_units = None
