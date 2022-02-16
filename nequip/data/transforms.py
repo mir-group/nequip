@@ -135,8 +135,10 @@ class TypeMapper:
     def format(
         data: list, type_names: List[str], element_formatter: str = ".6f"
     ) -> str:
-        data = torch.as_tensor(data)
-        if data.ndim == 0:
+        data = torch.as_tensor(data) if data is not None else None
+        if data is None:
+            return f"[{', '.join(type_names)}: None]"
+        elif data.ndim == 0:
             return (f"[{', '.join(type_names)}: {{:{element_formatter}}}]").format(data)
         elif data.ndim == 1 and len(data) == len(type_names):
             return (
