@@ -591,14 +591,14 @@ class AtomicInMemoryDataset(AtomicDataset):
 
             if ana_mode == "mean_std":
                 mean = scatter_mean(arr, atom_types, dim=0)
-                assert mean.ndim == arr.shape  # [N, dims] -> [type, dims]
+                assert mean.shape[1:] == arr.shape[1:]  # [N, dims] -> [type, dims]
                 assert len(mean) == N.shape[1]
                 std = scatter_std(arr, atom_types, dim=0, unbiased=unbiased)
                 assert std.shape == mean.shape
                 return mean, std
             elif ana_mode == "rms":
                 square = scatter_mean(arr.square(), atom_types, dim=0)
-                assert square.ndim == arr.shape  # [N, dims] -> [type, dims]
+                assert square.shape[1:] == arr.shape[1:]  # [N, dims] -> [type, dims]
                 assert len(square) == N.shape[1]
                 dims = len(square.shape) - 1
                 for i in range(dims):
