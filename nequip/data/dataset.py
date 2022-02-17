@@ -572,8 +572,9 @@ class AtomicInMemoryDataset(AtomicDataset):
         For a per-node quantity, computes the expected statistic but for each type instead of over all nodes.
         """
         N = bincount(atom_types.squeeze(-1), batch)
+        assert N.ndim == 2  # [batch, n_type]
         N = N[(N > 0).any(dim=1)]  # deal with non-contiguous batch indexes
-
+        assert arr.ndim >= 2
         if arr_is_per == "graph":
 
             if ana_mode != "mean_std":
@@ -590,10 +591,15 @@ class AtomicInMemoryDataset(AtomicDataset):
 
             if ana_mode == "mean_std":
                 mean = scatter_mean(arr, atom_types, dim=0)
+                assert mean.ndim == arr.shape  # [N, dims] -> [type, dims]
+                assert len(mean) == N.shape[1]
                 std = scatter_std(arr, atom_types, dim=0, unbiased=unbiased)
+                assert std.shape == mean.shape
                 return mean, std
             elif ana_mode == "rms":
                 square = scatter_mean(arr.square(), atom_types, dim=0)
+                assert square.ndim == arr.shape  # [N, dims] -> [type, dims]
+                assert len(square) == N.shape[1]
                 dims = len(square.shape) - 1
                 for i in range(dims):
                     square = square.mean(axis=-1)
