@@ -188,6 +188,53 @@ class TestStatistics:
         # TODO: check correct
 
 
+class TestPerAtomStatistics:
+    @pytest.mark.parametrize("mode", ["mean_std", "rms"])
+    def test_per_node_field(self, npz_dataset, mode):
+        # set up the transformer
+        npz_dataset = set_up_transformer(npz_dataset, True, False, False)
+
+        with pytest.raises(ValueError) as excinfo:
+            npz_dataset.statistics(
+                [AtomicDataDict.BATCH_KEY],
+                modes=[f"per_atom_{mode}"],
+            )
+
+    @pytest.mark.parametrize("fixed_field", [True, False])
+    @pytest.mark.parametrize("full_rank", [True, False])
+    @pytest.mark.parametrize("subset", [True, False])
+    def test_per_graph_field(self, npz_dataset, fixed_field, full_rank, subset):
+
+        npz_dataset = set_up_transformer(npz_dataset, full_rank, fixed_field, subset)
+        if npz_dataset is None:
+            return
+
+        E = torch.rand(npz_dataset.len())
+        ref_mean = torch.mean(E / NATOMS)
+        ref_std = torch.std(E / NATOMS)
+
+        if subset:
+            E_orig_order = torch.zeros_like(
+                npz_dataset.data[AtomicDataDict.TOTAL_ENERGY_KEY]
+            )
+            E_orig_order[npz_dataset._indices] = E.unsqueeze(-1)
+            npz_dataset.data[AtomicDataDict.TOTAL_ENERGY_KEY] = E_orig_order
+        else:
+            npz_dataset.data[AtomicDataDict.TOTAL_ENERGY_KEY] = E
+
+        ((mean, std),) = npz_dataset.statistics(
+            [AtomicDataDict.TOTAL_ENERGY_KEY],
+            modes=["per_atom_mean_std"],
+        )
+
+        print("mean", mean, ref_mean)
+        print("diff in mean", mean - ref_mean)
+        print("std", std, ref_std)
+
+        assert torch.allclose(mean, ref_mean, rtol=1e-1)
+        assert torch.allclose(std, ref_std, rtol=1e-2)
+
+
 class TestPerSpeciesStatistics:
     @pytest.mark.parametrize("fixed_field", [True, False])
     @pytest.mark.parametrize("mode", ["mean_std", "rms"])
