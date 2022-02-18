@@ -199,6 +199,10 @@ class TestPerAtomStatistics:
                 [AtomicDataDict.BATCH_KEY],
                 modes=[f"per_atom_{mode}"],
             )
+            assert (
+                excinfo
+                == f"It doesn't make sense to ask for `{mode}` since `{AtomicDataDict.BATCH_KEY}` is not per-graph"
+            )
 
     @pytest.mark.parametrize("fixed_field", [True, False])
     @pytest.mark.parametrize("full_rank", [True, False])
