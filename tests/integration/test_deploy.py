@@ -20,10 +20,13 @@ from nequip.ase import NequIPCalculator
 )
 def test_deploy(nequip_dataset, BENCHMARK_ROOT, device):
     dtype = str(torch.get_default_dtype())[len("torch.") :]
+    atol = {"float32": 1e-5, "float64": 1e-7}[dtype]
 
     # if torch.cuda.is_available():
     #     # TODO: is this true?
     #     pytest.skip("CUDA and subprocesses have issues")
+
+    keys = [AtomicDataDict.TOTAL_ENERGY_KEY, AtomicDataDict.FORCE_KEY]
 
     config_path = pathlib.Path(__file__).parents[2] / "configs/minimal.yaml"
     true_config = yaml.load(config_path.read_text(), Loader=yaml.Loader)
@@ -65,11 +68,10 @@ def test_deploy(nequip_dataset, BENCHMARK_ROOT, device):
         best_mod.eval()
 
         data = AtomicData.to_AtomicDataDict(nequip_dataset[0].to(device))
-        # Needed because of debug mode:
-        data[AtomicDataDict.TOTAL_ENERGY_KEY] = data[
-            AtomicDataDict.TOTAL_ENERGY_KEY
-        ].unsqueeze(0)
-        train_pred = best_mod(data)[AtomicDataDict.TOTAL_ENERGY_KEY].to("cpu")
+        for k in keys:
+            data.pop(k)
+        train_pred = best_mod(data)
+        train_pred = {k: train_pred[k].to("cpu") for k in keys}
 
         # load model and check that metadata saved
         # TODO: use both CPU and CUDA to load?
@@ -85,8 +87,12 @@ def test_deploy(nequip_dataset, BENCHMARK_ROOT, device):
 
         data_idx = 0
         data = AtomicData.to_AtomicDataDict(nequip_dataset[data_idx].to("cpu"))
-        deploy_pred = deploy_mod(data)[AtomicDataDict.TOTAL_ENERGY_KEY]
-        assert torch.allclose(train_pred, deploy_pred, atol=1e-7)
+        for k in keys:
+            data.pop(k)
+        deploy_pred = deploy_mod(data)
+        deploy_pred = {k: deploy_pred[k].to("cpu") for k in keys}
+        for k in keys:
+            assert torch.allclose(train_pred[k], deploy_pred[k], atol=atol)
 
         # now test info
         # hack for old version
@@ -109,9 +115,18 @@ def test_deploy(nequip_dataset, BENCHMARK_ROOT, device):
             deployed_path,
             device="cpu",
             species_to_type_name={s: s for s in ("C", "H", "O")},
+            set_global_options=False,
         )
         # use .get() so it's not transformed
-        atoms = nequip_dataset.get(data_idx).to_ase()
+        atoms = nequip_dataset.get(nequip_dataset.indices()[data_idx]).to_ase()
         atoms.calc = calc
-        ase_forces = atoms.get_potential_energy()
-        assert torch.allclose(train_pred, torch.as_tensor(ase_forces), atol=1e-7)
+        ase_pred = {
+            AtomicDataDict.TOTAL_ENERGY_KEY: atoms.get_potential_energy(),
+            AtomicDataDict.FORCE_KEY: atoms.get_forces(),
+        }
+        for k in keys:
+            assert torch.allclose(
+                deploy_pred[k],
+                torch.as_tensor(ase_pred[k], dtype=torch.get_default_dtype()),
+                atol=atol,
+            )
