@@ -137,15 +137,17 @@ lr_scheduler_factor: 0.5
 # the default is to scale the atomic energy and forces by scaling them by the force standard deviation and to shift the energy by the mean atomic energy
 # in certain cases, it can be useful to have a trainable shift/scale and to also have species-dependent shifts/scales for each atom
 
+# whether the shifts and scales are trainable. Defaults to False. Optional
 per_species_rescale_shifts_trainable: false
 per_species_rescale_scales_trainable: false
 
-# whether the shifts and scales are trainable. Defaults to False. Optional
-per_species_rescale_shifts: dataset_per_atom_total_energy_mean
 # initial atomic energy shift for each species. default to the mean of per atom energy. Optional
 # the value can be a constant float value, an array for each species, or a string that defines a statistics over the training dataset
-per_species_rescale_scales: dataset_forces_rms
+per_species_rescale_shifts: dataset_per_atom_total_energy_mean
+
 # initial atomic energy scale for each species. Optional.
 # the value can be a constant float value, an array for each species, or a string
-# per_species_rescale_arguments_in_dataset_units: True
+per_species_rescale_scales: dataset_forces_rms
+
 # if explicit numbers are given for the shifts/scales, this parameter must specify whether the given numbers are unitless shifts/scales or are in the units of the dataset. If ``True``, any global rescalings will correctly be applied to the per-species values.
+# per_species_rescale_arguments_in_dataset_units: True
