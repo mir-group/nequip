@@ -130,3 +130,24 @@ class TypeMapper:
     @property
     def has_chemical_symbols(self) -> bool:
         return self.chemical_symbol_to_type is not None
+
+    @staticmethod
+    def format(
+        data: list, type_names: List[str], element_formatter: str = ".6f"
+    ) -> str:
+        data = torch.as_tensor(data) if data is not None else None
+        if data is None:
+            return f"[{', '.join(type_names)}: None]"
+        elif data.ndim == 0:
+            return (f"[{', '.join(type_names)}: {{:{element_formatter}}}]").format(data)
+        elif data.ndim == 1 and len(data) == len(type_names):
+            return (
+                "["
+                + ", ".join(
+                    f"{{{i}[0]}}: {{{i}[1]:{element_formatter}}}"
+                    for i in range(len(data))
+                )
+                + "]"
+            ).format(*zip(type_names, data))
+        else:
+            raise ValueError
