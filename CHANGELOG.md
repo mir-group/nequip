@@ -11,6 +11,10 @@ Most recent change on the bottom.
 ### Added
 - `nequip-evaluate --repeat` option
 
+### Changed
+- defaults and commments in example.yaml and full.yaml, in particular longer default training and correct comment for E:F-weighting
+- better metrics config in example.yaml and full.yaml, in particular will total F-MAE/F-RMSE instead of mean over per-species
+
 ## [0.5.2] - 2022-02-04
 ### Added
 - Model builders may now process only the configuration
