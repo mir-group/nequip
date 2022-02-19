@@ -16,13 +16,13 @@ r_max: 4.0                                                                      
 num_layers: 4                                                                     # number of interaction blocks, we find 3-5 to work best
 l_max: 1                                                                          # the maximum irrep order (rotation order) for the network's features, l=1 is a good default, l=2 is more accurate but slower
 parity: true                                                                      # whether to include features with odd mirror parity; often turning parity off gives equally good results but faster networks, so do consider this
-num_features: 32                                                                  # the multiplicity of the features
+num_features: 32                                                                  # the multiplicity of the features, 32 is a good default for accurate network, if you want to be more accurate, go larger, if you want to be faster, go lower
 nonlinearity_type: gate                                                           # may be 'gate' or 'norm', 'gate' is recommended
 
 # scalar nonlinearities to use — available options are silu, ssp (shifted softplus), tanh, and abs.
 # Different nonlinearities are specified for e (even) and o (odd) parity;
 # note that only tanh and abs are correct for o (odd parity)
-# silu typically works best
+# silu typically works best for even 
 nonlinearity_scalars:
   e: silu
   o: tanh
@@ -70,8 +70,8 @@ wandb_project: toluene-example                                                  
 verbose: info                                                                      # the same as python logging, e.g. warning, info, debug, error; case insensitive
 log_batch_freq: 10                                                                 # batch frequency, how often to print training errors withinin the same epoch
 log_epoch_freq: 1                                                                  # epoch frequency, how often to print and save the model
-save_checkpoint_freq: -1                                                           # frequency to save the intermediate checkpoint. no saving when the value is not positive.
-save_ema_checkpoint_freq: -1                                                       # frequency to save the intermediate ema checkpoint. no saving when the value is not positive.
+save_checkpoint_freq: -1                                                           # frequency to save the intermediate checkpoint. no saving of intermediate checkpoints when the value is not positive.
+save_ema_checkpoint_freq: -1                                                       # frequency to save the intermediate ema checkpoint. no saving of intermediate checkpoints when the value is not positive.
 
 # training
 n_train: 100                                                                       # number of training data
@@ -93,7 +93,7 @@ early_stopping_patiences:                                                       
 
 early_stopping_lower_bounds:                                                       # stop early if a metric value is lower than the bound
   LR: 1.0e-5
-  
+
 # loss function
 loss_coeffs:                                                                        
   forces: 1                                                                        # if using PerAtomMSELoss, a default weight of 1:1 on each should work well
