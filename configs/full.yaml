@@ -2,7 +2,7 @@
 
 # This is a full yaml file with all nequip options.
 # It is primarily intented to serve as documentation/reference for all options
-# For a simpler yaml file containing all necessary features to get you started, we stronlgy recommend to start with configs/example.yaml
+# For a simpler yaml file containing all necessary features to get you started, we strongly recommend to start with configs/example.yaml
 
 # Two folders will be used during the training: 'root'/process and 'root'/'run_name'
 # run_name contains logfiles and saved models
@@ -139,9 +139,10 @@ chemical_symbols:
 # validation_dataset_file_name: xxx.xyz                                            # need to be a format accepted by ase.io.read
 
 # logging
-wandb: false                                                                       # we recommend using wandb for logging, we'll turn it off here as it's optional
+wandb: true                                                                        # we recommend using wandb for logging
 wandb_project: toluene-example                                                     # project name used in wandb
 wandb_watch: false
+
 # see https://docs.wandb.ai/ref/python/watch
 # wandb_watch_kwargs:
 #   log: all
