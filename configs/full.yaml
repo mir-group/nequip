@@ -108,7 +108,9 @@ key_mapping:
 npz_fixed_field_keys:                                                              # fields that are repeated across different examples
   - atomic_numbers
 
-# A list of atomic types to be found in the data. The NequIP types will be named with the chemical symbols, and inputs with the correct atomic numbers will be mapped to the corresponding types.
+# A list of chemical species found in the data. The NequIP atom types will be named after the chemical symbols and ordered by atomic number in ascending order.
+# (In this case, NequIP's internal atom type 0 will be named H and type 1 will be named C.)
+# Atoms in the input will be assigned NequIP atom types according to their atomic numbers.
 chemical_symbols:
   - H
   - C
