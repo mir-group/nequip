@@ -113,7 +113,8 @@ chemical_symbols:
   - H
   - C
 
-# Alternatively, you may explicitly specify which chemical species maps to which type in NequIP (type index; the name is still taken from the chemical symbol)
+# Alternatively, you may explicitly specify which chemical species in the input will map to NequIP atom type 0, which to atom type 1, and so on.
+# Other than providing an explicit order for the NequIP atom types, this option behaves the same as `chemical_symbols`
 # chemical_symbol_to_type:
 #   H: 0
 #   C: 1
