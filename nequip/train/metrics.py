@@ -240,7 +240,7 @@ class Metrics:
                         else:
                             flat_dict[f"{id_ele}_{item_name}"] = v.item()
 
-                    flat_dict[f"all_{item_name}"] = value.mean().item()
+                    flat_dict[f"ps_mean_{item_name}"] = value.mean().item()
                 else:
                     for id_ele, vec in enumerate(value):
                         ele = type_names[id_ele]
