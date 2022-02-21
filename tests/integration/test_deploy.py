@@ -9,7 +9,8 @@ import numpy as np
 import torch
 
 import nequip
-from nequip.data import AtomicDataDict, AtomicData
+from nequip.data import AtomicDataDict, AtomicData, dataset_from_config
+from nequip.utils import Config
 from nequip.scripts import deploy
 from nequip.train import Trainer
 from nequip.ase import NequIPCalculator
@@ -18,7 +19,7 @@ from nequip.ase import NequIPCalculator
 @pytest.mark.parametrize(
     "device", ["cpu"] + (["cuda"] if torch.cuda.is_available() else [])
 )
-def test_deploy(nequip_dataset, BENCHMARK_ROOT, device):
+def test_deploy(BENCHMARK_ROOT, device):
     dtype = str(torch.get_default_dtype())[len("torch.") :]
     atol = {"float32": 1e-5, "float64": 1e-7}[dtype]
 
@@ -33,7 +34,7 @@ def test_deploy(nequip_dataset, BENCHMARK_ROOT, device):
     with tempfile.TemporaryDirectory() as tmpdir:
         # Save time
         run_name = "test_deploy" + dtype
-        root = "./"
+        root = tmpdir + "nequip_rootdir/"
         true_config["run_name"] = run_name
         true_config["root"] = root
         true_config["dataset_file_name"] = str(
@@ -44,7 +45,8 @@ def test_deploy(nequip_dataset, BENCHMARK_ROOT, device):
         true_config["n_train"] = 1
         true_config["n_val"] = 1
         config_path = "conf.yaml"
-        with open(f"{tmpdir}/{config_path}", "w+") as fp:
+        full_config_path = f"{tmpdir}/{config_path}"
+        with open(full_config_path, "w+") as fp:
             yaml.dump(true_config, fp)
         # Train model
         retcode = subprocess.run(["nequip-train", str(config_path)], cwd=tmpdir)
@@ -61,13 +63,15 @@ def test_deploy(nequip_dataset, BENCHMARK_ROOT, device):
 
         # now test predictions the same
         best_mod, _ = Trainer.load_model_from_training_session(
-            traindir=f"{tmpdir}/{root}/{run_name}/",
+            traindir=f"{root}/{run_name}/",
             model_name="best_model.pth",
             device=device,
         )
         best_mod.eval()
 
-        data = AtomicData.to_AtomicDataDict(nequip_dataset[0].to(device))
+        # load train dataset, already cached
+        dataset = dataset_from_config(Config.from_file(full_config_path))
+        data = AtomicData.to_AtomicDataDict(dataset[0].to(device))
         for k in keys:
             data.pop(k)
         train_pred = best_mod(data)
@@ -86,7 +90,7 @@ def test_deploy(nequip_dataset, BENCHMARK_ROOT, device):
         assert len(metadata[deploy.TYPE_NAMES_KEY].split(" ")) == 3  # C, H, O
 
         data_idx = 0
-        data = AtomicData.to_AtomicDataDict(nequip_dataset[data_idx].to("cpu"))
+        data = AtomicData.to_AtomicDataDict(dataset[data_idx].to("cpu"))
         for k in keys:
             data.pop(k)
         deploy_pred = deploy_mod(data)
@@ -118,7 +122,7 @@ def test_deploy(nequip_dataset, BENCHMARK_ROOT, device):
             set_global_options=False,
         )
         # use .get() so it's not transformed
-        atoms = nequip_dataset.get(nequip_dataset.indices()[data_idx]).to_ase()
+        atoms = dataset.get(dataset.indices()[data_idx]).to_ase()
         atoms.calc = calc
         ase_pred = {
             AtomicDataDict.TOTAL_ENERGY_KEY: atoms.get_potential_energy(),
