@@ -12,11 +12,15 @@ Most recent change on the bottom.
 - `nequip-evaluate --repeat` option
 
 ### Changed
+
+- defaults and commments in example.yaml and full.yaml, in particular longer default training and correct comment for E:F-weighting
+- better metrics config in example.yaml and full.yaml, in particular will total F-MAE/F-RMSE instead of mean over per-species
 - default value for `report_init_validation` is now `True`
 - `all_*_*` metrics rename to -> `psavg_*_*`
 
 ### Fixed
 - error if both per-species and global shift are used together
+
 
 ## [0.5.2] - 2022-02-04
 ### Added
