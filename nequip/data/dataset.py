@@ -545,8 +545,8 @@ class AtomicInMemoryDataset(AtomicDataset):
         arr = arr / N
         assert arr.shape == (len(N), data_dim)
         if ana_mode == "mean_std":
-            mean = torch.mean(arr)
-            std = torch.std(arr, unbiased=unbiased)
+            mean = torch.mean(arr, dim=0)
+            std = torch.std(arr, unbiased=unbiased, dim=0)
             return mean, std
         elif ana_mode == "rms":
             return (torch.sqrt(torch.mean(arr.square())),)
