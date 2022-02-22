@@ -13,6 +13,8 @@ from nequip.data import (
     NpzDataset,
     ASEDataset,
     dataset_from_config,
+    register_fields,
+    deregister_fields,
 )
 from nequip.data.transforms import TypeMapper
 from nequip.utils import Config
@@ -207,27 +209,34 @@ class TestPerAtomStatistics:
     @pytest.mark.parametrize("fixed_field", [True, False])
     @pytest.mark.parametrize("full_rank", [True, False])
     @pytest.mark.parametrize("subset", [True, False])
-    def test_per_graph_field(self, npz_dataset, fixed_field, full_rank, subset):
+    @pytest.mark.parametrize(
+        "key,dim", [(AtomicDataDict.TOTAL_ENERGY_KEY, (1,)), ("somekey", (3,))]
+    )
+    def test_per_graph_field(
+        self, npz_dataset, fixed_field, full_rank, subset, key, dim
+    ):
+        if key == "somekey":
+            register_fields(graph_fields=[key])
 
         npz_dataset = set_up_transformer(npz_dataset, full_rank, fixed_field, subset)
         if npz_dataset is None:
             return
 
-        E = torch.rand(npz_dataset.len())
-        ref_mean = torch.mean(E / NATOMS)
-        ref_std = torch.std(E / NATOMS)
+        E = torch.rand((npz_dataset.len(),) + dim)
+        ref_mean = torch.mean(E / NATOMS, dim=0)
+        ref_std = torch.std(E / NATOMS, dim=0)
 
         if subset:
-            E_orig_order = torch.zeros_like(
-                npz_dataset.data[AtomicDataDict.TOTAL_ENERGY_KEY]
+            E_orig_order = torch.zeros(
+                (npz_dataset.data[AtomicDataDict.TOTAL_ENERGY_KEY].shape[0],) + dim
             )
-            E_orig_order[npz_dataset._indices] = E.unsqueeze(-1)
-            npz_dataset.data[AtomicDataDict.TOTAL_ENERGY_KEY] = E_orig_order
+            E_orig_order[npz_dataset._indices] = E
+            npz_dataset.data[key] = E_orig_order
         else:
-            npz_dataset.data[AtomicDataDict.TOTAL_ENERGY_KEY] = E
+            npz_dataset.data[key] = E
 
         ((mean, std),) = npz_dataset.statistics(
-            [AtomicDataDict.TOTAL_ENERGY_KEY],
+            [key],
             modes=["per_atom_mean_std"],
         )
 
@@ -237,6 +246,9 @@ class TestPerAtomStatistics:
 
         assert torch.allclose(mean, ref_mean, rtol=1e-1)
         assert torch.allclose(std, ref_std, rtol=1e-2)
+
+        if key == "somekey":
+            deregister_fields(key)
 
 
 class TestPerSpeciesStatistics:
