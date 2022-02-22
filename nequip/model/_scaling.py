@@ -208,14 +208,14 @@ def PerSpeciesRescale(
 
         if isinstance(scales, str):
             s = scales
-            scales = computed_stats[str_names.index(scales)]
+            scales = computed_stats[str_names.index(scales)].squeeze(-1)  # energy is 1D
             logging.info(f"Replace string {s} to {scales}")
         elif isinstance(scales, (list, float)):
             scales = torch.as_tensor(scales)
 
         if isinstance(shifts, str):
             s = shifts
-            shifts = computed_stats[str_names.index(shifts)]
+            shifts = computed_stats[str_names.index(shifts)].squeeze(-1)  # energy is 1D
             logging.info(f"Replace string {s} to {shifts}")
         elif isinstance(shifts, (list, float)):
             shifts = torch.as_tensor(shifts)

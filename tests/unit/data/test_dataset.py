@@ -13,6 +13,8 @@ from nequip.data import (
     NpzDataset,
     ASEDataset,
     dataset_from_config,
+    register_fields,
+    deregister_fields,
 )
 from nequip.data.transforms import TypeMapper
 from nequip.utils import Config
@@ -186,6 +188,67 @@ class TestStatistics:
             modes=["mean_std"],
         )
         # TODO: check correct
+
+
+class TestPerAtomStatistics:
+    @pytest.mark.parametrize("mode", ["mean_std", "rms"])
+    def test_per_node_field(self, npz_dataset, mode):
+        # set up the transformer
+        npz_dataset = set_up_transformer(npz_dataset, True, False, False)
+
+        with pytest.raises(ValueError) as excinfo:
+            npz_dataset.statistics(
+                [AtomicDataDict.BATCH_KEY],
+                modes=[f"per_atom_{mode}"],
+            )
+            assert (
+                excinfo
+                == f"It doesn't make sense to ask for `{mode}` since `{AtomicDataDict.BATCH_KEY}` is not per-graph"
+            )
+
+    @pytest.mark.parametrize("fixed_field", [True, False])
+    @pytest.mark.parametrize("full_rank", [True, False])
+    @pytest.mark.parametrize("subset", [True, False])
+    @pytest.mark.parametrize(
+        "key,dim", [(AtomicDataDict.TOTAL_ENERGY_KEY, (1,)), ("somekey", (3,))]
+    )
+    def test_per_graph_field(
+        self, npz_dataset, fixed_field, full_rank, subset, key, dim
+    ):
+        if key == "somekey":
+            register_fields(graph_fields=[key])
+
+        npz_dataset = set_up_transformer(npz_dataset, full_rank, fixed_field, subset)
+        if npz_dataset is None:
+            return
+
+        E = torch.rand((npz_dataset.len(),) + dim)
+        ref_mean = torch.mean(E / NATOMS, dim=0)
+        ref_std = torch.std(E / NATOMS, dim=0)
+
+        if subset:
+            E_orig_order = torch.zeros(
+                (npz_dataset.data[AtomicDataDict.TOTAL_ENERGY_KEY].shape[0],) + dim
+            )
+            E_orig_order[npz_dataset._indices] = E
+            npz_dataset.data[key] = E_orig_order
+        else:
+            npz_dataset.data[key] = E
+
+        ((mean, std),) = npz_dataset.statistics(
+            [key],
+            modes=["per_atom_mean_std"],
+        )
+
+        print("mean", mean, ref_mean)
+        print("diff in mean", mean - ref_mean)
+        print("std", std, ref_std)
+
+        assert torch.allclose(mean, ref_mean, rtol=1e-1)
+        assert torch.allclose(std, ref_std, rtol=1e-2)
+
+        if key == "somekey":
+            deregister_fields(key)
 
 
 class TestPerSpeciesStatistics:
