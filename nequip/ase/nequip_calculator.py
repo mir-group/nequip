@@ -103,14 +103,17 @@ class NequIPCalculator(Calculator):
 
         # prepare data
         data = AtomicData.from_ase(atoms=atoms, r_max=self.r_max)
+        for k in AtomicDataDict.ALL_ENERGY_KEYS:
+            if k in data:
+                del data[k]
         data = self.transform(data)
-
         data = data.to(self.device)
+        data = AtomicData.to_AtomicDataDict(data)
 
         # predict + extract data
-        out = self.model(AtomicData.to_AtomicDataDict(data))
+        out = self.model(data)
         forces = out[AtomicDataDict.FORCE_KEY].detach().cpu().numpy()
-        energy = out[AtomicDataDict.TOTAL_ENERGY_KEY].detach().cpu().item()
+        energy = out[AtomicDataDict.TOTAL_ENERGY_KEY].detach().cpu().numpy()
 
         # store results
         self.results = {
