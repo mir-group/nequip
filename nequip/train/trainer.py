@@ -699,6 +699,9 @@ class Trainer:
 
         self.model.to(self.torch_device)
 
+        self.num_weights = sum(p.numel() for p in self.model.parameters())
+        self.logger.info(f"Number of weights: {self.num_weights}")
+
         self.rescale_layers = []
         outer_layer = self.model
         while hasattr(outer_layer, "unscale"):
