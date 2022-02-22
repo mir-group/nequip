@@ -89,6 +89,8 @@ use_sc: true                                                                    
 # dataset_file_name: OUTCAR
 # ase_args:
 #   format: vasp-out
+# important VASP note: the ase vasp parser stores the potential energy to "free_energy" instead of "energy".
+# Here, the key_mapping maps the external name (key) to the NequIP default name (value)
 # key_mapping:
 #   free_energy: total_energy
 
