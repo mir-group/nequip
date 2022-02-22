@@ -540,7 +540,7 @@ class AtomicInMemoryDataset(AtomicDataset):
         N = N.unsqueeze(-1)
         assert N.ndim == 2
         assert N.shape == (len(arr), 1)
-        assert arr.ndim == 2
+        assert arr.ndim >= 2
         data_dim = arr.shape[1]
         arr = arr / N
         assert arr.shape == (len(N), data_dim)
