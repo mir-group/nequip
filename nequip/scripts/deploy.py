@@ -20,7 +20,7 @@ import ase.data
 
 from e3nn.util.jit import script
 
-from nequip.scripts.train import _set_global_options
+from nequip.scripts.train import _set_global_options, default_config
 from nequip.train import Trainer
 from nequip.utils import Config
 from nequip.utils.versions import check_code_version, get_config_code_versions
@@ -34,6 +34,7 @@ R_MAX_KEY: Final[str] = "r_max"
 N_SPECIES_KEY: Final[str] = "n_species"
 TYPE_NAMES_KEY: Final[str] = "type_names"
 JIT_BAILOUT_KEY: Final[str] = "_jit_bailout_depth"
+JIT_FUSION_STRATEGY_KEY: Final[str] = "_jit_fusion_strategy"
 TF32_KEY: Final[str] = "allow_tf32"
 
 _ALL_METADATA_KEYS = [
@@ -45,6 +46,7 @@ _ALL_METADATA_KEYS = [
     N_SPECIES_KEY,
     TYPE_NAMES_KEY,
     JIT_BAILOUT_KEY,
+    JIT_FUSION_STRATEGY_KEY,
     TF32_KEY,
 ]
 
@@ -113,14 +115,28 @@ def load_deployed_model(
                 torch.backends.cudnn.allow_tf32 = allow_tf32
 
         # JIT bailout
-        if metadata[JIT_BAILOUT_KEY] != "":
-            jit_bailout: int = int(metadata[JIT_BAILOUT_KEY])
+        if torch.__version__.split(".")[1] >= 11:
+            strategy = metadata.get(JIT_BAILOUT_KEY, "")
+            if strategy != "":
+                strategy = [e.split(",") for e in .split(";")]
+                strategy = [(e[0], int(e[1])) for e in strategy]
+            else:
+                strategy = default_config["_jit_fusion_strategy"]
             # no way to get current value, so assume we are overwriting it
             if set_global_options == "warn":
                 warnings.warn(
-                    "Loaded model had a different value for _jit_bailout_depth than was currently set; changing the GLOBAL setting!"
+                    "Loaded model had a different value for JIT fusion_strategy than was currently set; changing the GLOBAL setting!"
                 )
-            torch._C._jit_set_bailout_depth(jit_bailout)
+            torch.jit.set_fusion_strategy(strategy)
+        else:
+            if metadata[JIT_BAILOUT_KEY] != "":
+                jit_bailout: int = int(metadata[JIT_BAILOUT_KEY])
+                # no way to get current value, so assume we are overwriting it
+                if set_global_options == "warn":
+                    warnings.warn(
+                        "Loaded model had a different value for _jit_bailout_depth than was currently set; changing the GLOBAL setting!"
+                    )
+                torch._C._jit_set_bailout_depth(jit_bailout)
     return model, metadata
 
 
@@ -217,6 +233,9 @@ def main(args=None):
         metadata[N_SPECIES_KEY] = str(n_species)
         metadata[TYPE_NAMES_KEY] = " ".join(type_names)
 
+        metadata[JIT_FUSION_STRATEGY_KEY] = ";".join(
+            "%s,%i" % e for e in config.get("_jit_fusion_strategy", "")
+        )
         metadata[JIT_BAILOUT_KEY] = str(config["_jit_bailout_depth"])
         metadata[TF32_KEY] = str(int(config["allow_tf32"]))
         metadata[CONFIG_KEY] = (args.train_dir / "config.yaml").read_text()

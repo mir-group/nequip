@@ -44,6 +44,7 @@ default_config = dict(
     grad_anomaly_mode=False,
     append=False,
     _jit_bailout_depth=2,  # avoid 20 iters of pain, see https://github.com/pytorch/pytorch/issues/52286
+    _jit_fusion_strategy=[("DYANMIC", 5)],  # for pytorch >= 1.11
 )
 
 
@@ -118,9 +119,13 @@ def _set_global_options(config):
             torch.backends.cuda.matmul.allow_tf32 = False
             torch.backends.cudnn.allow_tf32 = False
 
-    # For avoiding 20 steps of painfully slow JIT recompilation
-    # See https://github.com/pytorch/pytorch/issues/52286
-    torch._C._jit_set_bailout_depth(config["_jit_bailout_depth"])
+    if torch.__version__.split(".")[1] >= 11:
+        # PyTorch >= 1.11
+        torch.jit.set_fusion_strategy(config["_jit_fusion_strategy"])
+    else:
+        # For avoiding 20 steps of painfully slow JIT recompilation
+        # See https://github.com/pytorch/pytorch/issues/52286
+        torch._C._jit_set_bailout_depth(config["_jit_bailout_depth"])
 
     if config.model_debug_mode:
         set_irreps_debug(enabled=True)
