@@ -119,7 +119,7 @@ def _set_global_options(config):
             torch.backends.cuda.matmul.allow_tf32 = False
             torch.backends.cudnn.allow_tf32 = False
 
-    if torch.__version__.split(".")[1] >= 11:
+    if int(torch.__version__.split(".")[1]) >= 12:
         # PyTorch >= 1.11
         torch.jit.set_fusion_strategy(config["_jit_fusion_strategy"])
     else:

@@ -115,10 +115,10 @@ def load_deployed_model(
                 torch.backends.cudnn.allow_tf32 = allow_tf32
 
         # JIT bailout
-        if torch.__version__.split(".")[1] >= 11:
+        if int(torch.__version__.split(".")[1]) >= 12:
             strategy = metadata.get(JIT_BAILOUT_KEY, "")
             if strategy != "":
-                strategy = [e.split(",") for e in .split(";")]
+                strategy = [e.split(",") for e in strategy.split(";")]
                 strategy = [(e[0], int(e[1])) for e in strategy]
             else:
                 strategy = default_config["_jit_fusion_strategy"]
