@@ -741,11 +741,6 @@ class Trainer:
             raise RuntimeError("You must call `set_dataset()` before calling `train()`")
         if not self._initialized:
             self.init()
-            self.logger.info(
-                "Number of weights: {}".format(
-                    sum(p.numel() for p in self.model.parameters())
-                )
-            )
 
         for callback in self._init_callbacks:
             callback(self)

@@ -10,6 +10,7 @@ Most recent change on the bottom.
 ## [Unreleased] - 0.5.3
 ### Added
 - `nequip-evaluate --repeat` option
+- Report number of weights to wandb
 
 ### Changed
 

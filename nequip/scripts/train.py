@@ -178,8 +178,13 @@ def fresh_start(config):
     final_model = model_from_config(
         config=config, initialize=True, dataset=trainer.dataset_train
     )
-
     logging.info("Successfully built the network...")
+    num_weights: int = sum(p.numel() for p in final_model.parameters())
+    logging.info(f"Number of weights: {num_weights}")
+    # upload it to wandb
+    if config.wandb:
+        # we've already imported wandb in an earlier `if`
+        wandb.config.update({"num_weights": num_weights})
 
     # by doing this here we check also any keys custom builders may have added
     _check_old_keys(config)
