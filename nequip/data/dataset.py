@@ -541,9 +541,9 @@ class AtomicInMemoryDataset(AtomicDataset):
         assert N.ndim == 2
         assert N.shape == (len(arr), 1)
         assert arr.ndim >= 2
-        data_dim = arr.shape[1]
+        data_dim = arr.shape[1:]
         arr = arr / N
-        assert arr.shape == (len(N), data_dim)
+        assert arr.shape == (len(N),) + data_dim
         if ana_mode == "mean_std":
             mean = torch.mean(arr, dim=0)
             std = torch.std(arr, unbiased=unbiased, dim=0)
