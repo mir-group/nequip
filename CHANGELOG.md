@@ -13,7 +13,7 @@ Most recent change on the bottom.
 
 ### Changed
 - default value for `report_init_validation` is now `True`
-- `all_*_*` metrics rename to -> `ps_mean_*_*`
+- `all_*_*` metrics rename to -> `psavg_*_*`
 
 ### Fixed
 - error if both per-species and global shift are used together
