@@ -207,18 +207,17 @@ class TestPerAtomStatistics:
             )
 
     @pytest.mark.parametrize("fixed_field", [True, False])
-    @pytest.mark.parametrize("full_rank", [True, False])
     @pytest.mark.parametrize("subset", [True, False])
     @pytest.mark.parametrize(
         "key,dim", [(AtomicDataDict.TOTAL_ENERGY_KEY, (1,)), ("somekey", (3,))]
     )
     def test_per_graph_field(
-        self, npz_dataset, fixed_field, full_rank, subset, key, dim
+        self, npz_dataset, fixed_field, subset, key, dim
     ):
         if key == "somekey":
             register_fields(graph_fields=[key])
 
-        npz_dataset = set_up_transformer(npz_dataset, full_rank, fixed_field, subset)
+        npz_dataset = set_up_transformer(npz_dataset, True, fixed_field, subset)
         if npz_dataset is None:
             return
 
@@ -267,7 +266,7 @@ class TestPerSpeciesStatistics:
         )
         print(result)
 
-    @pytest.mark.parametrize("alpha", [1e-10, 1e-6, 0.1, 0.5, 1])
+    @pytest.mark.parametrize("alpha", [1e-5, 1e-3, 0.1, 0.5])
     @pytest.mark.parametrize("fixed_field", [True, False])
     @pytest.mark.parametrize("full_rank", [True, False])
     @pytest.mark.parametrize("subset", [True, False])
@@ -277,6 +276,9 @@ class TestPerSpeciesStatistics:
     def test_per_graph_field(
         self, npz_dataset, alpha, fixed_field, full_rank, regressor, subset
     ):
+
+        if alpha <= 1e-4 and not full_rank:
+            return
 
         npz_dataset = set_up_transformer(npz_dataset, full_rank, fixed_field, subset)
         if npz_dataset is None:
@@ -295,10 +297,10 @@ class TestPerSpeciesStatistics:
         del n_spec
         del Ns
 
-        if alpha == 1e-10:
-            ref_mean, ref_std, E = generate_E(N, 100, 0.0)
+        if alpha == 1e-5:
+            ref_mean, ref_std, E = generate_E(N, 1000, 0.0)
         else:
-            ref_mean, ref_std, E = generate_E(N, 100, 0.5)
+            ref_mean, ref_std, E = generate_E(N, 1000, 0.5)
 
         if subset:
             E_orig_order = torch.zeros_like(
@@ -333,11 +335,16 @@ class TestPerSpeciesStatistics:
         print("diff in mean", mean - ref_mean)
         print("std", std, ref_std)
 
-        if alpha == 1e-10 and full_rank:
-            assert torch.allclose(mean, ref_mean, rtol=1e-1)
-            assert torch.allclose(std, torch.zeros_like(ref_mean), atol=1e-2)
-        # else:
-        #     assert res2 > ref_res2
+        if full_rank:
+            if alpha == 1e-5:
+                assert torch.allclose(mean, ref_mean, rtol=1e-1)
+            else:
+                assert torch.allclose(mean, ref_mean, rtol=8e-1)
+                assert torch.allclose(std, torch.zeros_like(ref_mean), atol=alpha*100)
+        elif regressor == "NormalizedGaussianProcess":
+            assert torch.std(mean).numpy() ==0
+        else:
+            assert mean[0] == mean[1]*2
 
 
 class TestReload:
