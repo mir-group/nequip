@@ -13,11 +13,11 @@ Most recent change on the bottom.
 - Report number of weights to wandb
 
 ### Changed
-
 - defaults and commments in example.yaml and full.yaml, in particular longer default training and correct comment for E:F-weighting
 - better metrics config in example.yaml and full.yaml, in particular will total F-MAE/F-RMSE instead of mean over per-species
 - default value for `report_init_validation` is now `True`
 - `all_*_*` metrics rename to -> `psavg_*_*`
+- `avg_num_neighbors` default `None` -> `auto`
 
 ### Fixed
 - error if both per-species and global shift are used together

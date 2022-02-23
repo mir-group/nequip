@@ -27,7 +27,7 @@ def add_avg_num_neighbors(
 ) -> Optional[float]:
     # Compute avg_num_neighbors
     annkey: str = "avg_num_neighbors"
-    ann = config.get(annkey, None)
+    ann = config.get(annkey, "auto")
     if ann == "auto":
         if not initialize:
             raise ValueError("avg_num_neighbors = auto but initialize is False")
