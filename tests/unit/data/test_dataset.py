@@ -337,7 +337,7 @@ class TestPerSpeciesStatistics:
             if alpha == 1e-5:
                 assert torch.allclose(mean, ref_mean, rtol=1e-1)
             else:
-                assert torch.allclose(mean, ref_mean, rtol=8e-1)
+                assert torch.allclose(mean, ref_mean, rtol=2)
                 assert torch.allclose(std, torch.zeros_like(ref_mean), atol=alpha * 100)
         elif regressor == "NormalizedGaussianProcess":
             assert torch.std(mean).numpy() == 0
