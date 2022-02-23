@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Most recent change on the bottom.
 
 
-## [Unreleased] - 0.5.3
+## [Unreleased]
+
+## [0.5.3] - 2022-02-23
 ### Added
 - `nequip-evaluate --repeat` option
 - Report number of weights to wandb
