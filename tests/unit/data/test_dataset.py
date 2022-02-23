@@ -211,9 +211,7 @@ class TestPerAtomStatistics:
     @pytest.mark.parametrize(
         "key,dim", [(AtomicDataDict.TOTAL_ENERGY_KEY, (1,)), ("somekey", (3,))]
     )
-    def test_per_graph_field(
-        self, npz_dataset, fixed_field, subset, key, dim
-    ):
+    def test_per_graph_field(self, npz_dataset, fixed_field, subset, key, dim):
         if key == "somekey":
             register_fields(graph_fields=[key])
 
@@ -340,11 +338,11 @@ class TestPerSpeciesStatistics:
                 assert torch.allclose(mean, ref_mean, rtol=1e-1)
             else:
                 assert torch.allclose(mean, ref_mean, rtol=8e-1)
-                assert torch.allclose(std, torch.zeros_like(ref_mean), atol=alpha*100)
+                assert torch.allclose(std, torch.zeros_like(ref_mean), atol=alpha * 100)
         elif regressor == "NormalizedGaussianProcess":
-            assert torch.std(mean).numpy() ==0
+            assert torch.std(mean).numpy() == 0
         else:
-            assert mean[0] == mean[1]*2
+            assert mean[0] == mean[1] * 2
 
 
 class TestReload:
