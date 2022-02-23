@@ -15,7 +15,7 @@ from nequip.utils import Config
 from nequip.data import AtomicData, dataset_from_config
 from nequip.model import model_from_config
 from nequip.scripts.deploy import _compile_for_deploy
-from nequip.scripts.train import _set_global_options, default_config
+from nequip.scripts.train import _set_global_options, default_config, check_code_version
 
 
 def main(args=None):
@@ -71,6 +71,7 @@ def main(args=None):
 
     config = Config.from_file(args.config, defaults=default_config)
     _set_global_options(config)
+    check_code_version(config)
 
     # Load dataset to get something to benchmark on
     print("Loading dataset... ")

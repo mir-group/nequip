@@ -23,11 +23,9 @@ else:
     import contextlib2 as contextlib
 
 import numpy as np
-import e3nn
 import torch
 from torch_ema import ExponentialMovingAverage
 
-import nequip
 from nequip.data import DataLoader, AtomicData, AtomicDataDict, AtomicDataset
 from nequip.utils import (
     Output,
@@ -42,7 +40,7 @@ from nequip.utils import (
     atomic_write_group,
     dtype_from_name,
 )
-from nequip.utils.git import get_commit
+from nequip.utils.versions import check_code_version
 from nequip.model import model_from_config
 
 from .loss import Loss, LossStat
@@ -254,7 +252,7 @@ class Trainer:
         log_epoch_freq: int = 1,
         save_checkpoint_freq: int = -1,
         save_ema_checkpoint_freq: int = -1,
-        report_init_validation: bool = False,
+        report_init_validation: bool = True,
         verbose="INFO",
         **kwargs,
     ):
@@ -518,19 +516,6 @@ class Trainer:
             if hasattr(self, "config_save_path"):
                 dictionary["progress"]["config_save_path"] = self.config_save_path
 
-        for code in [e3nn, nequip, torch]:
-            dictionary[f"{code.__name__}_version"] = code.__version__
-
-        codes_for_git = {"e3nn", "nequip"}
-        for builder in self.model_builders:
-            if not isinstance(builder, str):
-                continue
-            builder = builder.split(".")
-            if len(builder) > 1:
-                # it's not a single name which is from nequip
-                codes_for_git.add(builder[0])
-        dictionary["code_versions"] = {code: get_commit(code) for code in codes_for_git}
-
         return dictionary
 
     def save_config(self, blocking: bool = True) -> None:
@@ -608,15 +593,7 @@ class Trainer:
         """
 
         dictionary = deepcopy(dictionary)
-
-        for code in [e3nn, nequip, torch]:
-            version = dictionary.get(f"{code.__name__}_version", None)
-            if version is not None and version != code.__version__:
-                logging.warning(
-                    "Loading a pickled model created with different library version(s) may cause issues."
-                    f"current {code.__name__} verion: {code.__version__} "
-                    f"vs  original version: {version}"
-                )
+        check_code_version(dictionary)
 
         # update the restart and append option
         if append is not None:
@@ -722,6 +699,9 @@ class Trainer:
 
         self.model.to(self.torch_device)
 
+        self.num_weights = sum(p.numel() for p in self.model.parameters())
+        self.logger.info(f"Number of weights: {self.num_weights}")
+
         self.rescale_layers = []
         outer_layer = self.model
         while hasattr(outer_layer, "unscale"):
@@ -764,11 +744,6 @@ class Trainer:
             raise RuntimeError("You must call `set_dataset()` before calling `train()`")
         if not self._initialized:
             self.init()
-            self.logger.info(
-                "Number of weights: {}".format(
-                    sum(p.numel() for p in self.model.parameters())
-                )
-            )
 
         for callback in self._init_callbacks:
             callback(self)
@@ -966,10 +941,7 @@ class Trainer:
         # append details from metrics
         metrics, skip_keys = self.metrics.flatten_metrics(
             metrics=self.batch_metrics,
-            # TO DO, how about chemical to symbol
-            type_names=self.model.config.get("type_names")
-            if hasattr(self.model, "config")
-            else None,
+            type_names=self.dataset_train.type_mapper.type_names,
         )
         for key, value in metrics.items():
 
@@ -1090,9 +1062,7 @@ class Trainer:
 
             met, skip_keys = self.metrics.flatten_metrics(
                 metrics=self.metrics_dict[category],
-                type_names=self.model.config.get("type_names")
-                if hasattr(self.model, "config")
-                else None,
+                type_names=self.dataset_train.type_mapper.type_names,
             )
 
             # append details from loss
