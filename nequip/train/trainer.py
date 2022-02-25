@@ -38,7 +38,6 @@ from nequip.utils import (
     atomic_write,
     finish_all_writes,
     atomic_write_group,
-    dtype_from_name,
 )
 from nequip.utils.versions import check_code_version
 from nequip.model import model_from_config
@@ -365,11 +364,16 @@ class Trainer:
 
     @classmethod
     def from_config(kls, model, config):
-        params = {}
-        for k in inspect.signature(kls).parameters:
-            if k in config:
-                params[k] = config[k]
-        return kls(**params, model=model, config=config)
+        _, params = instantiate(
+            kls,
+            all_args=config,
+            return_args_only=True,
+            # For BC, because trainer has some *_kwargs args that aren't strict sub-builders
+            # ex. `optimizer_kwargs`
+            _strict_kwargs_postfix=False,
+        )
+        assert params.pop("config") is None
+        return kls(model=model, **params, config=config)
 
     def init_objects(self):
         # initialize optimizer
