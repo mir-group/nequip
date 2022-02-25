@@ -252,7 +252,7 @@ class Trainer:
         log_epoch_freq: int = 1,
         save_checkpoint_freq: int = -1,
         save_ema_checkpoint_freq: int = -1,
-        report_init_validation: bool = False,
+        report_init_validation: bool = True,
         verbose="INFO",
         config=None,
     ):
@@ -708,6 +708,9 @@ class Trainer:
 
         self.model.to(self.torch_device)
 
+        self.num_weights = sum(p.numel() for p in self.model.parameters())
+        self.logger.info(f"Number of weights: {self.num_weights}")
+
         self.rescale_layers = []
         outer_layer = self.model
         while hasattr(outer_layer, "unscale"):
@@ -750,11 +753,6 @@ class Trainer:
             raise RuntimeError("You must call `set_dataset()` before calling `train()`")
         if not self._initialized:
             self.init()
-            self.logger.info(
-                "Number of weights: {}".format(
-                    sum(p.numel() for p in self.model.parameters())
-                )
-            )
 
         for callback in self._init_callbacks:
             callback(self)
@@ -955,10 +953,7 @@ class Trainer:
         # append details from metrics
         metrics, skip_keys = self.metrics.flatten_metrics(
             metrics=self.batch_metrics,
-            # TO DO, how about chemical to symbol
-            type_names=self.model.config.get("type_names")
-            if hasattr(self.model, "config")
-            else None,
+            type_names=self.dataset_train.type_mapper.type_names,
         )
         for key, value in metrics.items():
 
@@ -1079,9 +1074,7 @@ class Trainer:
 
             met, skip_keys = self.metrics.flatten_metrics(
                 metrics=self.metrics_dict[category],
-                type_names=self.model.config.get("type_names")
-                if hasattr(self.model, "config")
-                else None,
+                type_names=self.dataset_train.type_mapper.type_names,
             )
 
             # append details from loss

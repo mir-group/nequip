@@ -7,9 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Most recent change on the bottom.
 
 
-## [Unreleased] - 0.5.3
+## [Unreleased] - 0.5.4
+
+## [0.5.3] - 2022-02-23
 ### Added
 - `nequip-evaluate --repeat` option
+- Report number of weights to wandb
+
+### Changed
+- defaults and commments in example.yaml and full.yaml, in particular longer default training and correct comment for E:F-weighting
+- better metrics config in example.yaml and full.yaml, in particular will total F-MAE/F-RMSE instead of mean over per-species
+- default value for `report_init_validation` is now `True`
+- `all_*_*` metrics rename to -> `psavg_*_*`
+- `avg_num_neighbors` default `None` -> `auto`
+
+### Fixed
+- error if both per-species and global shift are used together
+
 
 ## [0.5.2] - 2022-02-04
 ### Added
