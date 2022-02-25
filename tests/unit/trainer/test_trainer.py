@@ -44,7 +44,6 @@ minimal_config = Config(
         early_stopping_lower_bounds={"LR": 1e-10},
         model_builders=[dummy_builder],
         verbose="debug",
-        default_dtype=
     )
 )
 

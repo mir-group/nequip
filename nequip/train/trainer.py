@@ -494,7 +494,7 @@ class Trainer:
             dictionary[key] = getattr(self, key, None)
 
         if kwargs:
-            dictionary.update(getattr(self, "kwargs", {}))
+            dictionary.update(dict(getattr(self, "config", {})))
 
         if state_dict:
             dictionary["state_dict"] = {}
@@ -634,7 +634,7 @@ class Trainer:
 
         state_dict = dictionary.pop("state_dict", None)
 
-        trainer = cls(model=model, **dictionary)
+        trainer = cls.from_config(model=model, config=Config.from_dict(dictionary))
 
         if state_dict is not None and trainer.model is not None:
             logging.debug("Reload optimizer and scheduler states")
