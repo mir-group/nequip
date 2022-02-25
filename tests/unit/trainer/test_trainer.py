@@ -15,6 +15,7 @@ from nequip.data import AtomicDataDict
 from nequip.train.trainer import Trainer
 from nequip.utils.savenload import load_file
 from nequip.nn import GraphModuleMixin
+from nequip.utils import Config
 
 
 def dummy_builder():
@@ -22,26 +23,29 @@ def dummy_builder():
 
 
 # set up two config to test
-DEBUG = False
 NATOMS = 3
 NFRAMES = 10
-minimal_config = dict(
-    run_name="test",
-    n_train=4,
-    n_val=4,
-    exclude_keys=["sth"],
-    max_epochs=2,
-    batch_size=2,
-    learning_rate=1e-2,
-    optimizer="Adam",
-    seed=0,
-    append=False,
-    T_0=50,
-    T_mult=2,
-    loss_coeffs={"forces": 2},
-    early_stopping_patiences={"loss": 50},
-    early_stopping_lower_bounds={"LR": 1e-10},
-    model_builders=[dummy_builder],
+minimal_config = Config(
+    config=dict(
+        run_name="test",
+        n_train=4,
+        n_val=4,
+        exclude_keys=["sth"],
+        max_epochs=2,
+        batch_size=2,
+        learning_rate=1e-2,
+        optimizer="Adam",
+        seed=0,
+        append=False,
+        T_0=50,
+        T_mult=2,
+        loss_coeffs={"forces": 2},
+        early_stopping_patiences={"loss": 50},
+        early_stopping_lower_bounds={"LR": 1e-10},
+        model_builders=[dummy_builder],
+        verbose="debug",
+        default_dtype=
+    )
 )
 
 
@@ -54,7 +58,7 @@ def trainer():
     model = model_from_config(minimal_config)
     with tempfile.TemporaryDirectory(prefix="output") as path:
         minimal_config["root"] = path
-        c = Trainer(model=model, **minimal_config)
+        c = Trainer.from_config(model=model, config=minimal_config)
         yield c
 
 
@@ -77,10 +81,10 @@ class TestDuplicateError:
         minimal_config["root"] = temp_data
 
         model = DummyNet(3)
-        Trainer(model=model, **minimal_config)
+        Trainer.from_config(model=model, config=minimal_config)
 
         with pytest.raises(RuntimeError):
-            Trainer(model=model, **minimal_config)
+            Trainer.from_config(model=model, config=minimal_config)
 
 
 class TestSaveLoad:
@@ -336,8 +340,8 @@ class DummyScale(torch.nn.Module):
 @pytest.fixture(scope="class")
 def scale_train(nequip_dataset):
     with tempfile.TemporaryDirectory(prefix="output") as path:
-        trainer = Trainer(
-            model=DummyScale(AtomicDataDict.FORCE_KEY, scale=1.3, shift=1),
+        model = DummyScale(AtomicDataDict.FORCE_KEY, scale=1.3, shift=1)
+        config = dict(
             n_train=4,
             n_val=4,
             max_epochs=0,
@@ -346,6 +350,7 @@ def scale_train(nequip_dataset):
             root=path,
             run_name="test_scale",
         )
+        trainer = Trainer.from_config(model=model, config=config)
         trainer.set_dataset(nequip_dataset)
         trainer.train()
         trainer.scale = 1.3
