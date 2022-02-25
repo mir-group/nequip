@@ -258,15 +258,13 @@ class Trainer:
         self._initialized = False
         logging.debug("* Initialize Trainer")
 
-        # store all init arguments
-        self.model = model
+        assert isinstance(config, Config)
 
-        # TODO: remove this?
-        _local_kwargs = {}
+        # set attributes for init arguments
         for key in self.init_keys:
             setattr(self, key, locals()[key])
-            _local_kwargs[key] = locals()[key]
 
+        self.model = model
         self.ema = None
 
         output = Output.get_output(config)

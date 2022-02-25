@@ -340,14 +340,16 @@ class DummyScale(torch.nn.Module):
 def scale_train(nequip_dataset):
     with tempfile.TemporaryDirectory(prefix="output") as path:
         model = DummyScale(AtomicDataDict.FORCE_KEY, scale=1.3, shift=1)
-        config = dict(
-            n_train=4,
-            n_val=4,
-            max_epochs=0,
-            batch_size=2,
-            loss_coeffs=AtomicDataDict.FORCE_KEY,
-            root=path,
-            run_name="test_scale",
+        config = Config.from_dict(
+            dict(
+                n_train=4,
+                n_val=4,
+                max_epochs=0,
+                batch_size=2,
+                loss_coeffs=AtomicDataDict.FORCE_KEY,
+                root=path,
+                run_name="test_scale",
+            )
         )
         trainer = Trainer.from_config(model=model, config=config)
         trainer.set_dataset(nequip_dataset)
