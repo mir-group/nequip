@@ -34,7 +34,7 @@ def test_deploy(BENCHMARK_ROOT, device):
     with tempfile.TemporaryDirectory() as tmpdir:
         # Save time
         run_name = "test_deploy" + dtype
-        root = tmpdir + "nequip_rootdir/"
+        root = tmpdir + "/nequip_rootdir/"
         true_config["run_name"] = run_name
         true_config["root"] = root
         true_config["dataset_file_name"] = str(
