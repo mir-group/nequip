@@ -362,16 +362,14 @@ class Trainer:
 
     @classmethod
     def from_config(kls, model, config):
-        _, params = instantiate(
+        return instantiate(
             kls,
+            positional_args=dict(model=model, config=config),
             all_args=config,
-            return_args_only=True,
             # For BC, because trainer has some *_kwargs args that aren't strict sub-builders
             # ex. `optimizer_kwargs`
             _strict_kwargs_postfix=False,
-        )
-        assert params.pop("config") is None
-        return kls(model=model, **params, config=config)
+        )[0]
 
     def init_objects(self):
         # initialize optimizer
