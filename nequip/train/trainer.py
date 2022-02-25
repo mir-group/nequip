@@ -494,7 +494,7 @@ class Trainer:
             dictionary[key] = getattr(self, key, None)
 
         if kwargs:
-            dictionary.update(dict(getattr(self, "config", {})))
+            dictionary.update({k: v for k, v in getattr(self, "config", {}).items() if k not in self.init_keys})
 
         if state_dict:
             dictionary["state_dict"] = {}
