@@ -494,7 +494,15 @@ class Trainer:
             dictionary[key] = getattr(self, key, None)
 
         if kwargs:
-            dictionary.update({k: v for k, v in getattr(self, "config", {}).items() if k not in self.init_keys})
+            dictionary.update(
+                {
+                    k: v
+                    for k, v in getattr(self, "config", {}).items()
+                    # config could have keys that already got taken for the named parameters of the trainer
+                    # those are already handled in the loop above over init_keys
+                    if k not in inspect.signature(Trainer.__init__).parameters.keys()
+                }
+            )
 
         if state_dict:
             dictionary["state_dict"] = {}
