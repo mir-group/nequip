@@ -24,7 +24,7 @@ class NequIPCalculator(Calculator):
 
     """
 
-    implemented_properties = ["energy", "forces"]
+    implemented_properties = ["energy", "energies", "forces"]
 
     def __init__(
         self,
@@ -121,3 +121,12 @@ class NequIPCalculator(Calculator):
             # force has units eng / len:
             "forces": forces * (self.energy_units_to_eV / self.length_units_to_A),
         }
+
+        if AtomicDataDict.PER_ATOM_ENERGY_KEY in out:
+            self.results["energies"] = self.energy_units_to_eV * (
+                out[AtomicDataDict.PER_ATOM_ENERGY_KEY]
+                .detach()
+                .squeeze(-1)
+                .cpu()
+                .numpy()
+            )
