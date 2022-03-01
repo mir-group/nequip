@@ -178,7 +178,6 @@ def fresh_start(config):
     final_model = model_from_config(
         config=config, initialize=True, dataset=trainer.dataset_train
     )
-
     logging.info("Successfully built the network...")
 
     # by doing this here we check also any keys custom builders may have added

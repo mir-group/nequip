@@ -78,6 +78,22 @@ def main(args=None, running_as_script: bool = True):
         default=50,
     )
     parser.add_argument(
+        "--repeat",
+        help=(
+            "Number of times to repeat evaluating the test dataset. "
+            "This can help compensate for CUDA nondeterminism, or can be used to evaluate error on models whose inference passes are intentionally nondeterministic. "
+            "Note that `--repeat`ed passes over the dataset will also be `--output`ed if an `--output` is specified."
+        ),
+        type=int,
+        default=1,
+    )
+    parser.add_argument(
+        "--use-deterministic-algorithms",
+        help="Try to have PyTorch use deterministic algorithms. Will probably fail on GPU/CUDA.",
+        type=bool,
+        default=False,
+    )
+    parser.add_argument(
         "--device",
         help="Device to run the model on. If not provided, defaults to CUDA if available and CPU otherwise.",
         type=str,
@@ -171,6 +187,12 @@ def main(args=None, running_as_script: bool = True):
             "WARNING: please note that models running on CUDA are usually nondeterministc and that this manifests in the final test errors; for a _more_ deterministic result, please use `--device cpu`",
         )
 
+    if args.use_deterministic_algorithms:
+        logger.info(
+            "Telling PyTorch to try to use deterministic algorithms... please note that this will likely error on CUDA/GPU"
+        )
+        torch.use_deterministic_algorithms(True)
+
     # Load model:
     logger.info("Loading model... ")
     loaded_deployed_model: bool = False
@@ -246,8 +268,8 @@ def main(args=None, running_as_script: bool = True):
     # this makes no sense if a dataset is given seperately
     if (
         args.test_indexes is None
-        and train_idcs is not None
         and dataset_is_from_training
+        and train_idcs is not None
     ):
         # we know the train and val, get the rest
         all_idcs = set(range(len(dataset)))
@@ -286,6 +308,8 @@ def main(args=None, running_as_script: bool = True):
         logger.info(
             f"Using provided test set indexes, yielding a test set size of {len(test_idcs)} frames.",
         )
+    test_idcs = torch.as_tensor(test_idcs, dtype=torch.long)
+    test_idcs = test_idcs.tile((args.repeat,))
 
     # Figure out what metrics we're actually computing
     if do_metrics:
@@ -377,7 +401,8 @@ def main(args=None, running_as_script: bool = True):
                         " | ".join(
                             f"{k} = {v:4.4f}"
                             for k, v in metrics.flatten_metrics(
-                                metrics.current_result()
+                                metrics.current_result(),
+                                type_names=dataset.type_mapper.type_names,
                             )[0].items()
                         )
                     )
@@ -394,7 +419,10 @@ def main(args=None, running_as_script: bool = True):
         logger.critical(
             "\n".join(
                 f"{k:>20s} = {v:< 20f}"
-                for k, v in metrics.flatten_metrics(metrics.current_result())[0].items()
+                for k, v in metrics.flatten_metrics(
+                    metrics.current_result(),
+                    type_names=dataset.type_mapper.type_names,
+                )[0].items()
             )
         )
 
