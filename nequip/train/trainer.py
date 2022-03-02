@@ -711,6 +711,7 @@ class Trainer:
         self.init_objects()
 
         self._initialized = True
+        self.cumulative_wall = 0
 
     def init_metrics(self):
         if self.metrics_components is None:
@@ -750,6 +751,7 @@ class Trainer:
 
         self.init_log()
         self.wall = perf_counter()
+        self.previous_cumulative_wall = self.cumulative_wall
 
         with atomic_write_group():
             if self.iepoch == -1:
@@ -1030,7 +1032,9 @@ class Trainer:
 
         self.logger.info(f"! Stop training: {self.stop_arg}")
         wall = perf_counter() - self.wall
+        self.cumulative_wall = wall + self.previous_cumulative_wall
         self.logger.info(f"Wall time: {wall}")
+        self.logger.info(f"Cumulative wall time: {self.cumulative_wall}")
 
     def end_of_epoch_log(self):
         """
@@ -1039,10 +1043,12 @@ class Trainer:
 
         lr = self.optim.param_groups[0]["lr"]
         wall = perf_counter() - self.wall
+        self.cumulative_wall = wall + self.previous_cumulative_wall
         self.mae_dict = dict(
             LR=lr,
             epoch=self.iepoch,
             wall=wall,
+            cumulative_wall=self.cumulative_wall,
         )
 
         header = "epoch, wall, LR"
