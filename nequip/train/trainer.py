@@ -409,14 +409,14 @@ class Trainer:
         )
         n_args = 0
         for key, item in kwargs.items():
-            # prepand VALIDATION string if k is not with
+            # prepend VALIDATION string if k is not with
             if isinstance(item, dict):
                 new_dict = {}
                 for k, v in item.items():
                     if (
                         k.lower().startswith(VALIDATION)
                         or k.lower().startswith(TRAIN)
-                        or k.lower() in ["lr", "wall"]
+                        or k.lower() in ["lr", "wall", "cumulative_wall"]
                     ):
                         new_dict[k] = item[k]
                     else:
