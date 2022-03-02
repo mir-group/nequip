@@ -257,6 +257,7 @@ class Trainer:
         **kwargs,
     ):
         self._initialized = False
+        self.cumulative_wall = 0
         logging.debug("* Initialize Trainer")
 
         # store all init arguments
@@ -499,6 +500,7 @@ class Trainer:
                 dictionary["state_dict"]["cuda_rng_state"] = torch.cuda.get_rng_state(
                     device=self.torch_device
                 )
+            dictionary["state_dict"]["cumulative_wall"] = self.cumulative_wall
 
         if training_progress:
             dictionary["progress"] = {}
@@ -634,6 +636,7 @@ class Trainer:
                 if item is not None:
                     item.load_state_dict(state_dict[key])
             trainer._initialized = True
+            trainer.cumulative_wall = state_dict["cumulative_wall"]
 
             torch.set_rng_state(state_dict["rng_state"])
             trainer.dataset_rng.set_state(state_dict["dataset_rng_state"])
