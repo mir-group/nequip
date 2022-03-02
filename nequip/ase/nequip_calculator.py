@@ -25,7 +25,7 @@ class NequIPCalculator(Calculator):
 
     """
 
-    implemented_properties = ["energy", "forces", "stress", "free_energy"]
+    implemented_properties = ["energy", "energies", "forces", "stress", "free_energy"]
 
     def __init__(
         self,
@@ -114,7 +114,9 @@ class NequIPCalculator(Calculator):
         # predict + extract data
         out = self.model(data)
         forces = out[AtomicDataDict.FORCE_KEY].detach().cpu().numpy()
-        energy = out[AtomicDataDict.TOTAL_ENERGY_KEY].detach().cpu().numpy()
+        energy = (
+            out[AtomicDataDict.TOTAL_ENERGY_KEY].detach().cpu().numpy().reshape(tuple())
+        )
 
         # store results
         self.results = {
@@ -122,11 +124,23 @@ class NequIPCalculator(Calculator):
             # force has units eng / len:
             "forces": forces * (self.energy_units_to_eV / self.length_units_to_A),
         }
-        self.results["free_energy"] = self.results["energy"]
+        self.results["free_energy"] = self.results[
+            "energy"
+        ]  # "force consistant" energy
+
+        if AtomicDataDict.PER_ATOM_ENERGY_KEY in out:
+            self.results["energies"] = self.energy_units_to_eV * (
+                out[AtomicDataDict.PER_ATOM_ENERGY_KEY]
+                .detach()
+                .squeeze(-1)
+                .cpu()
+                .numpy()
+            )
+
         if "stress" in properties:
             stress = out[AtomicDataDict.STRESS_KEY].detach().cpu().numpy()
             stress = stress.reshape(3, 3) * (
-                self.energy_units_to_eV / self.length_units_to_A ** 3
+                self.energy_units_to_eV / self.length_units_to_A**3
             )
             # ase wants voigt format
             stress_voigt = full_3x3_to_voigt_6_stress(stress)
