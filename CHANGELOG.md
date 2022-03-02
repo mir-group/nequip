@@ -8,6 +8,12 @@ Most recent change on the bottom.
 
 
 ## [Unreleased] - 0.5.4
+### Added
+- `NequIPCalculator` now handles per-atom energies
+
+### Fixed
+- Better error in `Dataset.statistics` when field is missing
+- `NequIPCalculator` now outputs energy as scalar rather than `(1, 1)` array
 
 ## [0.5.3] - 2022-02-23
 ### Added

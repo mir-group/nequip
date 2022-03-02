@@ -133,9 +133,12 @@ def test_deploy(BENCHMARK_ROOT, device):
             AtomicDataDict.FORCE_KEY: atoms.get_forces(),
             AtomicDataDict.PER_ATOM_ENERGY_KEY: atoms.get_potential_energies(),
         }
+        assert ase_pred[AtomicDataDict.TOTAL_ENERGY_KEY].shape == tuple()
+        assert ase_pred[AtomicDataDict.FORCE_KEY].shape == (len(atoms), 3)
+        assert ase_pred[AtomicDataDict.PER_ATOM_ENERGY_KEY].shape == (len(atoms),)
         for k in keys:
             assert torch.allclose(
-                deploy_pred[k],
+                deploy_pred[k].squeeze(-1),
                 torch.as_tensor(ase_pred[k], dtype=torch.get_default_dtype()),
                 atol=atol,
             )

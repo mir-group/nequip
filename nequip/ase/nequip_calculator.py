@@ -113,7 +113,9 @@ class NequIPCalculator(Calculator):
         # predict + extract data
         out = self.model(data)
         forces = out[AtomicDataDict.FORCE_KEY].detach().cpu().numpy()
-        energy = out[AtomicDataDict.TOTAL_ENERGY_KEY].detach().cpu().numpy()
+        energy = (
+            out[AtomicDataDict.TOTAL_ENERGY_KEY].detach().cpu().numpy().reshape(tuple())
+        )
 
         # store results
         self.results = {
