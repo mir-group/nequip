@@ -18,9 +18,11 @@ def test_random(full_rank, alpha):
     n_dim = 3
 
     if full_rank:
-        X = torch.rand((n_samples, n_dim))
+        X = torch.randint(low=1, high=10, size=(n_samples, n_dim))
     else:
-        X = torch.rand((n_samples, 1)) * torch.ones((n_samples, n_dim))
+        X = torch.randint(low=1, high=10, size=(n_samples, 1)) * torch.ones(
+            (n_samples, n_dim)
+        )
 
     ref_mean = torch.rand((n_dim, 1))
     y = torch.matmul(X, ref_mean)
