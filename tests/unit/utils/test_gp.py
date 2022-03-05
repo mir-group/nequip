@@ -1,6 +1,5 @@
 import torch
 import pytest
-import yaml
 
 from nequip.utils.regressor import base_gp
 from sklearn.gaussian_process.kernels import DotProduct
