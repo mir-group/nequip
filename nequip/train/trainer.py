@@ -256,6 +256,7 @@ class Trainer:
         config=None,
     ):
         self._initialized = False
+        self.cumulative_wall = 0
         logging.debug("* Initialize Trainer")
 
         assert isinstance(config, Config)
@@ -417,14 +418,14 @@ class Trainer:
         )
         n_args = 0
         for key, item in kwargs.items():
-            # prepand VALIDATION string if k is not with
+            # prepend VALIDATION string if k is not with
             if isinstance(item, dict):
                 new_dict = {}
                 for k, v in item.items():
                     if (
                         k.lower().startswith(VALIDATION)
                         or k.lower().startswith(TRAIN)
-                        or k.lower() in ["lr", "wall"]
+                        or k.lower() in ["lr", "wall", "cumulative_wall"]
                     ):
                         new_dict[k] = item[k]
                     else:
@@ -516,6 +517,7 @@ class Trainer:
                 dictionary["state_dict"]["cuda_rng_state"] = torch.cuda.get_rng_state(
                     device=self.torch_device
                 )
+            dictionary["state_dict"]["cumulative_wall"] = self.cumulative_wall
 
         if training_progress:
             dictionary["progress"] = {}
@@ -651,6 +653,7 @@ class Trainer:
                 if item is not None:
                     item.load_state_dict(state_dict[key])
             trainer._initialized = True
+            trainer.cumulative_wall = state_dict["cumulative_wall"]
 
             torch.set_rng_state(state_dict["rng_state"])
             trainer.dataset_rng.set_state(state_dict["dataset_rng_state"])
@@ -728,6 +731,7 @@ class Trainer:
         self.init_objects()
 
         self._initialized = True
+        self.cumulative_wall = 0
 
     def init_metrics(self):
         if self.metrics_components is None:
@@ -767,6 +771,7 @@ class Trainer:
 
         self.init_log()
         self.wall = perf_counter()
+        self.previous_cumulative_wall = self.cumulative_wall
 
         with atomic_write_group():
             if self.iepoch == -1:
@@ -1050,7 +1055,9 @@ class Trainer:
 
         self.logger.info(f"! Stop training: {self.stop_arg}")
         wall = perf_counter() - self.wall
+        self.cumulative_wall = wall + self.previous_cumulative_wall
         self.logger.info(f"Wall time: {wall}")
+        self.logger.info(f"Cumulative wall time: {self.cumulative_wall}")
 
     def end_of_epoch_log(self):
         """
@@ -1059,10 +1066,12 @@ class Trainer:
 
         lr = self.optim.param_groups[0]["lr"]
         wall = perf_counter() - self.wall
+        self.cumulative_wall = wall + self.previous_cumulative_wall
         self.mae_dict = dict(
             LR=lr,
             epoch=self.iepoch,
             wall=wall,
+            cumulative_wall=self.cumulative_wall,
         )
 
         header = "epoch, wall, LR"

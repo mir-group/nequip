@@ -34,6 +34,7 @@ NATOMS = 3
 
 @pytest.fixture(scope="function")
 def npz():
+    np.random.seed(0)
     natoms = NATOMS
     nframes = 8
     yield dict(
@@ -219,6 +220,7 @@ class TestPerAtomStatistics:
         if npz_dataset is None:
             return
 
+        torch.manual_seed(0)
         E = torch.rand((npz_dataset.len(),) + dim)
         ref_mean = torch.mean(E / NATOMS, dim=0)
         ref_std = torch.std(E / NATOMS, dim=0)
@@ -296,9 +298,9 @@ class TestPerSpeciesStatistics:
         del Ns
 
         if alpha == 1e-5:
-            ref_mean, ref_std, E = generate_E(N, 1000, 0.0)
+            ref_mean, ref_std, E = generate_E(N, 100, 1000, 0.0)
         else:
-            ref_mean, ref_std, E = generate_E(N, 1000, 0.5)
+            ref_mean, ref_std, E = generate_E(N, 100, 1000, 0.5)
 
         if subset:
             E_orig_order = torch.zeros_like(
@@ -337,9 +339,8 @@ class TestPerSpeciesStatistics:
             if alpha == 1e-5:
                 assert torch.allclose(mean, ref_mean, rtol=1e-1)
             else:
-                assert torch.allclose(mean, ref_mean, rtol=2)
-                # This test is disabled because it (correctly) fails sometimes
-                # assert torch.allclose(std, torch.zeros_like(ref_mean), atol=alpha * 100)
+                assert torch.allclose(mean, ref_mean, rtol=1)
+                assert torch.allclose(std, torch.zeros_like(ref_mean), atol=alpha * 100)
         elif regressor == "NormalizedGaussianProcess":
             assert torch.std(mean).numpy() == 0
         else:
@@ -436,9 +437,9 @@ class TestFromList:
             )
 
 
-def generate_E(N, mean, std):
+def generate_E(N, mean_min, mean_max, std):
     torch.manual_seed(0)
-    ref_mean = torch.rand((N.shape[1])) * mean
+    ref_mean = torch.rand((N.shape[1])) * (mean_max - mean_min) + mean_min
     t_mean = torch.ones((N.shape[0], 1)) * ref_mean.reshape([1, -1])
     ref_std = torch.rand((N.shape[1])) * std
     t_std = torch.ones((N.shape[0], 1)) * ref_std.reshape([1, -1])
