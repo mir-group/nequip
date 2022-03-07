@@ -34,4 +34,4 @@ def test_random(full_rank, alpha):
     if full_rank:
         assert torch.allclose(ref_mean, mean, rtol=0.5)
     else:
-        assert torch.unique(mean).shape[0] == 1
+        assert torch.allclose(mean, mean[0], rtol=1e-3)
