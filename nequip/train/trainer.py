@@ -436,7 +436,7 @@ class Trainer:
             for key in self.train_on_keys:
                 if key not in self.model.irreps_out:
                     raise RuntimeError(
-                        "Loss function include fields that are not predicted by the model"
+                        f"Loss function include fields {key} that are not predicted by the model {self.model.irreps_out}"
                     )
 
     @property
