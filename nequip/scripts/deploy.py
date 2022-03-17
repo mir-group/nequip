@@ -115,7 +115,7 @@ def load_deployed_model(
                 torch.backends.cudnn.allow_tf32 = allow_tf32
 
         # JIT bailout
-        if int(torch.__version__.split(".")[1]) >= 12:
+        if int(torch.__version__.split(".")[1]) >= 11:
             strategy = metadata.get(JIT_FUSION_STRATEGY, "")
             if strategy != "":
                 strategy = [e.split(",") for e in strategy.split(";")]
