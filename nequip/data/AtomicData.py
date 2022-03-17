@@ -372,7 +372,10 @@ class AtomicData(Data):
             + list(kwargs.keys())
         )
         # the keys that are duplicated in kwargs are removed from the include_keys
-        include_keys = list(set(include_keys + ase_all_properties) - default_args)
+        include_keys = list(
+            set(include_keys + ase_all_properties + list(key_mapping.keys()))
+            - default_args
+        )
 
         km = {
             "forces": AtomicDataDict.FORCE_KEY,
