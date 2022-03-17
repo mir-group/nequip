@@ -44,7 +44,6 @@ default_config = dict(
     grad_anomaly_mode=False,
     append=False,
     _jit_bailout_depth=2,  # avoid 20 iters of pain, see https://github.com/pytorch/pytorch/issues/52286
-    _jit_fusion_strategy=[("DYANMIC", 5)],  # for pytorch >= 1.11
 )
 
 
@@ -119,7 +118,7 @@ def _set_global_options(config):
             torch.backends.cuda.matmul.allow_tf32 = False
             torch.backends.cudnn.allow_tf32 = False
 
-    if int(torch.__version__.split(".")[1]) >= 12:
+    if int(torch.__version__.split(".")[1]) >= 11:
         # PyTorch >= 1.11
         torch.jit.set_fusion_strategy(config["_jit_fusion_strategy"])
     else:
@@ -183,7 +182,6 @@ def fresh_start(config):
     final_model = model_from_config(
         config=config, initialize=True, dataset=trainer.dataset_train
     )
-
     logging.info("Successfully built the network...")
 
     # by doing this here we check also any keys custom builders may have added

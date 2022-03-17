@@ -189,7 +189,7 @@ early_stopping_lower_bounds:                                                    
   LR: 1.0e-5
 
 early_stopping_upper_bounds:                                                       # stop early if a metric value is higher than the bound
-  wall: 1.0e+100
+  cumulative_wall: 1.0e+100
 
 # loss function
 loss_coeffs:                                                                       # different weights to use in a weighted loss functions

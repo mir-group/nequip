@@ -150,4 +150,6 @@ class TypeMapper:
                 + "]"
             ).format(*zip(type_names, data))
         else:
-            raise ValueError
+            raise ValueError(
+                f"Don't know how to format data=`{data}` for types {type_names} with element_formatter=`{element_formatter}`"
+            )

@@ -27,14 +27,18 @@ def test_deploy(BENCHMARK_ROOT, device):
     #     # TODO: is this true?
     #     pytest.skip("CUDA and subprocesses have issues")
 
-    keys = [AtomicDataDict.TOTAL_ENERGY_KEY, AtomicDataDict.FORCE_KEY]
+    keys = [
+        AtomicDataDict.TOTAL_ENERGY_KEY,
+        AtomicDataDict.FORCE_KEY,
+        AtomicDataDict.PER_ATOM_ENERGY_KEY,
+    ]
 
     config_path = pathlib.Path(__file__).parents[2] / "configs/minimal.yaml"
     true_config = yaml.load(config_path.read_text(), Loader=yaml.Loader)
     with tempfile.TemporaryDirectory() as tmpdir:
         # Save time
         run_name = "test_deploy" + dtype
-        root = tmpdir + "nequip_rootdir/"
+        root = tmpdir + "/nequip_rootdir/"
         true_config["run_name"] = run_name
         true_config["root"] = root
         true_config["dataset_file_name"] = str(
@@ -73,7 +77,7 @@ def test_deploy(BENCHMARK_ROOT, device):
         dataset = dataset_from_config(Config.from_file(full_config_path))
         data = AtomicData.to_AtomicDataDict(dataset[0].to(device))
         for k in keys:
-            data.pop(k)
+            data.pop(k, None)
         train_pred = best_mod(data)
         train_pred = {k: train_pred[k].to("cpu") for k in keys}
 
@@ -92,7 +96,7 @@ def test_deploy(BENCHMARK_ROOT, device):
         data_idx = 0
         data = AtomicData.to_AtomicDataDict(dataset[data_idx].to("cpu"))
         for k in keys:
-            data.pop(k)
+            data.pop(k, None)
         deploy_pred = deploy_mod(data)
         deploy_pred = {k: deploy_pred[k].to("cpu") for k in keys}
         for k in keys:
@@ -127,10 +131,14 @@ def test_deploy(BENCHMARK_ROOT, device):
         ase_pred = {
             AtomicDataDict.TOTAL_ENERGY_KEY: atoms.get_potential_energy(),
             AtomicDataDict.FORCE_KEY: atoms.get_forces(),
+            AtomicDataDict.PER_ATOM_ENERGY_KEY: atoms.get_potential_energies(),
         }
+        assert ase_pred[AtomicDataDict.TOTAL_ENERGY_KEY].shape == tuple()
+        assert ase_pred[AtomicDataDict.FORCE_KEY].shape == (len(atoms), 3)
+        assert ase_pred[AtomicDataDict.PER_ATOM_ENERGY_KEY].shape == (len(atoms),)
         for k in keys:
             assert torch.allclose(
-                deploy_pred[k],
+                deploy_pred[k].squeeze(-1),
                 torch.as_tensor(ase_pred[k], dtype=torch.get_default_dtype()),
                 atol=atol,
             )
