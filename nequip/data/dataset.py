@@ -427,6 +427,10 @@ class AtomicInMemoryDataset(AtomicDataset):
                 assert arr_is_per in ("node", "graph", "edge")
             else:
                 # Give a better error
+                if field not in ff_transformed and field not in data_transformed:
+                    raise RuntimeError(
+                        f"Field `{field}` for which statistics were requested not found in data."
+                    )
                 if field not in selectors:
                     # this means field is not selected and so not available
                     raise RuntimeError(
@@ -542,13 +546,18 @@ class AtomicInMemoryDataset(AtomicDataset):
         """
         # using unique_consecutive handles the non-contiguous selected batch index
         _, N = torch.unique_consecutive(batch, return_counts=True)
+        N = N.unsqueeze(-1)
+        assert N.ndim == 2
+        assert N.shape == (len(arr), 1)
+        assert arr.ndim >= 2
+        data_dim = arr.shape[1:]
+        arr = arr / N
+        assert arr.shape == (len(N),) + data_dim
         if ana_mode == "mean_std":
-            arr = arr / N
-            mean = torch.mean(arr)
-            std = torch.std(arr, unbiased=unbiased)
+            mean = torch.mean(arr, dim=0)
+            std = torch.std(arr, unbiased=unbiased, dim=0)
             return mean, std
         elif ana_mode == "rms":
-            arr = arr / N
             return (torch.sqrt(torch.mean(arr.square())),)
         else:
             raise NotImplementedError(
@@ -572,8 +581,9 @@ class AtomicInMemoryDataset(AtomicDataset):
         For a per-node quantity, computes the expected statistic but for each type instead of over all nodes.
         """
         N = bincount(atom_types.squeeze(-1), batch)
+        assert N.ndim == 2  # [batch, n_type]
         N = N[(N > 0).any(dim=1)]  # deal with non-contiguous batch indexes
-
+        assert arr.ndim >= 2
         if arr_is_per == "graph":
 
             if ana_mode != "mean_std":
@@ -590,10 +600,15 @@ class AtomicInMemoryDataset(AtomicDataset):
 
             if ana_mode == "mean_std":
                 mean = scatter_mean(arr, atom_types, dim=0)
+                assert mean.shape[1:] == arr.shape[1:]  # [N, dims] -> [type, dims]
+                assert len(mean) == N.shape[1]
                 std = scatter_std(arr, atom_types, dim=0, unbiased=unbiased)
+                assert std.shape == mean.shape
                 return mean, std
             elif ana_mode == "rms":
                 square = scatter_mean(arr.square(), atom_types, dim=0)
+                assert square.shape[1:] == arr.shape[1:]  # [N, dims] -> [type, dims]
+                assert len(square) == N.shape[1]
                 dims = len(square.shape) - 1
                 for i in range(dims):
                     square = square.mean(axis=-1)

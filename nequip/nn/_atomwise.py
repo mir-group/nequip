@@ -8,6 +8,7 @@ from torch_runstats.scatter import scatter
 from e3nn.o3 import Linear
 
 from nequip.data import AtomicDataDict
+from nequip.data.transforms import TypeMapper
 from ._graph_mixin import GraphModuleMixin
 
 
@@ -109,6 +110,7 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
         self,
         field: str,
         num_types: int,
+        type_names: List[str],
         shifts: Optional[List[float]],
         scales: Optional[List[float]],
         arguments_in_dataset_units: bool,
@@ -119,6 +121,7 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
     ):
         super().__init__()
         self.num_types = num_types
+        self.type_names = type_names
         self.field = field
         self.out_field = f"shifted_{field}" if out_field is None else out_field
         self._init_irreps(
@@ -176,8 +179,9 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
                 return
         if self.arguments_in_dataset_units and rescale_module.has_scale:
             logging.debug(
-                f"PerSpeciesScaleShift's arguments were in dataset units; rescaling:\n"
-                f"Original scales {self.scales if self.has_scales else 'n/a'} shifts: {self.shifts if self.has_shifts else 'n/a'}"
+                f"PerSpeciesScaleShift's arguments were in dataset units; rescaling:\n  "
+                f"Original scales: {TypeMapper.format(self.scales, self.type_names) if self.has_scales else 'n/a'} "
+                f"shifts: {TypeMapper.format(self.shifts, self.type_names) if self.has_shifts else 'n/a'}"
             )
             with torch.no_grad():
                 if self.has_scales:
@@ -185,5 +189,6 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
                 if self.has_shifts:
                     self.shifts.div_(rescale_module.scale_by)
             logging.debug(
-                f"New scales {self.scales if self.has_scales else 'n/a'} shifts: {self.shifts if self.has_shifts else 'n/a'}"
+                f"  New scales: {TypeMapper.format(self.scales, self.type_names) if self.has_scales else 'n/a'} "
+                f"shifts: {TypeMapper.format(self.shifts, self.type_names) if self.has_shifts else 'n/a'}"
             )
