@@ -15,6 +15,7 @@ Most recent change on the bottom.
 - Better error in `Dataset.statistics` when field is missing
 - `NequIPCalculator` now outputs energy as scalar rather than `(1, 1)` array
 - `dataset: ase` now treats automatically adds `key_mapping` keys to `include_keys`, which is consistant with the npz dataset
+- fixed reloading models with `per_species_rescale_scales/shifts` set to `null`/`None`
 
 ## [0.5.3] - 2022-02-23
 ### Added
