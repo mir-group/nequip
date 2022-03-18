@@ -10,6 +10,7 @@ Most recent change on the bottom.
 ## [Unreleased] - 0.5.4
 ### Added
 - `NequIPCalculator` now handles per-atom energies
+- Added `initial_model_state_strict` YAML option
 
 ### Fixed
 - Better error in `Dataset.statistics` when field is missing
