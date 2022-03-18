@@ -31,8 +31,10 @@ def model_from_config(
     if dataset is not None:
         type_mapper = dataset.type_mapper
     else:
-        # TODO: do we care about case where cannot make TypeMapper from config?
-        type_mapper, _ = instantiate(TypeMapper, all_args=config)
+        try:
+            type_mapper, _ = instantiate(TypeMapper, all_args=config)
+        except RuntimeError:
+            pass
 
     if type_mapper is not None:
         if "num_types" in config:
