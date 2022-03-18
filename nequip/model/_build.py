@@ -2,8 +2,9 @@ import inspect
 from typing import Optional
 
 from nequip.data import AtomicDataset
+from nequip.data.transforms import TypeMapper
 from nequip.nn import GraphModuleMixin
-from nequip.utils import load_callable
+from nequip.utils import load_callable, instantiate
 
 
 def model_from_config(
@@ -26,17 +27,24 @@ def model_from_config(
         The build model.
     """
     # Pre-process config
-    if initialize and dataset is not None:
+    type_mapper = None
+    if dataset is not None:
+        type_mapper = dataset.type_mapper
+    else:
+        # TODO: do we care about case where cannot make TypeMapper from config?
+        type_mapper, _ = instantiate(TypeMapper, all_args=config)
+
+    if type_mapper is not None:
         if "num_types" in config:
             assert (
-                config["num_types"] == dataset.type_mapper.num_types
+                config["num_types"] == type_mapper.num_types
             ), "inconsistant config & dataset"
         if "type_names" in config:
             assert (
-                config["type_names"] == dataset.type_mapper.type_names
+                config["type_names"] == type_mapper.type_names
             ), "inconsistant config & dataset"
-        config["num_types"] = dataset.type_mapper.num_types
-        config["type_names"] = dataset.type_mapper.type_names
+        config["num_types"] = type_mapper.num_types
+        config["type_names"] = type_mapper.type_names
 
     # Build
     builders = [
