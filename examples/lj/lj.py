@@ -12,6 +12,7 @@ from torch_runstats.scatter import scatter
 from nequip.data import AtomicDataDict
 from nequip.nn import GraphModuleMixin, SequentialGraphNetwork, AtomwiseReduce
 
+
 # First, we define a model module to do the actual computation:
 class LennardJonesModule(GraphModuleMixin, torch.nn.Module):
     """NequIP model module implementing a Lennard-Jones potential term.

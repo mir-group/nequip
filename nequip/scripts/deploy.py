@@ -180,10 +180,10 @@ def main(args=None):
         if args.model and args.train_dir:
             raise ValueError("--model and --train-dir cannot both be specified.")
         if args.train_dir is not None:
-            logging.info(f"Loading best_model from training session...")
+            logging.info("Loading best_model from training session...")
             config = Config.from_file(str(args.train_dir / "config.yaml"))
         elif args.model is not None:
-            logging.info(f"Building model from config...")
+            logging.info("Building model from config...")
             config = Config.from_file(str(args.model), defaults=default_config)
         else:
             raise ValueError("one of --train-dir or --model must be given")
