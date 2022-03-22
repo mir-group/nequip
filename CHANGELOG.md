@@ -12,6 +12,9 @@ Most recent change on the bottom.
 - `NequIPCalculator` now handles per-atom energies
 - Added `initial_model_state_strict` YAML option
 
+### Changed
+- Disallow PyTorch 1.9, which has some JIT bugs.
+
 ### Fixed
 - Better error in `Dataset.statistics` when field is missing
 - `NequIPCalculator` now outputs energy as scalar rather than `(1, 1)` array
