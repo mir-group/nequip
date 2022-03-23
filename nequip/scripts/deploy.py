@@ -122,12 +122,11 @@ def load_deployed_model(
                 strategy = [(e[0], int(e[1])) for e in strategy]
             else:
                 strategy = default_config["_jit_fusion_strategy"]
-            # no way to get current value, so assume we are overwriting it
-            if set_global_options == "warn":
+            old_strat = torch.jit.set_fusion_strategy(strategy)
+            if set_global_options == "warn" and old_strat != strategy:
                 warnings.warn(
-                    "Loaded model had a different value for _jit_fusion_strategy than was currently set; changing the GLOBAL setting!"
+                    f"Loaded model had a different value for _jit_fusion_strategy ({strategy}) than was currently set ({old_strat}); changing the GLOBAL setting!"
                 )
-            torch.jit.set_fusion_strategy(strategy)
         else:
             jit_bailout: int = metadata.get(JIT_BAILOUT_KEY, "")
             if jit_bailout == "":
