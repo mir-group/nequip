@@ -11,7 +11,14 @@ from nequip.utils import Config
 
 # == Load old state ==
 def initialize_from_state(config: Config, model: GraphModuleMixin, initialize: bool):
-    """Initialize the model from the state dict file given by the config options `initial_model_state`."""
+    """Initialize the model from the state dict file given by the config options `initial_model_state`.
+
+    If `initial_model_state_strict` controls
+    > whether to strictly enforce that the keys in state_dict
+    > match the keys returned by this module's state_dict() function
+
+    See https://pytorch.org/docs/stable/generated/torch.nn.Module.html?highlight=load_state_dict#torch.nn.Module.load_state_dict.
+    """
     if not initialize:
         return model  # do nothing
     key = "initial_model_state"
@@ -20,7 +27,7 @@ def initialize_from_state(config: Config, model: GraphModuleMixin, initialize: b
             f"initialize_from_state requires the `{key}` option specifying the state to initialize from"
         )
     state = torch.load(config[key])
-    model.load_state_dict(state)
+    model.load_state_dict(state, strict=config.get(key + "_strict", True))
     return model
 
 
