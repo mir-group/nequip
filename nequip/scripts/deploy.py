@@ -121,7 +121,7 @@ def load_deployed_model(
                 strategy = [e.split(",") for e in strategy.split(";")]
                 strategy = [(e[0], int(e[1])) for e in strategy]
             else:
-                strategy = default_config["_jit_fusion_strategy"]
+                strategy = default_config[JIT_FUSION_STRATEGY]
             old_strat = torch.jit.set_fusion_strategy(strategy)
             if set_global_options == "warn" and old_strat != strategy:
                 warnings.warn(
@@ -130,7 +130,7 @@ def load_deployed_model(
         else:
             jit_bailout: int = metadata.get(JIT_BAILOUT_KEY, "")
             if jit_bailout == "":
-                jit_bailout = default_config["_jit_bailout_depth"]
+                jit_bailout = default_config[JIT_BAILOUT_KEY]
             jit_bailout = int(jit_bailout)
             # no way to get current value, so assume we are overwriting it
             if set_global_options == "warn":
@@ -234,7 +234,11 @@ def main(args=None):
         metadata[N_SPECIES_KEY] = str(n_species)
         metadata[TYPE_NAMES_KEY] = " ".join(type_names)
 
-        metadata[JIT_BAILOUT_KEY] = str(config["_jit_bailout_depth"])
+        metadata[JIT_BAILOUT_KEY] = str(config[JIT_BAILOUT_KEY])
+        if int(torch.__version__.split(".")[1]) >= 11 and JIT_FUSION_STRATEGY in config:
+            metadata[JIT_FUSION_STRATEGY] = ";".join(
+                "%s,%i" % e for e in config[JIT_FUSION_STRATEGY]
+            )
         metadata[TF32_KEY] = str(int(config["allow_tf32"]))
         metadata[CONFIG_KEY] = (args.train_dir / "config.yaml").read_text()
 
