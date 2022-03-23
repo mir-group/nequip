@@ -16,6 +16,7 @@ Most recent change on the bottom.
 
 ### Changed
 - Disallow PyTorch 1.9, which has some JIT bugs.
+- `nequip-deploy build` now requires `--train-dir` option when specifying the training session
 
 ### Fixed
 - Better error in `Dataset.statistics` when field is missing
