@@ -29,8 +29,8 @@ setup(
         "numpy",
         "ase",
         "tqdm",
-        "torch>=1.8,<=1.11",  # torch.fx added in 1.8
-        "e3nn>=0.4.4,<0.5.0",
+        "torch>=1.8,<=1.11,!=1.9.0",  # torch.fx added in 1.8
+        "e3nn>=0.3.5,<0.5.0",
         "pyyaml",
         "contextlib2;python_version<'3.7'",  # backport of nullcontext
         'contextvars;python_version<"3.7"',  # backport of contextvars for savenload

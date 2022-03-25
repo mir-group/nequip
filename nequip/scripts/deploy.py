@@ -20,7 +20,7 @@ import ase.data
 
 from e3nn.util.jit import script
 
-from nequip.scripts.train import _set_global_options
+from nequip.scripts.train import _set_global_options, default_config
 from nequip.train import Trainer
 from nequip.utils import Config
 from nequip.utils.versions import check_code_version, get_config_code_versions
@@ -34,6 +34,7 @@ R_MAX_KEY: Final[str] = "r_max"
 N_SPECIES_KEY: Final[str] = "n_species"
 TYPE_NAMES_KEY: Final[str] = "type_names"
 JIT_BAILOUT_KEY: Final[str] = "_jit_bailout_depth"
+JIT_FUSION_STRATEGY: Final[str] = "_jit_fusion_strategy"
 TF32_KEY: Final[str] = "allow_tf32"
 
 _ALL_METADATA_KEYS = [
@@ -45,6 +46,7 @@ _ALL_METADATA_KEYS = [
     N_SPECIES_KEY,
     TYPE_NAMES_KEY,
     JIT_BAILOUT_KEY,
+    JIT_FUSION_STRATEGY,
     TF32_KEY,
 ]
 
@@ -113,8 +115,23 @@ def load_deployed_model(
                 torch.backends.cudnn.allow_tf32 = allow_tf32
 
         # JIT bailout
-        if metadata[JIT_BAILOUT_KEY] != "":
-            jit_bailout: int = int(metadata[JIT_BAILOUT_KEY])
+        if int(torch.__version__.split(".")[1]) >= 11:
+            strategy = metadata.get(JIT_FUSION_STRATEGY, "")
+            if strategy != "":
+                strategy = [e.split(",") for e in strategy.split(";")]
+                strategy = [(e[0], int(e[1])) for e in strategy]
+            else:
+                strategy = default_config[JIT_FUSION_STRATEGY]
+            old_strat = torch.jit.set_fusion_strategy(strategy)
+            if set_global_options == "warn" and old_strat != strategy:
+                warnings.warn(
+                    f"Loaded model had a different value for _jit_fusion_strategy ({strategy}) than was currently set ({old_strat}); changing the GLOBAL setting!"
+                )
+        else:
+            jit_bailout: int = metadata.get(JIT_BAILOUT_KEY, "")
+            if jit_bailout == "":
+                jit_bailout = default_config[JIT_BAILOUT_KEY]
+            jit_bailout = int(jit_bailout)
             # no way to get current value, so assume we are overwriting it
             if set_global_options == "warn":
                 warnings.warn(
@@ -217,7 +234,11 @@ def main(args=None):
         metadata[N_SPECIES_KEY] = str(n_species)
         metadata[TYPE_NAMES_KEY] = " ".join(type_names)
 
-        metadata[JIT_BAILOUT_KEY] = str(config["_jit_bailout_depth"])
+        metadata[JIT_BAILOUT_KEY] = str(config[JIT_BAILOUT_KEY])
+        if int(torch.__version__.split(".")[1]) >= 11 and JIT_FUSION_STRATEGY in config:
+            metadata[JIT_FUSION_STRATEGY] = ";".join(
+                "%s,%i" % e for e in config[JIT_FUSION_STRATEGY]
+            )
         metadata[TF32_KEY] = str(int(config["allow_tf32"]))
         metadata[CONFIG_KEY] = (args.train_dir / "config.yaml").read_text()
 
