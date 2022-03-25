@@ -2,14 +2,19 @@ import numpy as np
 import logging
 import tempfile
 import inspect
+import functools
+import itertools
 import yaml
 import hashlib
+import os
 from os.path import dirname, basename, abspath
 from typing import Tuple, Dict, Any, List, Callable, Union, Optional, Sequence
 
 import ase
+import ase.io
 
 import torch
+import torch.multiprocessing as mp
 
 from torch_runstats.scatter import scatter_std, scatter_mean
 
@@ -27,6 +32,7 @@ from nequip.data import (
 from nequip.utils.batch_ops import bincount
 from nequip.utils.regressor import solver
 from nequip.utils.savenload import atomic_write
+from nequip.utils.multiprocessing import num_tasks
 from .transforms import TypeMapper
 from .AtomicData import _process_dict
 
@@ -726,6 +732,38 @@ class NpzDataset(AtomicInMemoryDataset):
         return fields, fixed_fields
 
 
+def _ase_dataset_reader(
+    rank: int,
+    world_size: int,
+    ase_kwargs: dict,
+    atomicdata_kwargs: dict,
+    include_frames,
+) -> List[AtomicData]:
+    """Parallel reader for all frames in file."""
+    # interleave--- in theory it is better for performance for the ranks
+    # to read consecutive blocks, but the way ASE is written the whole
+    # file gets streamed through all ranks anyway, so just trust the OS
+    # to cache things sanely, which it will.
+    # ASE handles correctly the case where there are no frames in index
+    # and just gives an empty list, so that will succeed:
+    index = slice(rank, None, world_size)
+    if include_frames is None:
+        # count includes 0, 1, ..., inf
+        include_frames = itertools.count()
+    return [
+        (
+            rank + (world_size * i),  # global index
+            AtomicData.from_ase(atoms=atoms, **atomicdata_kwargs),
+        )
+        # include_frames is global indexes, so turn i into a global index
+        if rank + (world_size * i) in include_frames
+        # in-memory dataset will ignore this later, but needed for indexing to work out
+        else None
+        # stream them from ase too
+        for i, atoms in enumerate(ase.io.iread(**ase_kwargs, index=index))
+    ]
+
+
 class ASEDataset(AtomicInMemoryDataset):
     """
 
@@ -789,10 +827,11 @@ class ASEDataset(AtomicInMemoryDataset):
         key_mapping: Optional[dict] = None,
         include_keys: Optional[List[str]] = None,
     ):
-
-        self.ase_args = dict(index=":")
+        self.ase_args = {}
         self.ase_args.update(getattr(type(self), "ASE_ARGS", dict()))
         self.ase_args.update(ase_args)
+        assert "index" not in self.ase_args
+        assert "filename" not in self.ase_args
 
         self.include_keys = include_keys
         self.key_mapping = key_mapping
@@ -850,15 +889,9 @@ class ASEDataset(AtomicInMemoryDataset):
     def raw_dir(self):
         return dirname(abspath(self.file_name))
 
-    def get_atoms(self):
-        from ase.io import read as aseread
-
-        return aseread(self.raw_dir + "/" + self.raw_file_names[0], **self.ase_args)
-
     def get_data(self):
-
-        # Get our data
-        atoms_list = self.get_atoms()
+        ase_args = {"filename": self.raw_dir + "/" + self.raw_file_names[0]}
+        ase_args.update(self.ase_args)
 
         # skip the None arguments
         kwargs = dict(
@@ -867,17 +900,24 @@ class ASEDataset(AtomicInMemoryDataset):
         )
         kwargs = {k: v for k, v in kwargs.items() if v is not None}
         kwargs.update(self.extra_fixed_fields)
-
-        if self.include_frames is None:
-            return (
-                [AtomicData.from_ase(atoms=atoms, **kwargs) for atoms in atoms_list],
-            )
+        n_proc = num_tasks()
+        reader = functools.partial(
+            _ase_dataset_reader,
+            world_size=n_proc,
+            ase_kwargs=ase_args,
+            atomicdata_kwargs=kwargs,
+            include_frames=self.include_frames,
+        )
+        if n_proc > 1:
+            with mp.Pool(processes=n_proc) as p:
+                # map it over the `rank` argument
+                datas = p.map(reader, range(n_proc))
+            datas = sum(datas, [])
+            # un-interleave the datas
+            datas = sorted(datas, key=lambda e: e[0])
         else:
-            return (
-                [
-                    AtomicData.from_ase(atoms=atoms_list[i], **kwargs)
-                    if i in self.include_frames
-                    else None  # in-memory dataset will ignore this later, but needed for indexing to work out
-                    for i in range(len(atoms_list))
-                ],
-            )
+            datas = reader(rank=0)
+            # datas here is already in order, stride 1 start 0
+            # no need to un-interleave
+        # return list of AtomicData:
+        return ([e[1] for e in datas],)

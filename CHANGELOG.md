@@ -12,6 +12,7 @@ Most recent change on the bottom.
 - `NequIPCalculator` now handles per-atom energies
 - Added `initial_model_state_strict` YAML option
 - fusion strategy support
+- multiprocessing for ASE dataset loading/processing
 
 ### Changed
 - Disallow PyTorch 1.9, which has some JIT bugs.
