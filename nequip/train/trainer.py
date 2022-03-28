@@ -23,11 +23,9 @@ else:
     import contextlib2 as contextlib
 
 import numpy as np
-import e3nn
 import torch
 from torch_ema import ExponentialMovingAverage
 
-import nequip
 from nequip.data import DataLoader, AtomicData, AtomicDataDict, AtomicDataset
 from nequip.utils import (
     Output,
@@ -42,7 +40,7 @@ from nequip.utils import (
     atomic_write_group,
     dtype_from_name,
 )
-from nequip.utils.git import get_commit
+from nequip.utils.versions import check_code_version
 from nequip.model import model_from_config
 
 from .loss import Loss, LossStat
@@ -254,11 +252,12 @@ class Trainer:
         log_epoch_freq: int = 1,
         save_checkpoint_freq: int = -1,
         save_ema_checkpoint_freq: int = -1,
-        report_init_validation: bool = False,
+        report_init_validation: bool = True,
         verbose="INFO",
         **kwargs,
     ):
         self._initialized = False
+        self.cumulative_wall = 0
         logging.debug("* Initialize Trainer")
 
         # store all init arguments
@@ -410,14 +409,14 @@ class Trainer:
         )
         n_args = 0
         for key, item in kwargs.items():
-            # prepand VALIDATION string if k is not with
+            # prepend VALIDATION string if k is not with
             if isinstance(item, dict):
                 new_dict = {}
                 for k, v in item.items():
                     if (
                         k.lower().startswith(VALIDATION)
                         or k.lower().startswith(TRAIN)
-                        or k.lower() in ["lr", "wall"]
+                        or k.lower() in ["lr", "wall", "cumulative_wall"]
                     ):
                         new_dict[k] = item[k]
                     else:
@@ -437,7 +436,7 @@ class Trainer:
             for key in self.train_on_keys:
                 if key not in self.model.irreps_out:
                     raise RuntimeError(
-                        "Loss function include fields that are not predicted by the model"
+                        f"Loss function include fields {key} that are not predicted by the model {self.model.irreps_out}"
                     )
 
     @property
@@ -501,6 +500,7 @@ class Trainer:
                 dictionary["state_dict"]["cuda_rng_state"] = torch.cuda.get_rng_state(
                     device=self.torch_device
                 )
+            dictionary["state_dict"]["cumulative_wall"] = self.cumulative_wall
 
         if training_progress:
             dictionary["progress"] = {}
@@ -517,19 +517,6 @@ class Trainer:
             dictionary["progress"]["trainer_save_path"] = self.trainer_save_path
             if hasattr(self, "config_save_path"):
                 dictionary["progress"]["config_save_path"] = self.config_save_path
-
-        for code in [e3nn, nequip, torch]:
-            dictionary[f"{code.__name__}_version"] = code.__version__
-
-        codes_for_git = {"e3nn", "nequip"}
-        for builder in self.model_builders:
-            if not isinstance(builder, str):
-                continue
-            builder = builder.split(".")
-            if len(builder) > 1:
-                # it's not a single name which is from nequip
-                codes_for_git.add(builder[0])
-        dictionary["code_versions"] = {code: get_commit(code) for code in codes_for_git}
 
         return dictionary
 
@@ -608,15 +595,7 @@ class Trainer:
         """
 
         dictionary = deepcopy(dictionary)
-
-        for code in [e3nn, nequip, torch]:
-            version = dictionary.get(f"{code.__name__}_version", None)
-            if version is not None and version != code.__version__:
-                logging.warning(
-                    "Loading a pickled model created with different library version(s) may cause issues."
-                    f"current {code.__name__} verion: {code.__version__} "
-                    f"vs  original version: {version}"
-                )
+        check_code_version(dictionary)
 
         # update the restart and append option
         if append is not None:
@@ -657,6 +636,7 @@ class Trainer:
                 if item is not None:
                     item.load_state_dict(state_dict[key])
             trainer._initialized = True
+            trainer.cumulative_wall = state_dict["cumulative_wall"]
 
             torch.set_rng_state(state_dict["rng_state"])
             trainer.dataset_rng.set_state(state_dict["dataset_rng_state"])
@@ -722,6 +702,9 @@ class Trainer:
 
         self.model.to(self.torch_device)
 
+        self.num_weights = sum(p.numel() for p in self.model.parameters())
+        self.logger.info(f"Number of weights: {self.num_weights}")
+
         self.rescale_layers = []
         outer_layer = self.model
         while hasattr(outer_layer, "unscale"):
@@ -731,6 +714,7 @@ class Trainer:
         self.init_objects()
 
         self._initialized = True
+        self.cumulative_wall = 0
 
     def init_metrics(self):
         if self.metrics_components is None:
@@ -764,17 +748,13 @@ class Trainer:
             raise RuntimeError("You must call `set_dataset()` before calling `train()`")
         if not self._initialized:
             self.init()
-            self.logger.info(
-                "Number of weights: {}".format(
-                    sum(p.numel() for p in self.model.parameters())
-                )
-            )
 
         for callback in self._init_callbacks:
             callback(self)
 
         self.init_log()
         self.wall = perf_counter()
+        self.previous_cumulative_wall = self.cumulative_wall
 
         with atomic_write_group():
             if self.iepoch == -1:
@@ -856,24 +836,19 @@ class Trainer:
                 self.lr_sched.step(self.iepoch + self.ibatch / self.n_batches)
 
         with torch.no_grad():
-            if len(self.rescale_layers) > 0:
-                if validation:
-                    scaled_out = out
-                    _data_unscaled = data
-                    for layer in self.rescale_layers:
-                        # loss function always needs to be in normalized unit
-                        scaled_out = layer.unscale(scaled_out, force_process=True)
-                        _data_unscaled = layer.unscale(
-                            _data_unscaled, force_process=True
-                        )
-                    loss, loss_contrib = self.loss(pred=scaled_out, ref=_data_unscaled)
-                else:
-                    # If we are in training mode, we need to bring the prediction
-                    # into real units
-                    for layer in self.rescale_layers[::-1]:
-                        out = layer.scale(out, force_process=True)
-            elif validation:
-                loss, loss_contrib = self.loss(pred=out, ref=data_unscaled)
+            if validation:
+                scaled_out = out
+                _data_unscaled = data
+                for layer in self.rescale_layers:
+                    # loss function always needs to be in normalized unit
+                    scaled_out = layer.unscale(scaled_out, force_process=True)
+                    _data_unscaled = layer.unscale(_data_unscaled, force_process=True)
+                loss, loss_contrib = self.loss(pred=scaled_out, ref=_data_unscaled)
+            else:
+                # If we are in training mode, we need to bring the prediction
+                # into real units
+                for layer in self.rescale_layers[::-1]:
+                    out = layer.scale(out, force_process=True)
 
             # save metrics stats
             self.batch_losses = self.loss_stat(loss, loss_contrib)
@@ -971,10 +946,7 @@ class Trainer:
         # append details from metrics
         metrics, skip_keys = self.metrics.flatten_metrics(
             metrics=self.batch_metrics,
-            # TO DO, how about chemical to symbol
-            type_names=self.model.config.get("type_names")
-            if hasattr(self.model, "config")
-            else None,
+            type_names=self.dataset_train.type_mapper.type_names,
         )
         for key, value in metrics.items():
 
@@ -1063,7 +1035,9 @@ class Trainer:
 
         self.logger.info(f"! Stop training: {self.stop_arg}")
         wall = perf_counter() - self.wall
+        self.cumulative_wall = wall + self.previous_cumulative_wall
         self.logger.info(f"Wall time: {wall}")
+        self.logger.info(f"Cumulative wall time: {self.cumulative_wall}")
 
     def end_of_epoch_log(self):
         """
@@ -1072,10 +1046,12 @@ class Trainer:
 
         lr = self.optim.param_groups[0]["lr"]
         wall = perf_counter() - self.wall
+        self.cumulative_wall = wall + self.previous_cumulative_wall
         self.mae_dict = dict(
             LR=lr,
             epoch=self.iepoch,
             wall=wall,
+            cumulative_wall=self.cumulative_wall,
         )
 
         header = "epoch, wall, LR"
@@ -1095,9 +1071,7 @@ class Trainer:
 
             met, skip_keys = self.metrics.flatten_metrics(
                 metrics=self.metrics_dict[category],
-                type_names=self.model.config.get("type_names")
-                if hasattr(self.model, "config")
-                else None,
+                type_names=self.dataset_train.type_mapper.type_names,
             )
 
             # append details from loss

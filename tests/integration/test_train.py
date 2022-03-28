@@ -25,6 +25,9 @@ class IdentityModel(GraphModuleMixin, torch.nn.Module):
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
         data[AtomicDataDict.FORCE_KEY] = self.one * data[AtomicDataDict.FORCE_KEY]
+        data[AtomicDataDict.NODE_FEATURES_KEY] = (
+            0.77 * data[AtomicDataDict.FORCE_KEY].tanh()
+        )  # some BS
         data[AtomicDataDict.TOTAL_ENERGY_KEY] = (
             self.one * data[AtomicDataDict.TOTAL_ENERGY_KEY]
         )
@@ -48,6 +51,9 @@ class ConstFactorModel(GraphModuleMixin, torch.nn.Module):
         data[AtomicDataDict.FORCE_KEY] = (
             self.factor * data[AtomicDataDict.FORCE_KEY] + 0.0 * self.dummy
         )
+        data[AtomicDataDict.NODE_FEATURES_KEY] = (
+            0.77 * data[AtomicDataDict.FORCE_KEY].tanh()
+        )  # some BS
         data[AtomicDataDict.TOTAL_ENERGY_KEY] = (
             self.factor * data[AtomicDataDict.TOTAL_ENERGY_KEY] + 0.0 * self.dummy
         )
@@ -70,6 +76,9 @@ class LearningFactorModel(GraphModuleMixin, torch.nn.Module):
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
         data[AtomicDataDict.FORCE_KEY] = self.factor * data[AtomicDataDict.FORCE_KEY]
+        data[AtomicDataDict.NODE_FEATURES_KEY] = (
+            0.77 * data[AtomicDataDict.FORCE_KEY].tanh()
+        )  # some BS
         data[AtomicDataDict.TOTAL_ENERGY_KEY] = (
             self.factor * data[AtomicDataDict.TOTAL_ENERGY_KEY]
         )

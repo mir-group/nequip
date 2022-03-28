@@ -16,11 +16,12 @@ import e3nn
 import e3nn.util.jit
 
 from nequip.model import model_from_config
-from nequip.utils import Config
-from nequip.data import dataset_from_config
-from nequip.utils.test import assert_AtomicData_equivariant, set_irreps_debug
+from nequip.utils import Config, instantiate
+from nequip.data import dataset_from_config, register_fields
 from nequip.utils import load_file, dtype_from_name
-from ._logger import set_up_script_logger
+from nequip.utils.test import assert_AtomicData_equivariant, set_irreps_debug
+from nequip.utils.versions import check_code_version
+from nequip.scripts._logger import set_up_script_logger
 
 default_config = dict(
     root="./",
@@ -43,11 +44,19 @@ default_config = dict(
     grad_anomaly_mode=False,
     append=False,
     _jit_bailout_depth=2,  # avoid 20 iters of pain, see https://github.com/pytorch/pytorch/issues/52286
+    # Quote from eelison in PyTorch slack:
+    # https://pytorch.slack.com/archives/CDZD1FANA/p1644259272007529?thread_ts=1644064449.039479&cid=CDZD1FANA
+    # > Right now the default behavior is to specialize twice on static shapes and then on dynamic shapes.
+    # > To reduce warmup time you can do something like setFusionStrartegy({{FusionBehavior::DYNAMIC, 3}})
+    # > ... Although we would wouldn't really expect to recompile a dynamic shape fusion in a model,
+    # > provided broadcasting patterns remain fixed
+    # We default to DYNAMIC alone because the number of edges is always dynamic,
+    # even if the number of atoms is fixed:
+    _jit_fusion_strategy=[("DYNAMIC", 3)],
 )
 
 
 def main(args=None, running_as_script: bool = True):
-
     config = parse_command_line(args)
 
     if running_as_script:
@@ -118,9 +127,14 @@ def _set_global_options(config):
             torch.backends.cuda.matmul.allow_tf32 = False
             torch.backends.cudnn.allow_tf32 = False
 
-    # For avoiding 20 steps of painfully slow JIT recompilation
-    # See https://github.com/pytorch/pytorch/issues/52286
-    torch._C._jit_set_bailout_depth(config["_jit_bailout_depth"])
+    if int(torch.__version__.split(".")[1]) >= 11:
+        # PyTorch >= 1.11
+        k = "_jit_fusion_strategy"
+        torch.jit.set_fusion_strategy(config.get(k))
+    else:
+        # For avoiding 20 steps of painfully slow JIT recompilation
+        # See https://github.com/pytorch/pytorch/issues/52286
+        torch._C._jit_set_bailout_depth(config["_jit_bailout_depth"])
 
     if config.model_debug_mode:
         set_irreps_debug(enabled=True)
@@ -130,9 +144,13 @@ def _set_global_options(config):
 
     e3nn.set_optimization_defaults(**config.get("e3nn_optimization_defaults", {}))
 
+    # Register fields:
+    instantiate(register_fields, all_args=config)
+
 
 def fresh_start(config):
-
+    # we use add_to_config cause it's a fresh start and need to record it
+    check_code_version(config, add_to_config=True)
     _set_global_options(config)
 
     # = Make the trainer =
@@ -174,7 +192,6 @@ def fresh_start(config):
     final_model = model_from_config(
         config=config, initialize=True, dataset=trainer.dataset_train
     )
-
     logging.info("Successfully built the network...")
 
     # by doing this here we check also any keys custom builders may have added
@@ -211,7 +228,6 @@ def fresh_start(config):
 
 
 def restart(config):
-
     # load the dictionary
     restart_file = f"{config.root}/{config.run_name}/trainer.pth"
     dictionary = load_file(
@@ -234,6 +250,10 @@ def restart(config):
                     f'Key "{k}" is different in config and the result trainer.pth file. Please double check'
                 )
 
+    # note, "trainer.pth"/dictionary also store code versions,
+    # which will not be stored in config and thus not checked here
+    check_code_version(config)
+
     # recursive loop, if same type but different value
     # raise error
 
@@ -242,6 +262,8 @@ def restart(config):
     # dtype, etc.
     _set_global_options(config)
 
+    # note, the from_dict method will check whether the code version
+    # in trainer.pth is consistent and issue warnings
     if config.wandb:
         from nequip.train.trainer_wandb import TrainerWandB
         from nequip.utils.wandb import resume

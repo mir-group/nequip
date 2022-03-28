@@ -7,7 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Most recent change on the bottom.
 
 
-## [Unreleased] - 0.5.2
+## [Unreleased] - 0.5.4
+### Added
+- `NequIPCalculator` now handles per-atom energies
+- Added `initial_model_state_strict` YAML option
+- fusion strategy support
+
+### Changed
+- Disallow PyTorch 1.9, which has some JIT bugs.
+
+### Fixed
+- Better error in `Dataset.statistics` when field is missing
+- `NequIPCalculator` now outputs energy as scalar rather than `(1, 1)` array
+- `dataset: ase` now treats automatically adds `key_mapping` keys to `include_keys`, which is consistant with the npz dataset
+- fixed reloading models with `per_species_rescale_scales/shifts` set to `null`/`None`
+
+## [0.5.3] - 2022-02-23
+### Added
+- `nequip-evaluate --repeat` option
+- Report number of weights to wandb
+
+### Changed
+- defaults and commments in example.yaml and full.yaml, in particular longer default training and correct comment for E:F-weighting
+- better metrics config in example.yaml and full.yaml, in particular will total F-MAE/F-RMSE instead of mean over per-species
+- default value for `report_init_validation` is now `True`
+- `all_*_*` metrics rename to -> `psavg_*_*`
+- `avg_num_neighbors` default `None` -> `auto`
+
+### Fixed
+- error if both per-species and global shift are used together
+
+
+## [0.5.2] - 2022-02-04
 ### Added
 - Model builders may now process only the configuration
 - Allow irreps to optionally be specified through the simplified keys `l_max`, `parity`, and `num_features`
@@ -15,6 +46,9 @@ Most recent change on the bottom.
 - Allow polynomial cutoff _p_ values besides 6.0
 - `nequip-evaluate` now sets a default `r_max` taken from the model for the dataset config
 - Support multiple rescale layers in trainer
+- `AtomicData.to_ase` supports arbitrary fields
+- `nequip-evaluate` can now output arbitrary fields to an XYZ file
+- `nequip-evaluate` reports which frame in the original dataset was used as input for each output frame
 
 ### Changed
 - `minimal.yaml`, `minimal_eng.yaml`, and `example.yaml` now use the simplified irreps options `l_max`, `parity`, and `num_features`
@@ -25,6 +59,7 @@ Most recent change on the bottom.
 - `include_frames` now works with ASE datasets
 - no training data labels in input_data
 - Average number of neighbors no longer crashes sometimes when not all nodes have neighbors (small cutoffs)
+- Handle field registrations correctly in `nequip-evaluate`
 
 ### Removed
 - `compile_model`

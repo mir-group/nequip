@@ -5,6 +5,7 @@ import torch
 
 from nequip.nn import RescaleOutput, GraphModuleMixin, PerSpeciesScaleShift
 from nequip.data import AtomicDataDict, AtomicDataset
+from nequip.data.transforms import TypeMapper
 
 
 RESCALE_THRESHOLD = 1e-6
@@ -13,7 +14,6 @@ RESCALE_THRESHOLD = 1e-6
 def RescaleEnergyEtc(
     model: GraphModuleMixin, config, dataset: AtomicDataset, initialize: bool
 ):
-
     return GlobalRescale(
         model=model,
         config=config,
@@ -25,7 +25,7 @@ def RescaleEnergyEtc(
         else f"dataset_{AtomicDataDict.TOTAL_ENERGY_KEY}_std",
         default_shift=None,
         default_scale_keys=AtomicDataDict.ALL_ENERGY_KEYS,
-        default_shift_keys=AtomicDataDict.TOTAL_ENERGY_KEY,
+        default_shift_keys=[AtomicDataDict.TOTAL_ENERGY_KEY],
         default_related_scale_keys=[AtomicDataDict.PER_ATOM_ENERGY_KEY],
         default_related_shift_keys=[],
     )
@@ -55,7 +55,7 @@ def GlobalRescale(
     if global_shift is not None:
         logging.warning(
             f"!!!! Careful global_shift is set to {global_shift}."
-            f"The energy model will no longer be extensive"
+            f"The model for {default_shift_keys} will no longer be size extensive"
         )
 
     # = Get statistics of training dataset =
@@ -95,7 +95,7 @@ def GlobalRescale(
                 f"Global energy scaling was very low: {global_scale}. If dataset values were used, does the dataset contain insufficient variation? Maybe try disabling global scaling with global_scale=None."
             )
 
-        logging.debug(
+        logging.info(
             f"Initially outputs are globally scaled by: {global_scale}, total_energy are globally shifted by {global_shift}."
         )
 
@@ -105,6 +105,12 @@ def GlobalRescale(
             global_shift = 0.0  # it has some kind of value
         if global_scale is not None:
             global_scale = 1.0  # same,
+
+    error_string = "keys need to be a list"
+    assert isinstance(default_scale_keys, list), error_string
+    assert isinstance(default_shift_keys, list), error_string
+    assert isinstance(default_related_scale_keys, list), error_string
+    assert isinstance(default_related_shift_keys, list), error_string
 
     # == Build the model ==
     return RescaleOutput(
@@ -146,6 +152,19 @@ def PerSpeciesRescale(
         module_prefix + "_shifts",
         f"dataset_per_atom_{AtomicDataDict.TOTAL_ENERGY_KEY}_mean",
     )
+
+    # Check for common double shift mistake with defaults
+    if "RescaleEnergyEtc" in config.get("model_builders", []):
+        # if the defaults are enabled, then we will get bad double shift
+        # THIS CHECK IS ONLY GOOD ENOUGH FOR EMITTING WARNINGS
+        has_global_shift = config.get("global_rescale_shift", None) is not None
+        if has_global_shift:
+            if shifts is not None:
+                # using default of per_atom shift
+                raise RuntimeError(
+                    "A global_rescale_shift was provided, but the default per-atom energy shift was not disabled."
+                )
+        del has_global_shift
 
     # = Determine what statistics need to be compute =\
     arguments_in_dataset_units = None
@@ -189,14 +208,14 @@ def PerSpeciesRescale(
 
         if isinstance(scales, str):
             s = scales
-            scales = computed_stats[str_names.index(scales)]
+            scales = computed_stats[str_names.index(scales)].squeeze(-1)  # energy is 1D
             logging.info(f"Replace string {s} to {scales}")
         elif isinstance(scales, (list, float)):
             scales = torch.as_tensor(scales)
 
         if isinstance(shifts, str):
             s = shifts
-            shifts = computed_stats[str_names.index(shifts)]
+            shifts = computed_stats[str_names.index(shifts)].squeeze(-1)  # energy is 1D
             logging.info(f"Replace string {s} to {shifts}")
         elif isinstance(shifts, (list, float)):
             shifts = torch.as_tensor(shifts)
@@ -207,13 +226,12 @@ def PerSpeciesRescale(
             )
 
     else:
-
         # Put dummy values
         # the real ones will be loaded from the state dict later
         # note that the state dict includes buffers,
         # so this is fine regardless of whether its trainable.
-        scales = 1.0
-        shifts = 0.0
+        scales = 1.0 if scales is not None else None
+        shifts = 0.0 if shifts is not None else None
         # values correctly scaled according to where the come from
         # will be brought from the state dict later,
         # so what you set this to doesnt matter:
@@ -236,7 +254,9 @@ def PerSpeciesRescale(
         params=params,
     )
 
-    logging.info(f"Atomic outputs are scaled by: {scales}, shifted by {shifts}.")
+    logging.info(
+        f"Atomic outputs are scaled by: {TypeMapper.format(scales, config.type_names)}, shifted by {TypeMapper.format(shifts, config.type_names)}."
+    )
 
     # == Build the model ==
     return model
