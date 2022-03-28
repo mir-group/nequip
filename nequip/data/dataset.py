@@ -735,10 +735,11 @@ class NpzDataset(AtomicInMemoryDataset):
 def _ase_dataset_reader(
     rank: int,
     world_size: int,
+    tmpdir: str,
     ase_kwargs: dict,
     atomicdata_kwargs: dict,
     include_frames,
-) -> List[AtomicData]:
+) -> Union[str, List[AtomicData]]:
     """Parallel reader for all frames in file."""
     # interleave--- in theory it is better for performance for the ranks
     # to read consecutive blocks, but the way ASE is written the whole
@@ -750,7 +751,7 @@ def _ase_dataset_reader(
     if include_frames is None:
         # count includes 0, 1, ..., inf
         include_frames = itertools.count()
-    return [
+    datas = [
         (
             rank + (world_size * i),  # global index
             AtomicData.from_ase(atoms=atoms, **atomicdata_kwargs),
@@ -760,8 +761,21 @@ def _ase_dataset_reader(
         # in-memory dataset will ignore this later, but needed for indexing to work out
         else None
         # stream them from ase too
-        for i, atoms in enumerate(ase.io.iread(**ase_kwargs, index=index))
+        for i, atoms in enumerate(
+            ase.io.iread(**ase_kwargs, index=index, parallel=False)
+        )
     ]
+    # Save to a tempfile---
+    # there can be a _lot_ of tensors here, and rather than dealing with
+    # the complications of running out of file descriptors and setting
+    # sharing methods, since this is a one time thing, just make it simple
+    # and avoid shared memory entirely.
+    if world_size > 1:
+        path = f"{tmpdir}/rank{rank}.pth"
+        torch.save(datas, path)
+        return path
+    else:
+        return datas
 
 
 class ASEDataset(AtomicInMemoryDataset):
@@ -901,23 +915,28 @@ class ASEDataset(AtomicInMemoryDataset):
         kwargs = {k: v for k, v in kwargs.items() if v is not None}
         kwargs.update(self.extra_fixed_fields)
         n_proc = num_tasks()
-        reader = functools.partial(
-            _ase_dataset_reader,
-            world_size=n_proc,
-            ase_kwargs=ase_args,
-            atomicdata_kwargs=kwargs,
-            include_frames=self.include_frames,
-        )
-        if n_proc > 1:
-            with mp.Pool(processes=n_proc) as p:
-                # map it over the `rank` argument
-                datas = p.map(reader, range(n_proc))
-            datas = sum(datas, [])
-            # un-interleave the datas
-            datas = sorted(datas, key=lambda e: e[0])
-        else:
-            datas = reader(rank=0)
-            # datas here is already in order, stride 1 start 0
-            # no need to un-interleave
+        with tempfile.TemporaryDirectory() as tmpdir:
+            reader = functools.partial(
+                _ase_dataset_reader,
+                world_size=n_proc,
+                tmpdir=tmpdir,
+                ase_kwargs=ase_args,
+                atomicdata_kwargs=kwargs,
+                include_frames=self.include_frames,
+            )
+            if n_proc > 1:
+                # things hang for some obscure OpenMP reason on some systems when using `fork` method
+                ctx = mp.get_context("forkserver")
+                with ctx.Pool(processes=n_proc) as p:
+                    # map it over the `rank` argument
+                    datas = p.map(reader, list(range(n_proc)))
+                    datas = [torch.load(d) for d in datas]
+                datas = sum(datas, [])
+                # un-interleave the datas
+                datas = sorted(datas, key=lambda e: e[0])
+            else:
+                datas = reader(rank=0)
+                # datas here is already in order, stride 1 start 0
+                # no need to un-interleave
         # return list of AtomicData:
         return ([e[1] for e in datas],)
