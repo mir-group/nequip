@@ -930,7 +930,8 @@ class ASEDataset(AtomicInMemoryDataset):
                 with ctx.Pool(processes=n_proc) as p:
                     # map it over the `rank` argument
                     datas = p.map(reader, list(range(n_proc)))
-                    datas = [torch.load(d) for d in datas]
+                # clean up the pool before loading the data
+                datas = [torch.load(d) for d in datas]
                 datas = sum(datas, [])
                 # un-interleave the datas
                 datas = sorted(datas, key=lambda e: e[0])
