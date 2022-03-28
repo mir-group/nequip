@@ -39,6 +39,9 @@ class NequIPCalculator(Calculator):
         Calculator.__init__(self, **kwargs)
         self.results = {}
         self.model = model
+        assert isinstance(
+            model, torch.nn.Module
+        ), "To build a NequIPCalculator from a deployed model, use NequIPCalculator.from_deployed_model"
         self.r_max = r_max
         self.device = device
         self.energy_units_to_eV = energy_units_to_eV
