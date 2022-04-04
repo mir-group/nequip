@@ -100,7 +100,7 @@ class NoseHoover(MolecularDynamics):
 
         nvt_bath_halfstep = self.nvt_bath + 0.5 * self.dt * e_kin_diff / self.nvt_q
         e_kin_diff_halfstep = 0.5 * (
-            np.sum(masses * np.sum(vel_halfstep ** 2, axis=1))
+            np.sum(masses * np.sum(vel_halfstep**2, axis=1))
             - (3 * self.natoms + 1) * units.kB * self.temp
         )
         self.nvt_bath = (

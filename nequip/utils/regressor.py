@@ -16,7 +16,7 @@ def solver(X, y, regressor: Optional[str] = "NormalizedGaussianProcess", **kwarg
 
 
 def normalized_gp(X, y, **kwargs):
-    feature_rms = 1.0 / np.sqrt(np.average(X ** 2, axis=0))
+    feature_rms = 1.0 / np.sqrt(np.average(X**2, axis=0))
     feature_rms = np.nan_to_num(feature_rms, 1)
     y_mean = torch.sum(y) / torch.sum(X)
     mean, std = base_gp(
