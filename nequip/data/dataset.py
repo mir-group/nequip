@@ -738,8 +738,11 @@ def _ase_dataset_reader(
     ase_kwargs: dict,
     atomicdata_kwargs: dict,
     include_frames,
+    dtype,
 ) -> Union[str, List[AtomicData]]:
     """Parallel reader for all frames in file."""
+    # this is a no-op if we are in the same process
+    torch.set_default_dtype(dtype)
     # interleave--- in theory it is better for performance for the ranks
     # to read consecutive blocks, but the way ASE is written the whole
     # file gets streamed through all ranks anyway, so just trust the OS
@@ -922,6 +925,7 @@ class ASEDataset(AtomicInMemoryDataset):
                 ase_kwargs=ase_args,
                 atomicdata_kwargs=kwargs,
                 include_frames=self.include_frames,
+                dtype=torch.get_default_dtype(),
             )
             if n_proc > 1:
                 # things hang for some obscure OpenMP reason on some systems when using `fork` method
