@@ -118,7 +118,6 @@ if _ASYNC_ENABLED:
         _MOVE_QUEUE.join()
         # ^ wait for all remaining moves to be processed
 
-
 else:
 
     def _submit_move(from_name, to_name, blocking: bool):
