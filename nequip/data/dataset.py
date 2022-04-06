@@ -32,7 +32,6 @@ from nequip.utils.batch_ops import bincount
 from nequip.utils.regressor import solver
 from nequip.utils.savenload import atomic_write
 from nequip.utils.multiprocessing import num_tasks
-from nequip.utils._global_options import _set_global_options, _get_latest_global_options
 from .transforms import TypeMapper
 from .AtomicData import _process_dict
 
@@ -743,6 +742,9 @@ def _ase_dataset_reader(
 ) -> Union[str, List[AtomicData]]:
     """Parallel reader for all frames in file."""
     if world_size > 1:
+        from nequip.utils._global_options import _set_global_options
+
+        # ^ avoid import loop
         # we only `multiprocessing` if world_size > 1
         _set_global_options(global_options)
     # interleave--- in theory it is better for performance for the ranks
@@ -920,6 +922,9 @@ class ASEDataset(AtomicInMemoryDataset):
         kwargs.update(self.extra_fixed_fields)
         n_proc = num_tasks()
         with tempfile.TemporaryDirectory() as tmpdir:
+            from nequip.utils._global_options import _get_latest_global_options
+
+            # ^ avoid import loop
             reader = functools.partial(
                 _ase_dataset_reader,
                 world_size=n_proc,
