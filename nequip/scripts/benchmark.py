@@ -90,6 +90,10 @@ def main(args=None):
 
     datas = itertools.cycle(datas)
 
+    if args.n == 0:
+        print("Got -n 0, so quitting without running benchmark.")
+        return
+
     # Load model:
     print("Loading model... ")
     model = model_from_config(config, initialize=True, dataset=dataset)
