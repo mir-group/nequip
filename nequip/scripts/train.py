@@ -16,11 +16,12 @@ import e3nn
 import e3nn.util.jit
 
 from nequip.model import model_from_config
-from nequip.utils import Config, instantiate
-from nequip.data import dataset_from_config, register_fields
-from nequip.utils import load_file, dtype_from_name
-from nequip.utils.test import assert_AtomicData_equivariant, set_irreps_debug
+from nequip.utils import Config
+from nequip.data import dataset_from_config
+from nequip.utils import load_file
+from nequip.utils.test import assert_AtomicData_equivariant
 from nequip.utils.versions import check_code_version
+from nequip.utils._global_options import _set_global_options
 from nequip.scripts._logger import set_up_script_logger
 
 default_config = dict(
@@ -115,37 +116,6 @@ def parse_command_line(args=None):
         config[flag] = getattr(args, flag) or config[flag]
 
     return config
-
-
-def _set_global_options(config):
-    """Configure global options of libraries like `torch` and `e3nn` based on `config`."""
-    # Set TF32 support
-    # See https://pytorch.org/docs/stable/notes/cuda.html#tensorfloat-32-tf32-on-ampere-devices
-    if torch.cuda.is_available():
-        if torch.torch.backends.cuda.matmul.allow_tf32 and not config.allow_tf32:
-            # it is enabled, and we dont want it to, so disable:
-            torch.backends.cuda.matmul.allow_tf32 = False
-            torch.backends.cudnn.allow_tf32 = False
-
-    if int(torch.__version__.split(".")[1]) >= 11:
-        # PyTorch >= 1.11
-        k = "_jit_fusion_strategy"
-        torch.jit.set_fusion_strategy(config.get(k))
-    else:
-        # For avoiding 20 steps of painfully slow JIT recompilation
-        # See https://github.com/pytorch/pytorch/issues/52286
-        torch._C._jit_set_bailout_depth(config["_jit_bailout_depth"])
-
-    if config.model_debug_mode:
-        set_irreps_debug(enabled=True)
-    torch.set_default_dtype(dtype_from_name(config.default_dtype))
-    if config.grad_anomaly_mode:
-        torch.autograd.set_detect_anomaly(True)
-
-    e3nn.set_optimization_defaults(**config.get("e3nn_optimization_defaults", {}))
-
-    # Register fields:
-    instantiate(register_fields, all_args=config)
 
 
 def fresh_start(config):

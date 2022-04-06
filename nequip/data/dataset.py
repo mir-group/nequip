@@ -32,6 +32,7 @@ from nequip.utils.batch_ops import bincount
 from nequip.utils.regressor import solver
 from nequip.utils.savenload import atomic_write
 from nequip.utils.multiprocessing import num_tasks
+from nequip.utils._global_options import _set_global_options, _get_latest_global_options
 from .transforms import TypeMapper
 from .AtomicData import _process_dict
 
@@ -738,11 +739,12 @@ def _ase_dataset_reader(
     ase_kwargs: dict,
     atomicdata_kwargs: dict,
     include_frames,
-    dtype,
+    global_options: dict,
 ) -> Union[str, List[AtomicData]]:
     """Parallel reader for all frames in file."""
-    # this is a no-op if we are in the same process
-    torch.set_default_dtype(dtype)
+    if world_size > 1:
+        # we only `multiprocessing` if world_size > 1
+        _set_global_options(global_options)
     # interleave--- in theory it is better for performance for the ranks
     # to read consecutive blocks, but the way ASE is written the whole
     # file gets streamed through all ranks anyway, so just trust the OS
@@ -925,7 +927,8 @@ class ASEDataset(AtomicInMemoryDataset):
                 ase_kwargs=ase_args,
                 atomicdata_kwargs=kwargs,
                 include_frames=self.include_frames,
-                dtype=torch.get_default_dtype(),
+                # get the global options of the parent to initialize the worker correctly
+                global_options=_get_latest_global_options(),
             )
             if n_proc > 1:
                 # things hang for some obscure OpenMP reason on some systems when using `fork` method
