@@ -12,9 +12,6 @@ from pathlib import Path
 
 import torch
 
-import e3nn
-import e3nn.util.jit
-
 from nequip.model import model_from_config
 from nequip.utils import Config
 from nequip.data import dataset_from_config

@@ -3,6 +3,7 @@ import warnings
 import torch
 
 import e3nn
+import e3nn.util.jit
 
 from nequip.data import register_fields
 from .misc import dtype_from_name
