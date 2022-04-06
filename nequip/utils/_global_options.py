@@ -38,40 +38,44 @@ def _set_global_options(config, warn_on_override: bool = False) -> None:
     _latest_global_config.update(dict(config))
     # Set TF32 support
     # See https://pytorch.org/docs/stable/notes/cuda.html#tensorfloat-32-tf32-on-ampere-devices
-    if torch.cuda.is_available():
-        if torch.torch.backends.cuda.matmul.allow_tf32 is not config.allow_tf32:
+    if torch.cuda.is_available() and "allow_tf32" in config:
+        if torch.torch.backends.cuda.matmul.allow_tf32 is not config["allow_tf32"]:
             # update the setting
             if warn_on_override:
                 warnings.warn(
-                    f"Setting the GLOBAL value for allow_tf32 to {config.allow_tf32} which is different than the previous value of {torch.torch.backends.cuda.matmul.allow_tf32}"
+                    f"Setting the GLOBAL value for allow_tf32 to {config['allow_tf32']} which is different than the previous value of {torch.torch.backends.cuda.matmul.allow_tf32}"
                 )
-            torch.backends.cuda.matmul.allow_tf32 = config.allow_tf32
-            torch.backends.cudnn.allow_tf32 = config.allow_tf32
+            torch.backends.cuda.matmul.allow_tf32 = config["allow_tf32"]
+            torch.backends.cudnn.allow_tf32 = config["allow_tf32"]
 
     if int(torch.__version__.split(".")[1]) >= 11:
         # PyTorch >= 1.11
         k = "_jit_fusion_strategy"
-        new_strat = config.get(k)
-        old_strat = torch.jit.set_fusion_strategy(new_strat)
-        if warn_on_override and old_strat != new_strat:
-            warnings.warn(
-                f"Setting the GLOBAL value for jit fusion strategy to `{new_strat}` which is different than the previous value of `{old_strat}`"
-            )
+        if k in config:
+            new_strat = config.get(k)
+            old_strat = torch.jit.set_fusion_strategy(new_strat)
+            if warn_on_override and old_strat != new_strat:
+                warnings.warn(
+                    f"Setting the GLOBAL value for jit fusion strategy to `{new_strat}` which is different than the previous value of `{old_strat}`"
+                )
     else:
         # For avoiding 20 steps of painfully slow JIT recompilation
         # See https://github.com/pytorch/pytorch/issues/52286
-        new_depth = config["_jit_bailout_depth"]
-        old_depth = torch._C._jit_set_bailout_depth(new_depth)
-        if warn_on_override and old_depth != new_depth:
-            warnings.warn(
-                f"Setting the GLOBAL value for jit bailout depth to `{new_depth}` which is different than the previous value of `{old_depth}`"
-            )
+        k = "_jit_bailout_depth"
+        if k in config:
+            new_depth = config[k]
+            old_depth = torch._C._jit_set_bailout_depth(new_depth)
+            if warn_on_override and old_depth != new_depth:
+                warnings.warn(
+                    f"Setting the GLOBAL value for jit bailout depth to `{new_depth}` which is different than the previous value of `{old_depth}`"
+                )
 
     # TODO: warn_on_override for the rest here?
-    if config.model_debug_mode:
+    if config.get("model_debug_mode", False):
         set_irreps_debug(enabled=True)
-    torch.set_default_dtype(dtype_from_name(config.default_dtype))
-    if config.grad_anomaly_mode:
+    if "default_dtype" in config:
+        torch.set_default_dtype(dtype_from_name(config["default_dtype"]))
+    if config.get("grad_anomaly_mode", False):
         torch.autograd.set_detect_anomaly(True)
 
     e3nn.set_optimization_defaults(**config.get("e3nn_optimization_defaults", {}))
