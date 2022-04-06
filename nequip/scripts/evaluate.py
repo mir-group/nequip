@@ -25,7 +25,7 @@ register_fields(graph_fields=[ORIGINAL_DATASET_INDEX_KEY])
 
 
 def main(args=None, running_as_script: bool = True):
-    # in results dir, do: nequip-deploy build . deployed.pth
+    # in results dir, do: nequip-deploy build --train-dir . deployed.pth
     parser = argparse.ArgumentParser(
         description=textwrap.dedent(
             """Compute the error of a model on a test set using various metrics.

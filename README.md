@@ -96,7 +96,7 @@ The `nequip-deploy` command is used to deploy the result of a training session i
 It compiles a NequIP model trained in Python to [TorchScript](https://pytorch.org/docs/stable/jit.html).
 The result is an optimized model file that has no dependency on the `nequip` Python library, or even on Python itself:
 ```bash
-nequip-deploy build path/to/training/session/ where/to/put/deployed_model.pth
+nequip-deploy build --train-dir path/to/training/session/ where/to/put/deployed_model.pth
 ```
 For more details on this command, please run `nequip-deploy --help`.
 
