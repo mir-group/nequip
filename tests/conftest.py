@@ -16,20 +16,42 @@ from nequip.utils.test import set_irreps_debug
 from nequip.data import AtomicData, ASEDataset
 from nequip.data.transforms import TypeMapper
 from nequip.utils.torch_geometric import Batch
+from nequip.utils._global_options import _set_global_options
+from nequip.utils.misc import dtype_from_name
 
 if "NEQUIP_NUM_TASKS" not in os.environ:
     # Test parallelization, but don't waste time spawning tons of workers if lots of cores available
     os.environ["NEQUIP_NUM_TASKS"] = "2"
 
-# For good practice, we *should* do this:
-# See https://docs.pytest.org/en/stable/fixture.html#using-fixtures-from-other-projects
-# pytest_plugins = ['e3nn.util.test']
-# But doing so exposes float_tolerance to doctests, which don't support parametrized, autouse fixtures.
-# Importing directly somehow only brings in the fixture later, preventing the issue.
-from e3nn.util.test import float_tolerance
+# The default float tolerance
+FLOAT_TOLERANCE = {
+    t: torch.as_tensor(v, dtype=dtype_from_name(t))
+    for t, v in {"float32": 1e-3, "float64": 1e-10}.items()
+}
 
-# Suppress linter errors
-float_tolerance = float_tolerance
+
+@pytest.fixture(scope="session", autouse=True, params=["float32", "float64"])
+def float_tolerance(request):
+    """Run all tests with various PyTorch default dtypes.
+
+    This is a session-wide, autouse fixture — you only need to request it explicitly if a test needs to know the tolerance for the current default dtype.
+
+    Returns
+    --------
+        A precision threshold to use for closeness tests.
+    """
+    old_dtype = torch.get_default_dtype()
+    dtype = request.param
+    _set_global_options({"default_dtype": dtype})
+    yield FLOAT_TOLERANCE[dtype]
+    _set_global_options(
+        {
+            "default_dtype": {torch.float32: "float32", torch.float64: "float64"}[
+                old_dtype
+            ]
+        }
+    )
+
 
 # - Ampere and TF32 -
 # Many of the tests for NequIP involve numerically checking
