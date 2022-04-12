@@ -8,11 +8,15 @@ Most recent change on the bottom.
 
 
 ## [Unreleased] - 0.5.4
+
+## [0.5.4] - 2022-04-12
 ### Added
 - `NequIPCalculator` now handles per-atom energies
 - Added `initial_model_state_strict` YAML option
 - `load_model_state` builder
 - fusion strategy support
+- `cumulative_wall` for early stopping
+- Deploy model from YAML file directly
 
 ### Changed
 - Disallow PyTorch 1.9, which has some JIT bugs.
