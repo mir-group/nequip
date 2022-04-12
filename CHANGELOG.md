@@ -28,6 +28,7 @@ Most recent change on the bottom.
 - `dataset: ase` now treats automatically adds `key_mapping` keys to `include_keys`, which is consistant with the npz dataset
 - fixed reloading models with `per_species_rescale_scales/shifts` set to `null`/`None`
 - graceful exit for `-n 0` in `nequip-benchmark`
+- Strictly correct CSV headers for metrics (#198)
 
 ## [0.5.3] - 2022-02-23
 ### Added
