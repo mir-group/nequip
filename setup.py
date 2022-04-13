@@ -13,7 +13,7 @@ setup(
     version=version,
     description="NequIP is an open-source code for building E(3)-equivariant interatomic potentials.",
     download_url="https://github.com/mir-group/nequip",
-    author="Simon Batzner, Albert Musealian, Lixin Sun, Mario Geiger, Anders Johansson, Tess Smidt",
+    author="Simon Batzner, Albert Musealian, Lixin Sun, Anders Johansson, Mario Geiger, Tess Smidt",
     python_requires=">=3.7",
     packages=find_packages(include=["nequip", "nequip.*"]),
     entry_points={
