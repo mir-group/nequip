@@ -19,22 +19,22 @@ To install:
 
 * We use [Weights&Biases](https://wandb.ai) to keep track of experiments. This is not a strict requirement — you can use our package without it — but it may make your life easier. If you want to use it, create an account [here](https://wandb.ai) and install the Python package:
 
-```
-pip install wandb
-```
+  ```
+  pip install wandb
+  ```
 
 * Install NequIP
 
-NequIP can be installed from PyPI:
-```
-pip install nequip
-```
-or directly from source:
-```
-git clone https://github.com/mir-group/nequip.git
-cd nequip
-pip install . 
-```
+  NequIP can be installed from PyPI:
+  ```
+  pip install nequip
+  ```
+  or directly from source:
+  ```
+  git clone https://github.com/mir-group/nequip.git
+  cd nequip
+  pip install . 
+  ```
 
 ### Installation Issues
 
