@@ -1,4 +1,4 @@
-name: Check Syntax and Run Tests
+name: Run Tests
 
 on:
   push:
@@ -16,7 +16,7 @@ jobs:
     strategy:
       matrix:
         python-version: [3.9]
-        torch-version: [1.10.0]
+        torch-version: [1.11.0]
 
     steps:
     - uses: actions/checkout@v2
@@ -24,20 +24,15 @@ jobs:
       uses: actions/setup-python@v2
       with:
         python-version: ${{ matrix.python-version }}
-    - name: Install flake8
-      run: |
-        pip install flake8
-    - name: Lint with flake8
-      run: |
-        flake8 . --count --show-source --statistics
     - name: Install dependencies
       env:
         TORCH: "${{ matrix.torch-version }}"
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         python -m pip install --upgrade pip
+        pip install setuptools wheel
         pip install torch==${TORCH} -f https://download.pytorch.org/whl/cpu/torch_stable.html
-        pip install .
+        pip install --upgrade-strategy only-if-needed .
     - name: Install pytest
       run: |
         pip install pytest

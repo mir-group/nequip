@@ -422,6 +422,10 @@ class AtomicInMemoryDataset(AtomicDataset):
                 assert arr_is_per in ("node", "graph", "edge")
             else:
                 # Give a better error
+                if field not in ff_transformed and field not in data_transformed:
+                    raise RuntimeError(
+                        f"Field `{field}` for which statistics were requested not found in data."
+                    )
                 if field not in selectors:
                     # this means field is not selected and so not available
                     raise RuntimeError(
