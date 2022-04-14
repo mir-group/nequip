@@ -8,6 +8,13 @@ Most recent change on the bottom.
 
 
 ## [Unreleased] - 0.5.5
+### Added
+- BETA! Support for stress in training and inference
+- `EMTTestDataset` for quick synthetic fake PBC data
+
+### Fixed
+- Equivariance testing correctly handles output cells
+- Equivariance testing correctly handles one-node or one-edge data
 
 ## [0.5.4] - 2022-04-12
 ### Added

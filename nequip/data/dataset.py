@@ -387,8 +387,10 @@ class AtomicInMemoryDataset(AtomicDataset):
             data_transformed = self.data.to_dict()
         # pre-select arrays
         # this ensures that all following computations use the right data
+        all_keys = set()
         selectors = {}
         for k in list(ff_transformed.keys()) + list(data_transformed.keys()):
+            all_keys.add(k)
             if k in _NODE_FIELDS:
                 selectors[k] = node_selector
             elif k in _GRAPH_FIELDS:
@@ -421,10 +423,9 @@ class AtomicInMemoryDataset(AtomicDataset):
                 )  # all statistics must be on floating
                 assert arr_is_per in ("node", "graph", "edge")
             else:
-                # Give a better error
-                if field not in ff_transformed and field not in data_transformed:
+                if field not in all_keys:
                     raise RuntimeError(
-                        f"Field `{field}` for which statistics were requested not found in data."
+                        f"The field key `{field}` is not present in this dataset"
                     )
                 if field not in selectors:
                     # this means field is not selected and so not available

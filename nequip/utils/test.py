@@ -56,11 +56,15 @@ def assert_permutation_equivariant(
     n_node: int = len(data_in[AtomicDataDict.POSITIONS_KEY])
     while True:
         node_perm = torch.randperm(n_node, device=device)
+        if n_node <= 1:
+            break  # otherwise inf loop
         if not torch.all(node_perm == torch.arange(n_node, device=device)):
             break
     n_edge: int = data_in[AtomicDataDict.EDGE_INDEX_KEY].shape[1]
     while True:
         edge_perm = torch.randperm(n_edge, device=device)
+        if n_edge <= 1:
+            break  # otherwise inf loop
         if not torch.all(edge_perm == torch.arange(n_edge, device=device)):
             break
     # ^ note that these permutations are maps from the "to" index to the "from" index
@@ -152,6 +156,10 @@ def assert_AtomicData_equivariant(
     if not isinstance(data_in, list):
         data_in = [data_in]
     data_in = [AtomicData.to_AtomicDataDict(d) for d in data_in]
+    device, dtype = (
+        data_in[0][AtomicDataDict.POSITIONS_KEY].device,
+        data_in[0][AtomicDataDict.POSITIONS_KEY].dtype,
+    )
 
     # == Test permutation of graph nodes ==
     # TODO: since permutation is distinct, run only on one.
@@ -178,21 +186,40 @@ def assert_AtomicData_equivariant(
             # must be this to actually rotate it
             irps[AtomicDataDict.CELL_KEY] = "3x1o"
 
+    stress_keys = (AtomicDataDict.STRESS_KEY, AtomicDataDict.VIRIAL_KEY)
+    for k in stress_keys:
+        irreps_in.pop(k, None)
+    if any(k in irreps_out for k in stress_keys):
+        from e3nn.io import CartesianTensor
+
+        stress_cart_tensor = CartesianTensor("ij=ji")  # stress is symmetric
+        stress_rtp = stress_cart_tensor.reduced_tensor_products().to(device, dtype)
+        # symmetric 3x3 cartesian tensor as irreps
+        for k in stress_keys:
+            irreps_out[k] = stress_cart_tensor
+
     def wrapper(*args):
         arg_dict = {k: v for k, v in zip(irreps_in, args)}
         # cell is a special case
-        if AtomicDataDict.CELL_KEY in arg_dict:
-            # unflatten
-            cell = arg_dict[AtomicDataDict.CELL_KEY]
-            assert cell.shape[-1] == 9
-            arg_dict[AtomicDataDict.CELL_KEY] = cell.reshape(cell.shape[:-1] + (3, 3))
+        for key in (AtomicDataDict.CELL_KEY,):
+            if key in arg_dict:
+                # unflatten
+                val = arg_dict[key]
+                assert val.shape[-1] == 9
+                arg_dict[key] = val.reshape(val.shape[:-1] + (3, 3))
         output = func(arg_dict)
         # cell is a special case
-        if AtomicDataDict.CELL_KEY in output:
-            # flatten
-            cell = arg_dict[AtomicDataDict.CELL_KEY]
-            assert cell.shape[-2:] == (3, 3)
-            arg_dict[AtomicDataDict.CELL_KEY] = cell.reshape(cell.shape[:-2] + (9,))
+        for key in (AtomicDataDict.CELL_KEY,):
+            if key in output:
+                # flatten
+                val = output[key]
+                assert val.shape[-2:] == (3, 3)
+                output[key] = val.reshape(val.shape[:-2] + (9,))
+        # stress is also a special case,
+        # we need it to be decomposed into irreps for equivar testing
+        for k in stress_keys:
+            if k in output:
+                output[k] = stress_cart_tensor.from_cartesian(output[k], rtp=stress_rtp)
         return [output[k] for k in irreps_out]
 
     # prepare input data
