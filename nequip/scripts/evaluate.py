@@ -14,7 +14,8 @@ import torch
 from nequip.data import AtomicData, Collater, dataset_from_config, register_fields
 from nequip.scripts.deploy import load_deployed_model, R_MAX_KEY
 from nequip.scripts._logger import set_up_script_logger
-from nequip.scripts.train import default_config, _set_global_options, check_code_version
+from nequip.scripts.train import default_config, check_code_version
+from nequip.utils._global_options import _set_global_options
 from nequip.train import Trainer, Loss, Metrics
 from nequip.utils import load_file, instantiate, Config
 

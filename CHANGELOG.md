@@ -11,6 +11,7 @@ Most recent change on the bottom.
 ### Added
 - BETA! Support for stress in training and inference
 - `EMTTestDataset` for quick synthetic fake PBC data
+- multiprocessing for ASE dataset loading/processing
 
 ### Fixed
 - Equivariance testing correctly handles output cells
