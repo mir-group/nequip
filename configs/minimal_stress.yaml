@@ -22,9 +22,7 @@ dataset_url: https://qmml.org/Datasets/w-14.zip             # url to download th
 dataset_file_name: ./benchmark_data/w-14.xyz                        # path to data set file
 dataset_key_mapping:
   force: forces
-  virial: stress
 dataset_include_keys:
-  - force
   - virial
 # A mapping of chemical species to type indexes is necessary if the dataset is provided with atomic numbers instead of type indexes.
 chemical_symbols:
@@ -51,7 +49,7 @@ max_epochs: 10
 
 # loss function
 loss_coeffs:
- - stress
+ - virial
  - forces
 
 # optimizer

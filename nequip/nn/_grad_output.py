@@ -176,12 +176,27 @@ class PartialForceOutput(GraphModuleMixin, torch.nn.Module):
 @compile_mode("script")
 class StressOutput(GraphModuleMixin, torch.nn.Module):
     r"""Compute stress (and forces) using autograd of an energy model.
+
+    See:
+        Knuth et. al. Comput. Phys. Commun 190, 33-50, 2015
+        https://pure.mpg.de/rest/items/item_2085135_9/component/file_2156800/content
+
     Args:
-        func: the model to wrap
+        energy_model: the model to wrap
+        do_forces: whether to compute forces as well
+        virial_alternate_sign_convention: if ``False`` (default), ``stress = (-1/V) * virial``.
+            If ``True``, ``stress = (1/V) * virial``.
+            See https://github.com/libAtoms/QUIP/issues/227 for discussion on the convention.
     """
     do_forces: bool
+    virial_alternate_sign_convention: bool
 
-    def __init__(self, energy_model: GraphModuleMixin, do_forces: bool = True):
+    def __init__(
+        self,
+        energy_model: GraphModuleMixin,
+        do_forces: bool = True,
+        virial_alternate_sign_convention: bool = False,
+    ):
         super().__init__()
 
         warnings.warn(
@@ -191,6 +206,7 @@ class StressOutput(GraphModuleMixin, torch.nn.Module):
         if not do_forces:
             raise NotImplementedError
         self.do_forces = do_forces
+        self.virial_alternate_sign_convention = virial_alternate_sign_convention
 
         self.energy_model = energy_model
 
@@ -293,7 +309,6 @@ class StressOutput(GraphModuleMixin, torch.nn.Module):
         if virial is None:
             # condition needed to unwrap optional for torchscript
             assert False, "failed to compute virial autograd"
-        data[AtomicDataDict.VIRIAL_KEY] = virial
 
         # we only compute the stress (1/V * virial) if we have a cell whose volume we can compute
         if has_cell:
@@ -311,6 +326,16 @@ class StressOutput(GraphModuleMixin, torch.nn.Module):
             data[AtomicDataDict.CELL_KEY] = orig_cell
         else:
             stress = self._empty  # torchscript
+
+        # see discussion in https://github.com/libAtoms/QUIP/issues/227 about sign convention
+        # they say the standard convention is virial = -stress x volume
+        # looking above this means that we need to pick up another negative sign for the virial
+        # to fit this equation with the stress computed above
+        # In the case of the "alternative" convention, we just leave it as is giving
+        # virial = stress x volume
+        if not self.virial_alternate_sign_convention:
+            virial = torch.neg(virial)
+        data[AtomicDataDict.VIRIAL_KEY] = virial
 
         # Remove helper
         del data["_displacement"]
