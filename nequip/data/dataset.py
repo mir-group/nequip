@@ -758,20 +758,20 @@ def _ase_dataset_reader(
     if include_frames is None:
         # count includes 0, 1, ..., inf
         include_frames = itertools.count()
-    datas = [
-        (
-            rank + (world_size * i),  # global index
-            AtomicData.from_ase(atoms=atoms, **atomicdata_kwargs),
+
+    datas = []
+    # stream them from ase too using iread
+    for i, atoms in enumerate(ase.io.iread(**ase_kwargs, index=index, parallel=False)):
+        global_index = rank + (world_size * i)
+        datas.append(
+            (
+                global_index,
+                AtomicData.from_ase(atoms=atoms, **atomicdata_kwargs)
+                if global_index in include_frames
+                # in-memory dataset will ignore this later, but needed for indexing to work out
+                else None,
+            )
         )
-        # include_frames is global indexes, so turn i into a global index
-        if rank + (world_size * i) in include_frames
-        # in-memory dataset will ignore this later, but needed for indexing to work out
-        else None
-        # stream them from ase too
-        for i, atoms in enumerate(
-            ase.io.iread(**ase_kwargs, index=index, parallel=False)
-        )
-    ]
     # Save to a tempfile---
     # there can be a _lot_ of tensors here, and rather than dealing with
     # the complications of running out of file descriptors and setting
