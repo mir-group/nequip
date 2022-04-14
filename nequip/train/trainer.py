@@ -1077,7 +1077,7 @@ class Trainer:
             # append details from loss
             for key, value in self.loss_dict[category].items():
                 mat_str += f", {value:16.5g}"
-                header += f", {category}_{key}"
+                header += f",{category}_{key}"
                 log_str[category] += f" {value:12.3g}"
                 log_header[category] += f" {key:>12.12}"
                 self.mae_dict[f"{category}_{key}"] = value
@@ -1085,7 +1085,7 @@ class Trainer:
             # append details from metrics
             for key, value in met.items():
                 mat_str += f", {value:12.3g}"
-                header += f", {category}_{key}"
+                header += f",{category}_{key}"
                 if key not in skip_keys:
                     log_str[category] += f" {value:12.3g}"
                     log_header[category] += f" {key:>12.12}"

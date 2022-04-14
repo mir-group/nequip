@@ -7,17 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Most recent change on the bottom.
 
 
-## [Unreleased] - 0.5.4
+## [Unreleased] - 0.5.5
+### Added
+- BETA! Support for stress in training and inference
+- `EMTTestDataset` for quick synthetic fake PBC data
+- multiprocessing for ASE dataset loading/processing
+
+### Fixed
+- Equivariance testing correctly handles output cells
+- Equivariance testing correctly handles one-node or one-edge data
+
+## [0.5.4] - 2022-04-12
 ### Added
 - `NequIPCalculator` now handles per-atom energies
 - Added `initial_model_state_strict` YAML option
 - `load_model_state` builder
 - fusion strategy support
-- multiprocessing for ASE dataset loading/processing
+- `cumulative_wall` for early stopping
+- Deploy model from YAML file directly
 
 ### Changed
 - Disallow PyTorch 1.9, which has some JIT bugs.
 - `nequip-deploy build` now requires `--train-dir` option when specifying the training session
+- Minimum Python version is now 3.7
 
 ### Fixed
 - Better error in `Dataset.statistics` when field is missing
@@ -25,6 +37,7 @@ Most recent change on the bottom.
 - `dataset: ase` now treats automatically adds `key_mapping` keys to `include_keys`, which is consistant with the npz dataset
 - fixed reloading models with `per_species_rescale_scales/shifts` set to `null`/`None`
 - graceful exit for `-n 0` in `nequip-benchmark`
+- Strictly correct CSV headers for metrics (#198)
 
 ## [0.5.3] - 2022-02-23
 ### Added
