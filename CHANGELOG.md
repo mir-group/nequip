@@ -8,6 +8,13 @@ Most recent change on the bottom.
 
 
 ## [Unreleased] - 0.5.5
+### Added
+- BETA! Support for stress in training and inference
+- `EMTTestDataset` for quick synthetic fake PBC data
+
+### Fixed
+- Equivariance testing correctly handles output cells
+- Equivariance testing correctly handles one-node or one-edge data
 
 ## [0.5.4] - 2022-04-12
 ### Added
@@ -82,8 +89,6 @@ Most recent change on the bottom.
 - The types may now be specified with a simpler `chemical_symbols` option
 - Equivariance testing reports per-field errors
 - `--equivariance-test n` tests equivariance on `n` frames from the training dataset
-- `EMTTestDataset` for quick synthetic fake PBC data
-- Support for stress
 
 ### Changed
 - All fields now have consistant [N, dim] shaping
@@ -93,9 +98,6 @@ Most recent change on the bottom.
 ### Fixed
 - Equivariance testing no longer unintentionally skips translation
 - Correct cat dim for all registered per-graph fields
-- Equivariance testing correctly handles output cells
-- Handling of `include_frames` with `ASEDataset`
-- Equivariance testing correctly handles one-node or one-edge data
 - `PerSpeciesScaleShift` now correctly outputs when scales, but not shifts, are enabled— previously it was broken and would only output updated values when both were enabled.
 - `nequip-evaluate` outputs correct species to the `extxyz` file when a chemical symbol <-> type mapping exists for the test dataset
 
