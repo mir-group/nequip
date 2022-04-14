@@ -12,24 +12,29 @@ NequIP is an open-source code for building E(3)-equivariant interatomic potentia
 
 NequIP requires:
 
-* Python >= 3.6
+* Python >= 3.7
 * PyTorch >= 1.8, !=1.9, <=1.11.*. PyTorch can be installed following the [instructions from their documentation](https://pytorch.org/get-started/locally/). Note that neither `torchvision` nor `torchaudio`, included in the default install command, are needed for NequIP.
 
 To install:
 
 * We use [Weights&Biases](https://wandb.ai) to keep track of experiments. This is not a strict requirement — you can use our package without it — but it may make your life easier. If you want to use it, create an account [here](https://wandb.ai) and install the Python package:
 
-```
-pip install wandb
-```
+  ```
+  pip install wandb
+  ```
 
 * Install NequIP
 
-```
-git clone https://github.com/mir-group/nequip.git
-cd nequip
-pip install . 
-```
+  NequIP can be installed from PyPI:
+  ```
+  pip install nequip
+  ```
+  or directly from source:
+  ```
+  git clone https://github.com/mir-group/nequip.git
+  cd nequip
+  pip install . 
+  ```
 
 ### Installation Issues
 
@@ -96,7 +101,7 @@ The `nequip-deploy` command is used to deploy the result of a training session i
 It compiles a NequIP model trained in Python to [TorchScript](https://pytorch.org/docs/stable/jit.html).
 The result is an optimized model file that has no dependency on the `nequip` Python library, or even on Python itself:
 ```bash
-nequip-deploy build path/to/training/session/ where/to/put/deployed_model.pth
+nequip-deploy build --train-dir path/to/training/session/ where/to/put/deployed_model.pth
 ```
 For more details on this command, please run `nequip-deploy --help`.
 

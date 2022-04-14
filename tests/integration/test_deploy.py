@@ -58,7 +58,13 @@ def test_deploy(BENCHMARK_ROOT, device):
         # Deploy
         deployed_path = pathlib.Path(f"deployed_{dtype}.pth")
         retcode = subprocess.run(
-            ["nequip-deploy", "build", f"{root}/{run_name}/", str(deployed_path)],
+            [
+                "nequip-deploy",
+                "build",
+                "--train-dir",
+                f"{root}/{run_name}/",
+                str(deployed_path),
+            ],
             cwd=tmpdir,
         )
         retcode.check_returncode()

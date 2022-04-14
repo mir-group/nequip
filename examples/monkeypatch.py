@@ -5,18 +5,17 @@ and modify it to save and output the features after the first
 convolution for later analysis.
 """
 
-import torch
-
 from nequip.utils import Config, find_first_of_type
 from nequip.data import AtomicDataDict, AtomicData, dataset_from_config
 from nequip.nn import SequentialGraphNetwork, SaveForOutput
+from nequip.train import Trainer
 
 # The path to the original training session
 path = "../results/aspirin/minimal"
 
 # Load the model
-model = torch.load(path + "/best_model.pth")
-
+# there are other ways to do this, such as model_from_config etc.
+model = Trainer.load_model_from_training_session(traindir=path)
 
 # Find the SequentialGraphNetwork, which contains the
 # sequential bulk of the NequIP GNN model. To see the

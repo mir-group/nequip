@@ -9,6 +9,7 @@ import argparse
 import pathlib
 import logging
 import warnings
+import yaml
 
 # This is a weird hack to avoid Intel MKL issues on the cluster when this is called as a subprocess of a process that has itself initialized PyTorch.
 # Since numpy gets imported later anyway for dataset stuff, this shouldn't affect performance.
@@ -20,6 +21,7 @@ import ase.data
 
 from e3nn.util.jit import script
 
+from nequip.model import model_from_config
 from nequip.scripts.train import _set_global_options, default_config
 from nequip.train import Trainer
 from nequip.utils import Config
@@ -162,8 +164,13 @@ def main(args=None):
 
     build_parser = subparsers.add_parser("build", help="Build a deployment model")
     build_parser.add_argument(
-        "train_dir",
-        help="Path to a working directory from a training session.",
+        "--model",
+        help="Path to a YAML file defining a model to deploy. Unless you know why you need to, do not use this option.",
+        type=pathlib.Path,
+    )
+    build_parser.add_argument(
+        "--train-dir",
+        help="Path to a working directory from a training session to deploy.",
         type=pathlib.Path,
     )
     build_parser.add_argument(
@@ -187,23 +194,29 @@ def main(args=None):
         print(config)
 
     elif args.command == "build":
-        if not args.train_dir.is_dir():
-            raise ValueError(f"{args.train_dir} is not a directory")
-        if args.out_file.is_dir():
-            raise ValueError(
-                f"{args.out_dir} is a directory, but a path to a file for the deployed model must be given"
-            )
+        if args.model and args.train_dir:
+            raise ValueError("--model and --train-dir cannot both be specified.")
+        if args.train_dir is not None:
+            logging.info("Loading best_model from training session...")
+            config = Config.from_file(str(args.train_dir / "config.yaml"))
+        elif args.model is not None:
+            logging.info("Building model from config...")
+            config = Config.from_file(str(args.model), defaults=default_config)
+        else:
+            raise ValueError("one of --train-dir or --model must be given")
 
-        # load config
-        config = Config.from_file(str(args.train_dir / "config.yaml"))
         _set_global_options(config)
-
         check_code_version(config)
 
         # -- load model --
-        model, _ = Trainer.load_model_from_training_session(
-            args.train_dir, model_name="best_model.pth", device="cpu"
-        )
+        if args.train_dir is not None:
+            model, _ = Trainer.load_model_from_training_session(
+                args.train_dir, model_name="best_model.pth", device="cpu"
+            )
+        elif args.model is not None:
+            model = model_from_config(config)
+        else:
+            raise AssertionError
 
         # -- compile --
         model = _compile_for_deploy(model)
@@ -240,7 +253,7 @@ def main(args=None):
                 "%s,%i" % e for e in config[JIT_FUSION_STRATEGY]
             )
         metadata[TF32_KEY] = str(int(config["allow_tf32"]))
-        metadata[CONFIG_KEY] = (args.train_dir / "config.yaml").read_text()
+        metadata[CONFIG_KEY] = yaml.dump(dict(config))
 
         metadata = {k: v.encode("ascii") for k, v in metadata.items()}
         torch.jit.save(model, args.out_file, _extra_files=metadata)
