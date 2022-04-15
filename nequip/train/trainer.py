@@ -888,12 +888,15 @@ class Trainer:
 
     def epoch_step(self):
 
-        datasets = [self.dl_train, self.dl_val]
+        dataloaders = {TRAIN: self.dl_train, VALIDATION: self.dl_val}
         categories = [TRAIN, VALIDATION] if self.iepoch >= 0 else [VALIDATION]
+        dataloaders = [
+            dataloaders[c] for c in categories
+        ]  # get the right dataloaders for the catagories we actually run
         self.metrics_dict = {}
         self.loss_dict = {}
 
-        for category, dataset in zip(categories, datasets):
+        for category, dataset in zip(categories, dataloaders):
             if category == VALIDATION and self.use_ema:
                 cm = self.ema.average_parameters()
             else:
