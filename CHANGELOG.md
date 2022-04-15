@@ -12,6 +12,7 @@ Most recent change on the bottom.
 - BETA! Support for stress in training and inference
 - `EMTTestDataset` for quick synthetic fake PBC data
 - multiprocessing for ASE dataset loading/processing
+- `nequip-benchmark` times dataset loading, model creation, and compilation
 
 ### Fixed
 - Equivariance testing correctly handles output cells
