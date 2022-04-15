@@ -147,6 +147,7 @@ class Trainer:
         optim_kwargs (dict): parameters to initialize the optimizer
 
         batch_size (int): size of each batch
+        validation_batch_size (int): batch size for evaluating the model for validation
         shuffle (bool): parameters for dataloader
         n_train (int): # of frames for training
         n_val (int): # of frames for validation
@@ -236,6 +237,7 @@ class Trainer:
         ema_use_num_updates=True,
         exclude_keys: list = [],
         batch_size: int = 5,
+        validation_batch_size: int = 5,
         shuffle: bool = True,
         n_train: Optional[int] = None,
         n_val: Optional[int] = None,
@@ -1190,7 +1192,6 @@ class Trainer:
         # based on recommendations from
         # https://pytorch.org/tutorials/recipes/recipes/tuning_guide.html#enable-async-data-loading-and-augmentation
         dl_kwargs = dict(
-            batch_size=self.batch_size,
             exclude_keys=self.exclude_keys,
             num_workers=self.dataloader_num_workers,
             # keep stuff around in memory
@@ -1207,8 +1208,13 @@ class Trainer:
         self.dl_train = DataLoader(
             dataset=self.dataset_train,
             shuffle=self.shuffle,  # training should shuffle
+            batch_size=self.batch_size,
             **dl_kwargs,
         )
         # validation, on the other hand, shouldn't shuffle
         # we still pass the generator just to be safe
-        self.dl_val = DataLoader(dataset=self.dataset_val, **dl_kwargs)
+        self.dl_val = DataLoader(
+            dataset=self.dataset_val,
+            batch_size=self.validation_batch_size,
+            **dl_kwargs,
+        )

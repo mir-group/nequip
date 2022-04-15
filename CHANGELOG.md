@@ -13,6 +13,7 @@ Most recent change on the bottom.
 - `EMTTestDataset` for quick synthetic fake PBC data
 - multiprocessing for ASE dataset loading/processing
 - `nequip-benchmark` times dataset loading, model creation, and compilation
+- `validation_batch_size`
 
 ### Fixed
 - Equivariance testing correctly handles output cells
