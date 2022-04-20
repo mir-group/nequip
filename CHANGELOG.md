@@ -14,6 +14,7 @@ Most recent change on the bottom.
 - multiprocessing for ASE dataset loading/processing
 - `nequip-benchmark` times dataset loading, model creation, and compilation
 - `validation_batch_size`
+- support multiple metrics on same field with different `functional`s
 
 ### Fixed
 - Equivariance testing correctly handles output cells

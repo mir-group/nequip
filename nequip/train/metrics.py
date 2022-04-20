@@ -78,7 +78,7 @@ class Metrics:
 
             if key not in self.running_stats:
                 self.running_stats[key] = {}
-                self.funcs[key] = find_loss_function(functional, {})
+                self.funcs[key] = {}
                 self.kwargs[key] = {}
                 self.params[key] = {}
 
@@ -94,6 +94,7 @@ class Metrics:
             )
             self.kwargs[key][param_hash].update(kwargs)
             self.params[key][param_hash] = (reduction, params)
+            self.funcs[key][param_hash] = find_loss_function(functional, {})
 
     def init_runstat(self, params, error: torch.Tensor):
         """
@@ -147,16 +148,15 @@ class Metrics:
 
         metrics = {}
         N = None
-        for key, func in self.funcs.items():
-
-            error = func(
-                pred=pred,
-                ref=ref,
-                key=key,
-                mean=False,
-            )
-
+        for key in self.funcs.keys():
             for param_hash, kwargs in self.kwargs[key].items():
+                func = self.funcs[key][param_hash]
+                error = func(
+                    pred=pred,
+                    ref=ref,
+                    key=key,
+                    mean=False,
+                )
 
                 _, params = self.params[key][param_hash]
                 per_species = params["PerSpecies"]
