@@ -15,6 +15,10 @@ Most recent change on the bottom.
 - `nequip-benchmark` times dataset loading, model creation, and compilation
 - `validation_batch_size`
 - support multiple metrics on same field with different `functional`s
+- allow custom metrics names
+
+### Changed
+- abbreviate `node_features`->`h` in loss titles
 
 ### Fixed
 - Equivariance testing correctly handles output cells

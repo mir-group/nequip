@@ -28,7 +28,7 @@ class Metrics:
     Example:
 
     ```
-    components = [(key1, "rmse"), (key2, "mse)]
+    components = [(key1, "rmse"), (key2, "mse")]
     ```
 
     You can also offer more details with a dictionary. The keys can be any keys for RunningStats or
@@ -36,8 +36,9 @@ class Metrics:
     report_per_component (bool): if True, report the mean on each component (equivalent to mean(axis=0) in numpy),
                                  otherwise, take the mean across batch and all components for vector data.
     functional: the function to compute the error. It has to be exactly the same as the one defined in torch.nn.
+                Callables are also allowed.
                 default: "L1Loss"
-    PerSpecies: whether compute the estimation for each species or not
+    PerSpecies: whether to compute the estimation for each species or not
 
     the keys are case-sensitive.
 
@@ -222,6 +223,8 @@ class Metrics:
             reduction, params = self.params[key][param_hash]
 
             short_name = ABBREV.get(key, key)
+            if hasattr(self.funcs[key][param_hash], "get_name"):
+                short_name = self.funcs[key][param_hash].get_name(short_name)
 
             per_atom = params["PerAtom"]
             suffix = "/N" if per_atom else ""
