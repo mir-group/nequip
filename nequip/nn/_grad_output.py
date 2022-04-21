@@ -184,18 +184,13 @@ class StressOutput(GraphModuleMixin, torch.nn.Module):
     Args:
         energy_model: the model to wrap
         do_forces: whether to compute forces as well
-        virial_alternate_sign_convention: if ``False`` (default), ``stress = (-1/V) * virial``.
-            If ``True``, ``stress = (1/V) * virial``.
-            See https://github.com/libAtoms/QUIP/issues/227 for discussion on the convention.
     """
     do_forces: bool
-    virial_alternate_sign_convention: bool
 
     def __init__(
         self,
         energy_model: GraphModuleMixin,
         do_forces: bool = True,
-        virial_alternate_sign_convention: bool = False,
     ):
         super().__init__()
 
@@ -206,7 +201,6 @@ class StressOutput(GraphModuleMixin, torch.nn.Module):
         if not do_forces:
             raise NotImplementedError
         self.do_forces = do_forces
-        self.virial_alternate_sign_convention = virial_alternate_sign_convention
 
         self.energy_model = energy_model
 
@@ -331,10 +325,7 @@ class StressOutput(GraphModuleMixin, torch.nn.Module):
         # they say the standard convention is virial = -stress x volume
         # looking above this means that we need to pick up another negative sign for the virial
         # to fit this equation with the stress computed above
-        # In the case of the "alternative" convention, we just leave it as is giving
-        # virial = stress x volume
-        if not self.virial_alternate_sign_convention:
-            virial = torch.neg(virial)
+        virial = torch.neg(virial)
         data[AtomicDataDict.VIRIAL_KEY] = virial
 
         # Remove helper
