@@ -1,5 +1,6 @@
 from nequip.nn import GraphModuleMixin, GradientOutput
 from nequip.nn import PartialForceOutput as PartialForceOutputModule
+from nequip.nn import StressOutput as StressOutputModule
 from nequip.data import AtomicDataDict
 
 
@@ -38,3 +39,20 @@ def PartialForceOutput(model: GraphModuleMixin) -> GradientOutput:
     ):
         raise ValueError("This model already has force outputs.")
     return PartialForceOutputModule(func=model)
+
+
+def StressForceOutput(model: GraphModuleMixin) -> GradientOutput:
+    r"""Add forces and stresses to a model that predicts energy.
+
+    Args:
+        energy_model: the model to wrap. Must have ``AtomicDataDict.TOTAL_ENERGY_KEY`` as an output.
+
+    Returns:
+        A ``StressOutput`` wrapping ``energy_model``.
+    """
+    if (
+        AtomicDataDict.FORCE_KEY in model.irreps_out
+        or AtomicDataDict.STRESS_KEY in model.irreps_out
+    ):
+        raise ValueError("This model already has force or stress outputs.")
+    return StressOutputModule(energy_model=model)

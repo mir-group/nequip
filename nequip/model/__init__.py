@@ -1,5 +1,5 @@
 from ._eng import EnergyModel, SimpleIrrepsConfig
-from ._grads import ForceOutput, PartialForceOutput
+from ._grads import ForceOutput, PartialForceOutput, StressForceOutput
 from ._scaling import RescaleEnergyEtc, PerSpeciesRescale
 from ._weight_init import (
     uniform_initialize_FCs,
@@ -16,6 +16,7 @@ __all__ = [
     EnergyModel,
     ForceOutput,
     PartialForceOutput,
+    StressForceOutput,
     RescaleEnergyEtc,
     PerSpeciesRescale,
     uniform_initialize_FCs,
