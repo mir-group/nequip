@@ -10,8 +10,6 @@ from nequip.utils import instantiate_from_cls_name
 
 class SimpleLoss:
     """wrapper to compute weighted loss function
-    if atomic_weight_on is True, the loss function will search for
-    AtomicDataDict.WEIGHTS_KEY+key in the reference data.
 
     Args:
 
@@ -82,6 +80,7 @@ class PerAtomLoss(SimpleLoss):
             )
             if self.func_name == "MSELoss":
                 loss = loss / N
+            assert loss.shape == pred[key].shape  # [atom, dim]
             if mean:
                 return loss.sum() / not_nan.sum()
             else:
@@ -91,6 +90,7 @@ class PerAtomLoss(SimpleLoss):
             loss = loss / N
             if self.func_name == "MSELoss":
                 loss = loss / N
+            assert loss.shape == pred[key].shape  # [atom, dim]
             if mean:
                 return loss.mean()
             else:
@@ -126,30 +126,37 @@ class PerSpeciesLoss(SimpleLoss):
 
         reduce_dims = tuple(i + 1 for i in range(len(per_atom_loss.shape) - 1))
 
+        spe_idx = pred[AtomicDataDict.ATOM_TYPE_KEY].squeeze(-1)
         if has_nan:
             if len(reduce_dims) > 0:
                 per_atom_loss = per_atom_loss.sum(dim=reduce_dims)
+            assert per_atom_loss.ndim == 1
 
-            spe_idx = pred[AtomicDataDict.ATOM_TYPE_KEY]
             per_species_loss = scatter(per_atom_loss, spe_idx, dim=0)
+
+            assert per_species_loss.ndim == 1  # [type]
 
             N = scatter(not_nan, spe_idx, dim=0)
             N = N.sum(reduce_dims)
-            N = 1.0 / N
+            N = N.reciprocal()
             N_species = ((N == N).int()).sum()
+            assert N.ndim == 1  # [type]
 
-            return (per_species_loss * N).sum() / N_species
+            per_species_loss = (per_species_loss * N).sum() / N_species
+
+            return per_species_loss
 
         else:
 
             if len(reduce_dims) > 0:
                 per_atom_loss = per_atom_loss.mean(dim=reduce_dims)
+            assert per_atom_loss.ndim == 1
 
             # offset species index by 1 to use 0 for nan
-            spe_idx = pred[AtomicDataDict.ATOM_TYPE_KEY]
             _, inverse_species_index = torch.unique(spe_idx, return_inverse=True)
 
             per_species_loss = scatter_mean(per_atom_loss, inverse_species_index, dim=0)
+            assert per_species_loss.ndim == 1  # [type]
 
             return per_species_loss.mean()
 

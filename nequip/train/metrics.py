@@ -12,7 +12,11 @@ from torch_runstats import RunningStats, Reduction
 from ._loss import find_loss_function
 from ._key import ABBREV
 
-metrics_to_reduction = {"mae": Reduction.MEAN, "rmse": Reduction.RMS}
+metrics_to_reduction = {
+    "mae": Reduction.MEAN,
+    "mean": Reduction.MEAN,
+    "rmse": Reduction.RMS,
+}
 
 
 class Metrics:
@@ -169,7 +173,9 @@ class Metrics:
                 params = {}
                 if per_species:
                     # TO DO, this needs OneHot component. will need to be decoupled
-                    params = {"accumulate_by": pred[AtomicDataDict.ATOM_TYPE_KEY]}
+                    params = {
+                        "accumulate_by": pred[AtomicDataDict.ATOM_TYPE_KEY].squeeze(-1)
+                    }
                 if per_atom:
                     if N is None:
                         N = torch.bincount(ref[AtomicDataDict.BATCH_KEY]).unsqueeze(-1)
@@ -234,7 +240,7 @@ class Metrics:
                         else:
                             flat_dict[f"{id_ele}_{item_name}"] = v.item()
 
-                    flat_dict[f"all_{item_name}"] = value.mean().item()
+                    flat_dict[f"psavg_{item_name}"] = value.mean().item()
                 else:
                     for id_ele, vec in enumerate(value):
                         ele = type_names[id_ele]

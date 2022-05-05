@@ -52,6 +52,8 @@ def training_session(request, BENCHMARK_ROOT, conffile):
         true_config["default_dtype"] = dtype
         true_config["max_epochs"] = 2
         true_config["model_builders"] = [builder]
+        # We need truth labels as inputs for these fake testing models
+        true_config["_override_allow_truth_label_inputs"] = True
 
         # to be a true identity, we can't have rescaling
         true_config["global_rescale_shift"] = None
@@ -74,7 +76,8 @@ def training_session(request, BENCHMARK_ROOT, conffile):
 
 @pytest.mark.parametrize("do_test_idcs", [True, False])
 @pytest.mark.parametrize("do_metrics", [True, False])
-def test_metrics(training_session, do_test_idcs, do_metrics):
+@pytest.mark.parametrize("do_output_fields", [True, False])
+def test_metrics(training_session, do_test_idcs, do_metrics, do_output_fields):
 
     builder, true_config, tmpdir, env = training_session
     # == Run test error ==
@@ -150,15 +153,23 @@ def test_metrics(training_session, do_test_idcs, do_metrics):
         expect_metrics = {"f_mae", "f_rmse"}
     default_params["metrics-config"] = metrics_yaml
 
-    # First run
+    if do_output_fields:
+        output_fields = [AtomicDataDict.NODE_FEATURES_KEY]
+        default_params["output-fields"] = ",".join(output_fields)
+    else:
+        output_fields = None
+
+    # -- First run --
     metrics = runit({"train-dir": outdir, "batch-size": 200, "device": "cpu"})
     # move out.xyz to out-orig.xyz
     shutil.move(tmpdir + "/out.xyz", tmpdir + "/out-orig.xyz")
     # Load it
     orig_atoms = ase.io.read(tmpdir + "/out-orig.xyz", index=":", format="extxyz")
 
+    # check that we have the metrics
     assert set(metrics.keys()) == expect_metrics
 
+    # check metrics
     if builder == IdentityModel:
         for metric, err in metrics.items():
             assert np.allclose(err, 0.0), f"Metric `{metric}` wasn't zero!"
@@ -166,7 +177,19 @@ def test_metrics(training_session, do_test_idcs, do_metrics):
         # TODO: check comperable to naive numpy compute
         pass
 
-    # Check insensitive to batch size
+    # check we got output fields
+    if output_fields is not None:
+        for a in orig_atoms:
+            for key in output_fields:
+                if key == AtomicDataDict.NODE_FEATURES_KEY:
+                    assert a.arrays[AtomicDataDict.NODE_FEATURES_KEY].shape == (
+                        len(a),
+                        3,  # THIS IS SPECIFIC TO THE HACK IN ConstFactorModel and friends
+                    )
+                else:
+                    raise RuntimeError
+
+    # -- Check insensitive to batch size --
     for batch_size in (13, 1000):
         metrics2 = runit(
             {
@@ -189,6 +212,10 @@ def test_metrics(training_session, do_test_idcs, do_metrics):
             )
             assert np.array_equal(origframe.get_pbc(), newframe.get_pbc())
             assert np.array_equal(origframe.get_cell(), newframe.get_cell())
+            if output_fields is not None:
+                for key in output_fields:
+                    # TODO handle info fields too
+                    assert np.allclose(origframe.arrays[key], newframe.arrays[key])
 
     # Check GPU
     if torch.cuda.is_available():

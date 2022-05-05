@@ -13,8 +13,8 @@ setup(
     version=version,
     description="NequIP is an open-source code for building E(3)-equivariant interatomic potentials.",
     download_url="https://github.com/mir-group/nequip",
-    author="Simon Batzner, Albert Musealian, Lixin Sun, Mario Geiger, Anders Johansson, Tess Smidt",
-    python_requires=">=3.6",
+    author="Simon Batzner, Albert Musealian, Lixin Sun, Anders Johansson, Mario Geiger, Tess Smidt",
+    python_requires=">=3.7",
     packages=find_packages(include=["nequip", "nequip.*"]),
     entry_points={
         # make the scripts available as command line scripts
@@ -29,14 +29,15 @@ setup(
         "numpy",
         "ase",
         "tqdm",
-        "torch>=1.8,<1.11",  # torch.fx added in 1.8
+        "torch>=1.8,<=1.12,!=1.9.0",  # torch.fx added in 1.8
         "e3nn>=0.3.5,<0.5.0",
         "pyyaml",
         "contextlib2;python_version<'3.7'",  # backport of nullcontext
+        'contextvars;python_version<"3.7"',  # backport of contextvars for savenload
         "typing_extensions;python_version<'3.8'",  # backport of Final
         "torch-runstats>=0.2.0",
         "torch-ema>=0.3.0",
-        "scikit_learn",  # for GaussianProcess for per-species statistics
+        "scikit_learn<=1.0.1",  # for GaussianProcess for per-species statistics; 1.0.2 has a bug!
     ],
     zip_safe=True,
 )

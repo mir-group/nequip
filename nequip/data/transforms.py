@@ -69,6 +69,11 @@ class TypeMapper:
             for sym, type in self.chemical_symbol_to_type.items():
                 Z_to_index[ase.data.atomic_numbers[sym] - self._min_Z] = type
             self._Z_to_index = Z_to_index
+            self._index_to_Z = torch.zeros(
+                size=(len(self.chemical_symbol_to_type),), dtype=torch.long
+            )
+            for sym, type_idx in self.chemical_symbol_to_type.items():
+                self._index_to_Z[type_idx] = ase.data.atomic_numbers[sym]
             self._valid_set = set(valid_atomic_numbers)
         # check
         if type_names is None:
@@ -117,3 +122,34 @@ class TypeMapper:
             )
 
         return self._Z_to_index[atomic_numbers - self._min_Z]
+
+    def untransform(self, atom_types):
+        """Transform atom types back into atomic numbers"""
+        return self._index_to_Z[atom_types]
+
+    @property
+    def has_chemical_symbols(self) -> bool:
+        return self.chemical_symbol_to_type is not None
+
+    @staticmethod
+    def format(
+        data: list, type_names: List[str], element_formatter: str = ".6f"
+    ) -> str:
+        data = torch.as_tensor(data) if data is not None else None
+        if data is None:
+            return f"[{', '.join(type_names)}: None]"
+        elif data.ndim == 0:
+            return (f"[{', '.join(type_names)}: {{:{element_formatter}}}]").format(data)
+        elif data.ndim == 1 and len(data) == len(type_names):
+            return (
+                "["
+                + ", ".join(
+                    f"{{{i}[0]}}: {{{i}[1]:{element_formatter}}}"
+                    for i in range(len(data))
+                )
+                + "]"
+            ).format(*zip(type_names, data))
+        else:
+            raise ValueError(
+                f"Don't know how to format data=`{data}` for types {type_names} with element_formatter=`{element_formatter}`"
+            )

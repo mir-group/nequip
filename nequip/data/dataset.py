@@ -28,6 +28,7 @@ from nequip.utils.batch_ops import bincount
 from nequip.utils.regressor import solver
 from nequip.utils.savenload import atomic_write
 from .transforms import TypeMapper
+from .AtomicData import _process_dict
 
 
 class AtomicDataset(Dataset):
@@ -87,7 +88,7 @@ class AtomicInMemoryDataset(AtomicDataset):
         force_fixed_keys: List[str] = [],
         extra_fixed_fields: Dict[str, Any] = {},
         include_frames: Optional[List[int]] = None,
-        type_mapper: TypeMapper = None,
+        type_mapper: Optional[TypeMapper] = None,
     ):
         # TO DO, this may be simplified
         # See if a subclass defines some inputs
@@ -252,8 +253,8 @@ class AtomicInMemoryDataset(AtomicDataset):
             num_examples = next(iter(num_examples))
 
             include_frames = self.include_frames
-            if self.include_frames is None:
-                include_frames = list(range(num_examples))
+            if include_frames is None:
+                include_frames = range(num_examples)
 
             # Make AtomicData from it:
             if AtomicDataDict.EDGE_INDEX_KEY in all_keys:
@@ -280,18 +281,7 @@ class AtomicInMemoryDataset(AtomicDataset):
         del fields
 
         # type conversion
-        for key, value in fixed_fields.items():
-            if isinstance(value, np.ndarray):
-                if np.issubdtype(value.dtype, np.floating):
-                    fixed_fields[key] = torch.as_tensor(
-                        value, dtype=torch.get_default_dtype()
-                    )
-                else:
-                    fixed_fields[key] = torch.as_tensor(value)
-            elif np.issubdtype(type(value), np.floating):
-                fixed_fields[key] = torch.as_tensor(
-                    value, dtype=torch.get_default_dtype()
-                )
+        _process_dict(fixed_fields, ignore_fields=["r_max"])
 
         logging.info(f"Loaded data: {data}")
 
@@ -363,6 +353,17 @@ class AtomicInMemoryDataset(AtomicDataset):
 
         if self._indices is not None:
             graph_selector = torch.as_tensor(self._indices)[::stride]
+            # note that self._indices is _not_ necessarily in order,
+            # while self.data --- which we take our arrays from ---
+            # is always in the original order.
+            # In particular, the values of `self.data.batch`
+            # are indexes in the ORIGINAL order
+            # thus we need graph level properties to also be in the original order
+            # so that batch values index into them correctly
+            # since self.data.batch is always sorted & contiguous
+            # (because of Batch.from_data_list)
+            # we sort it:
+            graph_selector, _ = torch.sort(graph_selector)
         else:
             graph_selector = torch.arange(0, self.len(), stride)
         num_graphs = len(graph_selector)
@@ -421,6 +422,10 @@ class AtomicInMemoryDataset(AtomicDataset):
                 assert arr_is_per in ("node", "graph", "edge")
             else:
                 # Give a better error
+                if field not in ff_transformed and field not in data_transformed:
+                    raise RuntimeError(
+                        f"Field `{field}` for which statistics were requested not found in data."
+                    )
                 if field not in selectors:
                     # this means field is not selected and so not available
                     raise RuntimeError(
@@ -525,7 +530,10 @@ class AtomicInMemoryDataset(AtomicDataset):
 
     @staticmethod
     def _per_atom_statistics(
-        ana_mode: str, arr: torch.Tensor, batch: torch.Tensor, unbiased: bool = True,
+        ana_mode: str,
+        arr: torch.Tensor,
+        batch: torch.Tensor,
+        unbiased: bool = True,
     ):
         """Compute "per-atom" statistics that are normalized by the number of atoms in the system.
 
@@ -533,13 +541,18 @@ class AtomicInMemoryDataset(AtomicDataset):
         """
         # using unique_consecutive handles the non-contiguous selected batch index
         _, N = torch.unique_consecutive(batch, return_counts=True)
+        N = N.unsqueeze(-1)
+        assert N.ndim == 2
+        assert N.shape == (len(arr), 1)
+        assert arr.ndim >= 2
+        data_dim = arr.shape[1:]
+        arr = arr / N
+        assert arr.shape == (len(N),) + data_dim
         if ana_mode == "mean_std":
-            arr = arr / N
-            mean = torch.mean(arr)
-            std = torch.std(arr, unbiased=unbiased)
+            mean = torch.mean(arr, dim=0)
+            std = torch.std(arr, unbiased=unbiased, dim=0)
             return mean, std
         elif ana_mode == "rms":
-            arr = arr / N
             return (torch.sqrt(torch.mean(arr.square())),)
         else:
             raise NotImplementedError(
@@ -563,8 +576,9 @@ class AtomicInMemoryDataset(AtomicDataset):
         For a per-node quantity, computes the expected statistic but for each type instead of over all nodes.
         """
         N = bincount(atom_types.squeeze(-1), batch)
+        assert N.ndim == 2  # [batch, n_type]
         N = N[(N > 0).any(dim=1)]  # deal with non-contiguous batch indexes
-
+        assert arr.ndim >= 2
         if arr_is_per == "graph":
 
             if ana_mode != "mean_std":
@@ -581,10 +595,15 @@ class AtomicInMemoryDataset(AtomicDataset):
 
             if ana_mode == "mean_std":
                 mean = scatter_mean(arr, atom_types, dim=0)
+                assert mean.shape[1:] == arr.shape[1:]  # [N, dims] -> [type, dims]
+                assert len(mean) == N.shape[1]
                 std = scatter_std(arr, atom_types, dim=0, unbiased=unbiased)
+                assert std.shape == mean.shape
                 return mean, std
             elif ana_mode == "rms":
                 square = scatter_mean(arr.square(), atom_types, dim=0)
+                assert square.shape[1:] == arr.shape[1:]  # [N, dims] -> [type, dims]
+                assert len(square) == N.shape[1]
                 dims = len(square.shape) - 1
                 for i in range(dims):
                     square = square.mean(axis=-1)
@@ -842,7 +861,10 @@ class ASEDataset(AtomicInMemoryDataset):
         atoms_list = self.get_atoms()
 
         # skip the None arguments
-        kwargs = dict(include_keys=self.include_keys, key_mapping=self.key_mapping,)
+        kwargs = dict(
+            include_keys=self.include_keys,
+            key_mapping=self.key_mapping,
+        )
         kwargs = {k: v for k, v in kwargs.items() if v is not None}
         kwargs.update(self.extra_fixed_fields)
 
@@ -854,6 +876,8 @@ class ASEDataset(AtomicInMemoryDataset):
             return (
                 [
                     AtomicData.from_ase(atoms=atoms_list[i], **kwargs)
-                    for i in self.include_frames
+                    if i in self.include_frames
+                    else None  # in-memory dataset will ignore this later, but needed for indexing to work out
+                    for i in range(len(atoms_list))
                 ],
             )

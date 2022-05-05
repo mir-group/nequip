@@ -144,7 +144,7 @@ class InteractionBlock(GraphModuleMixin, torch.nn.Module):
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
         """
-        Evaluate interaction Block with ResNet.
+        Evaluate interaction Block with ResNet (self-connection).
 
         :param node_input:
         :param node_attr:
@@ -173,7 +173,7 @@ class InteractionBlock(GraphModuleMixin, torch.nn.Module):
         # Necessary to get TorchScript to be able to type infer when its not None
         avg_num_neigh: Optional[float] = self.avg_num_neighbors
         if avg_num_neigh is not None:
-            x = x.div(avg_num_neigh ** 0.5)
+            x = x.div(avg_num_neigh**0.5)
 
         x = self.linear_2(x)
 

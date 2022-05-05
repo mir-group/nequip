@@ -21,25 +21,34 @@ import ase.data
 
 from e3nn.util.jit import script
 
+from nequip.model import model_from_config
+from nequip.scripts.train import _set_global_options, default_config
 from nequip.train import Trainer
+from nequip.utils import Config
+from nequip.utils.versions import check_code_version, get_config_code_versions
 
 CONFIG_KEY: Final[str] = "config"
 NEQUIP_VERSION_KEY: Final[str] = "nequip_version"
 TORCH_VERSION_KEY: Final[str] = "torch_version"
 E3NN_VERSION_KEY: Final[str] = "e3nn_version"
+CODE_COMMITS_KEY: Final[str] = "code_commits"
 R_MAX_KEY: Final[str] = "r_max"
 N_SPECIES_KEY: Final[str] = "n_species"
 TYPE_NAMES_KEY: Final[str] = "type_names"
 JIT_BAILOUT_KEY: Final[str] = "_jit_bailout_depth"
+JIT_FUSION_STRATEGY: Final[str] = "_jit_fusion_strategy"
 TF32_KEY: Final[str] = "allow_tf32"
 
 _ALL_METADATA_KEYS = [
     CONFIG_KEY,
     NEQUIP_VERSION_KEY,
+    TORCH_VERSION_KEY,
+    E3NN_VERSION_KEY,
     R_MAX_KEY,
     N_SPECIES_KEY,
     TYPE_NAMES_KEY,
     JIT_BAILOUT_KEY,
+    JIT_FUSION_STRATEGY,
     TF32_KEY,
 ]
 
@@ -108,8 +117,23 @@ def load_deployed_model(
                 torch.backends.cudnn.allow_tf32 = allow_tf32
 
         # JIT bailout
-        if metadata[JIT_BAILOUT_KEY] != "":
-            jit_bailout: int = int(metadata[JIT_BAILOUT_KEY])
+        if int(torch.__version__.split(".")[1]) >= 11:
+            strategy = metadata.get(JIT_FUSION_STRATEGY, "")
+            if strategy != "":
+                strategy = [e.split(",") for e in strategy.split(";")]
+                strategy = [(e[0], int(e[1])) for e in strategy]
+            else:
+                strategy = default_config[JIT_FUSION_STRATEGY]
+            old_strat = torch.jit.set_fusion_strategy(strategy)
+            if set_global_options == "warn" and old_strat != strategy:
+                warnings.warn(
+                    f"Loaded model had a different value for _jit_fusion_strategy ({strategy}) than was currently set ({old_strat}); changing the GLOBAL setting!"
+                )
+        else:
+            jit_bailout: int = metadata.get(JIT_BAILOUT_KEY, "")
+            if jit_bailout == "":
+                jit_bailout = default_config[JIT_BAILOUT_KEY]
+            jit_bailout = int(jit_bailout)
             # no way to get current value, so assume we are overwriting it
             if set_global_options == "warn":
                 warnings.warn(
@@ -140,8 +164,13 @@ def main(args=None):
 
     build_parser = subparsers.add_parser("build", help="Build a deployment model")
     build_parser.add_argument(
-        "train_dir",
-        help="Path to a working directory from a training session.",
+        "--model",
+        help="Path to a YAML file defining a model to deploy. Unless you know why you need to, do not use this option.",
+        type=pathlib.Path,
+    )
+    build_parser.add_argument(
+        "--train-dir",
+        help="Path to a working directory from a training session to deploy.",
         type=pathlib.Path,
     )
     build_parser.add_argument(
@@ -165,29 +194,43 @@ def main(args=None):
         print(config)
 
     elif args.command == "build":
-        if not args.train_dir.is_dir():
-            raise ValueError(f"{args.train_dir} is not a directory")
-        if args.out_file.is_dir():
-            raise ValueError(
-                f"{args.out_dir} is a directory, but a path to a file for the deployed model must be given"
-            )
+        if args.model and args.train_dir:
+            raise ValueError("--model and --train-dir cannot both be specified.")
+        if args.train_dir is not None:
+            logging.info("Loading best_model from training session...")
+            config = Config.from_file(str(args.train_dir / "config.yaml"))
+        elif args.model is not None:
+            logging.info("Building model from config...")
+            config = Config.from_file(str(args.model), defaults=default_config)
+        else:
+            raise ValueError("one of --train-dir or --model must be given")
+
+        _set_global_options(config)
+        check_code_version(config)
+
         # -- load model --
-        model, _ = Trainer.load_model_from_training_session(
-            args.train_dir, model_name="best_model.pth", device="cpu"
-        )
+        if args.train_dir is not None:
+            model, _ = Trainer.load_model_from_training_session(
+                args.train_dir, model_name="best_model.pth", device="cpu"
+            )
+        elif args.model is not None:
+            model = model_from_config(config)
+        else:
+            raise AssertionError
 
         # -- compile --
         model = _compile_for_deploy(model)
         logging.info("Compiled & optimized model.")
 
-        # load config
-        config_str = (args.train_dir / "config.yaml").read_text()
-        config = yaml.load(config_str, Loader=yaml.Loader)
-
         # Deploy
         metadata: dict = {}
-        for code in ["e3nn", "nequip", "torch"]:
-            metadata[code + "_version"] = config[code + "_version"]
+        code_versions, code_commits = get_config_code_versions(config)
+        for code, version in code_versions.items():
+            metadata[code + "_version"] = version
+        if len(code_commits) > 0:
+            metadata[CODE_COMMITS_KEY] = ";".join(
+                f"{k}={v}" for k, v in code_commits.items()
+            )
 
         metadata[R_MAX_KEY] = str(float(config["r_max"]))
         if "allowed_species" in config:
@@ -204,9 +247,13 @@ def main(args=None):
         metadata[N_SPECIES_KEY] = str(n_species)
         metadata[TYPE_NAMES_KEY] = " ".join(type_names)
 
-        metadata[JIT_BAILOUT_KEY] = str(config["_jit_bailout_depth"])
+        metadata[JIT_BAILOUT_KEY] = str(config[JIT_BAILOUT_KEY])
+        if int(torch.__version__.split(".")[1]) >= 11 and JIT_FUSION_STRATEGY in config:
+            metadata[JIT_FUSION_STRATEGY] = ";".join(
+                "%s,%i" % e for e in config[JIT_FUSION_STRATEGY]
+            )
         metadata[TF32_KEY] = str(int(config["allow_tf32"]))
-        metadata[CONFIG_KEY] = config_str
+        metadata[CONFIG_KEY] = yaml.dump(dict(config))
 
         metadata = {k: v.encode("ascii") for k, v in metadata.items()}
         torch.jit.save(model, args.out_file, _extra_files=metadata)
