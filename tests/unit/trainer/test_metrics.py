@@ -9,6 +9,15 @@ from .test_loss import data
 # all the config to test init
 # only the last one will be used to test the loss and mae
 metrics_tests = [
+    (  # test two different functionals on same key
+        (AtomicDataDict.TOTAL_ENERGY_KEY, "rmse"),
+        (AtomicDataDict.FORCE_KEY, "rmse", {"functional": "L1Loss"}),
+        (AtomicDataDict.FORCE_KEY, "rmse", {"functional": "MSELoss"}),
+    ),
+    (  # test two different peratom settings
+        (AtomicDataDict.TOTAL_ENERGY_KEY, "rmse"),
+        (AtomicDataDict.TOTAL_ENERGY_KEY, "rmse", {"PerAtom": True}),
+    ),
     (
         (AtomicDataDict.TOTAL_ENERGY_KEY, "rmse"),
         (
@@ -17,15 +26,16 @@ metrics_tests = [
             {"PerSpecies": True, "functional": "L1Loss", "dim": 3},
         ),
         (AtomicDataDict.FORCE_KEY, "mae", {"dim": 3}),
-    )
+    ),
 ]
 
 
 class TestInit:
     def test_init(self, metrics):
 
-        for key, value in metrics.funcs.items():
-            assert callable(value)
+        for d in metrics.funcs.values():
+            for value in d.values():
+                assert callable(value)
 
 
 class TestMetrics:

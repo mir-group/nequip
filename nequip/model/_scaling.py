@@ -90,7 +90,7 @@ def GlobalRescale(
             global_shift = computed_stats[str_names.index(global_shift)]
             logging.info(f"Replace string {s} to {global_shift}")
 
-        if isinstance(global_scale, float) and global_scale < RESCALE_THRESHOLD:
+        if global_scale is not None and global_scale < RESCALE_THRESHOLD:
             raise ValueError(
                 f"Global energy scaling was very low: {global_scale}. If dataset values were used, does the dataset contain insufficient variation? Maybe try disabling global scaling with global_scale=None."
             )
@@ -226,13 +226,12 @@ def PerSpeciesRescale(
             )
 
     else:
-
         # Put dummy values
         # the real ones will be loaded from the state dict later
         # note that the state dict includes buffers,
         # so this is fine regardless of whether its trainable.
-        scales = 1.0
-        shifts = 0.0
+        scales = 1.0 if scales is not None else None
+        shifts = 0.0 if shifts is not None else None
         # values correctly scaled according to where the come from
         # will be brought from the state dict later,
         # so what you set this to doesnt matter:

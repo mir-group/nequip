@@ -152,6 +152,7 @@ class Trainer:
         optim_kwargs (dict): parameters to initialize the optimizer
 
         batch_size (int): size of each batch
+        validation_batch_size (int): batch size for evaluating the model for validation
         shuffle (bool): parameters for dataloader
         n_train (int): # of frames for training
         n_val (int): # of frames for validation
@@ -242,6 +243,7 @@ class Trainer:
         ema_use_num_updates=True,
         exclude_keys: list = [],
         batch_size: int = 5,
+        validation_batch_size: int = 5,
         shuffle: bool = True,
         n_train: Optional[int] = None,
         n_val: Optional[int] = None,
@@ -955,12 +957,15 @@ class Trainer:
 
     def epoch_step(self):
 
-        datasets = [self.dl_train, self.dl_val]
+        dataloaders = {TRAIN: self.dl_train, VALIDATION: self.dl_val}
         categories = [TRAIN, VALIDATION] if self.iepoch >= 0 else [VALIDATION]
+        dataloaders = [
+            dataloaders[c] for c in categories
+        ]  # get the right dataloaders for the catagories we actually run
         self.metrics_dict = {}
         self.loss_dict = {}
 
-        for category, dataset in zip(categories, datasets):
+        for category, dataset in zip(categories, dataloaders):
             if category == VALIDATION and self.use_ema:
                 cm = self.ema.average_parameters()
             else:
@@ -1157,7 +1162,7 @@ class Trainer:
             # append details from loss
             for key, value in self.loss_dict[category].items():
                 mat_str += f", {value:16.5g}"
-                header += f", {category}_{key}"
+                header += f",{category}_{key}"
                 log_str[category] += f" {value:12.3g}"
                 log_header[category] += f" {key:>12.12}"
                 self.mae_dict[f"{category}_{key}"] = value
@@ -1165,7 +1170,7 @@ class Trainer:
             # append details from metrics
             for key, value in met.items():
                 mat_str += f", {value:12.3g}"
-                header += f", {category}_{key}"
+                header += f",{category}_{key}"
                 if key not in skip_keys:
                     log_str[category] += f" {value:12.3g}"
                     log_header[category] += f" {key:>12.12}"
@@ -1270,7 +1275,6 @@ class Trainer:
         # based on recommendations from
         # https://pytorch.org/tutorials/recipes/recipes/tuning_guide.html#enable-async-data-loading-and-augmentation
         dl_kwargs = dict(
-            batch_size=self.batch_size,
             exclude_keys=self.exclude_keys,
             num_workers=self.dataloader_num_workers,
             # keep stuff around in memory
@@ -1285,7 +1289,7 @@ class Trainer:
             generator=self.dataset_rng,
         )
         if self.horovod:
-            # TODO: what do do with drop_tail??
+            # TODO!: what do do with drop_tail??
             train_sampler = torch.utils.data.distributed.DistributedSampler(
                 self.dataset_train,
                 num_replicas=hvd.size(),
@@ -1311,10 +1315,14 @@ class Trainer:
         self.dl_train = DataLoader(
             dataset=self.dataset_train,
             sampler=train_sampler,
+            batch_size=self.batch_size,
             **dl_kwargs,
         )
         # validation, on the other hand, shouldn't shuffle
         # we still pass the generator just to be safe
         self.dl_val = DataLoader(
-            dataset=self.dataset_val, sampler=val_sampler, **dl_kwargs
+            dataset=self.dataset_val, 
+            sampler=val_sampler,
+            batch_size=self.validation_batch_size,
+            **dl_kwargs,
         )

@@ -4,6 +4,7 @@ import torch
 
 import ase.data
 from ase.calculators.calculator import Calculator, all_changes
+from ase.stress import full_3x3_to_voigt_6_stress
 
 from nequip.data import AtomicData, AtomicDataDict
 from nequip.data.transforms import TypeMapper
@@ -24,7 +25,7 @@ class NequIPCalculator(Calculator):
 
     """
 
-    implemented_properties = ["energy", "energies", "forces"]
+    implemented_properties = ["energy", "energies", "forces", "stress", "free_energy"]
 
     def __init__(
         self,
@@ -39,6 +40,9 @@ class NequIPCalculator(Calculator):
         Calculator.__init__(self, **kwargs)
         self.results = {}
         self.model = model
+        assert isinstance(
+            model, torch.nn.Module
+        ), "To build a NequIPCalculator from a deployed model, use NequIPCalculator.from_deployed_model"
         self.r_max = r_max
         self.device = device
         self.energy_units_to_eV = energy_units_to_eV
@@ -123,6 +127,9 @@ class NequIPCalculator(Calculator):
             # force has units eng / len:
             "forces": forces * (self.energy_units_to_eV / self.length_units_to_A),
         }
+        self.results["free_energy"] = self.results[
+            "energy"
+        ]  # "force consistant" energy
 
         if AtomicDataDict.PER_ATOM_ENERGY_KEY in out:
             self.results["energies"] = self.energy_units_to_eV * (
@@ -132,3 +139,12 @@ class NequIPCalculator(Calculator):
                 .cpu()
                 .numpy()
             )
+
+        if "stress" in properties:
+            stress = out[AtomicDataDict.STRESS_KEY].detach().cpu().numpy()
+            stress = stress.reshape(3, 3) * (
+                self.energy_units_to_eV / self.length_units_to_A**3
+            )
+            # ase wants voigt format
+            stress_voigt = full_3x3_to_voigt_6_stress(stress)
+            self.results["stress"] = stress_voigt

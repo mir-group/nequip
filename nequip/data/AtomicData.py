@@ -13,6 +13,7 @@ import ase.neighborlist
 import ase
 from ase.calculators.singlepoint import SinglePointCalculator, SinglePointDFTCalculator
 from ase.calculators.calculator import all_properties as ase_all_properties
+from ase.stress import voigt_6_to_full_3x3_stress, full_3x3_to_voigt_6_stress
 
 import torch
 import e3nn.o3
@@ -50,6 +51,8 @@ _DEFAULT_EDGE_FIELDS: Set[str] = {
 }
 _DEFAULT_GRAPH_FIELDS: Set[str] = {
     AtomicDataDict.TOTAL_ENERGY_KEY,
+    AtomicDataDict.STRESS_KEY,
+    AtomicDataDict.VIRIAL_KEY,
     AtomicDataDict.PBC_KEY,
     AtomicDataDict.CELL_KEY,
 }
@@ -424,6 +427,18 @@ class AtomicData(Data):
         cell = kwargs.pop("cell", atoms.get_cell())
         pbc = kwargs.pop("pbc", atoms.pbc)
 
+        # handle ASE-style 6 element Voigt order stress
+        for key in (AtomicDataDict.STRESS_KEY, AtomicDataDict.VIRIAL_KEY):
+            if key in add_fields:
+                if add_fields[key].shape == (3, 3):
+                    # it's already 3x3, do nothing else
+                    pass
+                elif add_fields[key].shape == (6,):
+                    # it's Voigt order
+                    add_fields[key] = voigt_6_to_full_3x3_stress(add_fields[key])
+                else:
+                    raise RuntimeError(f"bad shape for {key}")
+
         return cls.from_points(
             pos=atoms.positions,
             r_max=r_max,
@@ -478,7 +493,15 @@ class AtomicData(Data):
         energy = getattr(self, AtomicDataDict.TOTAL_ENERGY_KEY, None)
         energies = getattr(self, AtomicDataDict.PER_ATOM_ENERGY_KEY, None)
         force = getattr(self, AtomicDataDict.FORCE_KEY, None)
-        do_calc = energy is not None or force is not None
+        do_calc = any(
+            k in self
+            for k in [
+                AtomicDataDict.TOTAL_ENERGY_KEY,
+                AtomicDataDict.FORCE_KEY,
+                AtomicDataDict.PER_ATOM_ENERGY_KEY,
+                AtomicDataDict.STRESS_KEY,
+            ]
+        )
 
         # exclude those that are special for ASE and that we process seperately
         special_handling_keys = [
@@ -486,7 +509,11 @@ class AtomicData(Data):
             AtomicDataDict.CELL_KEY,
             AtomicDataDict.PBC_KEY,
             AtomicDataDict.ATOMIC_NUMBERS_KEY,
-        ] + AtomicDataDict.ALL_ENERGY_KEYS
+            AtomicDataDict.TOTAL_ENERGY_KEY,
+            AtomicDataDict.FORCE_KEY,
+            AtomicDataDict.PER_ATOM_ENERGY_KEY,
+            AtomicDataDict.STRESS_KEY,
+        ]
         assert (
             len(set(extra_fields).intersection(special_handling_keys)) == 0
         ), f"Cannot specify keys handled in special ways ({special_handling_keys}) as `extra_fields` for atoms output--- they are output by default"
@@ -529,6 +556,10 @@ class AtomicData(Data):
                     fields["energy"] = energy[batch_idx].cpu().numpy()
                 if force is not None:
                     fields["forces"] = force[mask].cpu().numpy()
+                if AtomicDataDict.STRESS_KEY in self:
+                    fields["stress"] = full_3x3_to_voigt_6_stress(
+                        self["stress"].view(-1, 3, 3)[batch_idx].cpu().numpy()
+                    )
                 mol.calc = SinglePointCalculator(mol, **fields)
 
             # add other information
