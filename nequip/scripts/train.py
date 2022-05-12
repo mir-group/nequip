@@ -1,4 +1,5 @@
 """ Train a network."""
+from typing import List, Dict
 import logging
 import argparse
 import warnings
@@ -23,7 +24,7 @@ import e3nn.util.jit
 
 from nequip.model import model_from_config
 from nequip.utils import Config, instantiate
-from nequip.data import dataset_from_config, register_fields
+from nequip.data import dataset_from_config, register_fields, AtomicDataset
 from nequip.utils import load_file, dtype_from_name
 from nequip.utils.test import assert_AtomicData_equivariant, set_irreps_debug
 from nequip.utils.versions import check_code_version
@@ -141,35 +142,40 @@ def _set_global_options(config):
     instantiate(register_fields, all_args=config)
 
 
-def _load_datasets(config):
+def _load_datasets(
+    config, prefixes: List[str], stop_on_first_found: bool = False
+) -> Dict[str, AtomicDataset]:
     # = Load the dataset =
     is_rank_zero: bool = True
     if config.horovod and hvd.rank() != 0:
+        # stall nonzero ranks here so that rank zero can process datasets
         is_rank_zero = False
         hvd.barrier()
-    dataset = dataset_from_config(
-        config, prefix="dataset", force_use_cached=not is_rank_zero
-    )
-    logging.info(f"Successfully loaded the data set of type {dataset}...")
-    try:
-        validation_dataset = dataset_from_config(
-            config, prefix="validation_dataset", force_use_cached=not is_rank_zero
-        )
-        logging.info(
-            f"Successfully loaded the validation data set of type {validation_dataset}..."
-        )
-    except KeyError:
-        # It couldn't be found
-        validation_dataset = None
+
+    out: Dict[str, AtomicDataset] = {}
+
+    for prefix in prefixes:
+        try:
+            dataset = dataset_from_config(
+                config, prefix=prefix, force_use_cached=not is_rank_zero
+            )
+            logging.info(f"Successfully loaded dataset `{prefix}` of type {dataset}...")
+        except KeyError:
+            # It couldn't be found
+            dataset = None
+        out[prefix] = dataset
+        if stop_on_first_found and dataset is not None:
+            break
 
     if config.horovod and hvd.rank() == 0:
         # ensure that cached datasets are written out before allowing other ranks to load
         os.sync()
         # rank 0 reaches this barrier after loading the dataset, so it's processed
-        # then other ranks are allowed to proceed from the L169 barrier and load
+        # then other ranks are allowed to proceed from the L151 barrier and load
         # the cached dataset
         hvd.barrier()
-    return dataset, validation_dataset
+
+    return out
 
 
 def fresh_start(config):
@@ -199,7 +205,8 @@ def fresh_start(config):
 
     # load dataset
     # (syncs horovod)
-    dataset, validation_dataset = _load_datasets(config)
+    datasets = _load_datasets(config, prefixes=["dataset", "validation_dataset"])
+    dataset, validation_dataset = datasets["dataset"], datasets["validation_dataset"]
 
     # = Train/test split =
     trainer.set_dataset(dataset, validation_dataset)
@@ -292,7 +299,8 @@ def restart(config):
         trainer = Trainer.from_dict(dictionary)
 
     # = Load the dataset =
-    dataset, validation_dataset = _load_datasets(config)
+    datasets = _load_datasets(config, prefixes=["dataset", "validation_dataset"])
+    dataset, validation_dataset = datasets["dataset"], datasets["validation_dataset"]
     trainer.set_dataset(dataset, validation_dataset)
 
     return trainer

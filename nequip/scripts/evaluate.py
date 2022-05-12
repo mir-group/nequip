@@ -1,5 +1,8 @@
 from typing import Optional
 import sys
+import math
+import os
+import shutil
 import argparse
 import logging
 import textwrap
@@ -11,10 +14,20 @@ import ase.io
 
 import torch
 
+try:
+    import horovod.torch as hvd
+except ImportError:
+    pass
+
 from nequip.data import AtomicData, Collater, dataset_from_config, register_fields
 from nequip.scripts.deploy import load_deployed_model, R_MAX_KEY
 from nequip.scripts._logger import set_up_script_logger
-from nequip.scripts.train import default_config, _set_global_options, check_code_version
+from nequip.scripts.train import (
+    default_config,
+    _set_global_options,
+    check_code_version,
+    _load_datasets,
+)
 from nequip.train import Trainer, Loss, Metrics
 from nequip.utils import load_file, instantiate, Config
 
@@ -100,6 +113,12 @@ def main(args=None, running_as_script: bool = True):
         default=None,
     )
     parser.add_argument(
+        "--horovod",
+        help="Whether to distribute with horovod.",
+        type=bool,
+        default=False,
+    )
+    parser.add_argument(
         "--output",
         help="ExtXYZ (.xyz) file to write out the test set and model predictions to.",
         type=Path,
@@ -171,15 +190,26 @@ def main(args=None, running_as_script: bool = True):
         assert args.output_fields == ""
         args.output_fields = []
 
+    if running_as_script:
+        set_up_script_logger(args.log)
+    logger = logging.getLogger("nequip-evaluate")
+    logger.setLevel(logging.INFO)
+
+    # Handle devices and setup
     if args.device is None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     else:
         device = torch.device(args.device)
 
-    if running_as_script:
-        set_up_script_logger(args.log)
-    logger = logging.getLogger("nequip-evaluate")
-    logger.setLevel(logging.INFO)
+    if args.horovod:
+        hvd.init()
+        logger.info(f"Using Horovod; this is rank {hvd.rank()}/{hvd.size()}")
+        if device.type == "cuda":
+            assert device == torch.device("cuda")  # no specific index
+            torch.cuda.set_device(hvd.local_rank())
+        if hvd.rank() != 0:
+            # disable outputs
+            logger.handlers = []
 
     logger.info(f"Using device: {device}")
     if device.type == "cuda":
@@ -248,16 +278,23 @@ def main(args=None, running_as_script: bool = True):
     # TODO: fix may come soon: https://github.com/rusty1s/pytorch_geometric/pull/2950
     # Until it does, just redirect them.
     with contextlib.redirect_stdout(sys.stderr):
-        try:
-            # Try to get validation dataset
-            dataset = dataset_from_config(dataset_config, prefix="validation_dataset")
+        # look for validation and only fall back to `dataset` prefix
+        # have to tell the loading function whether to use horovod
+        dataset_config.horovod = args.horovod
+        # this function syncs horovod if it is enabled
+        datasets = _load_datasets(
+            dataset_config,
+            prefixes=["validation_dataset", "dataset"],
+            stop_on_first_found=True,
+        )
+        if datasets["validation_dataset"] is not None:
+            dataset = datasets["validation_dataset"]
             dataset_is_validation = True
-        except KeyError:
-            pass
-        if not dataset_is_validation:
-            # Get shared train + validation dataset
-            # prefix `dataset`
-            dataset = dataset_from_config(dataset_config)
+        else:
+            dataset = datasets["dataset"]
+        del datasets
+        assert dataset is not None
+
     logger.info(
         f"Loaded {'validation_' if dataset_is_validation else ''}dataset specified in {args.dataset_config.name}.",
     )
@@ -343,23 +380,42 @@ def main(args=None, running_as_script: bool = True):
     batch_i: int = 0
     batch_size: int = args.batch_size
 
+    is_rank_zero: bool = True
+    if args.horovod:
+        is_rank_zero = hvd.rank() == 0
+        # divide the frames between ranks
+        n_per_rank = int(math.ceil(len(test_idcs) / hvd.size()))
+        test_idcs = test_idcs[hvd.rank() * n_per_rank : (hvd.rank() + 1) * n_per_rank]
+
     logger.info("Starting...")
     context_stack = contextlib.ExitStack()
     with contextlib.ExitStack() as context_stack:
-        # "None" checks if in a TTY and disables if not
-        prog = context_stack.enter_context(tqdm(total=len(test_idcs), disable=None))
-        if do_metrics:
-            display_bar = context_stack.enter_context(
-                tqdm(
-                    bar_format=""
-                    if prog.disable  # prog.ncols doesn't exist if disabled
-                    else ("{desc:." + str(prog.ncols) + "}"),
-                    disable=None,
+        if is_rank_zero:
+            # only do output on rank zero
+            # "None" checks if in a TTY and disables if not
+            prog = context_stack.enter_context(tqdm(total=len(test_idcs), disable=None))
+            if do_metrics:
+                display_bar = context_stack.enter_context(
+                    tqdm(
+                        bar_format=""
+                        if prog.disable  # prog.ncols doesn't exist if disabled
+                        else ("{desc:." + str(prog.ncols) + "}"),
+                        disable=None,
+                    )
                 )
-            )
 
         if output_type is not None:
-            output = context_stack.enter_context(open(args.output, "w"))
+            if args.horovod:
+                # give each rank its own output and merge later
+                # we do NOT guerantee that the final XYZ is in any order
+                # just that we include the indexes into the original dataset
+                # so this is OK
+                outfile = args.output.parent / (
+                    args.output.stem + f"-rank{hvd.rank()}.xyz"
+                )
+            else:
+                outfile = args.output
+            output = context_stack.enter_context(open(outfile, "w"))
         else:
             output = None
 
@@ -397,24 +453,48 @@ def main(args=None, running_as_script: bool = True):
                 # Accumulate metrics
                 if do_metrics:
                     metrics(out, batch)
-                    display_bar.set_description_str(
-                        " | ".join(
-                            f"{k} = {v:4.4f}"
-                            for k, v in metrics.flatten_metrics(
-                                metrics.current_result(),
-                                type_names=dataset.type_mapper.type_names,
-                            )[0].items()
+                    if args.horovod:
+                        # sync metrics across ranks
+                        metrics.gather()
+                    if is_rank_zero:
+                        display_bar.set_description_str(
+                            " | ".join(
+                                f"{k} = {v:4.4f}"
+                                for k, v in metrics.flatten_metrics(
+                                    metrics.current_result()
+                                )[0].items()
+                            )
                         )
-                    )
 
             batch_i += 1
-            prog.update(batch.num_graphs)
+            if is_rank_zero:
+                prog.update(batch.num_graphs)
 
-        prog.close()
-        if do_metrics:
-            display_bar.close()
+        if is_rank_zero:
+            prog.close()
+            if do_metrics:
+                display_bar.close()
 
-    if do_metrics:
+    if args.horovod and output_type is not None:
+        os.sync()
+
+        if is_rank_zero:
+            logger.info("Merging output files...")
+            output_files = [
+                args.output.parent / (args.output.stem + f"-rank{rank}.xyz")
+                for rank in range(hvd.size())
+            ]
+            with open(args.output, "wb") as wfd:
+                for f in output_files:
+                    with open(f, "rb") as fd:
+                        shutil.copyfileobj(fd, wfd)
+                        wfd.write(b"\n")
+            os.sync()
+            # delete old ones
+            for f in output_files:
+                f.unlink()
+
+    if is_rank_zero and do_metrics:
         logger.info("\n--- Final result: ---")
         logger.critical(
             "\n".join(
