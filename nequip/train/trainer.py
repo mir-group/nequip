@@ -1321,7 +1321,7 @@ class Trainer:
         # validation, on the other hand, shouldn't shuffle
         # we still pass the generator just to be safe
         self.dl_val = DataLoader(
-            dataset=self.dataset_val, 
+            dataset=self.dataset_val,
             sampler=val_sampler,
             batch_size=self.validation_batch_size,
             **dl_kwargs,
