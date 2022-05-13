@@ -9,8 +9,6 @@ root: results/aspirin
 run_name: minimal
 seed: 123
 dataset_seed: 456
-horovod: true
-device: cpu
 
 # network
 num_basis: 8

@@ -109,6 +109,11 @@ def parse_command_line(args=None):
         action="store_true",
     )
     parser.add_argument(
+        "--horovod",
+        help="Enable Horovod for multi-GPU training (it must be installed and run under `horovodrun`)",
+        action="store_true",
+    )
+    parser.add_argument(
         "--log",
         help="log file to store all the screen logging",
         type=Path,
@@ -117,7 +122,12 @@ def parse_command_line(args=None):
     args = parser.parse_args(args=args)
 
     config = Config.from_file(args.config, defaults=default_config)
-    for flag in ("model_debug_mode", "equivariance_test", "grad_anomaly_mode"):
+    for flag in (
+        "model_debug_mode",
+        "equivariance_test",
+        "grad_anomaly_mode",
+        "horovod",
+    ):
         config[flag] = getattr(args, flag) or config[flag]
 
     return config
