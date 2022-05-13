@@ -16,6 +16,7 @@ Most recent change on the bottom.
 - `validation_batch_size`
 - support multiple metrics on same field with different `functional`s
 - allow custom metrics names
+- allow `e3nn==0.5.0`
 
 ### Changed
 - abbreviate `node_features`->`h` in loss titles
