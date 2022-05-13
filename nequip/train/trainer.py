@@ -1311,7 +1311,7 @@ class Trainer:
                 )
             else:
                 train_sampler = torch.utils.data.SequentialSampler(self.dataset_train)
-            val_sampler = torch.utils.data.SequentialSampler(self.dataset_train)
+            val_sampler = torch.utils.data.SequentialSampler(self.dataset_val)
         self.dl_train = DataLoader(
             dataset=self.dataset_train,
             sampler=train_sampler,

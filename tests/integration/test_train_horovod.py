@@ -60,7 +60,6 @@ def test_metrics(nequip_dataset, BENCHMARK_ROOT, conffile, builder):
         true_config["_override_allow_truth_label_inputs"] = True
 
         horovod_config = true_config.copy()
-        horovod_config["horovod"] = True
         run_name_horovod = "test_train_horovod_" + dtype
         horovod_config["run_name"] = run_name_horovod
 
@@ -86,6 +85,7 @@ def test_metrics(nequip_dataset, BENCHMARK_ROOT, conffile, builder):
                 "-H",
                 f"localhost:{num_worker}",
                 "nequip-train",
+                "--horovod",
                 "conf_horovod.yaml",
             ],
             cwd=tmpdir,
