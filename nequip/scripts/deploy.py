@@ -78,7 +78,6 @@ def load_deployed_model(
     """
     metadata = {k: "" for k in _ALL_METADATA_KEYS}
     try:
-        # TODO: use .to()? instead of map_location
         model = torch.jit.load(model_path, map_location=device, _extra_files=metadata)
     except RuntimeError as e:
         raise ValueError(
