@@ -52,18 +52,18 @@ def check_code_version(config, add_to_config: bool = False):
         # we use .get just in case we recorded something in an old version we don't in a new one
         if version != current_code_versions.get(code, version):
             logging.error(
-                "Loading a saved model created with different library version(s) may cause issues."
-                f"current {code} version: {current_code_versions[code]} "
-                f"vs  original version: {version}"
+                "Loading a saved model created with different library version(s) may cause issues. "
+                f"Current {code} version: {current_code_versions[code]}"
+                f"  vs  original version: {version}"
             )
 
     for code, commit in code_commits.items():
         # see why .get above
         if commit != current_code_commits.get(code, commit):
             logging.error(
-                "Loading a saved model created with different library git commit(s) may cause issues."
-                f"currently {code}'s git commit: {current_code_commits[code]} "
-                f"vs  original commit: {commit}"
+                "Loading a saved model created with different library git commit(s) may cause issues. "
+                f"Current {code} git commit: {current_code_commits[code]}"
+                f"  vs  original commit: {commit}"
             )
 
     if add_to_config:
