@@ -77,11 +77,7 @@ def main(args=None):
     # Load dataset to get something to benchmark on
     print("Loading dataset... ")
     dataset_time = time.time()
-    # Currently, pytorch_geometric prints some status messages to stdout while loading the dataset
-    # TODO: fix may come soon: https://github.com/rusty1s/pytorch_geometric/pull/2950
-    # Until it does, just redirect them.
-    with contextlib.redirect_stdout(sys.stderr):
-        dataset = dataset_from_config(config)
+    dataset = dataset_from_config(config)
     dataset_time = time.time() - dataset_time
     print(f"    loading dataset took {dataset_time:.4f}s")
     datas = [
