@@ -27,6 +27,7 @@ def assert_permutation_equivariant(
     func: GraphModuleMixin,
     data_in: AtomicDataDict.Type,
     tolerance: Optional[float] = None,
+    raise_error: bool = True,
 ):
     r"""Test the permutation equivariance of ``func``.
 
@@ -39,7 +40,7 @@ def assert_permutation_equivariant(
         data_in: the example input data to test with
     """
     # Prevent pytest from showing this function in the traceback
-    # __tracebackhide__ = True
+    __tracebackhide__ = True
 
     if tolerance is None:
         atol = PERMUTATION_FLOAT_TOLERANCE[torch.get_default_dtype()]
@@ -121,9 +122,14 @@ def assert_permutation_equivariant(
                     problems.append(
                         f"edge/node permutation invariance violated for field {k}; maximum componentwise error: {err:e}. (`{k}` was assumed to be invariant, should it have been marked as equivariant?)"
                     )
-    if len(problems) > 0:
-        raise AssertionError("\n".join(problems))
-    return
+    msg = "\n".join(problems)
+    if len(problems) == 0:
+        return
+    else:
+        if raise_error:
+            raise AssertionError(msg)
+        else:
+            return msg
 
 
 def assert_AtomicData_equivariant(
@@ -163,7 +169,9 @@ def assert_AtomicData_equivariant(
 
     # == Test permutation of graph nodes ==
     # since permutation is discrete and should not be data dependent, run only on one frame.
-    assert_permutation_equivariant(func, data_in[0], tolerance=permutation_tolerance)
+    permutation_problems = assert_permutation_equivariant(
+        func, data_in[0], tolerance=permutation_tolerance, raise_error=False
+    )
 
     # == Test rotation, parity, and translation using e3nn ==
     irreps_in = {k: None for k in AtomicDataDict.ALLOWED_KEYS}
@@ -253,7 +261,9 @@ def assert_AtomicData_equivariant(
         problems = {k: v for k, v in errs.items() if v > o3_tolerance}
 
         def _describe(errors):
-            return "\n".join(
+            return (
+                permutation_problems + "\n" if permutation_problems is not None else ""
+            ) + "\n".join(
                 "(parity_k={:d}, did_translate={}) -> max error={:.3e}".format(
                     int(k[0]),
                     bool(k[1]),
@@ -262,7 +272,7 @@ def assert_AtomicData_equivariant(
                 for k, v in errors.items()
             )
 
-        if len(problems) > 0:
+        if len(problems) > 0 or permutation_problems is not None:
             raise AssertionError(
                 "Equivariance test failed for cases:" + _describe(problems)
             )
@@ -277,14 +287,16 @@ def assert_AtomicData_equivariant(
         problems = [e for e in all_errs if e[-1] > o3_tolerance]
 
         def _describe(errors):
-            return "\n".join(
+            return (
+                permutation_problems + "\n" if permutation_problems is not None else ""
+            ) + "\n".join(
                 "   (parity_k={:1d}, did_translate={:5}, field={:20}) -> max error={:.3e}".format(
                     int(k[0]), str(bool(k[1])), str(k[2]), float(k[3])
                 )
                 for k in errors
             )
 
-        if len(problems) > 0:
+        if len(problems) > 0 or permutation_problems is not None:
             raise AssertionError(
                 "Equivariance test failed for cases:\n" + _describe(problems)
             )
@@ -318,7 +330,7 @@ def set_irreps_debug(enabled: bool = False) -> None:
     from nequip.utils.torch_geometric import Data
 
     def pre_hook(mod: GraphModuleMixin, inp):
-        # __tracebackhide__ = True
+        __tracebackhide__ = True
         if not isinstance(mod, GraphModuleMixin):
             return
         mname = type(mod).__name__
@@ -354,7 +366,7 @@ def set_irreps_debug(enabled: bool = False) -> None:
     h1 = torch.nn.modules.module.register_module_forward_pre_hook(pre_hook)
 
     def post_hook(mod: GraphModuleMixin, _, out):
-        # __tracebackhide__ = True
+        __tracebackhide__ = True
         if not isinstance(mod, GraphModuleMixin):
             return
         mname = type(mod).__name__

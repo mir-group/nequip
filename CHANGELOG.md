@@ -22,6 +22,7 @@ Most recent change on the bottom.
 
 ### Changed
 - abbreviate `node_features`->`h` in loss titles
+- failure of permutation equivariance tests no longer short-circuts o3 equivariance tests
 
 ### Fixed
 - Equivariance testing correctly handles output cells
