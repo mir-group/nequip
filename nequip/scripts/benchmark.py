@@ -1,8 +1,6 @@
-import sys
 import argparse
 import textwrap
 import tempfile
-import contextlib
 import itertools
 import time
 
@@ -13,7 +11,7 @@ from torch.utils.benchmark.utils.common import trim_sigfig, select_unit
 from e3nn.util.jit import script
 
 from nequip.utils import Config
-from nequip.data import AtomicData, dataset_from_config
+from nequip.data import AtomicData, AtomicDataDict, dataset_from_config
 from nequip.model import model_from_config
 from nequip.scripts.deploy import _compile_for_deploy
 from nequip.scripts.train import default_config, check_code_version
@@ -81,15 +79,40 @@ def main(args=None):
     dataset_time = time.time() - dataset_time
     print(f"    loading dataset took {dataset_time:.4f}s")
     datas = [
-        AtomicData.to_AtomicDataDict(dataset[i].to(device))
-        for i in torch.randperm(len(dataset))[: args.n_data]
+        AtomicData.to_AtomicDataDict(dataset[i].to(device)) for i in range(args.n_data)
     ]
     n_atom: int = len(datas[0]["pos"])
-    assert all(len(d["pos"]) == n_atom for d in datas)  # TODO handle the general case
-    # TODO: show some stats about datas
+    if not all(len(d["pos"]) == n_atom for d in datas):
+        raise NotImplementedError(
+            "nequip-benchmark does not currently handle benchmarking on data frames with variable number of atoms"
+        )
+    print(
+        f"    loaded dataset of size {len(dataset)} and took the first --n-data={args.n_data} frames"
+    )
+    # print some dataset information
+    print(f"    benchmark frames statistics:")
+    print(f"         number of atoms: {n_atom}")
+    print(f"         number of types: {dataset.type_mapper.num_types}")
+    print(
+        f"          avg. num edges: {sum(d[AtomicDataDict.EDGE_INDEX_KEY].shape[1] for d in datas) / len(datas)}"
+    )
+    avg_edges_per_atom = torch.mean(
+        torch.cat(
+            [
+                torch.bincount(
+                    d[AtomicDataDict.EDGE_INDEX_KEY][0],
+                    minlength=d[AtomicDataDict.POSITIONS_KEY].shape[0],
+                ).float()
+                for d in datas
+            ]
+        )
+    ).item()
+    print(f"         avg. neigh/atom: {avg_edges_per_atom}")
 
+    # cycle over the datas we loaded
     datas = itertools.cycle(datas)
 
+    # short circut
     if args.n == 0:
         print("Got -n 0, so quitting without running benchmark.")
         return
