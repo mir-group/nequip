@@ -291,7 +291,22 @@ class TestGradient:
         n_at = data[AtomicDataDict.POSITIONS_KEY].shape[0]
         partial_forces = output_partial[AtomicDataDict.PARTIAL_FORCE_KEY]
         assert partial_forces.shape == (n_at, n_at, 3)
-        # TODO check sparsity?
+        # confirm that sparsity matches graph topology:
+        edge_index = data[AtomicDataDict.EDGE_INDEX_KEY]
+        adjacency = torch.zeros(n_at, n_at, dtype=torch.bool)
+        strict_locality = False
+        if strict_locality:
+            # only adjacent for nonzero deriv to neighbors
+            adjacency[edge_index[0], edge_index[1]] = True
+            adjacency[
+                torch.arange(n_at), torch.arange(n_at)
+            ] = True  # diagonal is ofc True
+        else:
+            # technically only adjacent to n-th degree neighbor, but in this tiny test system that is same as all-to-all and easier to program
+            adjacency = data[AtomicDataDict.BATCH_KEY].view(-1, 1) == data[
+                AtomicDataDict.BATCH_KEY
+            ].view(1, -1)
+        assert torch.equal(adjacency, torch.any(partial_forces != 0, dim=-1))
 
 
 class TestAutoGradient:
