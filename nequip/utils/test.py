@@ -162,7 +162,7 @@ def assert_AtomicData_equivariant(
     )
 
     # == Test permutation of graph nodes ==
-    # TODO: since permutation is distinct, run only on one.
+    # since permutation is discrete and should not be data dependent, run only on one frame.
     assert_permutation_equivariant(func, data_in[0], tolerance=permutation_tolerance)
 
     # == Test rotation, parity, and translation using e3nn ==

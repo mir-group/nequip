@@ -225,6 +225,10 @@ def PerSpeciesRescale(
                 f"Per species energy scaling was very low: {scales}. Maybe try setting {module_prefix}_scales = 1."
             )
 
+        logging.info(
+            f"Atomic outputs are scaled by: {TypeMapper.format(scales, config.type_names)}, shifted by {TypeMapper.format(shifts, config.type_names)}."
+        )
+
     else:
         # Put dummy values
         # the real ones will be loaded from the state dict later
@@ -252,10 +256,6 @@ def PerSpeciesRescale(
         shared_params=config,
         builder=PerSpeciesScaleShift,
         params=params,
-    )
-
-    logging.info(
-        f"Atomic outputs are scaled by: {TypeMapper.format(scales, config.type_names)}, shifted by {TypeMapper.format(shifts, config.type_names)}."
     )
 
     # == Build the model ==

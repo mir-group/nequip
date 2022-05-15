@@ -5,6 +5,7 @@ import copy
 import warnings
 import numpy as np
 import os.path as osp
+import sys
 from collections.abc import Sequence
 
 import torch.utils.data
@@ -180,7 +181,7 @@ class Dataset(torch.utils.data.Dataset):
                 f"force_use_cached was True, but processed data paths {self.processed_paths} not found"
             )
 
-        print("Processing...")
+        print("Processing dataset...", file=sys.stderr)
 
         makedirs(self.processed_dir)
         self.process()
@@ -190,7 +191,7 @@ class Dataset(torch.utils.data.Dataset):
         path = osp.join(self.processed_dir, "pre_filter.pt")
         torch.save(_repr(self.pre_filter), path)
 
-        print("Done!")
+        print("Done!", file=sys.stderr)
 
     def __len__(self) -> int:
         r"""The number of examples in the dataset."""

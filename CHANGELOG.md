@@ -17,6 +17,8 @@ Most recent change on the bottom.
 - support multiple metrics on same field with different `functional`s
 - allow custom metrics names
 - allow `e3nn==0.5.0`
+- `--verbose` option to `nequip-deploy`
+- print data statistics in `nequip-benchmark`
 
 ### Changed
 - abbreviate `node_features`->`h` in loss titles
@@ -25,6 +27,9 @@ Most recent change on the bottom.
 - Equivariance testing correctly handles output cells
 - Equivariance testing correctly handles one-node or one-edge data
 - `report_init_validation` now runs on validation set instead of training set
+- crash when unable to find `os.sched_getaffinity` on some systems
+- don't incorrectly log per-species scales/shifts when loading model (such as for deployment)
+- `nequip-benchmark` now picks data frames deterministically
 
 ## [0.5.4] - 2022-04-12
 ### Added

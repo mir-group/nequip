@@ -270,26 +270,22 @@ def main(args=None, running_as_script: bool = True):
         )
 
     dataset_is_validation: bool = False
-    # Currently, pytorch_geometric prints some status messages to stdout while loading the dataset
-    # TODO: fix may come soon: https://github.com/rusty1s/pytorch_geometric/pull/2950
-    # Until it does, just redirect them.
-    with contextlib.redirect_stdout(sys.stderr):
-        # look for validation and only fall back to `dataset` prefix
-        # have to tell the loading function whether to use horovod
-        dataset_config.horovod = args.horovod
-        # this function syncs horovod if it is enabled
-        datasets = _load_datasets(
-            dataset_config,
-            prefixes=["validation_dataset", "dataset"],
-            stop_on_first_found=True,
-        )
-        if datasets["validation_dataset"] is not None:
-            dataset = datasets["validation_dataset"]
-            dataset_is_validation = True
-        else:
-            dataset = datasets["dataset"]
-        del datasets
-        assert dataset is not None
+    # look for validation and only fall back to `dataset` prefix
+    # have to tell the loading function whether to use horovod
+    dataset_config.horovod = args.horovod
+    # this function syncs horovod if it is enabled
+    datasets = _load_datasets(
+        dataset_config,
+        prefixes=["validation_dataset", "dataset"],
+        stop_on_first_found=True,
+    )
+    if datasets["validation_dataset"] is not None:
+        dataset = datasets["validation_dataset"]
+        dataset_is_validation = True
+    else:
+        dataset = datasets["dataset"]
+    del datasets
+    assert dataset is not None
 
     logger.info(
         f"Loaded {'validation_' if dataset_is_validation else ''}dataset specified in {args.dataset_config.name}.",

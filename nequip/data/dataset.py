@@ -344,7 +344,12 @@ class AtomicInMemoryDataset(AtomicDataset):
 
                 The above computes the statistics over a set of size 3N, where N is the total number of nodes in the dataset.
 
-            modes: the statistic to compute for each field. Valid options are TODO.
+            modes: the statistic to compute for each field. Valid options are:
+                 - ``count``
+                 - ``rms``
+                 - ``mean_std``
+                 - ``per_atom_*``
+                 - ``per_species_*``
 
             stride: the stride over the dataset while computing statistcs.
 
@@ -624,7 +629,6 @@ class AtomicInMemoryDataset(AtomicDataset):
             raise NotImplementedError
 
 
-# TODO: document fixed field mapped key behavior more clearly
 class NpzDataset(AtomicInMemoryDataset):
     """Load data from an npz file.
 
@@ -635,6 +639,9 @@ class NpzDataset(AtomicInMemoryDataset):
         key_mapping (Dict[str, str]): mapping of npz keys to ``AtomicData`` keys. Optional
         include_keys (list): the attributes to be processed and stored. Optional
         npz_fixed_field_keys: the attributes that only have one instance but apply to all frames. Optional
+            Note that the mapped keys (as determined by the _values_ in ``key_mapping``) should be used in
+            ``npz_fixed_field_keys``, not the original npz keys from before mapping. If an npz key is not
+            present in ``key_mapping``, it is mapped to itself, and this point is not relevant.
 
     Example: Given a npz file with 10 configurations, each with 14 atoms.
 
@@ -709,7 +716,6 @@ class NpzDataset(AtomicInMemoryDataset):
     def raw_dir(self):
         return dirname(abspath(self.file_name))
 
-    # TODO: fixed fields?
     def get_data(self):
 
         data = np.load(self.raw_dir + "/" + self.raw_file_names[0], allow_pickle=True)
@@ -733,6 +739,7 @@ class NpzDataset(AtomicInMemoryDataset):
                 mapped[intkey] = mapped[intkey].astype(np.int64)
 
         fields = {k: v for k, v in mapped.items() if k not in self.npz_fixed_field_keys}
+        # note that we don't deal with extra_fixed_fields here; AtomicInMemoryDataset does that.
         fixed_fields = {
             k: v for k, v in mapped.items() if k in self.npz_fixed_field_keys
         }

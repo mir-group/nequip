@@ -134,8 +134,6 @@ def test_metrics(training_session, do_test_idcs, do_metrics, do_output_fields):
         metrics_yaml = "my-metrics.yaml"
         with open(f"{tmpdir}/{metrics_yaml}", "w") as f:
             # Write out a fancier metrics file
-            # We don't use PerSpecies here since the simple models don't fill ATOM_TYPE_KEY right now
-            # ^ TODO!
             f.write(
                 textwrap.dedent(
                     """
@@ -143,10 +141,28 @@ def test_metrics(training_session, do_test_idcs, do_metrics, do_output_fields):
                       - - forces
                         - rmse
                         - report_per_component: True
+                      - - forces
+                        - mae
+                        - PerSpecies: True
+                      - - total_energy
+                        - mae
+                      - - total_energy
+                        - mae
+                        - PerAtom: True
                     """
                 )
             )
-        expect_metrics = {"f_rmse_0", "f_rmse_1", "f_rmse_2"}
+        expect_metrics = {
+            "f_rmse_0",
+            "f_rmse_1",
+            "f_rmse_2",
+            "H_f_mae",
+            "C_f_mae",
+            "O_f_mae",
+            "psavg_f_mae",
+            "e_mae",
+            "e/N_mae",
+        }
     else:
         metrics_yaml = None
         # Regardless of builder, with minimal.yaml, we should have RMSE and MAE
@@ -201,7 +217,13 @@ def test_metrics(training_session, do_test_idcs, do_metrics, do_output_fields):
             }
         )
         for k, v in metrics.items():
-            assert np.all(np.abs(v - metrics2[k]) < 1e-5)
+            assert np.allclose(
+                v,
+                metrics2[k],
+                atol={torch.float32: 1e-6, torch.float64: 1e-8}[
+                    torch.get_default_dtype()
+                ],
+            )
 
         # Check the output XYZ
         batch_atoms = ase.io.read(tmpdir + "/out-orig.xyz", index=":", format="extxyz")
@@ -221,4 +243,10 @@ def test_metrics(training_session, do_test_idcs, do_metrics, do_output_fields):
     if torch.cuda.is_available():
         metrics_gpu = runit({"train-dir": outdir, "batch-size": 17, "device": "cuda"})
         for k, v in metrics.items():
-            assert np.all(np.abs(v - metrics_gpu[k]) < 1e-3)  # GPU nondeterminism
+            assert np.allclose(
+                v,
+                metrics_gpu[k],
+                atol={torch.float32: 1e-4, torch.float64: 1e-6}[
+                    torch.get_default_dtype()
+                ],
+            )
