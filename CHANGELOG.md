@@ -25,6 +25,7 @@ Most recent change on the bottom.
 - Equivariance testing correctly handles output cells
 - Equivariance testing correctly handles one-node or one-edge data
 - `report_init_validation` now runs on validation set instead of training set
+- crash when unable to find `os.sched_getaffinity` on some systems
 
 ## [0.5.4] - 2022-04-12
 ### Added
