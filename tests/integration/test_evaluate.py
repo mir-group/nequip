@@ -145,7 +145,7 @@ def test_metrics(training_session, do_test_idcs, do_metrics, do_output_fields):
                         - mae
                         - PerSpecies: True
                       - - total_energy
-                        - mae    
+                        - mae
                       - - total_energy
                         - mae
                         - PerAtom: True

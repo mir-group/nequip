@@ -93,7 +93,7 @@ def main(args=None):
         f"    loaded dataset of size {len(dataset)} and sampled --n-data={args.n_data} frames"
     )
     # print some dataset information
-    print(f"    benchmark frames statistics:")
+    print("    benchmark frames statistics:")
     print(f"         number of atoms: {n_atom}")
     print(f"         number of types: {dataset.type_mapper.num_types}")
     print(
