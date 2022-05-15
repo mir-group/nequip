@@ -58,7 +58,6 @@ def main(args=None):
         default=1,
     )
 
-    # TODO: option to profile
     # TODO: option to show memory use
 
     # Parse the args

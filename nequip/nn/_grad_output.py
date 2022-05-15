@@ -129,7 +129,6 @@ class PartialForceOutput(GraphModuleMixin, torch.nn.Module):
         vectorize_warnings: bool = False,
     ):
         super().__init__()
-        # TODO wrap:
         self.func = func
         self.vectorize = vectorize
         if vectorize_warnings:
