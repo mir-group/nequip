@@ -17,6 +17,7 @@ Most recent change on the bottom.
 - support multiple metrics on same field with different `functional`s
 - allow custom metrics names
 - allow `e3nn==0.5.0`
+- `--verbose` option to `nequip-deploy`
 
 ### Changed
 - abbreviate `node_features`->`h` in loss titles

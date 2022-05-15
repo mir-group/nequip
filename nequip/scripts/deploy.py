@@ -137,6 +137,7 @@ def main(args=None):
         required = {"required": True}
     else:
         required = {}
+    parser.add_argument("--verbose", help="log level", default="INFO", type=str)
     subparsers = parser.add_subparsers(dest="command", title="commands", **required)
     info_parser = subparsers.add_parser(
         "info", help="Get information from a deployed model file"
@@ -166,8 +167,7 @@ def main(args=None):
 
     args = parser.parse_args(args=args)
 
-    # TODO: configurable?
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=getattr(logging, args.verbose.upper()))
 
     if args.command == "info":
         model, metadata = load_deployed_model(args.model_path, set_global_options=False)
