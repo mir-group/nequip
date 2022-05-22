@@ -19,6 +19,7 @@ Most recent change on the bottom.
 - allow `e3nn==0.5.0`
 - `--verbose` option to `nequip-deploy`
 - print data statistics in `nequip-benchmark`
+- `normalized_sum` reduction in `AtomwiseReduce`
 
 ### Changed
 - abbreviate `node_features`->`h` in loss titles

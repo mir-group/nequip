@@ -58,11 +58,22 @@ class AtomwiseLinear(GraphModuleMixin, torch.nn.Module):
 
 
 class AtomwiseReduce(GraphModuleMixin, torch.nn.Module):
+    _factor: float
+
     def __init__(
-        self, field: str, out_field: Optional[str] = None, reduce="sum", irreps_in={}
+        self,
+        field: str,
+        out_field: Optional[str] = None,
+        reduce="sum",
+        avg_num_atoms=None,
+        irreps_in={},
     ):
         super().__init__()
-        assert reduce in ("sum", "mean")
+        assert reduce in ("sum", "mean", "normalized_sum")
+        self._factor = 1.0
+        if reduce == "normalized_sum":
+            assert avg_num_atoms is not None
+            self._factor = float(avg_num_atoms) ** -0.5
         self.reduce = reduce
         self.field = field
         self.out_field = f"{reduce}_{field}" if out_field is None else out_field
@@ -78,6 +89,8 @@ class AtomwiseReduce(GraphModuleMixin, torch.nn.Module):
         data[self.out_field] = scatter(
             data[self.field], data[AtomicDataDict.BATCH_KEY], dim=0, reduce=self.reduce
         )
+        if self._factor != 1.0:
+            data[self.out_field] = data[self.out_field] * self._factor
         return data
 
 
