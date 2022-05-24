@@ -1,7 +1,9 @@
 """ Train a network."""
+from typing import List, Dict
 import logging
 import argparse
 import warnings
+import os
 
 # This is a weird hack to avoid Intel MKL issues on the cluster when this is called as a subprocess of a process that has itself initialized PyTorch.
 # Since numpy gets imported later anyway for dataset stuff, this shouldn't affect performance.
@@ -12,9 +14,14 @@ from pathlib import Path
 
 import torch
 
+try:
+    import horovod.torch as hvd
+except ImportError:
+    pass
+
 from nequip.model import model_from_config
 from nequip.utils import Config
-from nequip.data import dataset_from_config
+from nequip.data import dataset_from_config, AtomicDataset
 from nequip.utils import load_file
 from nequip.utils.test import assert_AtomicData_equivariant
 from nequip.utils.versions import check_code_version
@@ -41,6 +48,7 @@ default_config = dict(
     equivariance_test=False,
     grad_anomaly_mode=False,
     append=False,
+    horovod=False,
     _jit_bailout_depth=2,  # avoid 20 iters of pain, see https://github.com/pytorch/pytorch/issues/52286
     # Quote from eelison in PyTorch slack:
     # https://pytorch.slack.com/archives/CDZD1FANA/p1644259272007529?thread_ts=1644064449.039479&cid=CDZD1FANA
@@ -61,7 +69,7 @@ def main(args=None, running_as_script: bool = True):
         set_up_script_logger(config.get("log", None), config.verbose)
 
     found_restart_file = isdir(f"{config.root}/{config.run_name}")
-    if found_restart_file and not config.append:
+    if found_restart_file and not config.append and not config.horovod:
         raise RuntimeError(
             f"Training instance exists at {config.root}/{config.run_name}; "
             "either set append to True or use a different root or runname"
@@ -101,6 +109,11 @@ def parse_command_line(args=None):
         action="store_true",
     )
     parser.add_argument(
+        "--horovod",
+        help="Enable Horovod for multi-GPU training (it must be installed and run under `horovodrun`)",
+        action="store_true",
+    )
+    parser.add_argument(
         "--log",
         help="log file to store all the screen logging",
         type=Path,
@@ -109,10 +122,51 @@ def parse_command_line(args=None):
     args = parser.parse_args(args=args)
 
     config = Config.from_file(args.config, defaults=default_config)
-    for flag in ("model_debug_mode", "equivariance_test", "grad_anomaly_mode"):
+    for flag in (
+        "model_debug_mode",
+        "equivariance_test",
+        "grad_anomaly_mode",
+        "horovod",
+    ):
         config[flag] = getattr(args, flag) or config[flag]
 
     return config
+
+
+def _load_datasets(
+    config, prefixes: List[str], stop_on_first_found: bool = False
+) -> Dict[str, AtomicDataset]:
+    # = Load the dataset =
+    is_rank_zero: bool = True
+    if config.horovod and hvd.rank() != 0:
+        # stall nonzero ranks here so that rank zero can process datasets
+        is_rank_zero = False
+        hvd.barrier()
+
+    out: Dict[str, AtomicDataset] = {}
+
+    for prefix in prefixes:
+        try:
+            dataset = dataset_from_config(
+                config, prefix=prefix, force_use_cached=not is_rank_zero
+            )
+            logging.info(f"Successfully loaded dataset `{prefix}` of type {dataset}...")
+        except KeyError:
+            # It couldn't be found
+            dataset = None
+        out[prefix] = dataset
+        if stop_on_first_found and dataset is not None:
+            break
+
+    if config.horovod and hvd.rank() == 0:
+        # ensure that cached datasets are written out before allowing other ranks to load
+        os.sync()
+        # rank 0 reaches this barrier after loading the dataset, so it's processed
+        # then other ranks are allowed to proceed from the L151 barrier and load
+        # the cached dataset
+        hvd.barrier()
+
+    return out
 
 
 def fresh_start(config):
@@ -140,17 +194,10 @@ def fresh_start(config):
     # to update wandb data?
     config.update(trainer.params)
 
-    # = Load the dataset =
-    dataset = dataset_from_config(config, prefix="dataset")
-    logging.info(f"Successfully loaded the data set of type {dataset}...")
-    try:
-        validation_dataset = dataset_from_config(config, prefix="validation_dataset")
-        logging.info(
-            f"Successfully loaded the validation data set of type {validation_dataset}..."
-        )
-    except KeyError:
-        # It couldn't be found
-        validation_dataset = None
+    # load dataset
+    # (syncs horovod)
+    datasets = _load_datasets(config, prefixes=["dataset", "validation_dataset"])
+    dataset, validation_dataset = datasets["dataset"], datasets["validation_dataset"]
 
     # = Train/test split =
     trainer.set_dataset(dataset, validation_dataset)
@@ -243,16 +290,8 @@ def restart(config):
         trainer = Trainer.from_dict(dictionary)
 
     # = Load the dataset =
-    dataset = dataset_from_config(config, prefix="dataset")
-    logging.info(f"Successfully re-loaded the data set of type {dataset}...")
-    try:
-        validation_dataset = dataset_from_config(config, prefix="validation_dataset")
-        logging.info(
-            f"Successfully re-loaded the validation data set of type {validation_dataset}..."
-        )
-    except KeyError:
-        # It couldn't be found
-        validation_dataset = None
+    datasets = _load_datasets(config, prefixes=["dataset", "validation_dataset"])
+    dataset, validation_dataset = datasets["dataset"], datasets["validation_dataset"]
     trainer.set_dataset(dataset, validation_dataset)
 
     return trainer

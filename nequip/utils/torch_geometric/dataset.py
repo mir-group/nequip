@@ -72,6 +72,7 @@ class Dataset(torch.utils.data.Dataset):
         transform: Optional[Callable] = None,
         pre_transform: Optional[Callable] = None,
         pre_filter: Optional[Callable] = None,
+        force_use_cached: bool = False,
     ):
         super().__init__()
 
@@ -82,6 +83,7 @@ class Dataset(torch.utils.data.Dataset):
         self.transform = transform
         self.pre_transform = pre_transform
         self.pre_filter = pre_filter
+        self.force_use_cached = force_use_cached
         self._indices: Optional[Sequence] = None
 
         if "download" in self.__class__.__dict__.keys():
@@ -144,6 +146,10 @@ class Dataset(torch.utils.data.Dataset):
     def _download(self):
         if files_exist(self.raw_paths):  # pragma: no cover
             return
+        if self.force_use_cached:
+            raise RuntimeError(
+                f"force_use_cached was True, but raw data paths {self.raw_paths} not found"
+            )
 
         makedirs(self.raw_dir)
         self.download()
@@ -169,6 +175,11 @@ class Dataset(torch.utils.data.Dataset):
 
         if files_exist(self.processed_paths):  # pragma: no cover
             return
+
+        if self.force_use_cached:
+            raise RuntimeError(
+                f"force_use_cached was True, but processed data paths {self.processed_paths} not found"
+            )
 
         print("Processing dataset...", file=sys.stderr)
 

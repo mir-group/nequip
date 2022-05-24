@@ -26,6 +26,11 @@ import numpy as np
 import torch
 from torch_ema import ExponentialMovingAverage
 
+try:
+    import horovod.torch as hvd
+except ImportError:
+    pass
+
 from nequip.data import DataLoader, AtomicData, AtomicDataDict, AtomicDataset
 from nequip.utils import (
     Output,
@@ -216,6 +221,7 @@ class Trainer:
         model,
         model_builders: Optional[list] = [],
         device: str = "cuda" if torch.cuda.is_available() else "cpu",
+        horovod: bool = False,
         seed: Optional[int] = None,
         dataset_seed: Optional[int] = None,
         loss_coeffs: Union[dict, str] = AtomicDataDict.TOTAL_ENERGY_KEY,
@@ -271,29 +277,58 @@ class Trainer:
             _local_kwargs[key] = locals()[key]
 
         self.ema = None
+        self.torch_device = torch.device(self.device)
 
-        output = Output.get_output(dict(**_local_kwargs, **kwargs))
-        self.output = output
+        # Initialize horovod
+        if self.horovod:
+            hvd.init()
+            if torch.cuda.is_available() and self.torch_device.type == "cuda":
+                assert self.torch_device.index is None
+                torch.cuda.set_device(hvd.local_rank())
 
-        self.logfile = output.open_logfile("log", propagate=True)
-        self.epoch_log = output.open_logfile("metrics_epoch.csv", propagate=False)
-        self.init_epoch_log = output.open_logfile(
-            "metrics_initialization.csv", propagate=False
-        )
-        self.batch_log = {
-            TRAIN: output.open_logfile(
-                f"metrics_batch_{ABBREV[TRAIN]}.csv", propagate=False
-            ),
-            VALIDATION: output.open_logfile(
-                f"metrics_batch_{ABBREV[VALIDATION]}.csv", propagate=False
-            ),
-        }
+            assert (
+                self.batch_size % hvd.size() == 0
+            ), "Batch size must be a multiple of the number of nodes"
+            self.batch_size //= hvd.size()
 
-        # add filenames if not defined
-        self.best_model_path = output.generate_file("best_model.pth")
-        self.last_model_path = output.generate_file("last_model.pth")
-        self.trainer_save_path = output.generate_file("trainer.pth")
-        self.config_path = self.output.generate_file("config.yaml")
+        if self.horovod and hvd.rank() != 0:
+            # none of these are used, just here so they exist
+            self.logfile = "/dev/null"
+            self.epoch_log = "/dev/null"
+            self.init_epoch_log = "/dev/null"
+            self.batch_log = {
+                TRAIN: "/dev/null",
+                VALIDATION: "/dev/null",
+            }
+            self.best_model_path = "/dev/null"
+            self.last_model_path = "/dev/null"
+            self.trainer_save_path = "/dev/null"
+            self.config_path = "/dev/null"
+        else:
+            output = Output.get_output(dict(**_local_kwargs, **kwargs))
+            self.output = output
+
+            self.logfile = output.open_logfile("log", propagate=True)
+            self.epoch_log = output.open_logfile("metrics_epoch.csv", propagate=False)
+            self.init_epoch_log = output.open_logfile(
+                "metrics_initialization.csv", propagate=False
+            )
+            self.batch_log = {
+                TRAIN: output.open_logfile(
+                    f"metrics_batch_{ABBREV[TRAIN]}.csv", propagate=False
+                ),
+                VALIDATION: output.open_logfile(
+                    f"metrics_batch_{ABBREV[VALIDATION]}.csv", propagate=False
+                ),
+            }
+
+            # add filenames if not defined
+            self.best_model_path = output.generate_file("best_model.pth")
+            self.last_model_path = output.generate_file("last_model.pth")
+            self.trainer_save_path = output.generate_file("trainer.pth")
+            self.config_path = self.output.generate_file("config.yaml")
+
+        self.logger.info(f"Torch device: {self.device}")
 
         if seed is not None:
             torch.manual_seed(seed)
@@ -302,9 +337,6 @@ class Trainer:
         self.dataset_rng = torch.Generator()
         if dataset_seed is not None:
             self.dataset_rng.manual_seed(dataset_seed)
-
-        self.logger.info(f"Torch device: {self.device}")
-        self.torch_device = torch.device(self.device)
 
         # sort out all the other parameters
         # for samplers, optimizer and scheduler
@@ -367,6 +399,10 @@ class Trainer:
 
     def init_objects(self):
         # initialize optimizer
+        learning_rate = self.learning_rate
+        if self.horovod:
+            # "Scale the learning rate by the number of workers."
+            learning_rate *= hvd.size()
         self.optim, self.optimizer_kwargs = instantiate_from_cls_name(
             module=torch.optim,
             class_name=self.optimizer_name,
@@ -375,6 +411,11 @@ class Trainer:
             all_args=self.kwargs,
             optional_args=self.optimizer_kwargs,
         )
+        if self.horovod:
+            self.optim = hvd.DistributedOptimizer(
+                self.optim,
+                named_parameters=self.model.named_parameters(),
+            )
 
         self.max_gradient_norm = (
             float(self.max_gradient_norm)
@@ -523,6 +564,8 @@ class Trainer:
         return dictionary
 
     def save_config(self, blocking: bool = True) -> None:
+        if self.horovod and hvd.rank() != 0:
+            return
         save_file(
             item=self.as_dict(state_dict=False, training_progress=False),
             supported_formats=dict(yaml=["yaml"]),
@@ -539,6 +582,8 @@ class Trainer:
         filename (str): name of the file
         format (str): format of the file. yaml and json format will not save the weights.
         """
+        if self.horovod and hvd.rank() != 0:
+            return
 
         if filename is None:
             filename = self.trainer_save_path
@@ -770,6 +815,13 @@ class Trainer:
 
         self.init_metrics()
 
+        if self.horovod:
+            for k, v in self.model.state_dict().items():
+                if not v.is_contiguous():
+                    print(k)
+            hvd.broadcast_parameters(self.model.state_dict(), root_rank=0)
+            hvd.broadcast_optimizer_state(self.optim, root_rank=0)
+
         while not self.stop_cond:
 
             self.epoch_step()
@@ -785,7 +837,10 @@ class Trainer:
 
     def batch_step(self, data, validation=False):
         # no need to have gradients from old steps taking up memory
-        self.optim.zero_grad(set_to_none=True)
+        if self.horovod:
+            self.optim.zero_grad()
+        else:
+            self.optim.zero_grad(set_to_none=True)
 
         if validation:
             self.model.eval()
@@ -823,8 +878,14 @@ class Trainer:
             # Actually do an optimization step, since we're training:
             loss, loss_contrib = self.loss(pred=out, ref=data_unscaled)
             # see https://pytorch.org/tutorials/recipes/recipes/tuning_guide.html#use-parameter-grad-none-instead-of-model-zero-grad-or-optimizer-zero-grad
-            self.optim.zero_grad(set_to_none=True)
+            if self.horovod:
+                self.optim.zero_grad()
+            else:
+                self.optim.zero_grad(set_to_none=True)
             loss.backward()
+
+            if self.horovod:
+                self.optim.synchronize()
 
             # See https://stackoverflow.com/a/56069467
             # Has to happen after .backward() so there are grads to clip
@@ -833,13 +894,21 @@ class Trainer:
                     self.model.parameters(), self.max_gradient_norm
                 )
 
-            self.optim.step()
-
+            if self.horovod:
+                # https://horovod.readthedocs.io/en/stable/api.html#horovod.torch.DistributedOptimizer
+                with self.optim.skip_synchronize():
+                    self.optim.step()
+            else:
+                self.optim.step()
+            # optim.step() means we are already sync'd in gradient weight
+            # so this is fine, and everyone can maintain it separately
             if self.use_ema:
                 self.ema.update()
 
             if self.lr_scheduler_name == "CosineAnnealingWarmRestarts":
                 self.lr_sched.step(self.iepoch + self.ibatch / self.n_batches)
+                if self.horovod:
+                    hvd.broadcast_optimizer_state(self.optim, root_rank=0)
 
         with torch.no_grad():
             if validation:
@@ -917,6 +986,10 @@ class Trainer:
                     self.end_of_batch_log(batch_type=category)
                     for callback in self._end_of_batch_callbacks:
                         callback(self)
+
+                if self.horovod:
+                    self.metrics.gather()
+                    self.loss_stat.gather()
                 self.metrics_dict[category] = self.metrics.current_result()
                 self.loss_dict[category] = self.loss_stat.current_result()
 
@@ -926,6 +999,7 @@ class Trainer:
 
         self.iepoch += 1
 
+        # no need to gather metrics again, since we just did above.
         self.end_of_epoch_log()
 
         # if the iepoch for the past epoch was -1, it will now be 0
@@ -934,6 +1008,8 @@ class Trainer:
         # scheduler at the beginning of training.
         if self.iepoch > 0 and self.lr_scheduler_name == "ReduceLROnPlateau":
             self.lr_sched.step(metrics=self.mae_dict[self.metrics_key])
+            if self.horovod:
+                hvd.broadcast_optimizer_state(self.optim, root_rank=0)
 
         for callback in self._end_of_epoch_callbacks:
             callback(self)
@@ -1021,6 +1097,8 @@ class Trainer:
                 self.save_ema_model(ckpt_path, blocking=False)
 
     def save_ema_model(self, path, blocking: bool = True):
+        if self.horovod and hvd.rank() != 0:
+            return
 
         if self.use_ema:
             # If using EMA, store the EMA validation model
@@ -1035,6 +1113,8 @@ class Trainer:
             self.save_model(path, blocking=blocking)
 
     def save_model(self, path, blocking: bool = True):
+        if self.horovod and hvd.rank() != 0:
+            return
         with atomic_write(path, blocking=blocking, binary=True) as write_to:
             torch.save(self.model.state_dict(), write_to)
 
@@ -1216,9 +1296,33 @@ class Trainer:
             # use the right randomness
             generator=self.dataset_rng,
         )
+        if self.horovod:
+            # TODO!: what do do with drop_tail??
+            train_sampler = torch.utils.data.distributed.DistributedSampler(
+                self.dataset_train,
+                num_replicas=hvd.size(),
+                rank=hvd.rank(),
+                shuffle=self.shuffle,
+                seed=self.dataset_seed,
+            )
+            val_sampler = torch.utils.data.distributed.DistributedSampler(
+                self.dataset_val,
+                num_replicas=hvd.size(),
+                rank=hvd.rank(),
+                shuffle=False,
+                seed=self.dataset_seed,
+            )
+        else:
+            if self.shuffle:
+                train_sampler = torch.utils.data.RandomSampler(
+                    self.dataset_train, generator=self.dataset_rng
+                )
+            else:
+                train_sampler = torch.utils.data.SequentialSampler(self.dataset_train)
+            val_sampler = torch.utils.data.SequentialSampler(self.dataset_val)
         self.dl_train = DataLoader(
             dataset=self.dataset_train,
-            shuffle=self.shuffle,  # training should shuffle
+            sampler=train_sampler,
             batch_size=self.batch_size,
             **dl_kwargs,
         )
@@ -1226,6 +1330,7 @@ class Trainer:
         # we still pass the generator just to be safe
         self.dl_val = DataLoader(
             dataset=self.dataset_val,
+            sampler=val_sampler,
             batch_size=self.validation_batch_size,
             **dl_kwargs,
         )

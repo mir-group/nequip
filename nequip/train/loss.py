@@ -7,6 +7,11 @@ from ._key import ABBREV
 
 from torch_runstats import RunningStats, Reduction
 
+try:
+    import horovod.torch as hvd
+except ImportError:
+    pass
+
 
 class Loss:
     """
@@ -187,3 +192,16 @@ class LossStat:
         }
         results["loss"] = self.loss_stat["total"].current_result().item()
         return results
+
+    def gather(self):
+        """Use horovod to gather and accumulate state of this LossStat across nodes to rank 0."""
+        state = (hvd.rank(), {k: rs.get_state() for k, rs in self.loss_stat.items()})
+        states = hvd.allgather_object(state, name="gather_lossstats")  # list of dict
+        if hvd.rank() == 0:
+            # accumulate on rank 0
+            for from_rank, state in states:
+                if from_rank == 0:
+                    # we already have this don't accumulate it
+                    continue
+                for k, rs_state in state.items():
+                    self.loss_stat[k].accumulate_state(rs_state)
