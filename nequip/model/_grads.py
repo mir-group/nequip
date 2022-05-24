@@ -8,10 +8,10 @@ def ForceOutput(model: GraphModuleMixin) -> GradientOutput:
     r"""Add forces to a model that predicts energy.
 
     Args:
-        energy_model: the model to wrap. Must have ``AtomicDataDict.TOTAL_ENERGY_KEY`` as an output.
+        model: the energy model to wrap. Must have ``AtomicDataDict.TOTAL_ENERGY_KEY`` as an output.
 
     Returns:
-        A ``GradientOutput`` wrapping ``energy_model``.
+        A ``GradientOutput`` wrapping ``model``.
     """
     if AtomicDataDict.FORCE_KEY in model.irreps_out:
         raise ValueError("This model already has force outputs.")
@@ -28,10 +28,10 @@ def PartialForceOutput(model: GraphModuleMixin) -> GradientOutput:
     r"""Add forces and partial forces to a model that predicts energy.
 
     Args:
-        energy_model: the model to wrap. Must have ``AtomicDataDict.TOTAL_ENERGY_KEY`` as an output.
+        model: the energy model to wrap. Must have ``AtomicDataDict.TOTAL_ENERGY_KEY`` as an output.
 
     Returns:
-        A ``GradientOutput`` wrapping ``energy_model``.
+        A ``GradientOutput`` wrapping ``model``.
     """
     if (
         AtomicDataDict.FORCE_KEY in model.irreps_out
@@ -45,14 +45,14 @@ def StressForceOutput(model: GraphModuleMixin) -> GradientOutput:
     r"""Add forces and stresses to a model that predicts energy.
 
     Args:
-        energy_model: the model to wrap. Must have ``AtomicDataDict.TOTAL_ENERGY_KEY`` as an output.
+        model: the model to wrap. Must have ``AtomicDataDict.TOTAL_ENERGY_KEY`` as an output.
 
     Returns:
-        A ``StressOutput`` wrapping ``energy_model``.
+        A ``StressOutput`` wrapping ``model``.
     """
     if (
         AtomicDataDict.FORCE_KEY in model.irreps_out
         or AtomicDataDict.STRESS_KEY in model.irreps_out
     ):
         raise ValueError("This model already has force or stress outputs.")
-    return StressOutputModule(energy_model=model)
+    return StressOutputModule(func=model)

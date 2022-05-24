@@ -787,6 +787,10 @@ class Trainer:
             raise RuntimeError(
                 f"metrics_key should start with either {VALIDATION} or {TRAIN}"
             )
+        if self.report_init_validation and self.metrics_key.lower().startswith(TRAIN):
+            raise RuntimeError(
+                f"metrics_key may not start with {TRAIN} when report_init_validation=True"
+            )
 
     def train(self):
 
@@ -998,7 +1002,11 @@ class Trainer:
         # no need to gather metrics again, since we just did above.
         self.end_of_epoch_log()
 
-        if self.lr_scheduler_name == "ReduceLROnPlateau":
+        # if the iepoch for the past epoch was -1, it will now be 0
+        # for -1 (report_init_validation: True) we aren't training, so it's wrong
+        # to step the LR scheduler even if it will have no effect with this particular
+        # scheduler at the beginning of training.
+        if self.iepoch > 0 and self.lr_scheduler_name == "ReduceLROnPlateau":
             self.lr_sched.step(metrics=self.mae_dict[self.metrics_key])
             if self.horovod:
                 hvd.broadcast_optimizer_state(self.optim, root_rank=0)
