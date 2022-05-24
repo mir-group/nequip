@@ -129,7 +129,6 @@ class PartialForceOutput(GraphModuleMixin, torch.nn.Module):
         vectorize_warnings: bool = False,
     ):
         super().__init__()
-        # TODO wrap:
         self.func = func
         self.vectorize = vectorize
         if vectorize_warnings:
@@ -182,14 +181,14 @@ class StressOutput(GraphModuleMixin, torch.nn.Module):
         https://pure.mpg.de/rest/items/item_2085135_9/component/file_2156800/content
 
     Args:
-        energy_model: the model to wrap
+        func: the energy model to wrap
         do_forces: whether to compute forces as well
     """
     do_forces: bool
 
     def __init__(
         self,
-        energy_model: GraphModuleMixin,
+        func: GraphModuleMixin,
         do_forces: bool = True,
     ):
         super().__init__()
@@ -202,12 +201,12 @@ class StressOutput(GraphModuleMixin, torch.nn.Module):
             raise NotImplementedError
         self.do_forces = do_forces
 
-        self.energy_model = energy_model
+        self.func = func
 
         # check and init irreps
         self._init_irreps(
-            irreps_in=self.energy_model.irreps_in.copy(),
-            irreps_out=self.energy_model.irreps_out.copy(),
+            irreps_in=self.func.irreps_in.copy(),
+            irreps_out=self.func.irreps_out.copy(),
         )
         self.irreps_out[AtomicDataDict.FORCE_KEY] = "1o"
         self.irreps_out[AtomicDataDict.STRESS_KEY] = "3x1o"
@@ -282,7 +281,7 @@ class StressOutput(GraphModuleMixin, torch.nn.Module):
             )
 
         # Call model and get gradients
-        data = self.energy_model(data)
+        data = self.func(data)
 
         grads = torch.autograd.grad(
             [data[AtomicDataDict.TOTAL_ENERGY_KEY].sum()],

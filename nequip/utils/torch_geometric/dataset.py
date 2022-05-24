@@ -5,6 +5,7 @@ import copy
 import warnings
 import numpy as np
 import os.path as osp
+import sys
 from collections.abc import Sequence
 
 import torch.utils.data
@@ -169,7 +170,7 @@ class Dataset(torch.utils.data.Dataset):
         if files_exist(self.processed_paths):  # pragma: no cover
             return
 
-        print("Processing...")
+        print("Processing dataset...", file=sys.stderr)
 
         makedirs(self.processed_dir)
         self.process()
@@ -179,7 +180,7 @@ class Dataset(torch.utils.data.Dataset):
         path = osp.join(self.processed_dir, "pre_filter.pt")
         torch.save(_repr(self.pre_filter), path)
 
-        print("Done!")
+        print("Done!", file=sys.stderr)
 
     def __len__(self) -> int:
         r"""The number of examples in the dataset."""
