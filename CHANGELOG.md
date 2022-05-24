@@ -32,6 +32,7 @@ Most recent change on the bottom.
 - crash when unable to find `os.sched_getaffinity` on some systems
 - don't incorrectly log per-species scales/shifts when loading model (such as for deployment)
 - `nequip-benchmark` now picks data frames deterministically
+- useful error message for `metrics_key: training_*` with `report_init_validation: True` (#213)
 
 ## [0.5.4] - 2022-04-12
 ### Added

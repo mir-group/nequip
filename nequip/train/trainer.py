@@ -742,6 +742,10 @@ class Trainer:
             raise RuntimeError(
                 f"metrics_key should start with either {VALIDATION} or {TRAIN}"
             )
+        if self.report_init_validation and self.metrics_key.lower().startswith(TRAIN):
+            raise RuntimeError(
+                f"metrics_key may not start with {TRAIN} when report_init_validation=True"
+            )
 
     def train(self):
 
