@@ -39,8 +39,15 @@ from .AtomicData import _process_dict
 class AtomicDataset(Dataset):
     """The base class for all NequIP datasets."""
 
-    fixed_fields: List[str]
+    fixed_fields: Dict[str, Any]
     root: str
+
+    def __init__(
+        self,
+        root: str,
+        type_mapper: Optional[TypeMapper] = None,
+    ):
+        super().__init__(root=root, transform=type_mapper)
 
     def statistics(
         self,
@@ -125,7 +132,7 @@ class AtomicInMemoryDataset(AtomicDataset):
         # Initialize the InMemoryDataset, which runs download and process
         # See https://pytorch-geometric.readthedocs.io/en/latest/notes/create_dataset.html#creating-in-memory-datasets
         # Then pre-process the data if disk files are not found
-        super().__init__(root=root, transform=type_mapper)
+        super().__init__(root=root, type_mapper=type_mapper)
         if self.data is None:
             self.data, self.fixed_fields, include_frames = torch.load(
                 self.processed_paths[0]
