@@ -24,6 +24,7 @@ Most recent change on the bottom.
 ### Changed
 - abbreviate `node_features`->`h` in loss titles
 - failure of permutation equivariance tests no longer short-circuts o3 equivariance tests
+- `NequIPCalculator` now stores all relevant properties computed by the model regardless of requested `properties`, and does not try to access those not computed by the model, allowing models that only compute energy or forces but not both
 
 ### Fixed
 - Equivariance testing correctly handles output cells
