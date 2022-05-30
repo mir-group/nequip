@@ -67,6 +67,37 @@ class AtomicDataset(Dataset):
         # self.transform is always a TypeMapper
         return self.transform
 
+    def _get_parameters(self) -> Dict[str, Any]:
+        """Get a dict of the parameters used to build this dataset."""
+        pnames = list(inspect.signature(self.__init__).parameters)
+        IGNORE_KEYS = {
+            # the type mapper is applied after saving, not before, so doesn't matter to cache validity
+            "type_mapper"
+        }
+        params = {
+            k: getattr(self, k)
+            for k in pnames
+            if k not in IGNORE_KEYS and hasattr(self, k)
+        }
+        # Add other relevant metadata:
+        params["dtype"] = str(torch.get_default_dtype())
+        params["nequip_version"] = nequip.__version__
+        return params
+
+    @property
+    def processed_dir(self) -> str:
+        # We want the file name to change when the parameters change
+        # So, first we get all parameters:
+        params = self._get_parameters()
+        # Make some kind of string of them:
+        # we don't care about this possibly changing between python versions,
+        # since a change in python version almost certainly means a change in
+        # versions of other things too, and is a good reason to recompute
+        buffer = yaml.dump(params).encode("ascii")
+        # And hash it:
+        param_hash = hashlib.sha1(buffer).hexdigest()
+        return f"{self.root}/processed_dataset_{param_hash}"
+
 
 class AtomicInMemoryDataset(AtomicDataset):
     r"""Base class for all datasets that fit in memory.
@@ -151,37 +182,6 @@ class AtomicInMemoryDataset(AtomicDataset):
     @property
     def raw_file_names(self):
         raise NotImplementedError()
-
-    def _get_parameters(self) -> Dict[str, Any]:
-        """Get a dict of the parameters used to build this dataset."""
-        pnames = list(inspect.signature(self.__init__).parameters)
-        IGNORE_KEYS = {
-            # the type mapper is applied after saving, not before, so doesn't matter to cache validity
-            "type_mapper"
-        }
-        params = {
-            k: getattr(self, k)
-            for k in pnames
-            if k not in IGNORE_KEYS and hasattr(self, k)
-        }
-        # Add other relevant metadata:
-        params["dtype"] = str(torch.get_default_dtype())
-        params["nequip_version"] = nequip.__version__
-        return params
-
-    @property
-    def processed_dir(self) -> str:
-        # We want the file name to change when the parameters change
-        # So, first we get all parameters:
-        params = self._get_parameters()
-        # Make some kind of string of them:
-        # we don't care about this possibly changing between python versions,
-        # since a change in python version almost certainly means a change in
-        # versions of other things too, and is a good reason to recompute
-        buffer = yaml.dump(params).encode("ascii")
-        # And hash it:
-        param_hash = hashlib.sha1(buffer).hexdigest()
-        return f"{self.root}/processed_dataset_{param_hash}"
 
     @property
     def processed_file_names(self) -> List[str]:
