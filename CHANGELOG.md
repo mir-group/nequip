@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Most recent change on the bottom.
 
 
-## [Unreleased] - 0.5.5
+## [Unreleased] - 0.5.6
+
+## [0.5.5] - 2022-06-16
 ### Added
 - BETA! Support for stress in training and inference
 - `EMTTestDataset` for quick synthetic fake PBC data
