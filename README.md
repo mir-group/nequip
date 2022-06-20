@@ -135,7 +135,7 @@ For installation instructions, please see the [`pair_nequip` repository](https:/
 
 The theory behind NequIP is described in our preprint (1). NequIP's backend builds on e3nn, a general framework for building E(3)-equivariant neural networks (2). If you use this repository in your work, please consider citing NequIP (1) and e3nn (3):
 
- 1. https://arxiv.org/abs/2101.03164
+ 1. https://www.nature.com/articles/s41467-022-29939-5
  2. https://e3nn.org
  3. https://doi.org/10.5281/zenodo.3724963
 

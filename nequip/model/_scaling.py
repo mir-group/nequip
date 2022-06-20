@@ -90,7 +90,7 @@ def GlobalRescale(
             global_shift = computed_stats[str_names.index(global_shift)]
             logging.info(f"Replace string {s} to {global_shift}")
 
-        if isinstance(global_scale, float) and global_scale < RESCALE_THRESHOLD:
+        if global_scale is not None and global_scale < RESCALE_THRESHOLD:
             raise ValueError(
                 f"Global energy scaling was very low: {global_scale}. If dataset values were used, does the dataset contain insufficient variation? Maybe try disabling global scaling with global_scale=None."
             )
@@ -225,6 +225,10 @@ def PerSpeciesRescale(
                 f"Per species energy scaling was very low: {scales}. Maybe try setting {module_prefix}_scales = 1."
             )
 
+        logging.info(
+            f"Atomic outputs are scaled by: {TypeMapper.format(scales, config.type_names)}, shifted by {TypeMapper.format(shifts, config.type_names)}."
+        )
+
     else:
         # Put dummy values
         # the real ones will be loaded from the state dict later
@@ -252,10 +256,6 @@ def PerSpeciesRescale(
         shared_params=config,
         builder=PerSpeciesScaleShift,
         params=params,
-    )
-
-    logging.info(
-        f"Atomic outputs are scaled by: {TypeMapper.format(scales, config.type_names)}, shifted by {TypeMapper.format(shifts, config.type_names)}."
     )
 
     # == Build the model ==

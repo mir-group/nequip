@@ -8,7 +8,6 @@ from typing import Tuple, Dict, Union
 import argparse
 import pathlib
 import logging
-import warnings
 import yaml
 
 # This is a weird hack to avoid Intel MKL issues on the cluster when this is called as a subprocess of a process that has itself initialized PyTorch.
@@ -22,10 +21,11 @@ import ase.data
 from e3nn.util.jit import script
 
 from nequip.model import model_from_config
-from nequip.scripts.train import _set_global_options, default_config
 from nequip.train import Trainer
 from nequip.utils import Config
 from nequip.utils.versions import check_code_version, get_config_code_versions
+from nequip.scripts.train import default_config
+from nequip.utils._global_options import _set_global_options
 
 CONFIG_KEY: Final[str] = "config"
 NEQUIP_VERSION_KEY: Final[str] = "nequip_version"
@@ -78,7 +78,6 @@ def load_deployed_model(
     """
     metadata = {k: "" for k in _ALL_METADATA_KEYS}
     try:
-        # TODO: use .to()? instead of map_location
         model = torch.jit.load(model_path, map_location=device, _extra_files=metadata)
     except RuntimeError as e:
         raise ValueError(
@@ -103,43 +102,28 @@ def load_deployed_model(
     # Set up global settings:
     assert set_global_options in (True, False, "warn")
     if set_global_options:
-        # Set TF32 support
-        # See https://pytorch.org/docs/stable/notes/cuda.html#tensorfloat-32-tf32-on-ampere-devices
-        if torch.cuda.is_available() and metadata[TF32_KEY] != "":
-            allow_tf32 = bool(int(metadata[TF32_KEY]))
-            if torch.torch.backends.cuda.matmul.allow_tf32 is not allow_tf32:
-                # Update setting
-                if set_global_options == "warn":
-                    warnings.warn(
-                        "Loaded model had a different value for allow_tf32 than was currently set; changing the GLOBAL setting!"
-                    )
-                torch.backends.cuda.matmul.allow_tf32 = allow_tf32
-                torch.backends.cudnn.allow_tf32 = allow_tf32
-
-        # JIT bailout
-        if int(torch.__version__.split(".")[1]) >= 11:
-            strategy = metadata.get(JIT_FUSION_STRATEGY, "")
-            if strategy != "":
-                strategy = [e.split(",") for e in strategy.split(";")]
-                strategy = [(e[0], int(e[1])) for e in strategy]
-            else:
-                strategy = default_config[JIT_FUSION_STRATEGY]
-            old_strat = torch.jit.set_fusion_strategy(strategy)
-            if set_global_options == "warn" and old_strat != strategy:
-                warnings.warn(
-                    f"Loaded model had a different value for _jit_fusion_strategy ({strategy}) than was currently set ({old_strat}); changing the GLOBAL setting!"
-                )
+        global_config_dict = {}
+        global_config_dict["allow_tf32"] = bool(int(metadata[TF32_KEY]))
+        # JIT strategy
+        strategy = metadata.get(JIT_FUSION_STRATEGY, "")
+        if strategy != "":
+            strategy = [e.split(",") for e in strategy.split(";")]
+            strategy = [(e[0], int(e[1])) for e in strategy]
         else:
-            jit_bailout: int = metadata.get(JIT_BAILOUT_KEY, "")
-            if jit_bailout == "":
-                jit_bailout = default_config[JIT_BAILOUT_KEY]
-            jit_bailout = int(jit_bailout)
-            # no way to get current value, so assume we are overwriting it
-            if set_global_options == "warn":
-                warnings.warn(
-                    "Loaded model had a different value for _jit_bailout_depth than was currently set; changing the GLOBAL setting!"
-                )
-            torch._C._jit_set_bailout_depth(jit_bailout)
+            strategy = default_config[JIT_FUSION_STRATEGY]
+        global_config_dict["_jit_fusion_strategy"] = strategy
+        # JIT bailout
+        # _set_global_options will check torch version
+        jit_bailout: int = metadata.get(JIT_BAILOUT_KEY, "")
+        if jit_bailout == "":
+            jit_bailout = default_config[JIT_BAILOUT_KEY]
+        jit_bailout = int(jit_bailout)
+        global_config_dict["_jit_bailout_depth"] = jit_bailout
+        # call to actually set the global options
+        _set_global_options(
+            global_config_dict,
+            warn_on_override=set_global_options == "warn",
+        )
     return model, metadata
 
 
@@ -152,6 +136,7 @@ def main(args=None):
         required = {"required": True}
     else:
         required = {}
+    parser.add_argument("--verbose", help="log level", default="INFO", type=str)
     subparsers = parser.add_subparsers(dest="command", title="commands", **required)
     info_parser = subparsers.add_parser(
         "info", help="Get information from a deployed model file"
@@ -181,8 +166,7 @@ def main(args=None):
 
     args = parser.parse_args(args=args)
 
-    # TODO: configurable?
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=getattr(logging, args.verbose.upper()))
 
     if args.command == "info":
         model, metadata = load_deployed_model(args.model_path, set_global_options=False)

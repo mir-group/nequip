@@ -2,6 +2,7 @@ import pytest
 
 import logging
 import tempfile
+import functools
 import torch
 
 import numpy as np
@@ -84,6 +85,10 @@ def config(request):
         (
             ["EnergyModel"],
             AtomicDataDict.TOTAL_ENERGY_KEY,
+        ),
+        (
+            ["EnergyModel", "StressForceOutput"],
+            AtomicDataDict.STRESS_KEY,
         ),
     ]
 )
@@ -187,9 +192,37 @@ class TestWorkflow:
         output = instance(AtomicData.to_AtomicDataDict(data))
         assert out_field in output
 
-    def test_saveload(self, model):
-        # TO DO, test load/save state_dict
-        pass
+    def test_batch(self, model, atomic_batch, device, float_tolerance):
+        """Confirm that the results for individual examples are the same regardless of whether they are batched."""
+        allclose = functools.partial(torch.allclose, atol=float_tolerance)
+        instance, out_field = model
+        instance.to(device)
+        data = atomic_batch.to(device)
+        data1 = data.get_example(0)
+        data2 = data.get_example(1)
+        output1 = instance(AtomicData.to_AtomicDataDict(data1))
+        output2 = instance(AtomicData.to_AtomicDataDict(data2))
+        output = instance(AtomicData.to_AtomicDataDict(data))
+        if out_field in (AtomicDataDict.TOTAL_ENERGY_KEY, AtomicDataDict.STRESS_KEY):
+            assert allclose(
+                output1[out_field],
+                output[out_field][0],
+            )
+            assert allclose(
+                output2[out_field],
+                output[out_field][1],
+            )
+        elif out_field in (AtomicDataDict.FORCE_KEY,):
+            assert allclose(
+                output1[out_field],
+                output[out_field][output[AtomicDataDict.BATCH_KEY] == 0],
+            )
+            assert allclose(
+                output2[out_field],
+                output[out_field][output[AtomicDataDict.BATCH_KEY] == 1],
+            )
+        else:
+            raise NotImplementedError
 
 
 class TestGradient:
@@ -258,7 +291,22 @@ class TestGradient:
         n_at = data[AtomicDataDict.POSITIONS_KEY].shape[0]
         partial_forces = output_partial[AtomicDataDict.PARTIAL_FORCE_KEY]
         assert partial_forces.shape == (n_at, n_at, 3)
-        # TODO check sparsity?
+        # confirm that sparsity matches graph topology:
+        edge_index = data[AtomicDataDict.EDGE_INDEX_KEY]
+        adjacency = torch.zeros(n_at, n_at, dtype=torch.bool)
+        strict_locality = False
+        if strict_locality:
+            # only adjacent for nonzero deriv to neighbors
+            adjacency[edge_index[0], edge_index[1]] = True
+            adjacency[
+                torch.arange(n_at), torch.arange(n_at)
+            ] = True  # diagonal is ofc True
+        else:
+            # technically only adjacent to n-th degree neighbor, but in this tiny test system that is same as all-to-all and easier to program
+            adjacency = data[AtomicDataDict.BATCH_KEY].view(-1, 1) == data[
+                AtomicDataDict.BATCH_KEY
+            ].view(1, -1)
+        assert torch.equal(adjacency, torch.any(partial_forces != 0, dim=-1))
 
 
 class TestAutoGradient:

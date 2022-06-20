@@ -1,5 +1,6 @@
 from nequip.nn import GraphModuleMixin, GradientOutput
 from nequip.nn import PartialForceOutput as PartialForceOutputModule
+from nequip.nn import StressOutput as StressOutputModule
 from nequip.data import AtomicDataDict
 
 
@@ -7,10 +8,10 @@ def ForceOutput(model: GraphModuleMixin) -> GradientOutput:
     r"""Add forces to a model that predicts energy.
 
     Args:
-        energy_model: the model to wrap. Must have ``AtomicDataDict.TOTAL_ENERGY_KEY`` as an output.
+        model: the energy model to wrap. Must have ``AtomicDataDict.TOTAL_ENERGY_KEY`` as an output.
 
     Returns:
-        A ``GradientOutput`` wrapping ``energy_model``.
+        A ``GradientOutput`` wrapping ``model``.
     """
     if AtomicDataDict.FORCE_KEY in model.irreps_out:
         raise ValueError("This model already has force outputs.")
@@ -27,10 +28,10 @@ def PartialForceOutput(model: GraphModuleMixin) -> GradientOutput:
     r"""Add forces and partial forces to a model that predicts energy.
 
     Args:
-        energy_model: the model to wrap. Must have ``AtomicDataDict.TOTAL_ENERGY_KEY`` as an output.
+        model: the energy model to wrap. Must have ``AtomicDataDict.TOTAL_ENERGY_KEY`` as an output.
 
     Returns:
-        A ``GradientOutput`` wrapping ``energy_model``.
+        A ``GradientOutput`` wrapping ``model``.
     """
     if (
         AtomicDataDict.FORCE_KEY in model.irreps_out
@@ -38,3 +39,20 @@ def PartialForceOutput(model: GraphModuleMixin) -> GradientOutput:
     ):
         raise ValueError("This model already has force outputs.")
     return PartialForceOutputModule(func=model)
+
+
+def StressForceOutput(model: GraphModuleMixin) -> GradientOutput:
+    r"""Add forces and stresses to a model that predicts energy.
+
+    Args:
+        model: the model to wrap. Must have ``AtomicDataDict.TOTAL_ENERGY_KEY`` as an output.
+
+    Returns:
+        A ``StressOutput`` wrapping ``model``.
+    """
+    if (
+        AtomicDataDict.FORCE_KEY in model.irreps_out
+        or AtomicDataDict.STRESS_KEY in model.irreps_out
+    ):
+        raise ValueError("This model already has force or stress outputs.")
+    return StressOutputModule(func=model)

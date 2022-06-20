@@ -7,7 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Most recent change on the bottom.
 
 
-## [Unreleased] - 0.5.4
+## [Unreleased] - 0.5.6
+
+## [0.5.5] - 2022-06-20
+### Added
+- BETA! Support for stress in training and inference
+- `EMTTestDataset` for quick synthetic fake PBC data
+- multiprocessing for ASE dataset loading/processing
+- `nequip-benchmark` times dataset loading, model creation, and compilation
+- `validation_batch_size`
+- support multiple metrics on same field with different `functional`s
+- allow custom metrics names
+- allow `e3nn==0.5.0`
+- `--verbose` option to `nequip-deploy`
+- print data statistics in `nequip-benchmark`
+- `normalized_sum` reduction in `AtomwiseReduce`
+
+### Changed
+- abbreviate `node_features`->`h` in loss titles
+- failure of permutation equivariance tests no longer short-circuts o3 equivariance tests
+- `NequIPCalculator` now stores all relevant properties computed by the model regardless of requested `properties`, and does not try to access those not computed by the model, allowing models that only compute energy or forces but not both
+
+### Fixed
+- Equivariance testing correctly handles output cells
+- Equivariance testing correctly handles one-node or one-edge data
+- `report_init_validation` now runs on validation set instead of training set
+- crash when unable to find `os.sched_getaffinity` on some systems
+- don't incorrectly log per-species scales/shifts when loading model (such as for deployment)
+- `nequip-benchmark` now picks data frames deterministically
+- useful error message for `metrics_key: training_*` with `report_init_validation: True` (#213)
 
 ## [0.5.4] - 2022-04-12
 ### Added

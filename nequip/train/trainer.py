@@ -147,6 +147,7 @@ class Trainer:
         optim_kwargs (dict): parameters to initialize the optimizer
 
         batch_size (int): size of each batch
+        validation_batch_size (int): batch size for evaluating the model for validation
         shuffle (bool): parameters for dataloader
         n_train (int): # of frames for training
         n_val (int): # of frames for validation
@@ -236,6 +237,7 @@ class Trainer:
         ema_use_num_updates=True,
         exclude_keys: list = [],
         batch_size: int = 5,
+        validation_batch_size: int = 5,
         shuffle: bool = True,
         n_train: Optional[int] = None,
         n_val: Optional[int] = None,
@@ -740,6 +742,10 @@ class Trainer:
             raise RuntimeError(
                 f"metrics_key should start with either {VALIDATION} or {TRAIN}"
             )
+        if self.report_init_validation and self.metrics_key.lower().startswith(TRAIN):
+            raise RuntimeError(
+                f"metrics_key may not start with {TRAIN} when report_init_validation=True"
+            )
 
     def train(self):
 
@@ -886,12 +892,15 @@ class Trainer:
 
     def epoch_step(self):
 
-        datasets = [self.dl_train, self.dl_val]
+        dataloaders = {TRAIN: self.dl_train, VALIDATION: self.dl_val}
         categories = [TRAIN, VALIDATION] if self.iepoch >= 0 else [VALIDATION]
+        dataloaders = [
+            dataloaders[c] for c in categories
+        ]  # get the right dataloaders for the catagories we actually run
         self.metrics_dict = {}
         self.loss_dict = {}
 
-        for category, dataset in zip(categories, datasets):
+        for category, dataset in zip(categories, dataloaders):
             if category == VALIDATION and self.use_ema:
                 cm = self.ema.average_parameters()
             else:
@@ -919,7 +928,11 @@ class Trainer:
 
         self.end_of_epoch_log()
 
-        if self.lr_scheduler_name == "ReduceLROnPlateau":
+        # if the iepoch for the past epoch was -1, it will now be 0
+        # for -1 (report_init_validation: True) we aren't training, so it's wrong
+        # to step the LR scheduler even if it will have no effect with this particular
+        # scheduler at the beginning of training.
+        if self.iepoch > 0 and self.lr_scheduler_name == "ReduceLROnPlateau":
             self.lr_sched.step(metrics=self.mae_dict[self.metrics_key])
 
         for callback in self._end_of_epoch_callbacks:
@@ -1190,7 +1203,6 @@ class Trainer:
         # based on recommendations from
         # https://pytorch.org/tutorials/recipes/recipes/tuning_guide.html#enable-async-data-loading-and-augmentation
         dl_kwargs = dict(
-            batch_size=self.batch_size,
             exclude_keys=self.exclude_keys,
             num_workers=self.dataloader_num_workers,
             # keep stuff around in memory
@@ -1207,8 +1219,13 @@ class Trainer:
         self.dl_train = DataLoader(
             dataset=self.dataset_train,
             shuffle=self.shuffle,  # training should shuffle
+            batch_size=self.batch_size,
             **dl_kwargs,
         )
         # validation, on the other hand, shouldn't shuffle
         # we still pass the generator just to be safe
-        self.dl_val = DataLoader(dataset=self.dataset_val, **dl_kwargs)
+        self.dl_val = DataLoader(
+            dataset=self.dataset_val,
+            batch_size=self.validation_batch_size,
+            **dl_kwargs,
+        )

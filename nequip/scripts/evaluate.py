@@ -14,7 +14,8 @@ import torch
 from nequip.data import AtomicData, Collater, dataset_from_config, register_fields
 from nequip.scripts.deploy import load_deployed_model, R_MAX_KEY
 from nequip.scripts._logger import set_up_script_logger
-from nequip.scripts.train import default_config, _set_global_options, check_code_version
+from nequip.scripts.train import default_config, check_code_version
+from nequip.utils._global_options import _set_global_options
 from nequip.train import Trainer, Loss, Metrics
 from nequip.utils import load_file, instantiate, Config
 
@@ -244,20 +245,16 @@ def main(args=None, running_as_script: bool = True):
         )
 
     dataset_is_validation: bool = False
-    # Currently, pytorch_geometric prints some status messages to stdout while loading the dataset
-    # TODO: fix may come soon: https://github.com/rusty1s/pytorch_geometric/pull/2950
-    # Until it does, just redirect them.
-    with contextlib.redirect_stdout(sys.stderr):
-        try:
-            # Try to get validation dataset
-            dataset = dataset_from_config(dataset_config, prefix="validation_dataset")
-            dataset_is_validation = True
-        except KeyError:
-            pass
-        if not dataset_is_validation:
-            # Get shared train + validation dataset
-            # prefix `dataset`
-            dataset = dataset_from_config(dataset_config)
+    try:
+        # Try to get validation dataset
+        dataset = dataset_from_config(dataset_config, prefix="validation_dataset")
+        dataset_is_validation = True
+    except KeyError:
+        pass
+    if not dataset_is_validation:
+        # Get shared train + validation dataset
+        # prefix `dataset`
+        dataset = dataset_from_config(dataset_config)
     logger.info(
         f"Loaded {'validation_' if dataset_is_validation else ''}dataset specified in {args.dataset_config.name}.",
     )

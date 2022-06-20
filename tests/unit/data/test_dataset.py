@@ -8,7 +8,9 @@ from ase.data import chemical_symbols
 from ase.io import write
 
 from nequip.data import (
+    AtomicData,
     AtomicDataDict,
+    Collater,
     AtomicInMemoryDataset,
     NpzDataset,
     ASEDataset,
@@ -188,7 +190,16 @@ class TestStatistics:
             ],
             modes=["mean_std"],
         )
-        # TODO: check correct
+        collater = Collater.for_dataset(npz_dataset)
+        all_data = collater([npz_dataset[i] for i in range(len(npz_dataset))])
+        all_data = AtomicData.to_AtomicDataDict(all_data)
+        all_data = AtomicDataDict.with_edge_vectors(all_data, with_lengths=True)
+        assert torch.allclose(
+            avg_edge_length, torch.mean(all_data[AtomicDataDict.EDGE_LENGTH_KEY])
+        )
+        assert torch.allclose(
+            std_edge_len, torch.std(all_data[AtomicDataDict.EDGE_LENGTH_KEY])
+        )
 
 
 class TestPerAtomStatistics:
