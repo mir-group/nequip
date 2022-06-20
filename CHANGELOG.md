@@ -9,7 +9,7 @@ Most recent change on the bottom.
 
 ## [Unreleased] - 0.5.6
 
-## [0.5.5] - 2022-06-16
+## [0.5.5] - 2022-06-20
 ### Added
 - BETA! Support for stress in training and inference
 - `EMTTestDataset` for quick synthetic fake PBC data
