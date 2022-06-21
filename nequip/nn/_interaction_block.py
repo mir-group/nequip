@@ -116,8 +116,8 @@ class InteractionBlock(GraphModuleMixin, torch.nn.Module):
             + invariant_layers * [invariant_neurons]
             + [tp.weight_numel],
             {
-                "ssp": ShiftedSoftPlus,
-                "silu": torch.nn.functional.silu,
+                "ssp": ShiftedSoftPlus(),
+                "silu": torch.nn.SiLU(),
             }[nonlinearity_scalars["e"]],
         )
 
