@@ -35,6 +35,7 @@ Examples:
 
 """
 import inspect
+import logging
 
 from copy import deepcopy
 from typing import Optional
@@ -48,12 +49,14 @@ class Config(object):
         config: Optional[dict] = None,
         allow_list: Optional[list] = None,
         exclude_keys: Optional[list] = None,
+        defaults: Optional[dict] = None,
     ):
 
         object.__setattr__(self, "_items", dict())
         object.__setattr__(self, "_item_types", dict())
         object.__setattr__(self, "_allow_list", list())
         object.__setattr__(self, "_allow_all", True)
+        object.__setattr__(self, "_accessed_keys", set())
 
         if allow_list is not None:
             self.add_allow_list(allow_list, default_values={})
@@ -62,6 +65,15 @@ class Config(object):
             config = {
                 key: value for key, value in config.items() if key not in exclude_keys
             }
+
+        object.__setattr__(self, "_initial_keys", frozenset(config.keys()))
+
+        if defaults is not None:
+            tmp = config
+            config = defaults.copy()
+            if tmp is not None:
+                config.update(tmp)
+            del tmp
         if config is not None:
             self.update(config)
 
@@ -80,6 +92,7 @@ class Config(object):
         return dict(self)
 
     def __getitem__(self, key):
+        self._accessed_keys.add(key)
         return self._items[key]
 
     def get_type(self, key):
@@ -151,12 +164,14 @@ class Config(object):
     __setattr__ = __setitem__
 
     def __getattr__(self, key):
+        self._accessed_keys.add(key)
         return self.__getitem__(key)
 
     def __contains__(self, key):
         return key in self._items
 
     def pop(self, *args):
+        self._accessed_keys.add(args[0])
         return self._items.pop(*args)
 
     def update_w_prefix(
@@ -211,6 +226,8 @@ class Config(object):
             keys (set): set of keys being udpated
 
         """
+        if dictionary is None:
+            dictionary = {}
 
         keys = []
 
@@ -227,6 +244,7 @@ class Config(object):
         return set(keys) - set([None])
 
     def get(self, *args):
+        self._accessed_keys.add(args[0])
         return self._items.get(*args)
 
     def persist(self):
@@ -266,8 +284,7 @@ class Config(object):
 
     @staticmethod
     def from_dict(dictionary: dict, defaults: dict = {}):
-        c = Config(defaults)
-        c.update(dictionary)
+        c = Config(dictionary, defaults=defaults)
         return c
 
     @staticmethod
@@ -338,3 +355,11 @@ class Config(object):
             return Config(config=default_params, allow_list=param_keys)
 
     load = from_file
+
+    def warn_unused(self):
+        # = Warn about unused keys =
+        unused_keys = self._initial_keys - self._accessed_keys
+        if len(unused_keys) > 0:
+            logging.warn(
+                f"!!! Keys {', '.join('`%s`' % k for k in unused_keys)} appeared in the config but were not used. Please check if any of them have a typo or should have been used!!!"
+            )
