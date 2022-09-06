@@ -706,6 +706,9 @@ class Trainer:
 
         self.num_weights = sum(p.numel() for p in self.model.parameters())
         self.logger.info(f"Number of weights: {self.num_weights}")
+        self.logger.info(
+            f"Number of trainable weights: {sum(p.numel() for p in self.model.parameters() if p.requires_grad)}"
+        )
 
         self.rescale_layers = []
         outer_layer = self.model

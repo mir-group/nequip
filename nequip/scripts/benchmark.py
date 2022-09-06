@@ -126,6 +126,10 @@ def main(args=None):
     model = model_from_config(config, initialize=True, dataset=dataset)
     model_time = time.time() - model_time
     print(f"    building model took {model_time:.4f}s")
+    print(f"    model has {sum(p.numel() for p in model.parameters())} weights")
+    print(
+        f"    model has {sum(p.numel() for p in model.parameters() if p.requires_grad)} trainable weights"
+    )
     print("Compile...")
     # "Deploy" it
     model.eval()
