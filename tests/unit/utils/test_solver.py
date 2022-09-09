@@ -1,8 +1,7 @@
 import torch
 import pytest
 
-from nequip.utils.regressor import base_gp
-from sklearn.gaussian_process.kernels import DotProduct
+from nequip.utils.regressor import solver
 
 
 # @pytest.mark.parametrize("full_rank", [True, False])
@@ -27,8 +26,8 @@ def test_random(full_rank, alpha):
     ref_mean = torch.rand((n_dim, 1))
     y = torch.matmul(X, ref_mean)
 
-    mean, std = base_gp(
-        X, y, DotProduct, {"sigma_0": 0, "sigma_0_bounds": "fixed"}, alpha=0.1
+    mean, std = solver(
+        X, y, alpha=0.1
     )
 
     if full_rank:

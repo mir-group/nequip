@@ -281,11 +281,8 @@ class TestPerSpeciesStatistics:
     @pytest.mark.parametrize("fixed_field", [True, False])
     @pytest.mark.parametrize("full_rank", [True, False])
     @pytest.mark.parametrize("subset", [True, False])
-    @pytest.mark.parametrize(
-        "regressor", ["NormalizedGaussianProcess", "GaussianProcess"]
-    )
     def test_per_graph_field(
-        self, npz_dataset, alpha, fixed_field, full_rank, regressor, subset
+        self, npz_dataset, alpha, fixed_field, full_rank, ubset
     ):
 
         if alpha <= 1e-4 and not full_rank:
@@ -333,7 +330,6 @@ class TestPerSpeciesStatistics:
                 AtomicDataDict.TOTAL_ENERGY_KEY
                 + "per_species_mean_std": {
                     "alpha": alpha,
-                    "regressor": regressor,
                     "stride": 1,
                 }
             },
@@ -352,10 +348,8 @@ class TestPerSpeciesStatistics:
             else:
                 assert torch.allclose(mean, ref_mean, rtol=1)
                 assert torch.allclose(std, torch.zeros_like(ref_mean), atol=alpha * 100)
-        elif regressor == "NormalizedGaussianProcess":
-            assert torch.std(mean).numpy() == 0
         else:
-            assert mean[0] == mean[1] * 2
+            assert torch.std(mean).numpy() == 0
 
 
 class TestReload:
