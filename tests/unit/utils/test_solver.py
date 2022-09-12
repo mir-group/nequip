@@ -4,8 +4,7 @@ import pytest
 from nequip.utils.regressor import solver
 
 
-# @pytest.mark.parametrize("full_rank", [True, False])
-@pytest.mark.parametrize("full_rank", [False])
+@pytest.mark.parametrize("full_rank", [True, False])
 @pytest.mark.parametrize("alpha", [0, 1e-3, 0.1, 1])
 def test_random(full_rank, alpha):
 
@@ -23,14 +22,20 @@ def test_random(full_rank, alpha):
             (n_samples, n_dim)
         )
 
-    ref_mean = torch.rand((n_dim, 1))
-    y = torch.matmul(X, ref_mean)
+    ref_mean, ref_std, y = generate_E(X, 100.0, 1000.0, 20.0)
 
-    mean, std = solver(
-        X, y, alpha=0.1
-    )
+    mean, std = solver(X, y, alpha=alpha)
 
     if full_rank:
-        assert torch.allclose(ref_mean, mean, rtol=0.5)
+        assert torch.allclose(ref_mean, mean, atol=(2*torch.max(ref_std)))
     else:
         assert torch.allclose(mean, mean[0], rtol=1e-3)
+
+def generate_E(X, mean_min, mean_max, std):
+    torch.manual_seed(0)
+    ref_mean = torch.rand((X.shape[1])) * (mean_max - mean_min) + mean_min
+    t_mean = torch.ones((X.shape[0], 1)) * ref_mean.reshape([1, -1])
+    ref_std = torch.rand((X.shape[1])) * std
+    t_std = torch.ones((X.shape[0], 1)) * ref_std.reshape([1, -1])
+    E = torch.normal(t_mean, t_std)
+    return ref_mean, ref_std, (X * E).sum(axis=-1)
