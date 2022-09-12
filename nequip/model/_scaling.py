@@ -12,7 +12,10 @@ RESCALE_THRESHOLD = 1e-6
 
 
 def RescaleEnergyEtc(
-    model: GraphModuleMixin, config, initialize: bool, dataset: Optional[AtomicDataset] = None
+    model: GraphModuleMixin,
+    config,
+    initialize: bool,
+    dataset: Optional[AtomicDataset] = None,
 ):
     return GlobalRescale(
         model=model,
