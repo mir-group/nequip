@@ -37,7 +37,7 @@ setup(
         "typing_extensions;python_version<'3.8'",  # backport of Final
         "torch-runstats>=0.2.0",
         "torch-ema>=0.3.0",
-        "scikit_learn<=1.0.1",  # for GaussianProcess for per-species statistics; 1.0.2 has a bug!
+        "scikit_learn>=1.0.1",
     ],
     zip_safe=True,
 )
