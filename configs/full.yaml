@@ -17,7 +17,19 @@ default_dtype: float32                                                          
 allow_tf32: false                                                                 # whether to use TensorFloat32 if it is available
 # device:  cuda                                                                   # which device to use. Default: automatically detected cuda or "cpu"
 
-# network
+# == network ==
+
+# `model_builders` defines a series of functions that will be called to construct the model
+# each model builder has the opportunity to update the model, the config, or both
+# model builders from other packages are allowed (see mir-group/allegro for an example); those from `nequip.model` don't require a prefix
+# these are the default model builders:
+model_builders:
+ - SimpleIrrepsConfig         # update the config with all the irreps for the network if using the simplified `l_max` / `num_features` / `parity` syntax
+ - EnergyModel                # build a full NequIP model
+ - PerSpeciesRescale          # add per-atom / per-species scaling and shifting to the NequIP model before the total energy sum
+ - ForceOutput                # wrap the energy model in a module that uses autodifferention to compute the forces
+ - RescaleEnergyEtc           # wrap the entire model in the appropriate global rescaling of the energy, forces, etc.
+
 r_max: 4.0                                                                        # cutoff radius in length units, here Angstrom, this is an important hyperparamter to scan
 num_layers: 4                                                                     # number of interaction blocks, we find 3-5 to work best
 
