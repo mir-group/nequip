@@ -24,7 +24,11 @@ def test_random(full_rank, alpha, per_species_set):
 
     mean, std = solver(X, y, alpha=alpha)
 
+    tolerance = 2 * torch.max(ref_std)
+
     if full_rank:
-        assert torch.allclose(ref_mean, mean, atol=(3*torch.max(ref_std)))
+        assert torch.allclose(ref_mean, mean, atol=tolerance)
     else:
         assert torch.allclose(mean[n_dim-1], mean[n_dim-2], rtol=1e-3)
+
+    assert torch.max(std) < tolerance

@@ -1,14 +1,17 @@
 import logging
 import torch
-from typing import Optional, Sequence
-from sklearn.linear_model import Ridge
 
+from torch import matmul
+from torch.linalg import solve, inv
+from typing import Optional, Sequence
+from opt_einsum import contract
 
 def solver(X, y, alpha=0.1, stride=1, **kwargs):
 
     dtype = torch.get_default_dtype()
     X = X[::stride].to(dtype)
     y = y[::stride].to(dtype)
+    n_features=X.shape[1]
 
     X, y = down_sampling_by_composition(X, y)
 
@@ -16,13 +19,20 @@ def solver(X, y, alpha=0.1, stride=1, **kwargs):
     # feature_rms = 1.0 / torch.sqrt(torch.mean(X**2, axis=0))
     # feature_rms = torch.nan_to_num(feature_rms, 1)
 
-    clf = Ridge(alpha, fit_intercept=False, **kwargs)
-    clf.fit(X, y - (torch.sum(X, axis=1, keepdim=True) * y_mean).reshape(y.shape))
+    A = matmul(X.T, X) + alpha*torch.eye(n_features)
+    dy = y - (torch.sum(X, axis=1, keepdim=True) * y_mean).reshape(y.shape)
+    Xy = matmul(X.T, dy)
 
-    mean = torch.as_tensor(clf.coef_, dtype=dtype).reshape([-1])
+    mean = solve(A, Xy)
+
+
+    sigma2 = torch.var(matmul(X, mean) - dy)
+    Ainv = inv(A)
+    std = sigma2*contract('ij,kj,kl,li->i', Ainv, X, X, Ainv)
+
     mean = mean + y_mean.reshape([-1])
 
-    return mean, None
+    return mean, std
 
 
 def down_sampling_by_composition(
