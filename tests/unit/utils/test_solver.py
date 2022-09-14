@@ -15,6 +15,8 @@ def test_random(full_rank, alpha, per_species_set):
     ref_mean, ref_std, E, n_samples, n_dim = per_species_set
 
     dtype = torch.get_default_dtype()
+
+
     X = torch.randint(low=1, high=10, size=(n_samples, n_dim)).to(dtype)
     if not full_rank:
         X[:, n_dim-2] = X[:, n_dim -1]
