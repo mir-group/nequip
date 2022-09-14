@@ -18,10 +18,9 @@ def solver(X, y, alpha=0.1, stride=1, **kwargs):
 
     clf = Ridge(alpha, fit_intercept=False, **kwargs)
     clf.fit(X, y - (torch.sum(X, axis=1, keepdim=True) * y_mean).reshape(y.shape))
-    vec = torch.diag(torch.ones(X.shape[1]))
-    mean = torch.as_tensor(clf.predict(vec), dtype=dtype)
 
-    mean = mean.reshape([-1]) + y_mean.reshape([-1])
+    mean = torch.as_tensor(clf.coef_, dtype=dtype).reshape([-1])
+    mean = mean + y_mean.reshape([-1])
 
     return mean, None
 
