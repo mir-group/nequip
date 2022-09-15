@@ -136,6 +136,7 @@ def atomic_batch(nequip_dataset):
 # Use debug mode
 set_irreps_debug(True)
 
+
 @pytest.fixture(scope="function")
 def per_species_set():
     dtype = torch.get_default_dtype()
@@ -151,5 +152,3 @@ def per_species_set():
     t_std = torch.ones((n_sample, 1)) * ref_std.reshape([1, -1])
     E = torch.normal(t_mean, t_std)
     return ref_mean.to(dtype), ref_std.to(dtype), E.to(dtype), n_sample, n_species
-
-
