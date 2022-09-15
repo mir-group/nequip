@@ -5,7 +5,7 @@ from nequip.utils.regressor import solver
 
 
 @pytest.mark.parametrize("full_rank", [True, False])
-@pytest.mark.parametrize("alpha", [0, 1e-3, 0.1, 1])
+@pytest.mark.parametrize("alpha", [0, 1e-3, 1e-2])
 def test_random(full_rank, alpha, per_species_set):
 
     if alpha == 0 and not full_rank:
@@ -26,12 +26,13 @@ def test_random(full_rank, alpha, per_species_set):
 
     tolerance = torch.max(ref_std)
 
-    print(mean, std)
-    print(ref_mean)
+    print("tolerance", tolerance)
+    print("solution", mean, std)
+    print("diff", mean-ref_mean)
 
     if full_rank:
         assert torch.allclose(ref_mean, mean, atol=tolerance)
     else:
-        assert torch.allclose(mean[n_dim - 1], mean[n_dim - 2], rtol=1e-3)
+        assert torch.allclose(mean[n_dim - 1], mean[n_dim - 2], atol=tolerance)
 
     assert torch.max(std) < tolerance

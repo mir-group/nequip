@@ -31,7 +31,7 @@ def ase_file(molecules):
 
 
 MAX_ATOMIC_NUMBER: int = 5
-NATOMS = 3
+NATOMS = 10
 
 
 @pytest.fixture(scope="function")
@@ -277,7 +277,7 @@ class TestPerSpeciesStatistics:
         )
         print(result)
 
-    @pytest.mark.parametrize("alpha", [1e-9, 1e-4, 1e-1])
+    @pytest.mark.parametrize("alpha", [0, 1e-3, 0.01])
     @pytest.mark.parametrize("fixed_field", [True, False])
     @pytest.mark.parametrize("full_rank", [True, False])
     @pytest.mark.parametrize("subset", [True, False])
@@ -303,10 +303,7 @@ class TestPerSpeciesStatistics:
         del n_spec
         del Ns
 
-        if alpha < 1e-4:
-            ref_mean, ref_std, E = generate_E(N, 100, 1000, 0.0)
-        else:
-            ref_mean, ref_std, E = generate_E(N, 100, 1000, 0.5)
+        ref_mean, ref_std, E = generate_E(N, 100, 1000, 10)
 
         if subset:
             E_orig_order = torch.zeros_like(
@@ -335,16 +332,17 @@ class TestPerSpeciesStatistics:
 
         res = torch.matmul(N, mean.reshape([-1, 1])) - E.reshape([-1, 1])
         res2 = torch.sum(torch.square(res))
-        print("residue", alpha, res2, ref_res2)
+        print("alpha, residue, actual residue", alpha, res2, ref_res2)
         print("mean", mean, ref_mean)
         print("diff in mean", mean - ref_mean)
         print("std", std, ref_std)
 
+        tolerance = torch.max(ref_std)*4
         if full_rank:
-            assert torch.allclose(mean, ref_mean, rtol=1e-1)
+            assert torch.allclose(mean, ref_mean, atol=tolerance)
             # assert torch.allclose(std, torch.zeros_like(ref_mean), atol=alpha * 100)
         else:
-            pass
+            assert torch.allclose(mean, mean[0], atol=tolerance)
             # assert torch.std(mean).numpy() == 0
 
 
