@@ -24,9 +24,9 @@ def test_random(full_rank, alpha, per_species_set):
 
     mean, std = solver(X, y, alpha=alpha)
 
-    tolerance = 2 * torch.max(ref_std)
+    tolerance = torch.max(ref_std)
 
-    print(mean)
+    print(mean, std)
     print(ref_mean)
 
     if full_rank:

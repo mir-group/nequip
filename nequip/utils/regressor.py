@@ -29,11 +29,11 @@ def solver(X, y, alpha=0.1, stride=1, **kwargs):
 
     sigma2 = torch.var(matmul(X, mean) - dy)
     Ainv = inv(A)
-    std = sigma2 * contract("ij,kj,kl,li->i", Ainv, X, X, Ainv)
+    cov = torch.sqrt(sigma2 * contract("ij,kj,kl,li->i", Ainv, X, X, Ainv))
 
     mean = mean + y_mean.reshape([-1])
 
-    return mean, std
+    return mean, cov
 
 
 def down_sampling_by_composition(
