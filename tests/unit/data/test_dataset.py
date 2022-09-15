@@ -337,7 +337,7 @@ class TestPerSpeciesStatistics:
         print("diff in mean", mean - ref_mean)
         print("std", std, ref_std)
 
-        tolerance = torch.max(ref_std)*4
+        tolerance = torch.max(ref_std) * 4
         if full_rank:
             assert torch.allclose(mean, ref_mean, atol=tolerance)
             # assert torch.allclose(std, torch.zeros_like(ref_mean), atol=alpha * 100)

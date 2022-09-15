@@ -28,7 +28,7 @@ def test_random(full_rank, alpha, per_species_set):
 
     print("tolerance", tolerance)
     print("solution", mean, std)
-    print("diff", mean-ref_mean)
+    print("diff", mean - ref_mean)
 
     if full_rank:
         assert torch.allclose(ref_mean, mean, atol=tolerance)

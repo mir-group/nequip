@@ -18,14 +18,14 @@ def solver(X, y, alpha=0.1, stride=1, **kwargs):
 
     X_norm = torch.sum(X)
 
-    X = X/X_norm
-    y = y/X_norm
+    X = X / X_norm
+    y = y / X_norm
 
     y_mean = torch.sum(y) / torch.sum(X)
 
     feature_rms = torch.sqrt(torch.mean(X**2, axis=0))
 
-    alpha_mat = torch.diag(feature_rms)* alpha*alpha
+    alpha_mat = torch.diag(feature_rms) * alpha * alpha
 
     A = matmul(X.T, X) + alpha_mat
     dy = y - (torch.sum(X, axis=1, keepdim=True) * y_mean).reshape(y.shape)
