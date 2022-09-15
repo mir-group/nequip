@@ -17,10 +17,11 @@ def solver(X, y, alpha=0.1, stride=1, **kwargs):
     X, y = down_sampling_by_composition(X, y)
 
     y_mean = torch.sum(y) / torch.sum(X)
-    # feature_rms = 1.0 / torch.sqrt(torch.mean(X**2, axis=0))
-    # feature_rms = torch.nan_to_num(feature_rms, 1)
+    feature_rms = torch.sqrt(torch.mean(X**2, axis=0))
 
-    A = matmul(X.T, X) + alpha * torch.eye(n_features)
+    alpha_mat = torch.diag(feature_rms)
+
+    A = matmul(X.T, X) + alpha_mat
     dy = y - (torch.sum(X, axis=1, keepdim=True) * y_mean).reshape(y.shape)
     Xy = matmul(X.T, dy)
 
