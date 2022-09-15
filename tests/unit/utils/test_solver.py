@@ -19,7 +19,7 @@ def test_random(full_rank, alpha, per_species_set):
 
     X = torch.randint(low=1, high=10, size=(n_samples, n_dim)).to(dtype)
     if not full_rank:
-        X[:, n_dim - 2] = X[:, n_dim - 1]*2
+        X[:, n_dim - 2] = X[:, n_dim - 1] * 2
     y = (X * E).sum(axis=-1)
 
     mean, std = solver(X, y, alpha=alpha)
