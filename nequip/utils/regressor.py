@@ -12,7 +12,6 @@ def solver(X, y, alpha=0.1, stride=1, **kwargs):
     dtype = torch.get_default_dtype()
     X = X[::stride].to(dtype)
     y = y[::stride].to(dtype)
-    n_features = X.shape[1]
 
     X, y = down_sampling_by_composition(X, y)
 
