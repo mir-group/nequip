@@ -7,7 +7,7 @@ from typing import Optional, Sequence
 from opt_einsum import contract
 
 
-def solver(X, y, alpha=0.001, stride=1, **kwargs):
+def solver(X, y, alpha: Optional[float] = 0.001, stride: Optional[int] = 1, **kwargs):
 
     dtype = torch.get_default_dtype()
     X = X[::stride].to(dtype)
@@ -37,6 +37,8 @@ def solver(X, y, alpha=0.001, stride=1, **kwargs):
     cov = torch.sqrt(sigma2 * contract("ij,kj,kl,li->i", Ainv, X, X, Ainv))
 
     mean = mean + y_mean.reshape([-1])
+
+    logging.debug(f"Ridge Regression, residue {sigma2}")
 
     return mean, cov
 
