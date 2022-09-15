@@ -281,9 +281,7 @@ class TestPerSpeciesStatistics:
     @pytest.mark.parametrize("fixed_field", [True, False])
     @pytest.mark.parametrize("full_rank", [True, False])
     @pytest.mark.parametrize("subset", [True, False])
-    def test_per_graph_field(
-        self, npz_dataset, alpha, fixed_field, full_rank, subset
-    ):
+    def test_per_graph_field(self, npz_dataset, alpha, fixed_field, full_rank, subset):
 
         if alpha <= 1e-4 and not full_rank:
             return
