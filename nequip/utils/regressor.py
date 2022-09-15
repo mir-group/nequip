@@ -7,7 +7,7 @@ from typing import Optional, Sequence
 from opt_einsum import contract
 
 
-def solver(X, y, alpha=0.1, stride=1, **kwargs):
+def solver(X, y, alpha=0.001, stride=1, **kwargs):
 
     dtype = torch.get_default_dtype()
     X = X[::stride].to(dtype)
