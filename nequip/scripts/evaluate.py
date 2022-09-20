@@ -74,7 +74,7 @@ def main(args=None, running_as_script: bool = True):
     )
     parser.add_argument(
         "--batch-size",
-        help="Batch size to use. Larger is usually faster on GPU. If you run out of memory, lower this.",
+        help="Batch size to use. Larger is usually faster on GPU. If you run out of memory, lower this. You can also try to raise this for faster evaluation. Default: 50.",
         type=int,
         default=50,
     )
