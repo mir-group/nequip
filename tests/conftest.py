@@ -140,7 +140,7 @@ set_irreps_debug(True)
 @pytest.fixture(scope="function")
 def per_species_set():
     dtype = torch.get_default_dtype()
-    torch.manual_seed(0)
+    rng = torch.Generator().manual_seed(0)
     mean_min = 1
     mean_max = 100
     std = 20
