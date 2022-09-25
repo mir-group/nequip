@@ -148,7 +148,7 @@ def per_species_set():
     n_species = 9
     ref_mean = torch.rand((n_species)) * (mean_max - mean_min) + mean_min
     t_mean = torch.ones((n_sample, 1)) * ref_mean.reshape([1, -1])
-    ref_std = torch.rand((n_species)) * std
+    ref_std = torch.rand((n_species), generator=rng) * std
     t_std = torch.ones((n_sample, 1)) * ref_std.reshape([1, -1])
     E = torch.normal(t_mean, t_std)
     return ref_mean.to(dtype), ref_std.to(dtype), E.to(dtype), n_sample, n_species
