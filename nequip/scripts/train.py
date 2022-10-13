@@ -86,6 +86,7 @@ def main(args=None, running_as_script: bool = True):
             "This is meant for training models that would be impossible otherwise due to OOM.\n"
             "Note that this comes at a speed cost and SHOULD NOT be used if your training fits in GPU memory without it.\n"
             "Please also consider whether a smaller model is a more appropriate solution!\n"
+            "Also, a warning from PyTorch: 'If you overuse pinned memory, it can cause serious problems when running low on RAM!'"
         )
         with torch.autograd.graph.save_on_cpu(pin_memory=True):
             trainer.train()
