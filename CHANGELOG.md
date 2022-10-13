@@ -10,6 +10,7 @@ Most recent change on the bottom.
 ## [Unreleased] - 0.5.6
 ### Added
 - `nequip-benchmark` and `nequip-train` report number of weights and number of trainable weights
+- GPU OOM offloading mode
 
 ## [0.5.5] - 2022-06-20
 ### Added

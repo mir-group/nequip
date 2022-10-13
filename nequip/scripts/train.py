@@ -40,6 +40,7 @@ default_config = dict(
     model_debug_mode=False,
     equivariance_test=False,
     grad_anomaly_mode=False,
+    gpu_oom_offload=False,
     append=False,
     _jit_bailout_depth=2,  # avoid 20 iters of pain, see https://github.com/pytorch/pytorch/issues/52286
     # Quote from eelison in PyTorch slack:
@@ -75,7 +76,21 @@ def main(args=None, running_as_script: bool = True):
 
     # Train
     trainer.save()
-    trainer.train()
+    if config.get("gpu_oom_offload", False):
+        if not torch.cuda.is_available():
+            raise RuntimeError(
+                "CUDA is not available; --gpu-oom-offload doesn't make sense."
+            )
+        warnings.warn(
+            "! GPU OOM Offloading is ON:\n"
+            "This is meant for training models that would be impossible otherwise due to OOM.\n"
+            "Note that this comes at a speed cost and SHOULD NOT be used if your training fits in GPU memory without it.\n"
+            "Please also consider whether a smaller model is a more appropriate solution!\n"
+        )
+        with torch.autograd.graph.save_on_cpu(pin_memory=True):
+            trainer.train()
+    else:
+        trainer.train()
 
     return
 
@@ -101,6 +116,11 @@ def parse_command_line(args=None):
         action="store_true",
     )
     parser.add_argument(
+        "--gpu-oom-offload",
+        help="Use `torch.autograd.graph.save_on_cpu` to offload intermediate tensors to CPU (host) memory in order to train models that would be impossible otherwise due to OOM. Note that this comes as at a speed cost and SHOULD NOT be used if your training fits in GPU memory without it. Please also consider whether a smaller model is a more appropriate solution.",
+        action="store_true",
+    )
+    parser.add_argument(
         "--log",
         help="log file to store all the screen logging",
         type=Path,
@@ -109,7 +129,12 @@ def parse_command_line(args=None):
     args = parser.parse_args(args=args)
 
     config = Config.from_file(args.config, defaults=default_config)
-    for flag in ("model_debug_mode", "equivariance_test", "grad_anomaly_mode"):
+    for flag in (
+        "model_debug_mode",
+        "equivariance_test",
+        "grad_anomaly_mode",
+        "gpu_oom_offload",
+    ):
         config[flag] = getattr(args, flag) or config[flag]
 
     return config
