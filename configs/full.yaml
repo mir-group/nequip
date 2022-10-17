@@ -29,6 +29,7 @@ model_builders:
  - PerSpeciesRescale          # add per-atom / per-species scaling and shifting to the NequIP model before the total energy sum
  - ForceOutput                # wrap the energy model in a module that uses autodifferention to compute the forces
  - RescaleEnergyEtc           # wrap the entire model in the appropriate global rescaling of the energy, forces, etc.
+#   ^ global rescaling blocks must always go last!
 
 r_max: 4.0                                                                        # cutoff radius in length units, here Angstrom, this is an important hyperparamter to scan
 num_layers: 4                                                                     # number of interaction blocks, we find 3-5 to work best
