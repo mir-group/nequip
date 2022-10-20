@@ -133,23 +133,22 @@ class TypeMapper:
 
     @staticmethod
     def format(
-        data: list, type_names: List[str], element_formatter: str = ".6f"
+        data: list, type_names: List[str]
     ) -> str:
         data = torch.as_tensor(data) if data is not None else None
         if data is None:
             return f"[{', '.join(type_names)}: None]"
         elif data.ndim == 0:
-            return (f"[{', '.join(type_names)}: {{:{element_formatter}}}]").format(data)
-        elif data.ndim == 1 and len(data) == len(type_names):
+            return (f"[{', '.join(type_names)}: {{}}}]").format(data)
+        elif data.ndim == 1:
+            return (f"[{', '.join(type_names)}: {{}}]").format(data)
+        elif data.ndim == 2 and len(data) == len(type_names):
             return (
                 "["
-                + ", ".join(
-                    f"{{{i}[0]}}: {{{i}[1]:{element_formatter}}}"
-                    for i in range(len(data))
-                )
+                + ", ".join(f"{{{i}[0]}}: {{{i}[1]}}" for i in range(len(data)))
                 + "]"
             ).format(*zip(type_names, data))
         else:
             raise ValueError(
-                f"Don't know how to format data=`{data}` for types {type_names} with element_formatter=`{element_formatter}`"
+                f"Don't know how to format data=`{data}` for types {type_names}"
             )
