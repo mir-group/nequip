@@ -297,10 +297,16 @@ class SequentialGraphNetwork(GraphModuleMixin, torch.nn.Sequential):
             assert AtomicDataDict._irreps_compatible(
                 module_list[idx - 1].irreps_out, module.irreps_in
             )
-        if len(module_list) > idx:
+        # check output compatibility as well:
+        if len(module_list) - 1 > idx:
             assert AtomicDataDict._irreps_compatible(
                 module_list[idx + 1].irreps_in, module.irreps_out
             )
+        elif len(module_list) - 1 == idx:
+            # adding it at the end, nothing to check
+            pass
+        else:
+            raise AssertionError
 
         # insert the new irreps_out to the later modules
         for module_id, next_module in enumerate(module_list[idx + 1 :]):

@@ -13,6 +13,7 @@ Most recent change on the bottom.
 
 ### Fixed
 - Force load of extension packages from `model_builders` before datasets are loaded
+- Fix `SequentialGraphNetwork.insert` at the end of the sequence
 
 ## [0.5.5] - 2022-06-20
 ### Added
