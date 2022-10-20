@@ -11,6 +11,9 @@ Most recent change on the bottom.
 ### Added
 - `nequip-benchmark` and `nequip-train` report number of weights and number of trainable weights
 
+### Fixed
+- Force load of extension packages from `model_builders` before datasets are loaded
+
 ## [0.5.5] - 2022-06-20
 ### Added
 - BETA! Support for stress in training and inference

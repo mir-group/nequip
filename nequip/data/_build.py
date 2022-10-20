@@ -4,7 +4,7 @@ from importlib import import_module
 from nequip import data
 from nequip.data.transforms import TypeMapper
 from nequip.data import AtomicDataset, register_fields
-from nequip.utils import instantiate, get_w_prefix
+from nequip.utils import instantiate, get_w_prefix, load_callable
 
 
 def dataset_from_config(config, prefix: str = "dataset") -> AtomicDataset:
@@ -16,14 +16,15 @@ def dataset_from_config(config, prefix: str = "dataset") -> AtomicDataset:
     Examples see tests/data/test_dataset.py TestFromConfig
     and tests/datasets/test_simplest.py
 
-    Args:
+    Note: this function can cause arbitrary extension packages, including those listed
+          in ``model_builders``, to be imported / loaded.
 
-    config (dict, nequip.utils.Config): dict/object that store all the parameters
-    prefix (str): Optional. The prefix of all dataset parameters
+    Args:
+        config (dict, nequip.utils.Config): dict/object that store all the parameters
+        prefix (str): Optional. The prefix of all dataset parameters
 
     Return:
-
-    dataset (nequip.data.AtomicDataset)
+        dataset (nequip.data.AtomicDataset)
     """
 
     config_dataset = config.get(prefix, None)
@@ -74,6 +75,15 @@ def dataset_from_config(config, prefix: str = "dataset") -> AtomicDataset:
     # Register fields:
     # This might reregister fields, but that's OK:
     instantiate(register_fields, all_args=config)
+
+    # We also want to make sure fields get registered for any models that are getting built
+    # with any custom model builders from extension packages...
+    # This will load them, which should trigger imports and relevant calls to `register_fields`
+    # this is a weird hack with side effects but it shouldn't be too bad and is better than
+    # writing everything up with entry points
+    # taken from model/_build.py
+    for b in config.get("model_builders", []):
+        load_callable(b, prefix="nequip.model")
 
     instance, _ = instantiate(
         class_name,
