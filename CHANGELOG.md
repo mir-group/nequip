@@ -11,6 +11,9 @@ Most recent change on the bottom.
 ### Added
 - `nequip-benchmark` and `nequip-train` report number of weights and number of trainable weights
 
+### Changed
+- `AtomwiseOperation` -> `Operation`
+
 ### Fixed
 - Force load of extension packages from `model_builders` before datasets are loaded
 - Fix `SequentialGraphNetwork.insert` at the end of the sequence

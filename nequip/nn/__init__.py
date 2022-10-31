@@ -1,6 +1,6 @@
 from ._graph_mixin import GraphModuleMixin, SequentialGraphNetwork  # noqa: F401
 from ._atomwise import (  # noqa: F401
-    AtomwiseOperation,
+    Operation,
     AtomwiseReduce,
     AtomwiseLinear,
     PerSpeciesScaleShift,

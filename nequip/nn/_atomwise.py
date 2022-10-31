@@ -1,26 +1,32 @@
 import logging
-from typing import Optional, List
+from typing import Optional, List, Union
 
 import torch
 import torch.nn.functional
 from torch_runstats.scatter import scatter
 
-from e3nn.o3 import Linear
+from e3nn.o3 import Linear, Irreps
 
 from nequip.data import AtomicDataDict
 from nequip.data.transforms import TypeMapper
 from ._graph_mixin import GraphModuleMixin
 
 
-class AtomwiseOperation(GraphModuleMixin, torch.nn.Module):
+class Operation(GraphModuleMixin, torch.nn.Module):
+    """Apply an arbitrary PyTorch function / module to some field."""
+
     def __init__(self, operation, field: str, irreps_in=None):
         super().__init__()
         self.operation = operation
         self.field = field
         self._init_irreps(
             irreps_in=irreps_in,
-            my_irreps_in={field: operation.irreps_in},
-            irreps_out={field: operation.irreps_out},
+            my_irreps_in={field: operation.irreps_in}
+            if hasattr(operation, "irreps_in")
+            else {},
+            irreps_out={field: operation.irreps_out}
+            if hasattr(operation, "irreps_out")
+            else {},
         )
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
@@ -42,7 +48,6 @@ class AtomwiseLinear(GraphModuleMixin, torch.nn.Module):
         self.out_field = out_field
         if irreps_out is None:
             irreps_out = irreps_in[field]
-
         self._init_irreps(
             irreps_in=irreps_in,
             required_irreps_in=[field],
@@ -119,14 +124,15 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
     shifts_trainable: bool
     has_scales: bool
     has_shifts: bool
+    _dim: int
 
     def __init__(
         self,
         field: str,
         num_types: int,
         type_names: List[str],
-        shifts: Optional[List[float]],
-        scales: Optional[List[float]],
+        shifts: Optional[List[Union[float, torch.Tensor]]],
+        scales: Optional[List[Union[float, torch.Tensor]]],
         arguments_in_dataset_units: bool,
         out_field: Optional[str] = None,
         scales_trainable: bool = False,
@@ -140,16 +146,21 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
         self.out_field = f"shifted_{field}" if out_field is None else out_field
         self._init_irreps(
             irreps_in=irreps_in,
-            my_irreps_in={self.field: "0e"},  # input to shift must be a single scalar
             irreps_out={self.out_field: irreps_in[self.field]},
         )
+        assert self.irreps_in[self.field] == Irreps(
+            [(self.irreps_in[self.field].num_irreps, (0, 1))]
+        ), "PerSpeciesScaleShift input must be one set of scalars"
+        self._dim = self.irreps_in[self.field].num_irreps
 
         self.has_shifts = shifts is not None
         if shifts is not None:
             shifts = torch.as_tensor(shifts, dtype=torch.get_default_dtype())
             if len(shifts.reshape([-1])) == 1:
-                shifts = torch.ones(num_types) * shifts
-            assert shifts.shape == (num_types,), f"Invalid shape of shifts {shifts}"
+                shifts = torch.ones(num_types, self._dim) * shifts
+            elif shifts.ndim == 1:
+                shifts = torch.ones(num_types, self._dim) * shifts.view(1, -1)
+            shifts = shifts.view(num_types, self._dim)
             self.shifts_trainable = shifts_trainable
             if shifts_trainable:
                 self.shifts = torch.nn.Parameter(shifts)
@@ -160,8 +171,10 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
         if scales is not None:
             scales = torch.as_tensor(scales, dtype=torch.get_default_dtype())
             if len(scales.reshape([-1])) == 1:
-                scales = torch.ones(num_types) * scales
-            assert scales.shape == (num_types,), f"Invalid shape of scales {scales}"
+                scales = torch.ones(num_types, self._dim) * scales
+            elif scales.ndim == 1:
+                scales = torch.ones(num_types, self._dim) * scales.view(1, -1)
+            scales = scales.view(num_types, self._dim)
             self.scales_trainable = scales_trainable
             if scales_trainable:
                 self.scales = torch.nn.Parameter(scales)
@@ -181,9 +194,9 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
             species_idx
         ), "in_field doesnt seem to have correct per-atom shape"
         if self.has_scales:
-            in_field = self.scales[species_idx].view(-1, 1) * in_field
+            in_field = self.scales[species_idx].view(-1, self._dim) * in_field
         if self.has_shifts:
-            in_field = self.shifts[species_idx].view(-1, 1) + in_field
+            in_field = self.shifts[species_idx].view(-1, self._dim) + in_field
         data[self.out_field] = in_field
         return data
 

@@ -612,7 +612,7 @@ class AtomicInMemoryDataset(AtomicDataset):
 
             N = N.type(torch.get_default_dtype())
 
-            return solver(N, arr, **algorithm_kwargs)
+            out = solver(N, arr, **algorithm_kwargs)
 
         elif arr_is_per == "node":
             arr = arr.type(torch.get_default_dtype())
@@ -623,7 +623,7 @@ class AtomicInMemoryDataset(AtomicDataset):
                 assert len(mean) == N.shape[1]
                 std = scatter_std(arr, atom_types, dim=0, unbiased=unbiased)
                 assert std.shape == mean.shape
-                return mean, std
+                out = (mean, std)
             elif ana_mode == "rms":
                 square = scatter_mean(arr.square(), atom_types, dim=0)
                 assert square.shape[1:] == arr.shape[1:]  # [N, dims] -> [type, dims]
@@ -631,10 +631,13 @@ class AtomicInMemoryDataset(AtomicDataset):
                 dims = len(square.shape) - 1
                 for i in range(dims):
                     square = square.mean(axis=-1)
-                return (torch.sqrt(square),)
-
+                out = (torch.sqrt(square),)
         else:
             raise NotImplementedError
+
+        # make outputs [n_type, dim]
+        out = tuple(e.reshape(N.shape[-1], -1) if e.ndim == 1 else e for e in out)
+        return out
 
 
 class NpzDataset(AtomicInMemoryDataset):

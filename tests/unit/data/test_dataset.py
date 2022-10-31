@@ -284,8 +284,12 @@ class TestPerSpeciesStatistics:
     @pytest.mark.parametrize(
         "regressor", ["NormalizedGaussianProcess", "GaussianProcess"]
     )
+    @pytest.mark.parametrize(
+        "key,dim",
+        [(AtomicDataDict.TOTAL_ENERGY_KEY, 1), (AtomicDataDict.GRAPH_FEATURES_KEY, 3)],
+    )
     def test_per_graph_field(
-        self, npz_dataset, alpha, fixed_field, full_rank, regressor, subset
+        self, npz_dataset, alpha, fixed_field, full_rank, regressor, subset, key, dim
     ):
 
         if alpha <= 1e-4 and not full_rank:
@@ -309,28 +313,28 @@ class TestPerSpeciesStatistics:
         del Ns
 
         if alpha == 1e-5:
-            ref_mean, ref_std, E = generate_E(N, 100, 1000, 0.0)
+            ref_mean, ref_std, E = generate_E(N, 100, 1000, 0.0, dim=dim)
         else:
-            ref_mean, ref_std, E = generate_E(N, 100, 1000, 0.5)
+            ref_mean, ref_std, E = generate_E(N, 100, 1000, 0.5, dim=dim)
 
         if subset:
-            E_orig_order = torch.zeros_like(
-                npz_dataset.data[AtomicDataDict.TOTAL_ENERGY_KEY]
+            E_orig_order = torch.zeros(
+                npz_dataset.data[AtomicDataDict.TOTAL_ENERGY_KEY].shape[0], dim
             )
-            E_orig_order[npz_dataset._indices] = E.unsqueeze(-1)
-            npz_dataset.data[AtomicDataDict.TOTAL_ENERGY_KEY] = E_orig_order
+            E_orig_order[npz_dataset._indices] = E
+            npz_dataset.data[key] = E_orig_order
         else:
-            npz_dataset.data[AtomicDataDict.TOTAL_ENERGY_KEY] = E
+            npz_dataset.data[key] = E
 
         ref_res2 = torch.square(
-            torch.matmul(N, ref_mean.reshape([-1, 1])) - E.reshape([-1, 1])
+            torch.matmul(N, ref_mean.reshape([-1, dim])) - E.reshape([-1, dim])
         ).sum()
 
         ((mean, std),) = npz_dataset.statistics(
-            [AtomicDataDict.TOTAL_ENERGY_KEY],
+            [key],
             modes=["per_species_mean_std"],
             kwargs={
-                AtomicDataDict.TOTAL_ENERGY_KEY
+                key
                 + "per_species_mean_std": {
                     "alpha": alpha,
                     "regressor": regressor,
@@ -448,14 +452,16 @@ class TestFromList:
             )
 
 
-def generate_E(N, mean_min, mean_max, std):
-    torch.manual_seed(0)
-    ref_mean = torch.rand((N.shape[1])) * (mean_max - mean_min) + mean_min
-    t_mean = torch.ones((N.shape[0], 1)) * ref_mean.reshape([1, -1])
-    ref_std = torch.rand((N.shape[1])) * std
-    t_std = torch.ones((N.shape[0], 1)) * ref_std.reshape([1, -1])
-    E = torch.normal(t_mean, t_std)
-    return ref_mean, ref_std, (N * E).sum(axis=-1)
+def generate_E(N, mean_min, mean_max, std, dim):
+    rng = torch.Generator()
+    ref_mean = (
+        torch.rand((N.shape[1], dim), generator=rng) * (mean_max - mean_min) + mean_min
+    )
+    t_mean = torch.ones((N.shape[0], 1, dim)) * ref_mean.reshape([1, -1, dim])
+    ref_std = torch.rand((N.shape[1], dim), generator=rng) * std
+    t_std = torch.ones((N.shape[0], 1, dim)) * ref_std.reshape([1, -1, dim])
+    E = torch.normal(t_mean, t_std, generator=rng)
+    return ref_mean, ref_std, (N.unsqueeze(-1) * E).sum(axis=-2)
 
 
 def set_up_transformer(npz_dataset, full_rank, fixed_field, subset):

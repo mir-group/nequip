@@ -132,14 +132,12 @@ class TypeMapper:
         return self.chemical_symbol_to_type is not None
 
     @staticmethod
-    def format(
-        data: list, type_names: List[str]
-    ) -> str:
+    def format(data: list, type_names: List[str]) -> str:
         data = torch.as_tensor(data) if data is not None else None
         if data is None:
             return f"[{', '.join(type_names)}: None]"
         elif data.ndim == 0:
-            return (f"[{', '.join(type_names)}: {{}}}]").format(data)
+            return (f"[{', '.join(type_names)}: {{}}]").format(data)
         elif data.ndim == 1:
             return (f"[{', '.join(type_names)}: {{}}]").format(data)
         elif data.ndim == 2 and len(data) == len(type_names):
