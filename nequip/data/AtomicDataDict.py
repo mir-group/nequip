@@ -112,3 +112,27 @@ def with_batch(data: Type) -> Type:
         batch = torch.zeros(len(pos), dtype=torch.long, device=pos.device)
         data[_keys.BATCH_KEY] = batch
         return data
+
+
+@torch.jit.script
+def num_graphs(data: Type) -> int:
+    return data[_keys.BATCH_KEY].max().item() + 1
+
+
+@torch.jit.script
+def repeat(data: Type, n: int) -> Type:
+    """Duplicate a batched AtomidDataDict.Type ``n`` times"""
+    data = with_batch(data)
+    repeated_data = {}
+    num_graphs: int = num_graphs(data)
+    total_num_atoms: int = data[_keys.POSITIONS_KEY].shape[0]
+    for k, v in data.items():
+        if k == _keys.EDGE_INDEX_KEY:
+            repeated_data[k] = torch.cat(
+                [v + i * total_num_atoms for i in range(n)], dim=1
+            )
+        elif k == _keys.BATCH_KEY:
+            repeated_data[k] = torch.cat([v + i * num_graphs for i in range(n)], dim=0)
+        else:
+            repeated_data[k] = torch.cat((v,) * n, dim=0)
+    return repeated_data
