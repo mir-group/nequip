@@ -1,5 +1,5 @@
 import logging
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Any
 
 import torch
 
@@ -136,7 +136,7 @@ def PerSpeciesRescale(
     initialize: bool,
     dataset: Optional[AtomicDataset] = None,
 ):
-    """Add global rescaling for energy(-based quantities).
+    """Add per-species rescaling/shifting for the atomic energy.
 
     If ``initialize`` is false, doesn't compute statistics.
     """
@@ -170,7 +170,32 @@ def PerSpeciesRescale(
                 )
         del has_global_shift
 
-    # = Determine what statistics need to be compute =\
+    return GeneralPerSpeciesRescale(
+        model=model,
+        config=config,
+        initialize=initialize,
+        module_prefix=module_prefix,
+        field=AtomicDataDict.PER_ATOM_ENERGY_KEY,
+        scales=scales,
+        shifts=shifts,
+        before="total_energy_sum",
+        dataset=dataset,
+    )
+
+
+def GeneralPerSpeciesRescale(
+    model: GraphModuleMixin,
+    config,
+    initialize: bool,
+    module_prefix: str,
+    field: str,
+    scales: Any,
+    shifts: Any,
+    before: str,
+    dataset: Optional[AtomicDataset] = None,
+):
+    """General per-species / per-atom rescaling of arbitrary quantities."""
+    # = Determine what statistics need to be compute =
     arguments_in_dataset_units = None
     if initialize:
         str_names = []
@@ -213,21 +238,21 @@ def PerSpeciesRescale(
 
         if isinstance(scales, str):
             s = scales
-            scales = computed_stats[str_names.index(scales)].squeeze(-1)  # energy is 1D
+            scales = computed_stats[str_names.index(scales)]
             logging.info(f"Replace string {s} to {scales}")
         elif isinstance(scales, (list, float)):
             scales = torch.as_tensor(scales)
 
         if isinstance(shifts, str):
             s = shifts
-            shifts = computed_stats[str_names.index(shifts)].squeeze(-1)  # energy is 1D
+            shifts = computed_stats[str_names.index(shifts)]
             logging.info(f"Replace string {s} to {shifts}")
         elif isinstance(shifts, (list, float)):
             shifts = torch.as_tensor(shifts)
 
         if scales is not None and torch.min(scales) < RESCALE_THRESHOLD:
             raise ValueError(
-                f"Per species energy scaling was very low: {scales}. Maybe try setting {module_prefix}_scales = 1."
+                f"Per species scaling (prefix: {module_prefix}) was very low: {scales}. Maybe try setting {module_prefix}_scales = 1."
             )
 
         logging.info(
@@ -248,15 +273,15 @@ def PerSpeciesRescale(
 
     # insert in per species shift
     params = dict(
-        field=AtomicDataDict.PER_ATOM_ENERGY_KEY,
-        out_field=AtomicDataDict.PER_ATOM_ENERGY_KEY,
+        field=field,
+        out_field=field,
         shifts=shifts,
         scales=scales,
     )
 
     params["arguments_in_dataset_units"] = arguments_in_dataset_units
     model.insert_from_parameters(
-        before="total_energy_sum",
+        before=before,
         name=module_prefix,
         shared_params=config,
         builder=PerSpeciesScaleShift,
