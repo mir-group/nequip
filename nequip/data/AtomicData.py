@@ -773,7 +773,7 @@ def neighbor_list_and_relative_vec(
         keep_edge = ~bad_edge
         if not np.any(keep_edge):
             raise ValueError(
-                "After eliminating self edges, no edges remain in this system."
+                f"Every single atom has no neighbors within the cutoff r_max={r_max} (after eliminating self edges, no edges remain in this system)"
             )
         first_idex = first_idex[keep_edge]
         second_idex = second_idex[keep_edge]
