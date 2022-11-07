@@ -11,6 +11,9 @@ Most recent change on the bottom.
 ### Added
 - `nequip-benchmark` and `nequip-train` report number of weights and number of trainable weights
 
+### Fixed
+- Git utilities when installed as ZIPed `.egg` (#264)
+
 ## [0.5.5] - 2022-06-20
 ### Added
 - BETA! Support for stress in training and inference
