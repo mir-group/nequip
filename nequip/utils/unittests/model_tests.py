@@ -189,7 +189,10 @@ class BaseModelTests:
         data.pos[2, 1] = r_max  # put it past the cutoff
         edge_embed2 = instance(AtomicData.to_AtomicDataDict(data))[key]
 
-        assert torch.allclose(edge_embed[:2], edge_embed2[:2])
+        if key == AtomicDataDict.EDGE_EMBEDDING_KEY:
+            # we can only check that other edges are unaffected if we know it's an embedding
+            # For example, an Allegro edge feature is many body so will be affected
+            assert torch.allclose(edge_embed[:2], edge_embed2[:2])
         assert edge_embed[2:].abs().sum() > 1e-6  # some nonzero terms
         assert torch.allclose(edge_embed2[2:], torch.zeros(1, device=device))
 
