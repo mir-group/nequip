@@ -55,6 +55,11 @@ def main(args=None):
         type=float,
         default=1,
     )
+    parser.add_argument(
+        "--no-compile",
+        help="Don't compile the model to TorchScript",
+        action="store_true",
+    )
 
     # TODO: option to show memory use
 
@@ -130,24 +135,28 @@ def main(args=None):
     print(
         f"    model has {sum(p.numel() for p in model.parameters() if p.requires_grad)} trainable weights"
     )
-    print("Compile...")
-    # "Deploy" it
-    model.eval()
-    compile_time = time.time()
-    model = script(model)
-    model = _compile_for_deploy(model)
-    compile_time = time.time() - compile_time
-    print(f"    compilation took {compile_time:.4f}s")
 
-    # save and reload to avoid bugs
-    with tempfile.NamedTemporaryFile() as f:
-        torch.jit.save(model, f.name)
-        model = torch.jit.load(f.name, map_location=device)
-        # freeze like in the LAMMPS plugin
-        model = torch.jit.freeze(model)
-        # and reload again just to avoid bugs
-        torch.jit.save(model, f.name)
-        model = torch.jit.load(f.name, map_location=device)
+    model.eval()
+    if args.no_compile:
+        model = model.to(device)
+    else:
+        print("Compile...")
+        # "Deploy" it
+        compile_time = time.time()
+        model = script(model)
+        model = _compile_for_deploy(model)
+        compile_time = time.time() - compile_time
+        print(f"    compilation took {compile_time:.4f}s")
+
+        # save and reload to avoid bugs
+        with tempfile.NamedTemporaryFile() as f:
+            torch.jit.save(model, f.name)
+            model = torch.jit.load(f.name, map_location=device)
+            # freeze like in the LAMMPS plugin
+            model = torch.jit.freeze(model)
+            # and reload again just to avoid bugs
+            torch.jit.save(model, f.name)
+            model = torch.jit.load(f.name, map_location=device)
 
     # Make sure we're warm past compilation
     warmup = config["_jit_bailout_depth"] + 4  # just to be safe...
