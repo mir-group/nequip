@@ -327,7 +327,7 @@ class BaseEnergyModelTests(BaseModelTests):
                 numeric, analytical, rtol=5e-2
             )
 
-    def test_partial_forces(self, config, atomic_batch, device):
+    def test_partial_forces(self, config, atomic_batch, device, strict_locality):
         config, out_fields = config
         if "ForceOutput" not in config["model_builders"]:
             pytest.skip()
@@ -363,14 +363,14 @@ class BaseEnergyModelTests(BaseModelTests):
         assert partial_forces.shape == (n_at, n_at, 3)
         # confirm that sparsity matches graph topology:
         edge_index = data[AtomicDataDict.EDGE_INDEX_KEY]
-        adjacency = torch.zeros(n_at, n_at, dtype=torch.bool)
-        strict_locality = False
+        adjacency = torch.zeros(
+            n_at, n_at, dtype=torch.bool, device=partial_forces.device
+        )
         if strict_locality:
             # only adjacent for nonzero deriv to neighbors
             adjacency[edge_index[0], edge_index[1]] = True
-            adjacency[
-                torch.arange(n_at), torch.arange(n_at)
-            ] = True  # diagonal is ofc True
+            arange = torch.arange(n_at, device=partial_forces.device)
+            adjacency[arange, arange] = True  # diagonal is ofc True
         else:
             # technically only adjacent to n-th degree neighbor, but in this tiny test system that is same as all-to-all and easier to program
             adjacency = data[AtomicDataDict.BATCH_KEY].view(-1, 1) == data[
