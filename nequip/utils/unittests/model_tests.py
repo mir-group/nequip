@@ -14,6 +14,7 @@ from nequip.data import (
     Collater,
     _GRAPH_FIELDS,
     _NODE_FIELDS,
+    _EDGE_FIELDS,
 )
 from nequip.data.transforms import TypeMapper
 from nequip.model import model_from_config
@@ -138,6 +139,25 @@ class BaseModelTests:
                 assert allclose(
                     output2[out_field],
                     output[out_field][output[AtomicDataDict.BATCH_KEY] == 1],
+                )
+            elif out_field in _EDGE_FIELDS:
+                assert allclose(
+                    output1[out_field],
+                    output[out_field][
+                        output[AtomicDataDict.BATCH_KEY][
+                            output[AtomicDataDict.EDGE_INDEX_KEY][0]
+                        ]
+                        == 0
+                    ],
+                )
+                assert allclose(
+                    output2[out_field],
+                    output[out_field][
+                        output[AtomicDataDict.BATCH_KEY][
+                            output[AtomicDataDict.EDGE_INDEX_KEY][0]
+                        ]
+                        == 1
+                    ],
                 )
             else:
                 raise NotImplementedError
