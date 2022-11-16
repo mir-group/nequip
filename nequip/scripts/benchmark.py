@@ -3,6 +3,8 @@ import textwrap
 import tempfile
 import itertools
 import time
+import logging
+import sys
 
 import torch
 from torch.utils.benchmark import Timer, Measurement
@@ -60,11 +62,18 @@ def main(args=None):
         help="Don't compile the model to TorchScript",
         action="store_true",
     )
+    parser.add_argument(
+        "--verbose", help="Logging verbosity level", type=str, default="error"
+    )
 
     # TODO: option to show memory use
 
     # Parse the args
     args = parser.parse_args(args=args)
+
+    root_logger = logging.getLogger()
+    root_logger.setLevel(getattr(logging, args.verbose.upper()))
+    root_logger.handlers = [logging.StreamHandler(sys.stderr)]
 
     if args.device is None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
