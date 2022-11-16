@@ -63,10 +63,13 @@ def main(args=None):
         action="store_true",
     )
     parser.add_argument(
+        "--memory-summary",
+        help="Print torch.cuda.memory_summary() after running the model",
+        action="store_true",
+    )
+    parser.add_argument(
         "--verbose", help="Logging verbosity level", type=str, default="error"
     )
-
-    # TODO: option to show memory use
 
     # Parse the args
     args = parser.parse_args(args=args)
@@ -144,6 +147,9 @@ def main(args=None):
     print(
         f"    model has {sum(p.numel() for p in model.parameters() if p.requires_grad)} trainable weights"
     )
+    print(
+        f"    model weights and buffers take {sum(p.numel() * p.element_size() for p in itertools.chain(model.parameters(), model.buffers())) / (1024 * 1024):.2f} MB"
+    )
 
     model.eval()
     if args.no_compile:
@@ -204,6 +210,10 @@ def main(args=None):
             stmt="model(next(datas).copy())", globals={"model": model, "datas": datas}
         )
         perloop: Measurement = t.timeit(args.n)
+
+        if args.memory_summary and torch.cuda.is_available():
+            print("Memory usage summary:")
+            print(torch.cuda.memory_summary())
 
         print(" -- Results --")
         print(
