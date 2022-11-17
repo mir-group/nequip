@@ -140,7 +140,7 @@ def main(args=None):
     # Load model:
     print("Building model... ")
     model_time = time.time()
-    model = model_from_config(config, initialize=True, dataset=dataset)
+    model = model_from_config(config, initialize=True, dataset=dataset, deploy=True)
     model_time = time.time() - model_time
     print(f"    building model took {model_time:.4f}s")
     print(f"    model has {sum(p.numel() for p in model.parameters())} weights")
