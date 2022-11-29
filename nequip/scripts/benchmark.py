@@ -5,6 +5,7 @@ import itertools
 import time
 import logging
 import sys
+import pdb
 
 import torch
 from torch.utils.benchmark import Timer, Measurement
@@ -70,9 +71,16 @@ def main(args=None):
     parser.add_argument(
         "--verbose", help="Logging verbosity level", type=str, default="error"
     )
+    parser.add_argument(
+        "--pdb",
+        help="Run model builders and model under debugger to easily drop to debugger to investigate errors.",
+        action="store_true",
+    )
 
     # Parse the args
     args = parser.parse_args(args=args)
+    if args.pdb:
+        assert args.profile is None
 
     root_logger = logging.getLogger()
     root_logger.setLevel(getattr(logging, args.verbose.upper()))
@@ -140,7 +148,13 @@ def main(args=None):
     # Load model:
     print("Building model... ")
     model_time = time.time()
-    model = model_from_config(config, initialize=True, dataset=dataset, deploy=True)
+    try:
+        model = model_from_config(config, initialize=True, dataset=dataset, deploy=True)
+    except:  # noqa: E722
+        if args.pdb:
+            pdb.post_mortem()
+        else:
+            raise
     model_time = time.time() - model_time
     print(f"    building model took {model_time:.4f}s")
     print(f"    model has {sum(p.numel() for p in model.parameters())} weights")
@@ -196,6 +210,14 @@ def main(args=None):
             for _ in range(1 + warmup + args.n):
                 model(next(datas).copy())
                 p.step()
+    elif args.pdb:
+        print("Running model under debugger...")
+        try:
+            for _ in range(args.n):
+                model(next(datas).copy())
+        except:  # noqa: E722)
+            pdb.post_mortem()
+        print("Done.")
     else:
         print("Warmup...")
         warmup_time = time.time()

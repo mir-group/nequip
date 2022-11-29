@@ -11,6 +11,7 @@ Most recent change on the bottom.
 ### Added
 - `nequip-benchmark` and `nequip-train` report number of weights and number of trainable weights
 - `nequip-benchmark --no-compile` and `--verbose` and `--memory-summary`
+- `nequip-benchmark --pdb` for debugging model (builder) errors
 
 ### Fixed
 - Git utilities when installed as ZIPed `.egg` (#264)
