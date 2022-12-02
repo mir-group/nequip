@@ -121,9 +121,9 @@ class TypeMapper:
                 f"Data included atomic numbers {bad_set} that are not part of the atomic number -> type mapping!"
             )
 
-        return self._Z_to_index[atomic_numbers - self._min_Z].to(
-            device=atomic_numbers.device
-        )
+        return self._Z_to_index.to(device=atomic_numbers.device)[
+            atomic_numbers - self._min_Z
+        ]
 
     def untransform(self, atom_types):
         """Transform atom types back into atomic numbers"""
