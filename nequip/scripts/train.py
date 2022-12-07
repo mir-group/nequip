@@ -81,12 +81,8 @@ def main(args=None, running_as_script: bool = True):
 
 
 def parse_command_line(args=None):
-    parser = argparse.ArgumentParser(
-        description="Train (or restart training of) a NequIP model."
-    )
-    parser.add_argument(
-        "config", help="YAML file configuring the model, dataset, and other options"
-    )
+    parser = argparse.ArgumentParser(description="Train a NequIP model.")
+    parser.add_argument("config", help="configuration file")
     parser.add_argument(
         "--equivariance-test",
         help="test the model's equivariance before training on n (default 1) random frames from the dataset",
