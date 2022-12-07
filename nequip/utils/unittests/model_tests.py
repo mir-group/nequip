@@ -74,9 +74,7 @@ class BaseModelTests:
         instance, out_fields = model
         data = AtomicData.to_AtomicDataDict(atomic_batch.to(device=device))
         instance = instance.to(device=device)
-        model_script = script(
-            instance, in_place=False
-        )  # don't modify the model used by other tests later
+        model_script = script(instance)
 
         for out_field in out_fields:
             assert torch.allclose(
