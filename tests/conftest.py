@@ -146,7 +146,7 @@ def per_species_set():
     std = 20
     n_sample = 1000
     n_species = 9
-    ref_mean = torch.rand((n_species)) * (mean_max - mean_min) + mean_min
+    ref_mean = torch.rand((n_species), generator=rng) * (mean_max - mean_min) + mean_min
     t_mean = torch.ones((n_sample, 1)) * ref_mean.reshape([1, -1])
     ref_std = torch.rand((n_species), generator=rng) * std
     t_std = torch.ones((n_sample, 1)) * ref_std.reshape([1, -1])
