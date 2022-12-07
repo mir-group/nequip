@@ -129,7 +129,7 @@ def load_deployed_model(
 
 def main(args=None):
     parser = argparse.ArgumentParser(
-        description="Create and view information about deployed NequIP potentials."
+        description="Deploy and view information about previously deployed NequIP models."
     )
     # backward compat for 3.6
     if sys.version_info[1] > 6:
