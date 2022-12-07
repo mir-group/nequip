@@ -9,6 +9,7 @@ Most recent change on the bottom.
 
 ## [Unreleased] - 0.5.6
 ### Added
+- sklearn dependency removed
 - `nequip-benchmark` and `nequip-train` report number of weights and number of trainable weights
 - `nequip-benchmark --no-compile` and `--verbose` and `--memory-summary`
 - `nequip-benchmark --pdb` for debugging model (builder) errors
