@@ -133,5 +133,22 @@ def atomic_batch(nequip_dataset):
     return Batch.from_data_list([nequip_dataset[0], nequip_dataset[1]])
 
 
+@pytest.fixture(scope="function")
+def per_species_set():
+    dtype = torch.get_default_dtype()
+    torch.manual_seed(0)
+    mean_min = 1
+    mean_max = 100
+    std = 20
+    n_sample = 1000
+    n_species = 9
+    ref_mean = torch.rand((n_species)) * (mean_max - mean_min) + mean_min
+    t_mean = torch.ones((n_sample, 1)) * ref_mean.reshape([1, -1])
+    ref_std = torch.rand((n_species)) * std
+    t_std = torch.ones((n_sample, 1)) * ref_std.reshape([1, -1])
+    E = torch.normal(t_mean, t_std)
+    return ref_mean.to(dtype), ref_std.to(dtype), E.to(dtype), n_sample, n_species
+
+
 # Use debug mode
 set_irreps_debug(True)
