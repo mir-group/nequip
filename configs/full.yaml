@@ -211,6 +211,8 @@ loss_coeffs:                                                                    
   total_energy:                                                                    
     - 1
     - PerAtomMSELoss
+# note that the ratio between force and energy loss matters for the training process. One may consider using 1:1 with the PerAtomMSELoss. If the energy loss still significantly dominate the loss function at the initial epochs, tune the energy loss weight lower helps the training a lot.
+
 
 # # default loss function is MSELoss, the name has to be exactly the same as those in torch.nn.
 # the only supprted targets are forces and total_energy
@@ -342,9 +344,10 @@ global_rescale_scale_trainable: false
 # global_rescale_shift_trainable: false
 # global_rescale_scale: dataset_forces_rms
 # global_rescale_scale_trainable: false
-# per_species_rescale_trainable: true
-# per_species_rescale_shifts: dataset_per_atom_total_energy_mean
-# per_species_rescale_scales: dataset_per_atom_total_energy_std
+# per_species_rescale_shifts_trainable: false
+# per_species_rescale_scales_trainable: true
+# per_species_rescale_shifts: dataset_per_species_total_energy_mean
+# per_species_rescale_scales: dataset_per_species_forces_rms
 
 # # full block needed for global rescale
 # global_rescale_shift: dataset_total_energy_mean
