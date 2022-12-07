@@ -21,6 +21,7 @@ def model(float_tolerance, request):
     shifts[zero_species] = 0
     params = dict(
         num_types=3,
+        type_names=["A", "B", "C"],
         total_shift=1.0,
         shifts=shifts,
     )

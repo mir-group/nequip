@@ -3,6 +3,7 @@ import os
 import os.path as osp
 import urllib
 import zipfile
+import sys
 
 
 def makedirs(dir):
@@ -24,11 +25,11 @@ def download_url(url, folder, log=True):
 
     if osp.exists(path):  # pragma: no cover
         if log:
-            print("Using exist file", filename)
+            print("Using existing file", filename, file=sys.stderr)
         return path
 
     if log:
-        print("Downloading", url)
+        print("Downloading", url, file=sys.stderr)
 
     makedirs(folder)
 

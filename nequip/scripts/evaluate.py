@@ -1,3 +1,4 @@
+from typing import Optional
 import sys
 import argparse
 import logging
@@ -10,19 +11,21 @@ import ase.io
 
 import torch
 
-from nequip.utils import Config
-from nequip.data import AtomicData, Collater, dataset_from_config
-from nequip.train import Trainer
+from nequip.data import AtomicData, Collater, dataset_from_config, register_fields
 from nequip.scripts.deploy import load_deployed_model, R_MAX_KEY
-from nequip.scripts.train import default_config, _set_global_options
-from nequip.utils import load_file, instantiate
-from nequip.train.loss import Loss
-from nequip.train.metrics import Metrics
-from ._logger import set_up_script_logger
+from nequip.scripts._logger import set_up_script_logger
+from nequip.scripts.train import default_config, check_code_version
+from nequip.utils._global_options import _set_global_options
+from nequip.train import Trainer, Loss, Metrics
+from nequip.utils import load_file, instantiate, Config
+
+
+ORIGINAL_DATASET_INDEX_KEY: str = "original_dataset_index"
+register_fields(graph_fields=[ORIGINAL_DATASET_INDEX_KEY])
 
 
 def main(args=None, running_as_script: bool = True):
-    # in results dir, do: nequip-deploy build . deployed.pth
+    # in results dir, do: nequip-deploy build --train-dir . deployed.pth
     parser = argparse.ArgumentParser(
         description=textwrap.dedent(
             """Compute the error of a model on a test set using various metrics.
@@ -71,9 +74,25 @@ def main(args=None, running_as_script: bool = True):
     )
     parser.add_argument(
         "--batch-size",
-        help="Batch size to use. Larger is usually faster on GPU. If you run out of memory, lower this.",
+        help="Batch size to use. Larger is usually faster on GPU. If you run out of memory, lower this. You can also try to raise this for faster evaluation. Default: 50.",
         type=int,
         default=50,
+    )
+    parser.add_argument(
+        "--repeat",
+        help=(
+            "Number of times to repeat evaluating the test dataset. "
+            "This can help compensate for CUDA nondeterminism, or can be used to evaluate error on models whose inference passes are intentionally nondeterministic. "
+            "Note that `--repeat`ed passes over the dataset will also be `--output`ed if an `--output` is specified."
+        ),
+        type=int,
+        default=1,
+    )
+    parser.add_argument(
+        "--use-deterministic-algorithms",
+        help="Try to have PyTorch use deterministic algorithms. Will probably fail on GPU/CUDA.",
+        type=bool,
+        default=False,
     )
     parser.add_argument(
         "--device",
@@ -83,9 +102,15 @@ def main(args=None, running_as_script: bool = True):
     )
     parser.add_argument(
         "--output",
-        help="XYZ file to write out the test set and model predicted forces, energies, etc. to.",
+        help="ExtXYZ (.xyz) file to write out the test set and model predictions to.",
         type=Path,
         default=None,
+    )
+    parser.add_argument(
+        "--output-fields",
+        help="Extra fields (names comma separated with no spaces) to write to the `--output`.",
+        type=str,
+        default="",
     )
     parser.add_argument(
         "--log",
@@ -135,9 +160,17 @@ def main(args=None, running_as_script: bool = True):
         )
     if args.model is None:
         raise ValueError("--model or --train-dir must be provided")
+    output_type: Optional[str] = None
     if args.output is not None:
         if args.output.suffix != ".xyz":
-            raise ValueError("Only extxyz format for `--output` is supported.")
+            raise ValueError("Only .xyz format for `--output` is supported.")
+        args.output_fields = [e for e in args.output_fields.split(",") if e != ""] + [
+            ORIGINAL_DATASET_INDEX_KEY
+        ]
+        output_type = "xyz"
+    else:
+        assert args.output_fields == ""
+        args.output_fields = []
 
     if args.device is None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -155,9 +188,14 @@ def main(args=None, running_as_script: bool = True):
             "WARNING: please note that models running on CUDA are usually nondeterministc and that this manifests in the final test errors; for a _more_ deterministic result, please use `--device cpu`",
         )
 
+    if args.use_deterministic_algorithms:
+        logger.info(
+            "Telling PyTorch to try to use deterministic algorithms... please note that this will likely error on CUDA/GPU"
+        )
+        torch.use_deterministic_algorithms(True)
+
     # Load model:
     logger.info("Loading model... ")
-    model_from_training: bool = False
     loaded_deployed_model: bool = False
     model_r_max = None
     try:
@@ -167,6 +205,9 @@ def main(args=None, running_as_script: bool = True):
             set_global_options=True,  # don't warn that setting
         )
         logger.info("loaded deployed model.")
+        # the global settings for a deployed model are set by
+        # set_global_options in the call to load_deployed_model
+        # above
         model_r_max = float(metadata[R_MAX_KEY])
         loaded_deployed_model = True
     except ValueError:  # its not a deployed model
@@ -175,11 +216,17 @@ def main(args=None, running_as_script: bool = True):
     # chains if there is an issue loading the training session model. This makes the error messages more
     # comprehensible:
     if not loaded_deployed_model:
+        # Use the model config, regardless of dataset config
+        global_config = args.model.parent / "config.yaml"
+        global_config = Config.from_file(str(global_config), defaults=default_config)
+        _set_global_options(global_config)
+        check_code_version(global_config)
+        del global_config
+
         # load a training session model
         model, model_config = Trainer.load_model_from_training_session(
             traindir=args.model.parent, model_name=args.model.name
         )
-        model_from_training = True
         model = model.to(device)
         logger.info("loaded model from training session")
         model_r_max = model_config["r_max"]
@@ -193,35 +240,21 @@ def main(args=None, running_as_script: bool = True):
         str(args.dataset_config), defaults={"r_max": model_r_max}
     )
     if dataset_config["r_max"] != model_r_max:
-        logger.warn(
+        raise RuntimeError(
             f"Dataset config has r_max={dataset_config['r_max']}, but model has r_max={model_r_max}!"
         )
 
-    # set global options
-    if model_from_training:
-        # Use the model config, regardless of dataset config
-        global_config = args.model.parent / "config.yaml"
-        global_config = Config.from_file(str(global_config), defaults=default_config)
-        _set_global_options(global_config)
-        del global_config
-    else:
-        # the global settings for a deployed model are set by
-        # set_global_options in the call to load_deployed_model
-        # above
-        pass
-
     dataset_is_validation: bool = False
-    # Currently, pytorch_geometric prints some status messages to stdout while loading the dataset
-    # TODO: fix may come soon: https://github.com/rusty1s/pytorch_geometric/pull/2950
-    # Until it does, just redirect them.
-    with contextlib.redirect_stdout(sys.stderr):
-        try:
-            # Try to get validation dataset
-            dataset = dataset_from_config(dataset_config, prefix="validation_dataset")
-            dataset_is_validation = True
-        except KeyError:
-            # Get shared train + validation dataset
-            dataset = dataset_from_config(dataset_config)
+    try:
+        # Try to get validation dataset
+        dataset = dataset_from_config(dataset_config, prefix="validation_dataset")
+        dataset_is_validation = True
+    except KeyError:
+        pass
+    if not dataset_is_validation:
+        # Get shared train + validation dataset
+        # prefix `dataset`
+        dataset = dataset_from_config(dataset_config)
     logger.info(
         f"Loaded {'validation_' if dataset_is_validation else ''}dataset specified in {args.dataset_config.name}.",
     )
@@ -232,8 +265,8 @@ def main(args=None, running_as_script: bool = True):
     # this makes no sense if a dataset is given seperately
     if (
         args.test_indexes is None
-        and train_idcs is not None
         and dataset_is_from_training
+        and train_idcs is not None
     ):
         # we know the train and val, get the rest
         all_idcs = set(range(len(dataset)))
@@ -241,13 +274,13 @@ def main(args=None, running_as_script: bool = True):
         if dataset_is_validation:
             test_idcs = list(all_idcs - val_idcs)
             logger.info(
-                f"Using origial validation dataset minus validation set frames, yielding a test set size of {len(test_idcs)} frames.",
+                f"Using origial validation dataset ({len(dataset)} frames) minus validation set frames ({len(val_idcs)} frames), yielding a test set size of {len(test_idcs)} frames.",
             )
         else:
             test_idcs = list(all_idcs - train_idcs - val_idcs)
             assert set(test_idcs).isdisjoint(train_idcs)
             logger.info(
-                f"Using origial training dataset minus training and validation frames, yielding a test set size of {len(test_idcs)} frames.",
+                f"Using origial training dataset ({len(dataset)} frames) minus training ({len(train_idcs)} frames) and validation frames ({len(val_idcs)} frames), yielding a test set size of {len(test_idcs)} frames.",
             )
         # No matter what it should be disjoint from validation:
         assert set(test_idcs).isdisjoint(val_idcs)
@@ -272,6 +305,8 @@ def main(args=None, running_as_script: bool = True):
         logger.info(
             f"Using provided test set indexes, yielding a test set size of {len(test_idcs)} frames.",
         )
+    test_idcs = torch.as_tensor(test_idcs, dtype=torch.long)
+    test_idcs = test_idcs.tile((args.repeat,))
 
     # Figure out what metrics we're actually computing
     if do_metrics:
@@ -320,16 +355,16 @@ def main(args=None, running_as_script: bool = True):
                 )
             )
 
-        if args.output is not None:
+        if output_type is not None:
             output = context_stack.enter_context(open(args.output, "w"))
         else:
             output = None
 
         while True:
-            datas = [
-                dataset[int(idex)]
-                for idex in test_idcs[batch_i * batch_size : (batch_i + 1) * batch_size]
+            this_batch_test_indexes = test_idcs[
+                batch_i * batch_size : (batch_i + 1) * batch_size
             ]
+            datas = [dataset[int(idex)] for idex in this_batch_test_indexes]
             if len(datas) == 0:
                 break
             batch = c.collate(datas)
@@ -338,16 +373,24 @@ def main(args=None, running_as_script: bool = True):
 
             with torch.no_grad():
                 # Write output
-                # TODO: make sure don't keep appending to existing file
-                if output is not None:
+                if output_type == "xyz":
+                    # add test frame to the output:
+                    out[ORIGINAL_DATASET_INDEX_KEY] = torch.LongTensor(
+                        this_batch_test_indexes
+                    )
+                    # append to the file
                     ase.io.write(
                         output,
                         AtomicData.from_AtomicDataDict(out)
                         .to(device="cpu")
-                        .to_ase(type_mapper=dataset.type_mapper),
+                        .to_ase(
+                            type_mapper=dataset.type_mapper,
+                            extra_fields=args.output_fields,
+                        ),
                         format="extxyz",
                         append=True,
                     )
+
                 # Accumulate metrics
                 if do_metrics:
                     metrics(out, batch)
@@ -355,7 +398,8 @@ def main(args=None, running_as_script: bool = True):
                         " | ".join(
                             f"{k} = {v:4.4f}"
                             for k, v in metrics.flatten_metrics(
-                                metrics.current_result()
+                                metrics.current_result(),
+                                type_names=dataset.type_mapper.type_names,
                             )[0].items()
                         )
                     )
@@ -372,7 +416,10 @@ def main(args=None, running_as_script: bool = True):
         logger.critical(
             "\n".join(
                 f"{k:>20s} = {v:< 20f}"
-                for k, v in metrics.flatten_metrics(metrics.current_result())[0].items()
+                for k, v in metrics.flatten_metrics(
+                    metrics.current_result(),
+                    type_names=dataset.type_mapper.type_names,
+                )[0].items()
             )
         )
 

@@ -7,7 +7,82 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Most recent change on the bottom.
 
 
-## [Unreleased] - 0.5.2
+## [Unreleased] - 0.5.6
+### Added
+- `nequip-benchmark` and `nequip-train` report number of weights and number of trainable weights
+- `nequip-benchmark --no-compile` and `--verbose` and `--memory-summary`
+- `nequip-benchmark --pdb` for debugging model (builder) errors
+
+### Fixed
+- Git utilities when installed as ZIPed `.egg` (#264)
+
+## [0.5.5] - 2022-06-20
+### Added
+- BETA! Support for stress in training and inference
+- `EMTTestDataset` for quick synthetic fake PBC data
+- multiprocessing for ASE dataset loading/processing
+- `nequip-benchmark` times dataset loading, model creation, and compilation
+- `validation_batch_size`
+- support multiple metrics on same field with different `functional`s
+- allow custom metrics names
+- allow `e3nn==0.5.0`
+- `--verbose` option to `nequip-deploy`
+- print data statistics in `nequip-benchmark`
+- `normalized_sum` reduction in `AtomwiseReduce`
+
+### Changed
+- abbreviate `node_features`->`h` in loss titles
+- failure of permutation equivariance tests no longer short-circuts o3 equivariance tests
+- `NequIPCalculator` now stores all relevant properties computed by the model regardless of requested `properties`, and does not try to access those not computed by the model, allowing models that only compute energy or forces but not both
+
+### Fixed
+- Equivariance testing correctly handles output cells
+- Equivariance testing correctly handles one-node or one-edge data
+- `report_init_validation` now runs on validation set instead of training set
+- crash when unable to find `os.sched_getaffinity` on some systems
+- don't incorrectly log per-species scales/shifts when loading model (such as for deployment)
+- `nequip-benchmark` now picks data frames deterministically
+- useful error message for `metrics_key: training_*` with `report_init_validation: True` (#213)
+
+## [0.5.4] - 2022-04-12
+### Added
+- `NequIPCalculator` now handles per-atom energies
+- Added `initial_model_state_strict` YAML option
+- `load_model_state` builder
+- fusion strategy support
+- `cumulative_wall` for early stopping
+- Deploy model from YAML file directly
+
+### Changed
+- Disallow PyTorch 1.9, which has some JIT bugs.
+- `nequip-deploy build` now requires `--train-dir` option when specifying the training session
+- Minimum Python version is now 3.7
+
+### Fixed
+- Better error in `Dataset.statistics` when field is missing
+- `NequIPCalculator` now outputs energy as scalar rather than `(1, 1)` array
+- `dataset: ase` now treats automatically adds `key_mapping` keys to `include_keys`, which is consistant with the npz dataset
+- fixed reloading models with `per_species_rescale_scales/shifts` set to `null`/`None`
+- graceful exit for `-n 0` in `nequip-benchmark`
+- Strictly correct CSV headers for metrics (#198)
+
+## [0.5.3] - 2022-02-23
+### Added
+- `nequip-evaluate --repeat` option
+- Report number of weights to wandb
+
+### Changed
+- defaults and commments in example.yaml and full.yaml, in particular longer default training and correct comment for E:F-weighting
+- better metrics config in example.yaml and full.yaml, in particular will total F-MAE/F-RMSE instead of mean over per-species
+- default value for `report_init_validation` is now `True`
+- `all_*_*` metrics rename to -> `psavg_*_*`
+- `avg_num_neighbors` default `None` -> `auto`
+
+### Fixed
+- error if both per-species and global shift are used together
+
+
+## [0.5.2] - 2022-02-04
 ### Added
 - Model builders may now process only the configuration
 - Allow irreps to optionally be specified through the simplified keys `l_max`, `parity`, and `num_features`
@@ -15,6 +90,9 @@ Most recent change on the bottom.
 - Allow polynomial cutoff _p_ values besides 6.0
 - `nequip-evaluate` now sets a default `r_max` taken from the model for the dataset config
 - Support multiple rescale layers in trainer
+- `AtomicData.to_ase` supports arbitrary fields
+- `nequip-evaluate` can now output arbitrary fields to an XYZ file
+- `nequip-evaluate` reports which frame in the original dataset was used as input for each output frame
 
 ### Changed
 - `minimal.yaml`, `minimal_eng.yaml`, and `example.yaml` now use the simplified irreps options `l_max`, `parity`, and `num_features`
@@ -24,6 +102,8 @@ Most recent change on the bottom.
 - Handle one of `per_species_shifts`/`scales` being `null` when the other is a dataset statistc
 - `include_frames` now works with ASE datasets
 - no training data labels in input_data
+- Average number of neighbors no longer crashes sometimes when not all nodes have neighbors (small cutoffs)
+- Handle field registrations correctly in `nequip-evaluate`
 
 ### Removed
 - `compile_model`

@@ -136,7 +136,9 @@ class SequentialGraphNetwork(GraphModuleMixin, torch.nn.Sequential):
             module_list = list(modules)
         # check in/out irreps compatible
         for m1, m2 in zip(module_list, module_list[1:]):
-            assert AtomicDataDict._irreps_compatible(m1.irreps_out, m2.irreps_in)
+            assert AtomicDataDict._irreps_compatible(
+                m1.irreps_out, m2.irreps_in
+            ), f"Incompatible irreps_out from {type(m1).__name__} for input to {type(m2).__name__}: {m1.irreps_out} -> {m2.irreps_in}"
         self._init_irreps(
             irreps_in=module_list[0].irreps_in,
             my_irreps_in=module_list[0].irreps_in,

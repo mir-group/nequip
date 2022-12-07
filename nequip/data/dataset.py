@@ -2,14 +2,18 @@ import numpy as np
 import logging
 import tempfile
 import inspect
+import functools
+import itertools
 import yaml
 import hashlib
 from os.path import dirname, basename, abspath
 from typing import Tuple, Dict, Any, List, Callable, Union, Optional, Sequence
 
 import ase
+import ase.io
 
 import torch
+import torch.multiprocessing as mp
 
 from torch_runstats.scatter import scatter_std, scatter_mean
 
@@ -27,6 +31,7 @@ from nequip.data import (
 from nequip.utils.batch_ops import bincount
 from nequip.utils.regressor import solver
 from nequip.utils.savenload import atomic_write
+from nequip.utils.multiprocessing import num_tasks
 from .transforms import TypeMapper
 from .AtomicData import _process_dict
 
@@ -34,8 +39,15 @@ from .AtomicData import _process_dict
 class AtomicDataset(Dataset):
     """The base class for all NequIP datasets."""
 
-    fixed_fields: List[str]
+    fixed_fields: Dict[str, Any]
     root: str
+
+    def __init__(
+        self,
+        root: str,
+        type_mapper: Optional[TypeMapper] = None,
+    ):
+        super().__init__(root=root, transform=type_mapper)
 
     def statistics(
         self,
@@ -54,6 +66,37 @@ class AtomicDataset(Dataset):
     def type_mapper(self) -> Optional[TypeMapper]:
         # self.transform is always a TypeMapper
         return self.transform
+
+    def _get_parameters(self) -> Dict[str, Any]:
+        """Get a dict of the parameters used to build this dataset."""
+        pnames = list(inspect.signature(self.__init__).parameters)
+        IGNORE_KEYS = {
+            # the type mapper is applied after saving, not before, so doesn't matter to cache validity
+            "type_mapper"
+        }
+        params = {
+            k: getattr(self, k)
+            for k in pnames
+            if k not in IGNORE_KEYS and hasattr(self, k)
+        }
+        # Add other relevant metadata:
+        params["dtype"] = str(torch.get_default_dtype())
+        params["nequip_version"] = nequip.__version__
+        return params
+
+    @property
+    def processed_dir(self) -> str:
+        # We want the file name to change when the parameters change
+        # So, first we get all parameters:
+        params = self._get_parameters()
+        # Make some kind of string of them:
+        # we don't care about this possibly changing between python versions,
+        # since a change in python version almost certainly means a change in
+        # versions of other things too, and is a good reason to recompute
+        buffer = yaml.dump(params).encode("ascii")
+        # And hash it:
+        param_hash = hashlib.sha1(buffer).hexdigest()
+        return f"{self.root}/processed_dataset_{param_hash}"
 
 
 class AtomicInMemoryDataset(AtomicDataset):
@@ -120,7 +163,7 @@ class AtomicInMemoryDataset(AtomicDataset):
         # Initialize the InMemoryDataset, which runs download and process
         # See https://pytorch-geometric.readthedocs.io/en/latest/notes/create_dataset.html#creating-in-memory-datasets
         # Then pre-process the data if disk files are not found
-        super().__init__(root=root, transform=type_mapper)
+        super().__init__(root=root, type_mapper=type_mapper)
         if self.data is None:
             self.data, self.fixed_fields, include_frames = torch.load(
                 self.processed_paths[0]
@@ -139,37 +182,6 @@ class AtomicInMemoryDataset(AtomicDataset):
     @property
     def raw_file_names(self):
         raise NotImplementedError()
-
-    def _get_parameters(self) -> Dict[str, Any]:
-        """Get a dict of the parameters used to build this dataset."""
-        pnames = list(inspect.signature(self.__init__).parameters)
-        IGNORE_KEYS = {
-            # the type mapper is applied after saving, not before, so doesn't matter to cache validity
-            "type_mapper"
-        }
-        params = {
-            k: getattr(self, k)
-            for k in pnames
-            if k not in IGNORE_KEYS and hasattr(self, k)
-        }
-        # Add other relevant metadata:
-        params["dtype"] = str(torch.get_default_dtype())
-        params["nequip_version"] = nequip.__version__
-        return params
-
-    @property
-    def processed_dir(self) -> str:
-        # We want the file name to change when the parameters change
-        # So, first we get all parameters:
-        params = self._get_parameters()
-        # Make some kind of string of them:
-        # we don't care about this possibly changing between python versions,
-        # since a change in python version almost certainly means a change in
-        # versions of other things too, and is a good reason to recompute
-        buffer = yaml.dump(params).encode("ascii")
-        # And hash it:
-        param_hash = hashlib.sha1(buffer).hexdigest()
-        return f"{self.root}/processed_dataset_{param_hash}"
 
     @property
     def processed_file_names(self) -> List[str]:
@@ -283,7 +295,13 @@ class AtomicInMemoryDataset(AtomicDataset):
         # type conversion
         _process_dict(fixed_fields, ignore_fields=["r_max"])
 
-        logging.info(f"Loaded data: {data}")
+        total_MBs = sum(item.numel() * item.element_size() for _, item in data) / (
+            1024 * 1024
+        )
+        logging.info(
+            f"Loaded data: {data}\n    processed data size: ~{total_MBs:.2f} MB"
+        )
+        del total_MBs
 
         # use atomic writes to avoid race conditions between
         # different trainings that use the same dataset
@@ -334,7 +352,12 @@ class AtomicInMemoryDataset(AtomicDataset):
 
                 The above computes the statistics over a set of size 3N, where N is the total number of nodes in the dataset.
 
-            modes: the statistic to compute for each field. Valid options are TODO.
+            modes: the statistic to compute for each field. Valid options are:
+                 - ``count``
+                 - ``rms``
+                 - ``mean_std``
+                 - ``per_atom_*``
+                 - ``per_species_*``
 
             stride: the stride over the dataset while computing statistcs.
 
@@ -353,6 +376,17 @@ class AtomicInMemoryDataset(AtomicDataset):
 
         if self._indices is not None:
             graph_selector = torch.as_tensor(self._indices)[::stride]
+            # note that self._indices is _not_ necessarily in order,
+            # while self.data --- which we take our arrays from ---
+            # is always in the original order.
+            # In particular, the values of `self.data.batch`
+            # are indexes in the ORIGINAL order
+            # thus we need graph level properties to also be in the original order
+            # so that batch values index into them correctly
+            # since self.data.batch is always sorted & contiguous
+            # (because of Batch.from_data_list)
+            # we sort it:
+            graph_selector, _ = torch.sort(graph_selector)
         else:
             graph_selector = torch.arange(0, self.len(), stride)
         num_graphs = len(graph_selector)
@@ -376,8 +410,10 @@ class AtomicInMemoryDataset(AtomicDataset):
             data_transformed = self.data.to_dict()
         # pre-select arrays
         # this ensures that all following computations use the right data
+        all_keys = set()
         selectors = {}
         for k in list(ff_transformed.keys()) + list(data_transformed.keys()):
+            all_keys.add(k)
             if k in _NODE_FIELDS:
                 selectors[k] = node_selector
             elif k in _GRAPH_FIELDS:
@@ -410,7 +446,10 @@ class AtomicInMemoryDataset(AtomicDataset):
                 )  # all statistics must be on floating
                 assert arr_is_per in ("node", "graph", "edge")
             else:
-                # Give a better error
+                if field not in all_keys:
+                    raise RuntimeError(
+                        f"The field key `{field}` is not present in this dataset"
+                    )
                 if field not in selectors:
                     # this means field is not selected and so not available
                     raise RuntimeError(
@@ -526,13 +565,18 @@ class AtomicInMemoryDataset(AtomicDataset):
         """
         # using unique_consecutive handles the non-contiguous selected batch index
         _, N = torch.unique_consecutive(batch, return_counts=True)
+        N = N.unsqueeze(-1)
+        assert N.ndim == 2
+        assert N.shape == (len(arr), 1)
+        assert arr.ndim >= 2
+        data_dim = arr.shape[1:]
+        arr = arr / N
+        assert arr.shape == (len(N),) + data_dim
         if ana_mode == "mean_std":
-            arr = arr / N
-            mean = torch.mean(arr)
-            std = torch.std(arr, unbiased=unbiased)
+            mean = torch.mean(arr, dim=0)
+            std = torch.std(arr, unbiased=unbiased, dim=0)
             return mean, std
         elif ana_mode == "rms":
-            arr = arr / N
             return (torch.sqrt(torch.mean(arr.square())),)
         else:
             raise NotImplementedError(
@@ -556,8 +600,9 @@ class AtomicInMemoryDataset(AtomicDataset):
         For a per-node quantity, computes the expected statistic but for each type instead of over all nodes.
         """
         N = bincount(atom_types.squeeze(-1), batch)
+        assert N.ndim == 2  # [batch, n_type]
         N = N[(N > 0).any(dim=1)]  # deal with non-contiguous batch indexes
-
+        assert arr.ndim >= 2
         if arr_is_per == "graph":
 
             if ana_mode != "mean_std":
@@ -574,10 +619,15 @@ class AtomicInMemoryDataset(AtomicDataset):
 
             if ana_mode == "mean_std":
                 mean = scatter_mean(arr, atom_types, dim=0)
+                assert mean.shape[1:] == arr.shape[1:]  # [N, dims] -> [type, dims]
+                assert len(mean) == N.shape[1]
                 std = scatter_std(arr, atom_types, dim=0, unbiased=unbiased)
+                assert std.shape == mean.shape
                 return mean, std
             elif ana_mode == "rms":
                 square = scatter_mean(arr.square(), atom_types, dim=0)
+                assert square.shape[1:] == arr.shape[1:]  # [N, dims] -> [type, dims]
+                assert len(square) == N.shape[1]
                 dims = len(square.shape) - 1
                 for i in range(dims):
                     square = square.mean(axis=-1)
@@ -587,7 +637,6 @@ class AtomicInMemoryDataset(AtomicDataset):
             raise NotImplementedError
 
 
-# TODO: document fixed field mapped key behavior more clearly
 class NpzDataset(AtomicInMemoryDataset):
     """Load data from an npz file.
 
@@ -598,6 +647,9 @@ class NpzDataset(AtomicInMemoryDataset):
         key_mapping (Dict[str, str]): mapping of npz keys to ``AtomicData`` keys. Optional
         include_keys (list): the attributes to be processed and stored. Optional
         npz_fixed_field_keys: the attributes that only have one instance but apply to all frames. Optional
+            Note that the mapped keys (as determined by the _values_ in ``key_mapping``) should be used in
+            ``npz_fixed_field_keys``, not the original npz keys from before mapping. If an npz key is not
+            present in ``key_mapping``, it is mapped to itself, and this point is not relevant.
 
     Example: Given a npz file with 10 configurations, each with 14 atoms.
 
@@ -670,7 +722,6 @@ class NpzDataset(AtomicInMemoryDataset):
     def raw_dir(self):
         return dirname(abspath(self.file_name))
 
-    # TODO: fixed fields?
     def get_data(self):
 
         data = np.load(self.raw_dir + "/" + self.raw_file_names[0], allow_pickle=True)
@@ -694,10 +745,64 @@ class NpzDataset(AtomicInMemoryDataset):
                 mapped[intkey] = mapped[intkey].astype(np.int64)
 
         fields = {k: v for k, v in mapped.items() if k not in self.npz_fixed_field_keys}
+        # note that we don't deal with extra_fixed_fields here; AtomicInMemoryDataset does that.
         fixed_fields = {
             k: v for k, v in mapped.items() if k in self.npz_fixed_field_keys
         }
         return fields, fixed_fields
+
+
+def _ase_dataset_reader(
+    rank: int,
+    world_size: int,
+    tmpdir: str,
+    ase_kwargs: dict,
+    atomicdata_kwargs: dict,
+    include_frames,
+    global_options: dict,
+) -> Union[str, List[AtomicData]]:
+    """Parallel reader for all frames in file."""
+    if world_size > 1:
+        from nequip.utils._global_options import _set_global_options
+
+        # ^ avoid import loop
+        # we only `multiprocessing` if world_size > 1
+        _set_global_options(global_options)
+    # interleave--- in theory it is better for performance for the ranks
+    # to read consecutive blocks, but the way ASE is written the whole
+    # file gets streamed through all ranks anyway, so just trust the OS
+    # to cache things sanely, which it will.
+    # ASE handles correctly the case where there are no frames in index
+    # and just gives an empty list, so that will succeed:
+    index = slice(rank, None, world_size)
+    if include_frames is None:
+        # count includes 0, 1, ..., inf
+        include_frames = itertools.count()
+
+    datas = []
+    # stream them from ase too using iread
+    for i, atoms in enumerate(ase.io.iread(**ase_kwargs, index=index, parallel=False)):
+        global_index = rank + (world_size * i)
+        datas.append(
+            (
+                global_index,
+                AtomicData.from_ase(atoms=atoms, **atomicdata_kwargs)
+                if global_index in include_frames
+                # in-memory dataset will ignore this later, but needed for indexing to work out
+                else None,
+            )
+        )
+    # Save to a tempfile---
+    # there can be a _lot_ of tensors here, and rather than dealing with
+    # the complications of running out of file descriptors and setting
+    # sharing methods, since this is a one time thing, just make it simple
+    # and avoid shared memory entirely.
+    if world_size > 1:
+        path = f"{tmpdir}/rank{rank}.pth"
+        torch.save(datas, path)
+        return path
+    else:
+        return datas
 
 
 class ASEDataset(AtomicInMemoryDataset):
@@ -763,10 +868,11 @@ class ASEDataset(AtomicInMemoryDataset):
         key_mapping: Optional[dict] = None,
         include_keys: Optional[List[str]] = None,
     ):
-
-        self.ase_args = dict(index=":")
+        self.ase_args = {}
         self.ase_args.update(getattr(type(self), "ASE_ARGS", dict()))
         self.ase_args.update(ase_args)
+        assert "index" not in self.ase_args
+        assert "filename" not in self.ase_args
 
         self.include_keys = include_keys
         self.key_mapping = key_mapping
@@ -824,15 +930,9 @@ class ASEDataset(AtomicInMemoryDataset):
     def raw_dir(self):
         return dirname(abspath(self.file_name))
 
-    def get_atoms(self):
-        from ase.io import read as aseread
-
-        return aseread(self.raw_dir + "/" + self.raw_file_names[0], **self.ase_args)
-
     def get_data(self):
-
-        # Get our data
-        atoms_list = self.get_atoms()
+        ase_args = {"filename": self.raw_dir + "/" + self.raw_file_names[0]}
+        ase_args.update(self.ase_args)
 
         # skip the None arguments
         kwargs = dict(
@@ -841,17 +941,35 @@ class ASEDataset(AtomicInMemoryDataset):
         )
         kwargs = {k: v for k, v in kwargs.items() if v is not None}
         kwargs.update(self.extra_fixed_fields)
+        n_proc = num_tasks()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            from nequip.utils._global_options import _get_latest_global_options
 
-        if self.include_frames is None:
-            return (
-                [AtomicData.from_ase(atoms=atoms, **kwargs) for atoms in atoms_list],
+            # ^ avoid import loop
+            reader = functools.partial(
+                _ase_dataset_reader,
+                world_size=n_proc,
+                tmpdir=tmpdir,
+                ase_kwargs=ase_args,
+                atomicdata_kwargs=kwargs,
+                include_frames=self.include_frames,
+                # get the global options of the parent to initialize the worker correctly
+                global_options=_get_latest_global_options(),
             )
-        else:
-            return (
-                [
-                    AtomicData.from_ase(atoms=atoms_list[i], **kwargs)
-                    if i in self.include_frames
-                    else None  # in-memory dataset will ignore this later, but needed for indexing to work out
-                    for i in range(len(atoms_list))
-                ],
-            )
+            if n_proc > 1:
+                # things hang for some obscure OpenMP reason on some systems when using `fork` method
+                ctx = mp.get_context("forkserver")
+                with ctx.Pool(processes=n_proc) as p:
+                    # map it over the `rank` argument
+                    datas = p.map(reader, list(range(n_proc)))
+                # clean up the pool before loading the data
+                datas = [torch.load(d) for d in datas]
+                datas = sum(datas, [])
+                # un-interleave the datas
+                datas = sorted(datas, key=lambda e: e[0])
+            else:
+                datas = reader(rank=0)
+                # datas here is already in order, stride 1 start 0
+                # no need to un-interleave
+        # return list of AtomicData:
+        return ([e[1] for e in datas],)

@@ -2,12 +2,16 @@ import inspect
 from typing import Optional
 
 from nequip.data import AtomicDataset
+from nequip.data.transforms import TypeMapper
 from nequip.nn import GraphModuleMixin
-from nequip.utils import load_callable
+from nequip.utils import load_callable, instantiate
 
 
 def model_from_config(
-    config, initialize: bool = False, dataset: Optional[AtomicDataset] = None
+    config,
+    initialize: bool = False,
+    dataset: Optional[AtomicDataset] = None,
+    deploy: bool = False,
 ) -> GraphModuleMixin:
     """Build a model based on `config`.
 
@@ -16,27 +20,38 @@ def model_from_config(
      - ``model``: the model produced by the previous builder. Cannot be requested by the first builder, must be requested by subsequent ones.
      - ``initialize``: whether to initialize the model
      - ``dataset``: if ``initialize`` is True, the dataset
+     - ``deploy``: whether the model object is for deployment / inference
 
     Args:
         config
-        initialize (bool): if True (default False), ``model_initializers`` will also be run.
+        initialize (bool): whether ``model_builders`` should be instructed to initialize the model
         dataset: dataset for initializers if ``initialize`` is True.
+        deploy (bool): whether ``model_builders`` should be told the model is for deployment / inference
 
     Returns:
         The build model.
     """
     # Pre-process config
-    if initialize and dataset is not None:
+    type_mapper = None
+    if dataset is not None:
+        type_mapper = dataset.type_mapper
+    else:
+        try:
+            type_mapper, _ = instantiate(TypeMapper, all_args=config)
+        except RuntimeError:
+            pass
+
+    if type_mapper is not None:
         if "num_types" in config:
             assert (
-                config["num_types"] == dataset.type_mapper.num_types
+                config["num_types"] == type_mapper.num_types
             ), "inconsistant config & dataset"
         if "type_names" in config:
             assert (
-                config["type_names"] == dataset.type_mapper.type_names
+                config["type_names"] == type_mapper.type_names
             ), "inconsistant config & dataset"
-        config["num_types"] = dataset.type_mapper.num_types
-        config["type_names"] = dataset.type_mapper.type_names
+        config["num_types"] = type_mapper.num_types
+        config["type_names"] = type_mapper.type_names
 
     # Build
     builders = [
@@ -51,6 +66,8 @@ def model_from_config(
         params = {}
         if "initialize" in pnames:
             params["initialize"] = initialize
+        if "deploy" in pnames:
+            params["deploy"] = deploy
         if "config" in pnames:
             params["config"] = config
         if "dataset" in pnames:

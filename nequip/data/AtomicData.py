@@ -13,6 +13,7 @@ import ase.neighborlist
 import ase
 from ase.calculators.singlepoint import SinglePointCalculator, SinglePointDFTCalculator
 from ase.calculators.calculator import all_properties as ase_all_properties
+from ase.stress import voigt_6_to_full_3x3_stress, full_3x3_to_voigt_6_stress
 
 import torch
 import e3nn.o3
@@ -47,9 +48,12 @@ _DEFAULT_EDGE_FIELDS: Set[str] = {
     AtomicDataDict.EDGE_LENGTH_KEY,
     AtomicDataDict.EDGE_ATTRS_KEY,
     AtomicDataDict.EDGE_EMBEDDING_KEY,
+    AtomicDataDict.EDGE_FEATURES_KEY,
 }
 _DEFAULT_GRAPH_FIELDS: Set[str] = {
     AtomicDataDict.TOTAL_ENERGY_KEY,
+    AtomicDataDict.STRESS_KEY,
+    AtomicDataDict.VIRIAL_KEY,
     AtomicDataDict.PBC_KEY,
     AtomicDataDict.CELL_KEY,
 }
@@ -206,7 +210,9 @@ class AtomicData(Data):
         **kwargs: other data, optional.
     """
 
-    def __init__(self, irreps: Dict[str, e3nn.o3.Irreps] = {}, **kwargs):
+    def __init__(
+        self, irreps: Dict[str, e3nn.o3.Irreps] = {}, _validate: bool = True, **kwargs
+    ):
 
         # empty init needed by get_example
         if len(kwargs) == 0 and len(irreps) == 0:
@@ -214,47 +220,49 @@ class AtomicData(Data):
             return
 
         # Check the keys
-        AtomicDataDict.validate_keys(kwargs)
-        _process_dict(kwargs)
+        if _validate:
+            AtomicDataDict.validate_keys(kwargs)
+            _process_dict(kwargs)
 
         super().__init__(num_nodes=len(kwargs["pos"]), **kwargs)
 
-        # Validate shapes
-        assert self.pos.dim() == 2 and self.pos.shape[1] == 3
-        assert self.edge_index.dim() == 2 and self.edge_index.shape[0] == 2
-        if "edge_cell_shift" in self and self.edge_cell_shift is not None:
-            assert self.edge_cell_shift.shape == (self.num_edges, 3)
-            assert self.edge_cell_shift.dtype == self.pos.dtype
-        if "cell" in self and self.cell is not None:
-            assert (self.cell.shape == (3, 3)) or (
-                self.cell.dim() == 3 and self.cell.shape[1:] == (3, 3)
-            )
-            assert self.cell.dtype == self.pos.dtype
-        if "node_features" in self and self.node_features is not None:
-            assert self.node_features.shape[0] == self.num_nodes
-            assert self.node_features.dtype == self.pos.dtype
-        if "node_attrs" in self and self.node_attrs is not None:
-            assert self.node_attrs.shape[0] == self.num_nodes
-            assert self.node_attrs.dtype == self.pos.dtype
-
-        if (
-            AtomicDataDict.ATOMIC_NUMBERS_KEY in self
-            and self.atomic_numbers is not None
-        ):
-            assert self.atomic_numbers.dtype in _TORCH_INTEGER_DTYPES
-        if "batch" in self and self.batch is not None:
-            assert self.batch.dim() == 2 and self.batch.shape[0] == self.num_nodes
-            # Check that there are the right number of cells
+        if _validate:
+            # Validate shapes
+            assert self.pos.dim() == 2 and self.pos.shape[1] == 3
+            assert self.edge_index.dim() == 2 and self.edge_index.shape[0] == 2
+            if "edge_cell_shift" in self and self.edge_cell_shift is not None:
+                assert self.edge_cell_shift.shape == (self.num_edges, 3)
+                assert self.edge_cell_shift.dtype == self.pos.dtype
             if "cell" in self and self.cell is not None:
-                cell = self.cell.view(-1, 3, 3)
-                assert cell.shape[0] == self.batch.max() + 1
+                assert (self.cell.shape == (3, 3)) or (
+                    self.cell.dim() == 3 and self.cell.shape[1:] == (3, 3)
+                )
+                assert self.cell.dtype == self.pos.dtype
+            if "node_features" in self and self.node_features is not None:
+                assert self.node_features.shape[0] == self.num_nodes
+                assert self.node_features.dtype == self.pos.dtype
+            if "node_attrs" in self and self.node_attrs is not None:
+                assert self.node_attrs.shape[0] == self.num_nodes
+                assert self.node_attrs.dtype == self.pos.dtype
 
-        # Validate irreps
-        # __*__ is the only way to hide from torch_geometric
-        self.__irreps__ = AtomicDataDict._fix_irreps_dict(irreps)
-        for field, irreps in self.__irreps__:
-            if irreps is not None:
-                assert self[field].shape[-1] == irreps.dim
+            if (
+                AtomicDataDict.ATOMIC_NUMBERS_KEY in self
+                and self.atomic_numbers is not None
+            ):
+                assert self.atomic_numbers.dtype in _TORCH_INTEGER_DTYPES
+            if "batch" in self and self.batch is not None:
+                assert self.batch.dim() == 2 and self.batch.shape[0] == self.num_nodes
+                # Check that there are the right number of cells
+                if "cell" in self and self.cell is not None:
+                    cell = self.cell.view(-1, 3, 3)
+                    assert cell.shape[0] == self.batch.max() + 1
+
+            # Validate irreps
+            # __*__ is the only way to hide from torch_geometric
+            self.__irreps__ = AtomicDataDict._fix_irreps_dict(irreps)
+            for field, irreps in self.__irreps__:
+                if irreps is not None:
+                    assert self[field].shape[-1] == irreps.dim
 
     @classmethod
     def from_points(
@@ -365,7 +373,10 @@ class AtomicData(Data):
             + list(kwargs.keys())
         )
         # the keys that are duplicated in kwargs are removed from the include_keys
-        include_keys = list(set(include_keys + ase_all_properties) - default_args)
+        include_keys = list(
+            set(include_keys + ase_all_properties + list(key_mapping.keys()))
+            - default_args
+        )
 
         km = {
             "forces": AtomicDataDict.FORCE_KEY,
@@ -417,6 +428,18 @@ class AtomicData(Data):
         cell = kwargs.pop("cell", atoms.get_cell())
         pbc = kwargs.pop("pbc", atoms.pbc)
 
+        # handle ASE-style 6 element Voigt order stress
+        for key in (AtomicDataDict.STRESS_KEY, AtomicDataDict.VIRIAL_KEY):
+            if key in add_fields:
+                if add_fields[key].shape == (3, 3):
+                    # it's already 3x3, do nothing else
+                    pass
+                elif add_fields[key].shape == (6,):
+                    # it's Voigt order
+                    add_fields[key] = voigt_6_to_full_3x3_stress(add_fields[key])
+                else:
+                    raise RuntimeError(f"bad shape for {key}")
+
         return cls.from_points(
             pos=atoms.positions,
             r_max=r_max,
@@ -426,7 +449,11 @@ class AtomicData(Data):
             **add_fields,
         )
 
-    def to_ase(self, type_mapper=None) -> Union[List[ase.Atoms], ase.Atoms]:
+    def to_ase(
+        self,
+        type_mapper=None,
+        extra_fields: List[str] = [],
+    ) -> Union[List[ase.Atoms], ase.Atoms]:
         """Build a (list of) ``ase.Atoms`` object(s) from an ``AtomicData`` object.
 
         For each unique batch number provided in ``AtomicDataDict.BATCH_KEY``,
@@ -436,12 +463,18 @@ class AtomicData(Data):
         Args:
             type_mapper: if provided, will be used to map ``ATOM_TYPES`` back into
                 elements, if the configuration of the ``type_mapper`` allows.
+            extra_fields: fields other than those handled explicitly (currently
+                those defining the structure as well as energy, per-atom energy,
+                and forces) to include in the output object. Per-atom (per-node)
+                quantities will be included in ``arrays``; per-graph and per-edge
+                quantities will be included in ``info``.
 
         Returns:
             A list of ``ase.Atoms`` objects if ``AtomicDataDict.BATCH_KEY`` is in self
             and is not None. Otherwise, a single ``ase.Atoms`` object is returned.
         """
         positions = self.pos
+        edge_index = self[AtomicDataDict.EDGE_INDEX_KEY]
         if positions.device != torch.device("cpu"):
             raise TypeError(
                 "Explicitly move this `AtomicData` to CPU using `.to()` before calling `to_ase()`."
@@ -461,7 +494,30 @@ class AtomicData(Data):
         energy = getattr(self, AtomicDataDict.TOTAL_ENERGY_KEY, None)
         energies = getattr(self, AtomicDataDict.PER_ATOM_ENERGY_KEY, None)
         force = getattr(self, AtomicDataDict.FORCE_KEY, None)
-        do_calc = energy is not None or force is not None
+        do_calc = any(
+            k in self
+            for k in [
+                AtomicDataDict.TOTAL_ENERGY_KEY,
+                AtomicDataDict.FORCE_KEY,
+                AtomicDataDict.PER_ATOM_ENERGY_KEY,
+                AtomicDataDict.STRESS_KEY,
+            ]
+        )
+
+        # exclude those that are special for ASE and that we process seperately
+        special_handling_keys = [
+            AtomicDataDict.POSITIONS_KEY,
+            AtomicDataDict.CELL_KEY,
+            AtomicDataDict.PBC_KEY,
+            AtomicDataDict.ATOMIC_NUMBERS_KEY,
+            AtomicDataDict.TOTAL_ENERGY_KEY,
+            AtomicDataDict.FORCE_KEY,
+            AtomicDataDict.PER_ATOM_ENERGY_KEY,
+            AtomicDataDict.STRESS_KEY,
+        ]
+        assert (
+            len(set(extra_fields).intersection(special_handling_keys)) == 0
+        ), f"Cannot specify keys handled in special ways ({special_handling_keys}) as `extra_fields` for atoms output--- they are output by default"
 
         if cell is not None:
             cell = cell.view(-1, 3, 3)
@@ -480,8 +536,11 @@ class AtomicData(Data):
             if batch is not None:
                 mask = batch == batch_idx
                 mask = mask.view(-1)
+                # if both ends of the edge are in the batch, the edge is in the batch
+                edge_mask = mask[edge_index[0]] & mask[edge_index[1]]
             else:
                 mask = slice(None)
+                edge_mask = slice(None)
 
             mol = ase.Atoms(
                 numbers=atomic_nums[mask].view(-1),  # must be flat for ASE
@@ -498,7 +557,31 @@ class AtomicData(Data):
                     fields["energy"] = energy[batch_idx].cpu().numpy()
                 if force is not None:
                     fields["forces"] = force[mask].cpu().numpy()
+                if AtomicDataDict.STRESS_KEY in self:
+                    fields["stress"] = full_3x3_to_voigt_6_stress(
+                        self["stress"].view(-1, 3, 3)[batch_idx].cpu().numpy()
+                    )
                 mol.calc = SinglePointCalculator(mol, **fields)
+
+            # add other information
+            for key in extra_fields:
+                if key in _NODE_FIELDS:
+                    # mask it
+                    mol.arrays[key] = (
+                        self[key][mask].cpu().numpy().reshape(mask.sum(), -1)
+                    )
+                elif key in _EDGE_FIELDS:
+                    mol.info[key] = (
+                        self[key][edge_mask].cpu().numpy().reshape(edge_mask.sum(), -1)
+                    )
+                elif key == AtomicDataDict.EDGE_INDEX_KEY:
+                    mol.info[key] = self[key][:, edge_mask].cpu().numpy()
+                elif key in _GRAPH_FIELDS:
+                    mol.info[key] = self[key][batch_idx].cpu().numpy().reshape(-1)
+                else:
+                    raise RuntimeError(
+                        f"Extra field `{key}` isn't registered as node/edge/graph"
+                    )
 
             batch_atoms.append(mol)
 
@@ -535,7 +618,8 @@ class AtomicData(Data):
 
     @classmethod
     def from_AtomicDataDict(cls, data: AtomicDataDict.Type):
-        return cls(**data)
+        # it's an AtomicDataDict, so don't validate-- assume valid:
+        return cls(_validate=False, **data)
 
     @property
     def irreps(self):
@@ -690,7 +774,7 @@ def neighbor_list_and_relative_vec(
         keep_edge = ~bad_edge
         if not np.any(keep_edge):
             raise ValueError(
-                "After eliminating self edges, no edges remain in this system."
+                f"Every single atom has no neighbors within the cutoff r_max={r_max} (after eliminating self edges, no edges remain in this system)"
             )
         first_idex = first_idex[keep_edge]
         second_idex = second_idex[keep_edge]

@@ -23,11 +23,9 @@ else:
     import contextlib2 as contextlib
 
 import numpy as np
-import e3nn
 import torch
 from torch_ema import ExponentialMovingAverage
 
-import nequip
 from nequip.data import DataLoader, AtomicData, AtomicDataDict, AtomicDataset
 from nequip.utils import (
     Output,
@@ -42,7 +40,7 @@ from nequip.utils import (
     atomic_write_group,
     dtype_from_name,
 )
-from nequip.utils.git import get_commit
+from nequip.utils.versions import check_code_version
 from nequip.model import model_from_config
 
 from .loss import Loss, LossStat
@@ -149,6 +147,7 @@ class Trainer:
         optim_kwargs (dict): parameters to initialize the optimizer
 
         batch_size (int): size of each batch
+        validation_batch_size (int): batch size for evaluating the model for validation
         shuffle (bool): parameters for dataloader
         n_train (int): # of frames for training
         n_val (int): # of frames for validation
@@ -238,6 +237,7 @@ class Trainer:
         ema_use_num_updates=True,
         exclude_keys: list = [],
         batch_size: int = 5,
+        validation_batch_size: int = 5,
         shuffle: bool = True,
         n_train: Optional[int] = None,
         n_val: Optional[int] = None,
@@ -254,11 +254,12 @@ class Trainer:
         log_epoch_freq: int = 1,
         save_checkpoint_freq: int = -1,
         save_ema_checkpoint_freq: int = -1,
-        report_init_validation: bool = False,
+        report_init_validation: bool = True,
         verbose="INFO",
         **kwargs,
     ):
         self._initialized = False
+        self.cumulative_wall = 0
         logging.debug("* Initialize Trainer")
 
         # store all init arguments
@@ -410,14 +411,14 @@ class Trainer:
         )
         n_args = 0
         for key, item in kwargs.items():
-            # prepand VALIDATION string if k is not with
+            # prepend VALIDATION string if k is not with
             if isinstance(item, dict):
                 new_dict = {}
                 for k, v in item.items():
                     if (
                         k.lower().startswith(VALIDATION)
                         or k.lower().startswith(TRAIN)
-                        or k.lower() in ["lr", "wall"]
+                        or k.lower() in ["lr", "wall", "cumulative_wall"]
                     ):
                         new_dict[k] = item[k]
                     else:
@@ -437,7 +438,7 @@ class Trainer:
             for key in self.train_on_keys:
                 if key not in self.model.irreps_out:
                     raise RuntimeError(
-                        "Loss function include fields that are not predicted by the model"
+                        f"Loss function include fields {key} that are not predicted by the model {self.model.irreps_out}"
                     )
 
     @property
@@ -501,6 +502,7 @@ class Trainer:
                 dictionary["state_dict"]["cuda_rng_state"] = torch.cuda.get_rng_state(
                     device=self.torch_device
                 )
+            dictionary["state_dict"]["cumulative_wall"] = self.cumulative_wall
 
         if training_progress:
             dictionary["progress"] = {}
@@ -517,19 +519,6 @@ class Trainer:
             dictionary["progress"]["trainer_save_path"] = self.trainer_save_path
             if hasattr(self, "config_save_path"):
                 dictionary["progress"]["config_save_path"] = self.config_save_path
-
-        for code in [e3nn, nequip, torch]:
-            dictionary[f"{code.__name__}_version"] = code.__version__
-
-        codes_for_git = {"e3nn", "nequip"}
-        for builder in self.model_builders:
-            if not isinstance(builder, str):
-                continue
-            builder = builder.split(".")
-            if len(builder) > 1:
-                # it's not a single name which is from nequip
-                codes_for_git.add(builder[0])
-        dictionary["code_versions"] = {code: get_commit(code) for code in codes_for_git}
 
         return dictionary
 
@@ -608,15 +597,7 @@ class Trainer:
         """
 
         dictionary = deepcopy(dictionary)
-
-        for code in [e3nn, nequip, torch]:
-            version = dictionary.get(f"{code.__name__}_version", None)
-            if version is not None and version != code.__version__:
-                logging.warning(
-                    "Loading a pickled model created with different library version(s) may cause issues."
-                    f"current {code.__name__} verion: {code.__version__} "
-                    f"vs  original version: {version}"
-                )
+        check_code_version(dictionary)
 
         # update the restart and append option
         if append is not None:
@@ -657,6 +638,7 @@ class Trainer:
                 if item is not None:
                     item.load_state_dict(state_dict[key])
             trainer._initialized = True
+            trainer.cumulative_wall = state_dict["cumulative_wall"]
 
             torch.set_rng_state(state_dict["rng_state"])
             trainer.dataset_rng.set_state(state_dict["dataset_rng_state"])
@@ -722,6 +704,12 @@ class Trainer:
 
         self.model.to(self.torch_device)
 
+        self.num_weights = sum(p.numel() for p in self.model.parameters())
+        self.logger.info(f"Number of weights: {self.num_weights}")
+        self.logger.info(
+            f"Number of trainable weights: {sum(p.numel() for p in self.model.parameters() if p.requires_grad)}"
+        )
+
         self.rescale_layers = []
         outer_layer = self.model
         while hasattr(outer_layer, "unscale"):
@@ -731,6 +719,7 @@ class Trainer:
         self.init_objects()
 
         self._initialized = True
+        self.cumulative_wall = 0
 
     def init_metrics(self):
         if self.metrics_components is None:
@@ -756,6 +745,10 @@ class Trainer:
             raise RuntimeError(
                 f"metrics_key should start with either {VALIDATION} or {TRAIN}"
             )
+        if self.report_init_validation and self.metrics_key.lower().startswith(TRAIN):
+            raise RuntimeError(
+                f"metrics_key may not start with {TRAIN} when report_init_validation=True"
+            )
 
     def train(self):
 
@@ -764,17 +757,13 @@ class Trainer:
             raise RuntimeError("You must call `set_dataset()` before calling `train()`")
         if not self._initialized:
             self.init()
-            self.logger.info(
-                "Number of weights: {}".format(
-                    sum(p.numel() for p in self.model.parameters())
-                )
-            )
 
         for callback in self._init_callbacks:
             callback(self)
 
         self.init_log()
         self.wall = perf_counter()
+        self.previous_cumulative_wall = self.cumulative_wall
 
         with atomic_write_group():
             if self.iepoch == -1:
@@ -816,7 +805,7 @@ class Trainer:
             # this will normalize the targets
             # in validation (eval mode), it does nothing
             # in train mode, if normalizes the targets
-            data_unscaled = layer.unscale(data)
+            data_unscaled = layer.unscale(data_unscaled)
 
         # Run model
         # We make a shallow copy of the input dict in case the model modifies it
@@ -856,24 +845,19 @@ class Trainer:
                 self.lr_sched.step(self.iepoch + self.ibatch / self.n_batches)
 
         with torch.no_grad():
-            if len(self.rescale_layers) > 0:
-                if validation:
-                    scaled_out = out
-                    _data_unscaled = data
-                    for layer in self.rescale_layers:
-                        # loss function always needs to be in normalized unit
-                        scaled_out = layer.unscale(scaled_out, force_process=True)
-                        _data_unscaled = layer.unscale(
-                            _data_unscaled, force_process=True
-                        )
-                    loss, loss_contrib = self.loss(pred=scaled_out, ref=_data_unscaled)
-                else:
-                    # If we are in training mode, we need to bring the prediction
-                    # into real units
-                    for layer in self.rescale_layers[::-1]:
-                        out = layer.scale(out, force_process=True)
-            elif validation:
-                loss, loss_contrib = self.loss(pred=out, ref=data_unscaled)
+            if validation:
+                scaled_out = out
+                _data_unscaled = data
+                for layer in self.rescale_layers:
+                    # loss function always needs to be in normalized unit
+                    scaled_out = layer.unscale(scaled_out, force_process=True)
+                    _data_unscaled = layer.unscale(_data_unscaled, force_process=True)
+                loss, loss_contrib = self.loss(pred=scaled_out, ref=_data_unscaled)
+            else:
+                # If we are in training mode, we need to bring the prediction
+                # into real units
+                for layer in self.rescale_layers[::-1]:
+                    out = layer.scale(out, force_process=True)
 
             # save metrics stats
             self.batch_losses = self.loss_stat(loss, loss_contrib)
@@ -911,12 +895,15 @@ class Trainer:
 
     def epoch_step(self):
 
-        datasets = [self.dl_train, self.dl_val]
+        dataloaders = {TRAIN: self.dl_train, VALIDATION: self.dl_val}
         categories = [TRAIN, VALIDATION] if self.iepoch >= 0 else [VALIDATION]
+        dataloaders = [
+            dataloaders[c] for c in categories
+        ]  # get the right dataloaders for the catagories we actually run
         self.metrics_dict = {}
         self.loss_dict = {}
 
-        for category, dataset in zip(categories, datasets):
+        for category, dataset in zip(categories, dataloaders):
             if category == VALIDATION and self.use_ema:
                 cm = self.ema.average_parameters()
             else:
@@ -944,7 +931,11 @@ class Trainer:
 
         self.end_of_epoch_log()
 
-        if self.lr_scheduler_name == "ReduceLROnPlateau":
+        # if the iepoch for the past epoch was -1, it will now be 0
+        # for -1 (report_init_validation: True) we aren't training, so it's wrong
+        # to step the LR scheduler even if it will have no effect with this particular
+        # scheduler at the beginning of training.
+        if self.iepoch > 0 and self.lr_scheduler_name == "ReduceLROnPlateau":
             self.lr_sched.step(metrics=self.mae_dict[self.metrics_key])
 
         for callback in self._end_of_epoch_callbacks:
@@ -971,10 +962,7 @@ class Trainer:
         # append details from metrics
         metrics, skip_keys = self.metrics.flatten_metrics(
             metrics=self.batch_metrics,
-            # TO DO, how about chemical to symbol
-            type_names=self.model.config.get("type_names")
-            if hasattr(self.model, "config")
-            else None,
+            type_names=self.dataset_train.type_mapper.type_names,
         )
         for key, value in metrics.items():
 
@@ -1063,7 +1051,9 @@ class Trainer:
 
         self.logger.info(f"! Stop training: {self.stop_arg}")
         wall = perf_counter() - self.wall
+        self.cumulative_wall = wall + self.previous_cumulative_wall
         self.logger.info(f"Wall time: {wall}")
+        self.logger.info(f"Cumulative wall time: {self.cumulative_wall}")
 
     def end_of_epoch_log(self):
         """
@@ -1072,10 +1062,12 @@ class Trainer:
 
         lr = self.optim.param_groups[0]["lr"]
         wall = perf_counter() - self.wall
+        self.cumulative_wall = wall + self.previous_cumulative_wall
         self.mae_dict = dict(
             LR=lr,
             epoch=self.iepoch,
             wall=wall,
+            cumulative_wall=self.cumulative_wall,
         )
 
         header = "epoch, wall, LR"
@@ -1095,15 +1087,13 @@ class Trainer:
 
             met, skip_keys = self.metrics.flatten_metrics(
                 metrics=self.metrics_dict[category],
-                type_names=self.model.config.get("type_names")
-                if hasattr(self.model, "config")
-                else None,
+                type_names=self.dataset_train.type_mapper.type_names,
             )
 
             # append details from loss
             for key, value in self.loss_dict[category].items():
                 mat_str += f", {value:16.5g}"
-                header += f", {category}_{key}"
+                header += f",{category}_{key}"
                 log_str[category] += f" {value:12.3g}"
                 log_header[category] += f" {key:>12.12}"
                 self.mae_dict[f"{category}_{key}"] = value
@@ -1111,7 +1101,7 @@ class Trainer:
             # append details from metrics
             for key, value in met.items():
                 mat_str += f", {value:12.3g}"
-                header += f", {category}_{key}"
+                header += f",{category}_{key}"
                 if key not in skip_keys:
                     log_str[category] += f" {value:12.3g}"
                     log_header[category] += f" {key:>12.12}"
@@ -1190,7 +1180,9 @@ class Trainer:
                 if self.n_train > len(dataset):
                     raise ValueError("Not enough data in dataset for requested n_train")
                 if self.n_val > len(validation_dataset):
-                    raise ValueError("Not enough data in dataset for requested n_train")
+                    raise ValueError(
+                        "Not enough data in validation dataset for requested n_val"
+                    )
                 if self.train_val_split == "random":
                     self.train_idcs = torch.randperm(
                         len(dataset), generator=self.dataset_rng
@@ -1216,7 +1208,6 @@ class Trainer:
         # based on recommendations from
         # https://pytorch.org/tutorials/recipes/recipes/tuning_guide.html#enable-async-data-loading-and-augmentation
         dl_kwargs = dict(
-            batch_size=self.batch_size,
             exclude_keys=self.exclude_keys,
             num_workers=self.dataloader_num_workers,
             # keep stuff around in memory
@@ -1233,8 +1224,13 @@ class Trainer:
         self.dl_train = DataLoader(
             dataset=self.dataset_train,
             shuffle=self.shuffle,  # training should shuffle
+            batch_size=self.batch_size,
             **dl_kwargs,
         )
         # validation, on the other hand, shouldn't shuffle
         # we still pass the generator just to be safe
-        self.dl_val = DataLoader(dataset=self.dataset_val, **dl_kwargs)
+        self.dl_val = DataLoader(
+            dataset=self.dataset_val,
+            batch_size=self.validation_batch_size,
+            **dl_kwargs,
+        )

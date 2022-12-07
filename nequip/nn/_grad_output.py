@@ -1,4 +1,5 @@
 from typing import List, Union, Optional
+import warnings
 
 import torch
 
@@ -21,6 +22,7 @@ class GradientOutput(GraphModuleMixin, torch.nn.Module):
         sign: either 1 or -1; the returned gradient is multiplied by this.
     """
     sign: float
+    _negate: bool
     skip: bool
 
     def __init__(
@@ -35,6 +37,7 @@ class GradientOutput(GraphModuleMixin, torch.nn.Module):
         sign = float(sign)
         assert sign in (1.0, -1.0)
         self.sign = sign
+        self._negate = sign == -1.0
         self.of = of
         self.skip = False
 
@@ -96,8 +99,10 @@ class GradientOutput(GraphModuleMixin, torch.nn.Module):
             if grad is None:
                 # From the docs: "If an output doesn’t require_grad, then the gradient can be None"
                 raise RuntimeError("Something is wrong, gradient couldn't be computed")
-            else:
-                data[out] = self.sign * grad
+
+            if self._negate:
+                grad = torch.neg(grad)
+            data[out] = grad
 
         # unset requires_grad_
         for req_grad, k in zip(old_requires_grad, self.wrt):
@@ -124,7 +129,6 @@ class PartialForceOutput(GraphModuleMixin, torch.nn.Module):
         vectorize_warnings: bool = False,
     ):
         super().__init__()
-        # TODO wrap:
         self.func = func
         self.vectorize = vectorize
         if vectorize_warnings:
@@ -166,3 +170,167 @@ class PartialForceOutput(GraphModuleMixin, torch.nn.Module):
         out_data[AtomicDataDict.FORCE_KEY] = partial_forces.sum(dim=0)
 
         return out_data
+
+
+@compile_mode("script")
+class StressOutput(GraphModuleMixin, torch.nn.Module):
+    r"""Compute stress (and forces) using autograd of an energy model.
+
+    See:
+        Knuth et. al. Comput. Phys. Commun 190, 33-50, 2015
+        https://pure.mpg.de/rest/items/item_2085135_9/component/file_2156800/content
+
+    Args:
+        func: the energy model to wrap
+        do_forces: whether to compute forces as well
+    """
+    do_forces: bool
+
+    def __init__(
+        self,
+        func: GraphModuleMixin,
+        do_forces: bool = True,
+    ):
+        super().__init__()
+
+        warnings.warn(
+            "!! Stresses in NequIP are in BETA and UNDER DEVELOPMENT: _please_ carefully check the sanity of your results and report any (potential) issues on the GitHub"
+        )
+
+        if not do_forces:
+            raise NotImplementedError
+        self.do_forces = do_forces
+
+        self.func = func
+
+        # check and init irreps
+        self._init_irreps(
+            irreps_in=self.func.irreps_in.copy(),
+            irreps_out=self.func.irreps_out.copy(),
+        )
+        self.irreps_out[AtomicDataDict.FORCE_KEY] = "1o"
+        self.irreps_out[AtomicDataDict.STRESS_KEY] = "3x1o"
+        self.irreps_out[AtomicDataDict.VIRIAL_KEY] = "3x1o"
+
+        # for torchscript compat
+        self.register_buffer("_empty", torch.Tensor())
+
+    def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
+        data = AtomicDataDict.with_batch(data)
+
+        batch = data[AtomicDataDict.BATCH_KEY]
+        num_batch: int = int(batch.max().cpu().item()) + 1
+        pos = data[AtomicDataDict.POSITIONS_KEY]
+
+        has_cell: bool = AtomicDataDict.CELL_KEY in data
+
+        if has_cell:
+            orig_cell = data[AtomicDataDict.CELL_KEY]
+            # Make the cell per-batch
+            cell = orig_cell.view(-1, 3, 3).expand(num_batch, 3, 3)
+            data[AtomicDataDict.CELL_KEY] = cell
+        else:
+            # torchscript
+            orig_cell = self._empty
+            cell = self._empty
+        # Add the displacements
+        # the GradientOutput will make them require grad
+        # See SchNetPack code:
+        # https://github.com/atomistic-machine-learning/schnetpack/blob/master/src/schnetpack/atomistic/model.py#L45
+        # SchNetPack issue:
+        # https://github.com/atomistic-machine-learning/schnetpack/issues/165
+        # Paper they worked from:
+        # Knuth et. al. Comput. Phys. Commun 190, 33-50, 2015
+        # https://pure.mpg.de/rest/items/item_2085135_9/component/file_2156800/content
+        displacement = torch.zeros(
+            (num_batch, 3, 3),
+            dtype=pos.dtype,
+            device=pos.device,
+        )
+        displacement.requires_grad_(True)
+        data["_displacement"] = displacement
+        # in the above paper, the infinitesimal distortion is *symmetric*
+        # so we symmetrize the displacement before applying it to
+        # the positions/cell
+        # This is not strictly necessary (reasoning thanks to Mario):
+        # the displacement's asymmetric 1o term corresponds to an
+        # infinitesimal rotation, which should not affect the final
+        # output (invariance).
+        # That said, due to numerical error, this will never be
+        # exactly true. So, we symmetrize the deformation to
+        # take advantage of this understanding and not rely on
+        # the invariance here:
+        symmetric_displacement = 0.5 * (displacement + displacement.transpose(-1, -2))
+        did_pos_req_grad: bool = pos.requires_grad
+        pos.requires_grad_(True)
+        # bmm is natom in batch
+        data[AtomicDataDict.POSITIONS_KEY] = pos + torch.bmm(
+            pos.unsqueeze(-2), symmetric_displacement[batch]
+        ).squeeze(-2)
+        # we only displace the cell if we have one:
+        if has_cell:
+            # bmm is num_batch in batch
+            # here we apply the distortion to the cell as well
+            # this is critical also for the correctness
+            # if we didn't symmetrize the distortion, since without this
+            # there would then be an infinitesimal rotation of the positions
+            # but not cell, and it thus wouldn't be global and have
+            # no effect due to equivariance/invariance.
+            data[AtomicDataDict.CELL_KEY] = cell + torch.bmm(
+                cell, symmetric_displacement
+            )
+
+        # Call model and get gradients
+        data = self.func(data)
+
+        grads = torch.autograd.grad(
+            [data[AtomicDataDict.TOTAL_ENERGY_KEY].sum()],
+            [pos, data["_displacement"]],
+            create_graph=self.training,  # needed to allow gradients of this output during training
+        )
+
+        # Put negative sign on forces
+        forces = grads[0]
+        if forces is None:
+            # condition needed to unwrap optional for torchscript
+            assert False, "failed to compute forces autograd"
+        forces = torch.neg(forces)
+        data[AtomicDataDict.FORCE_KEY] = forces
+
+        # Store virial
+        virial = grads[1]
+        if virial is None:
+            # condition needed to unwrap optional for torchscript
+            assert False, "failed to compute virial autograd"
+
+        # we only compute the stress (1/V * virial) if we have a cell whose volume we can compute
+        if has_cell:
+            # ^ can only scale by cell volume if we have one...:
+            # Rescale stress tensor
+            # See https://github.com/atomistic-machine-learning/schnetpack/blob/master/src/schnetpack/atomistic/output_modules.py#L180
+            # First dim is batch, second is vec, third is xyz
+            volume = torch.einsum(
+                "zi,zi->z",
+                cell[:, 0, :],
+                torch.cross(cell[:, 1, :], cell[:, 2, :], dim=1),
+            ).unsqueeze(-1)
+            stress = virial / volume.view(-1, 1, 1)
+            data[AtomicDataDict.CELL_KEY] = orig_cell
+        else:
+            stress = self._empty  # torchscript
+        data[AtomicDataDict.STRESS_KEY] = stress
+
+        # see discussion in https://github.com/libAtoms/QUIP/issues/227 about sign convention
+        # they say the standard convention is virial = -stress x volume
+        # looking above this means that we need to pick up another negative sign for the virial
+        # to fit this equation with the stress computed above
+        virial = torch.neg(virial)
+        data[AtomicDataDict.VIRIAL_KEY] = virial
+
+        # Remove helper
+        del data["_displacement"]
+        if not did_pos_req_grad:
+            # don't give later modules one that does
+            pos.requires_grad_(False)
+
+        return data

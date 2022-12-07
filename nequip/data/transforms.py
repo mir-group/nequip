@@ -121,12 +121,37 @@ class TypeMapper:
                 f"Data included atomic numbers {bad_set} that are not part of the atomic number -> type mapping!"
             )
 
-        return self._Z_to_index[atomic_numbers - self._min_Z]
+        return self._Z_to_index.to(device=atomic_numbers.device)[
+            atomic_numbers - self._min_Z
+        ]
 
     def untransform(self, atom_types):
         """Transform atom types back into atomic numbers"""
-        return self._index_to_Z[atom_types]
+        return self._index_to_Z[atom_types].to(device=atom_types.device)
 
     @property
     def has_chemical_symbols(self) -> bool:
         return self.chemical_symbol_to_type is not None
+
+    @staticmethod
+    def format(
+        data: list, type_names: List[str], element_formatter: str = ".6f"
+    ) -> str:
+        data = torch.as_tensor(data) if data is not None else None
+        if data is None:
+            return f"[{', '.join(type_names)}: None]"
+        elif data.ndim == 0:
+            return (f"[{', '.join(type_names)}: {{:{element_formatter}}}]").format(data)
+        elif data.ndim == 1 and len(data) == len(type_names):
+            return (
+                "["
+                + ", ".join(
+                    f"{{{i}[0]}}: {{{i}[1]:{element_formatter}}}"
+                    for i in range(len(data))
+                )
+                + "]"
+            ).format(*zip(type_names, data))
+        else:
+            raise ValueError(
+                f"Don't know how to format data=`{data}` for types {type_names} with element_formatter=`{element_formatter}`"
+            )

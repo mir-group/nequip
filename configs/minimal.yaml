@@ -46,6 +46,7 @@ wandb: false
 n_train: 5
 n_val: 5
 batch_size: 1
+validation_batch_size: 5
 max_epochs: 10
 
 # loss function

@@ -1,0 +1,46 @@
+# general
+root: results/toy-emt
+run_name: minimal
+seed: 123
+dataset_seed: 456
+
+# network
+model_builders:
+  - EnergyModel
+  - PerSpeciesRescale
+  - StressForceOutput
+  - RescaleEnergyEtc
+num_basis: 8
+r_max: 4.0
+irreps_edge_sh: 0e + 1o
+conv_to_output_hidden_irreps_out: 16x0e
+feature_irreps_hidden: 16x0o + 16x0e + 16x1o + 16x1e
+
+# data set
+dataset: EMTTest                                                                       # type of data set, can be npz or ase
+dataset_element: Cu
+dataset_num_frames: 100
+chemical_symbols:
+  - Cu
+
+global_rescale_scale: dataset_total_energy_std
+per_species_rescale_shifts: dataset_per_atom_total_energy_mean
+per_species_rescale_scales: dataset_per_atom_total_energy_std
+
+# logging
+wandb: false
+# verbose: debug
+
+# training
+n_train: 90
+n_val: 10
+batch_size: 1
+max_epochs: 100
+
+# loss function
+loss_coeffs:                                                                       # different weights to use in a weighted loss functions
+  forces: 1                                                                        # for MD applications, we recommed a force weight of 100 and an energy weight of 1
+  stress: 1
+
+# optimizer
+optimizer_name: Adam

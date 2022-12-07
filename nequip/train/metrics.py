@@ -28,7 +28,7 @@ class Metrics:
     Example:
 
     ```
-    components = [(key1, "rmse"), (key2, "mse)]
+    components = [(key1, "rmse"), (key2, "mse")]
     ```
 
     You can also offer more details with a dictionary. The keys can be any keys for RunningStats or
@@ -36,8 +36,9 @@ class Metrics:
     report_per_component (bool): if True, report the mean on each component (equivalent to mean(axis=0) in numpy),
                                  otherwise, take the mean across batch and all components for vector data.
     functional: the function to compute the error. It has to be exactly the same as the one defined in torch.nn.
+                Callables are also allowed.
                 default: "L1Loss"
-    PerSpecies: whether compute the estimation for each species or not
+    PerSpecies: whether to compute the estimation for each species or not
 
     the keys are case-sensitive.
 
@@ -78,7 +79,7 @@ class Metrics:
 
             if key not in self.running_stats:
                 self.running_stats[key] = {}
-                self.funcs[key] = find_loss_function(functional, {})
+                self.funcs[key] = {}
                 self.kwargs[key] = {}
                 self.params[key] = {}
 
@@ -94,6 +95,7 @@ class Metrics:
             )
             self.kwargs[key][param_hash].update(kwargs)
             self.params[key][param_hash] = (reduction, params)
+            self.funcs[key][param_hash] = find_loss_function(functional, {})
 
     def init_runstat(self, params, error: torch.Tensor):
         """
@@ -147,16 +149,15 @@ class Metrics:
 
         metrics = {}
         N = None
-        for key, func in self.funcs.items():
-
-            error = func(
-                pred=pred,
-                ref=ref,
-                key=key,
-                mean=False,
-            )
-
+        for key in self.funcs.keys():
             for param_hash, kwargs in self.kwargs[key].items():
+                func = self.funcs[key][param_hash]
+                error = func(
+                    pred=pred,
+                    ref=ref,
+                    key=key,
+                    mean=False,
+                )
 
                 _, params = self.params[key][param_hash]
                 per_species = params["PerSpecies"]
@@ -222,6 +223,8 @@ class Metrics:
             reduction, params = self.params[key][param_hash]
 
             short_name = ABBREV.get(key, key)
+            if hasattr(self.funcs[key][param_hash], "get_name"):
+                short_name = self.funcs[key][param_hash].get_name(short_name)
 
             per_atom = params["PerAtom"]
             suffix = "/N" if per_atom else ""
@@ -240,7 +243,7 @@ class Metrics:
                         else:
                             flat_dict[f"{id_ele}_{item_name}"] = v.item()
 
-                    flat_dict[f"all_{item_name}"] = value.mean().item()
+                    flat_dict[f"psavg_{item_name}"] = value.mean().item()
                 else:
                     for id_ele, vec in enumerate(value):
                         ele = type_names[id_ele]
