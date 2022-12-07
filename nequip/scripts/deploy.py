@@ -198,7 +198,7 @@ def main(args=None):
                 args.train_dir, model_name="best_model.pth", device="cpu"
             )
         elif args.model is not None:
-            model = model_from_config(config)
+            model = model_from_config(config, deploy=True)
         else:
             raise AssertionError
 

@@ -295,7 +295,13 @@ class AtomicInMemoryDataset(AtomicDataset):
         # type conversion
         _process_dict(fixed_fields, ignore_fields=["r_max"])
 
-        logging.info(f"Loaded data: {data}")
+        total_MBs = sum(item.numel() * item.element_size() for _, item in data) / (
+            1024 * 1024
+        )
+        logging.info(
+            f"Loaded data: {data}\n    processed data size: ~{total_MBs:.2f} MB"
+        )
+        del total_MBs
 
         # use atomic writes to avoid race conditions between
         # different trainings that use the same dataset

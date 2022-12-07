@@ -3,6 +3,9 @@ import textwrap
 import tempfile
 import itertools
 import time
+import logging
+import sys
+import pdb
 
 import torch
 from torch.utils.benchmark import Timer, Measurement
@@ -55,11 +58,33 @@ def main(args=None):
         type=float,
         default=1,
     )
-
-    # TODO: option to show memory use
+    parser.add_argument(
+        "--no-compile",
+        help="Don't compile the model to TorchScript",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--memory-summary",
+        help="Print torch.cuda.memory_summary() after running the model",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--verbose", help="Logging verbosity level", type=str, default="error"
+    )
+    parser.add_argument(
+        "--pdb",
+        help="Run model builders and model under debugger to easily drop to debugger to investigate errors.",
+        action="store_true",
+    )
 
     # Parse the args
     args = parser.parse_args(args=args)
+    if args.pdb:
+        assert args.profile is None
+
+    root_logger = logging.getLogger()
+    root_logger.setLevel(getattr(logging, args.verbose.upper()))
+    root_logger.handlers = [logging.StreamHandler(sys.stderr)]
 
     if args.device is None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -123,31 +148,44 @@ def main(args=None):
     # Load model:
     print("Building model... ")
     model_time = time.time()
-    model = model_from_config(config, initialize=True, dataset=dataset)
+    try:
+        model = model_from_config(config, initialize=True, dataset=dataset, deploy=True)
+    except:  # noqa: E722
+        if args.pdb:
+            pdb.post_mortem()
+        else:
+            raise
     model_time = time.time() - model_time
     print(f"    building model took {model_time:.4f}s")
     print(f"    model has {sum(p.numel() for p in model.parameters())} weights")
     print(
         f"    model has {sum(p.numel() for p in model.parameters() if p.requires_grad)} trainable weights"
     )
-    print("Compile...")
-    # "Deploy" it
-    model.eval()
-    compile_time = time.time()
-    model = script(model)
-    model = _compile_for_deploy(model)
-    compile_time = time.time() - compile_time
-    print(f"    compilation took {compile_time:.4f}s")
+    print(
+        f"    model weights and buffers take {sum(p.numel() * p.element_size() for p in itertools.chain(model.parameters(), model.buffers())) / (1024 * 1024):.2f} MB"
+    )
 
-    # save and reload to avoid bugs
-    with tempfile.NamedTemporaryFile() as f:
-        torch.jit.save(model, f.name)
-        model = torch.jit.load(f.name, map_location=device)
-        # freeze like in the LAMMPS plugin
-        model = torch.jit.freeze(model)
-        # and reload again just to avoid bugs
-        torch.jit.save(model, f.name)
-        model = torch.jit.load(f.name, map_location=device)
+    model.eval()
+    if args.no_compile:
+        model = model.to(device)
+    else:
+        print("Compile...")
+        # "Deploy" it
+        compile_time = time.time()
+        model = script(model)
+        model = _compile_for_deploy(model)
+        compile_time = time.time() - compile_time
+        print(f"    compilation took {compile_time:.4f}s")
+
+        # save and reload to avoid bugs
+        with tempfile.NamedTemporaryFile() as f:
+            torch.jit.save(model, f.name)
+            model = torch.jit.load(f.name, map_location=device)
+            # freeze like in the LAMMPS plugin
+            model = torch.jit.freeze(model)
+            # and reload again just to avoid bugs
+            torch.jit.save(model, f.name)
+            model = torch.jit.load(f.name, map_location=device)
 
     # Make sure we're warm past compilation
     warmup = config["_jit_bailout_depth"] + 4  # just to be safe...
@@ -172,6 +210,14 @@ def main(args=None):
             for _ in range(1 + warmup + args.n):
                 model(next(datas).copy())
                 p.step()
+    elif args.pdb:
+        print("Running model under debugger...")
+        try:
+            for _ in range(args.n):
+                model(next(datas).copy())
+        except:  # noqa: E722)
+            pdb.post_mortem()
+        print("Done.")
     else:
         print("Warmup...")
         warmup_time = time.time()
@@ -186,6 +232,10 @@ def main(args=None):
             stmt="model(next(datas).copy())", globals={"model": model, "datas": datas}
         )
         perloop: Measurement = t.timeit(args.n)
+
+        if args.memory_summary and torch.cuda.is_available():
+            print("Memory usage summary:")
+            print(torch.cuda.memory_summary())
 
         print(" -- Results --")
         print(

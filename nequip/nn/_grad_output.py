@@ -315,10 +315,10 @@ class StressOutput(GraphModuleMixin, torch.nn.Module):
                 torch.cross(cell[:, 1, :], cell[:, 2, :], dim=1),
             ).unsqueeze(-1)
             stress = virial / volume.view(-1, 1, 1)
-            data[AtomicDataDict.STRESS_KEY] = stress
             data[AtomicDataDict.CELL_KEY] = orig_cell
         else:
             stress = self._empty  # torchscript
+        data[AtomicDataDict.STRESS_KEY] = stress
 
         # see discussion in https://github.com/libAtoms/QUIP/issues/227 about sign convention
         # they say the standard convention is virial = -stress x volume

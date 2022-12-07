@@ -8,7 +8,10 @@ from nequip.utils import load_callable, instantiate
 
 
 def model_from_config(
-    config, initialize: bool = False, dataset: Optional[AtomicDataset] = None
+    config,
+    initialize: bool = False,
+    dataset: Optional[AtomicDataset] = None,
+    deploy: bool = False,
 ) -> GraphModuleMixin:
     """Build a model based on `config`.
 
@@ -17,11 +20,13 @@ def model_from_config(
      - ``model``: the model produced by the previous builder. Cannot be requested by the first builder, must be requested by subsequent ones.
      - ``initialize``: whether to initialize the model
      - ``dataset``: if ``initialize`` is True, the dataset
+     - ``deploy``: whether the model object is for deployment / inference
 
     Args:
         config
-        initialize (bool): if True (default False), ``model_initializers`` will also be run.
+        initialize (bool): whether ``model_builders`` should be instructed to initialize the model
         dataset: dataset for initializers if ``initialize`` is True.
+        deploy (bool): whether ``model_builders`` should be told the model is for deployment / inference
 
     Returns:
         The build model.
@@ -61,6 +66,8 @@ def model_from_config(
         params = {}
         if "initialize" in pnames:
             params["initialize"] = initialize
+        if "deploy" in pnames:
+            params["deploy"] = deploy
         if "config" in pnames:
             params["config"] = config
         if "dataset" in pnames:

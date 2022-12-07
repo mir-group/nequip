@@ -121,11 +121,13 @@ class TypeMapper:
                 f"Data included atomic numbers {bad_set} that are not part of the atomic number -> type mapping!"
             )
 
-        return self._Z_to_index[atomic_numbers - self._min_Z]
+        return self._Z_to_index.to(device=atomic_numbers.device)[
+            atomic_numbers - self._min_Z
+        ]
 
     def untransform(self, atom_types):
         """Transform atom types back into atomic numbers"""
-        return self._index_to_Z[atom_types]
+        return self._index_to_Z[atom_types].to(device=atom_types.device)
 
     @property
     def has_chemical_symbols(self) -> bool:
