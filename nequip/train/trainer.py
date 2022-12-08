@@ -38,7 +38,6 @@ from nequip.utils import (
     atomic_write,
     finish_all_writes,
     atomic_write_group,
-    dtype_from_name,
 )
 from nequip.utils.versions import check_code_version
 from nequip.model import model_from_config
@@ -256,23 +255,22 @@ class Trainer:
         save_ema_checkpoint_freq: int = -1,
         report_init_validation: bool = True,
         verbose="INFO",
-        **kwargs,
+        config=None,
     ):
         self._initialized = False
         self.cumulative_wall = 0
         logging.debug("* Initialize Trainer")
 
-        # store all init arguments
-        self.model = model
+        assert isinstance(config, Config)
 
-        _local_kwargs = {}
+        # set attributes for init arguments
         for key in self.init_keys:
             setattr(self, key, locals()[key])
-            _local_kwargs[key] = locals()[key]
 
+        self.model = model
         self.ema = None
 
-        output = Output.get_output(dict(**_local_kwargs, **kwargs))
+        output = Output.get_output(config)
         self.output = output
 
         self.logfile = output.open_logfile("log", propagate=True)
@@ -308,7 +306,7 @@ class Trainer:
 
         # sort out all the other parameters
         # for samplers, optimizer and scheduler
-        self.kwargs = deepcopy(kwargs)
+        self.config = config
         self.optimizer_kwargs = deepcopy(optimizer_kwargs)
         self.lr_scheduler_kwargs = deepcopy(lr_scheduler_kwargs)
         self.early_stopping_kwargs = deepcopy(early_stopping_kwargs)
@@ -322,7 +320,7 @@ class Trainer:
             builder=Loss,
             prefix="loss",
             positional_args=dict(coeffs=self.loss_coeffs),
-            all_args=self.kwargs,
+            all_args=self.config,
         )
         self.loss_stat = LossStat(self.loss)
 
@@ -344,7 +342,7 @@ class Trainer:
             self._remove_from_model_input = self._remove_from_model_input.union(
                 AtomicDataDict.ALL_ENERGY_KEYS
             )
-        if kwargs.get("_override_allow_truth_label_inputs", False):
+        if config.get("_override_allow_truth_label_inputs", False):
             # needed for unit testing models
             self._remove_from_model_input = set()
 
@@ -365,6 +363,17 @@ class Trainer:
 
         self.init()
 
+    @classmethod
+    def from_config(kls, model, config):
+        return instantiate(
+            kls,
+            positional_args=dict(model=model, config=config),
+            all_args=config,
+            # For BC, because trainer has some *_kwargs args that aren't strict sub-builders
+            # ex. `optimizer_kwargs`
+            _strict_kwargs_postfix=False,
+        )[0]
+
     def init_objects(self):
         # initialize optimizer
         self.optim, self.optimizer_kwargs = instantiate_from_cls_name(
@@ -372,7 +381,7 @@ class Trainer:
             class_name=self.optimizer_name,
             prefix="optimizer",
             positional_args=dict(params=self.model.parameters(), lr=self.learning_rate),
-            all_args=self.kwargs,
+            all_args=self.config,
             optional_args=self.optimizer_kwargs,
         )
 
@@ -398,7 +407,7 @@ class Trainer:
                 prefix="lr_scheduler",
                 positional_args=dict(optimizer=self.optim),
                 optional_args=self.lr_scheduler_kwargs,
-                all_args=self.kwargs,
+                all_args=self.config,
             )
 
         # initialize early stopping conditions
@@ -406,7 +415,7 @@ class Trainer:
             EarlyStopping,
             prefix="early_stopping",
             optional_args=self.early_stopping_kwargs,
-            all_args=self.kwargs,
+            all_args=self.config,
             return_args_only=True,
         )
         n_args = 0
@@ -446,7 +455,7 @@ class Trainer:
         return [
             key
             for key in list(inspect.signature(Trainer.__init__).parameters.keys())
-            if key not in (["self", "kwargs", "model"] + Trainer.object_keys)
+            if key not in (["self", "kwargs", "model", "config"] + Trainer.object_keys)
         ]
 
     @property
@@ -454,7 +463,7 @@ class Trainer:
         return self.as_dict(state_dict=False, training_progress=False, kwargs=False)
 
     def update_kwargs(self, config):
-        self.kwargs.update(
+        self.config.update(
             {key: value for key, value in config.items() if key not in self.init_keys}
         )
 
@@ -488,7 +497,15 @@ class Trainer:
             dictionary[key] = getattr(self, key, None)
 
         if kwargs:
-            dictionary.update(getattr(self, "kwargs", {}))
+            dictionary.update(
+                {
+                    k: v
+                    for k, v in getattr(self, "config", {}).items()
+                    # config could have keys that already got taken for the named parameters of the trainer
+                    # those are already handled in the loop above over init_keys
+                    if k not in inspect.signature(Trainer.__init__).parameters.keys()
+                }
+            )
 
         if state_dict:
             dictionary["state_dict"] = {}
@@ -629,7 +646,7 @@ class Trainer:
 
         state_dict = dictionary.pop("state_dict", None)
 
-        trainer = cls(model=model, **dictionary)
+        trainer = cls.from_config(model=model, config=Config.from_dict(dictionary))
 
         if state_dict is not None and trainer.model is not None:
             logging.debug("Reload optimizer and scheduler states")
@@ -688,7 +705,7 @@ class Trainer:
             # this set as default dtype... does it matter?
             model.to(
                 device=torch.device(device),
-                dtype=dtype_from_name(config.default_dtype),
+                dtype=torch.get_default_dtype(),
             )
             model_state_dict = torch.load(
                 traindir + "/" + model_name, map_location=device
@@ -735,7 +752,7 @@ class Trainer:
             builder=Metrics,
             prefix="metrics",
             positional_args=dict(components=self.metrics_components),
-            all_args=self.kwargs,
+            all_args=self.config,
         )
 
         if not (
@@ -772,6 +789,9 @@ class Trainer:
                 self.save_config()
 
         self.init_metrics()
+
+        # we're done initializing things, so check:
+        self.config.warn_unused()
 
         while not self.stop_cond:
 

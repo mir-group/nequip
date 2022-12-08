@@ -8,6 +8,7 @@ from os.path import abspath, relpath, isfile, isdir
 from typing import Optional
 
 from .config import Config
+from .auto_init import instantiate
 
 
 class Output:
@@ -144,20 +145,11 @@ class Output:
 
     @classmethod
     def get_output(cls, kwargs: dict = {}):
-
-        d = inspect.signature(cls.__init__)
-        _kwargs = {
-            key: kwargs.get(key, None)
-            for key in list(d.parameters.keys())
-            if key not in ["self", "kwargs"]
-        }
-        return cls(**_kwargs)
+        return cls.from_config(Config.from_dict(kwargs))
 
     @classmethod
     def from_config(cls, config):
-        c = Config.from_class(cls)
-        c.update(config)
-        return cls(**dict(c))
+        return instantiate(cls, all_args=config)[0]
 
 
 def set_if_none(x, y):

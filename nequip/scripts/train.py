@@ -134,11 +134,11 @@ def fresh_start(config):
 
         config = init_n_update(config)
 
-        trainer = TrainerWandB(model=None, **dict(config))
+        trainer = TrainerWandB.from_config(model=None, config=config)
     else:
         from nequip.train.trainer import Trainer
 
-        trainer = Trainer(model=None, **dict(config))
+        trainer = Trainer.from_config(model=None, config=config)
 
     # what is this
     # to update wandb data?
