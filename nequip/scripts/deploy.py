@@ -129,7 +129,7 @@ def load_deployed_model(
 
 def main(args=None):
     parser = argparse.ArgumentParser(
-        description="Create and view information about deployed NequIP potentials."
+        description="Deploy and view information about previously deployed NequIP models."
     )
     # backward compat for 3.6
     if sys.version_info[1] > 6:
@@ -198,7 +198,7 @@ def main(args=None):
                 args.train_dir, model_name="best_model.pth", device="cpu"
             )
         elif args.model is not None:
-            model = model_from_config(config)
+            model = model_from_config(config, deploy=True)
         else:
             raise AssertionError
 

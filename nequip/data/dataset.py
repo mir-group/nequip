@@ -39,8 +39,15 @@ from .AtomicData import _process_dict
 class AtomicDataset(Dataset):
     """The base class for all NequIP datasets."""
 
-    fixed_fields: List[str]
+    fixed_fields: Dict[str, Any]
     root: str
+
+    def __init__(
+        self,
+        root: str,
+        type_mapper: Optional[TypeMapper] = None,
+    ):
+        super().__init__(root=root, transform=type_mapper)
 
     def statistics(
         self,
@@ -59,6 +66,37 @@ class AtomicDataset(Dataset):
     def type_mapper(self) -> Optional[TypeMapper]:
         # self.transform is always a TypeMapper
         return self.transform
+
+    def _get_parameters(self) -> Dict[str, Any]:
+        """Get a dict of the parameters used to build this dataset."""
+        pnames = list(inspect.signature(self.__init__).parameters)
+        IGNORE_KEYS = {
+            # the type mapper is applied after saving, not before, so doesn't matter to cache validity
+            "type_mapper"
+        }
+        params = {
+            k: getattr(self, k)
+            for k in pnames
+            if k not in IGNORE_KEYS and hasattr(self, k)
+        }
+        # Add other relevant metadata:
+        params["dtype"] = str(torch.get_default_dtype())
+        params["nequip_version"] = nequip.__version__
+        return params
+
+    @property
+    def processed_dir(self) -> str:
+        # We want the file name to change when the parameters change
+        # So, first we get all parameters:
+        params = self._get_parameters()
+        # Make some kind of string of them:
+        # we don't care about this possibly changing between python versions,
+        # since a change in python version almost certainly means a change in
+        # versions of other things too, and is a good reason to recompute
+        buffer = yaml.dump(params).encode("ascii")
+        # And hash it:
+        param_hash = hashlib.sha1(buffer).hexdigest()
+        return f"{self.root}/processed_dataset_{param_hash}"
 
 
 class AtomicInMemoryDataset(AtomicDataset):
@@ -127,7 +165,7 @@ class AtomicInMemoryDataset(AtomicDataset):
         # See https://pytorch-geometric.readthedocs.io/en/latest/notes/create_dataset.html#creating-in-memory-datasets
         # Then pre-process the data if disk files are not found
         super().__init__(
-            root=root, transform=type_mapper, force_use_cached=force_use_cached
+            root=root, type_mapper=type_mapper, force_use_cached=force_use_cached
         )
         if self.data is None:
             self.data, self.fixed_fields, include_frames = torch.load(
@@ -147,39 +185,6 @@ class AtomicInMemoryDataset(AtomicDataset):
     @property
     def raw_file_names(self):
         raise NotImplementedError()
-
-    def _get_parameters(self) -> Dict[str, Any]:
-        """Get a dict of the parameters used to build this dataset."""
-        pnames = list(inspect.signature(self.__init__).parameters)
-        IGNORE_KEYS = {
-            # the type mapper is applied after saving, not before, so doesn't matter to cache validity
-            "type_mapper",
-            # this parameter controls loading, doesn't affect dataset
-            "force_use_cached",
-        }
-        params = {
-            k: getattr(self, k)
-            for k in pnames
-            if k not in IGNORE_KEYS and hasattr(self, k)
-        }
-        # Add other relevant metadata:
-        params["dtype"] = str(torch.get_default_dtype())
-        params["nequip_version"] = nequip.__version__
-        return params
-
-    @property
-    def processed_dir(self) -> str:
-        # We want the file name to change when the parameters change
-        # So, first we get all parameters:
-        params = self._get_parameters()
-        # Make some kind of string of them:
-        # we don't care about this possibly changing between python versions,
-        # since a change in python version almost certainly means a change in
-        # versions of other things too, and is a good reason to recompute
-        buffer = yaml.dump(params).encode("ascii")
-        # And hash it:
-        param_hash = hashlib.sha1(buffer).hexdigest()
-        return f"{self.root}/processed_dataset_{param_hash}"
 
     @property
     def processed_file_names(self) -> List[str]:
@@ -293,7 +298,13 @@ class AtomicInMemoryDataset(AtomicDataset):
         # type conversion
         _process_dict(fixed_fields, ignore_fields=["r_max"])
 
-        logging.info(f"Loaded data: {data}")
+        total_MBs = sum(item.numel() * item.element_size() for _, item in data) / (
+            1024 * 1024
+        )
+        logging.info(
+            f"Loaded data: {data}\n    processed data size: ~{total_MBs:.2f} MB"
+        )
+        del total_MBs
 
         # use atomic writes to avoid race conditions between
         # different trainings that use the same dataset
@@ -633,7 +644,7 @@ class NpzDataset(AtomicInMemoryDataset):
     """Load data from an npz file.
 
     To avoid loading unneeded data, keys are ignored by default unless they are in ``key_mapping``, ``include_keys``,
-    ``npz_fixed_fields`` or ``extra_fixed_fields``.
+    ``npz_fixed_fields_keys`` or ``extra_fixed_fields``.
 
     Args:
         key_mapping (Dict[str, str]): mapping of npz keys to ``AtomicData`` keys. Optional

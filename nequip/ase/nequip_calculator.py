@@ -116,21 +116,18 @@ class NequIPCalculator(Calculator):
 
         # predict + extract data
         out = self.model(data)
-        forces = out[AtomicDataDict.FORCE_KEY].detach().cpu().numpy()
-        energy = (
-            out[AtomicDataDict.TOTAL_ENERGY_KEY].detach().cpu().numpy().reshape(tuple())
-        )
-
-        # store results
-        self.results = {
-            "energy": energy * self.energy_units_to_eV,
-            # force has units eng / len:
-            "forces": forces * (self.energy_units_to_eV / self.length_units_to_A),
-        }
-        self.results["free_energy"] = self.results[
-            "energy"
-        ]  # "force consistant" energy
-
+        self.results = {}
+        # only store results the model actually computed to avoid KeyErrors
+        if AtomicDataDict.TOTAL_ENERGY_KEY in out:
+            self.results["energy"] = self.energy_units_to_eV * (
+                out[AtomicDataDict.TOTAL_ENERGY_KEY]
+                .detach()
+                .cpu()
+                .numpy()
+                .reshape(tuple())
+            )
+            # "force consistant" energy
+            self.results["free_energy"] = self.results["energy"]
         if AtomicDataDict.PER_ATOM_ENERGY_KEY in out:
             self.results["energies"] = self.energy_units_to_eV * (
                 out[AtomicDataDict.PER_ATOM_ENERGY_KEY]
@@ -139,8 +136,12 @@ class NequIPCalculator(Calculator):
                 .cpu()
                 .numpy()
             )
-
-        if "stress" in properties:
+        if AtomicDataDict.FORCE_KEY in out:
+            # force has units eng / len:
+            self.results["forces"] = (
+                self.energy_units_to_eV / self.length_units_to_A
+            ) * out[AtomicDataDict.FORCE_KEY].detach().cpu().numpy()
+        if AtomicDataDict.STRESS_KEY in out:
             stress = out[AtomicDataDict.STRESS_KEY].detach().cpu().numpy()
             stress = stress.reshape(3, 3) * (
                 self.energy_units_to_eV / self.length_units_to_A**3

@@ -7,7 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Most recent change on the bottom.
 
 
-## [Unreleased] - 0.5.5
+## [Unreleased] - 0.5.6
+### Added
+- sklearn dependency removed
+- `nequip-benchmark` and `nequip-train` report number of weights and number of trainable weights
+- `nequip-benchmark --no-compile` and `--verbose` and `--memory-summary`
+- `nequip-benchmark --pdb` for debugging model (builder) errors
+
+### Fixed
+- Git utilities when installed as ZIPed `.egg` (#264)
+
+## [0.5.5] - 2022-06-20
 ### Added
 - BETA! Support for stress in training and inference
 - `EMTTestDataset` for quick synthetic fake PBC data
@@ -24,6 +34,7 @@ Most recent change on the bottom.
 ### Changed
 - abbreviate `node_features`->`h` in loss titles
 - failure of permutation equivariance tests no longer short-circuts o3 equivariance tests
+- `NequIPCalculator` now stores all relevant properties computed by the model regardless of requested `properties`, and does not try to access those not computed by the model, allowing models that only compute energy or forces but not both
 
 ### Fixed
 - Equivariance testing correctly handles output cells
