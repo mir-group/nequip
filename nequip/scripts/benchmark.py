@@ -16,7 +16,7 @@ from e3nn.util.jit import script
 from nequip.utils import Config
 from nequip.data import AtomicData, AtomicDataDict, dataset_from_config
 from nequip.model import model_from_config
-from nequip.scripts.deploy import _compile_for_deploy
+from nequip.scripts.deploy import _compile_for_deploy, load_deployed_model
 from nequip.scripts.train import default_config, check_code_version
 from nequip.utils._global_options import _set_global_options
 
@@ -28,6 +28,12 @@ def main(args=None):
         )
     )
     parser.add_argument("config", help="configuration file")
+    parser.add_argument(
+        "--model",
+        help="A deployed model to load instead of building a new one from `config`. ",
+        type=str,
+        default=None,
+    )
     parser.add_argument(
         "--profile",
         help="Profile instead of timing, creating and outputing a Chrome trace JSON to the given path.",
@@ -146,17 +152,29 @@ def main(args=None):
         return
 
     # Load model:
-    print("Building model... ")
-    model_time = time.time()
-    try:
-        model = model_from_config(config, initialize=True, dataset=dataset, deploy=True)
-    except:  # noqa: E722
-        if args.pdb:
-            pdb.post_mortem()
-        else:
-            raise
-    model_time = time.time() - model_time
-    print(f"    building model took {model_time:.4f}s")
+    if args.model is None:
+        print("Building model... ")
+        model_time = time.time()
+        try:
+            model = model_from_config(
+                config, initialize=True, dataset=dataset, deploy=True
+            )
+        except:  # noqa: E722
+            if args.pdb:
+                pdb.post_mortem()
+            else:
+                raise
+        model_time = time.time() - model_time
+        print(f"    building model took {model_time:.4f}s")
+    else:
+        print("Loading model...")
+        model, metadata = load_deployed_model(args.model, device=device, freeze=False)
+        print("    deployed model has metadata:")
+        print(
+            "\n".join(
+                "        %s: %s" % e for e in metadata.items() if e[0] != "config"
+            )
+        )
     print(f"    model has {sum(p.numel() for p in model.parameters())} weights")
     print(
         f"    model has {sum(p.numel() for p in model.parameters() if p.requires_grad)} trainable weights"
