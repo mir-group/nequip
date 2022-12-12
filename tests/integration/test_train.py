@@ -4,12 +4,23 @@ import pathlib
 import yaml
 import subprocess
 import os
+import sys
 
 import numpy as np
 import torch
 
 from nequip.data import AtomicDataDict
 from nequip.nn import GraphModuleMixin
+
+
+def _check_and_print(retcode):
+    __tracebackhide__ = True
+    if retcode.returncode:
+        if len(retcode.stdout) > 0:
+            print(retcode.stdout.decode("ascii"))
+        if len(retcode.stderr) > 0:
+            print(retcode.stderr.decode("ascii"), file=sys.stderr)
+        retcode.check_returncode()
 
 
 class IdentityModel(GraphModuleMixin, torch.nn.Module):
@@ -139,7 +150,7 @@ def test_metrics(nequip_dataset, BENCHMARK_ROOT, conffile, builder):
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
-        retcode.check_returncode()
+        _check_and_print(retcode)
 
         # == Load metrics ==
         outdir = f"{tmpdir}/{true_config['root']}/{run_name}/"
@@ -261,7 +272,7 @@ def test_requeue(nequip_dataset, BENCHMARK_ROOT, conffile):
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
             )
-            retcode.check_returncode()
+            _check_and_print(retcode)
 
             # == Load metrics ==
             dat = np.genfromtxt(

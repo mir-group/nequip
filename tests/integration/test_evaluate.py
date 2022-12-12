@@ -14,7 +14,7 @@ import torch
 
 from nequip.data import AtomicDataDict
 
-from test_train import ConstFactorModel, IdentityModel  # noqa
+from test_train import ConstFactorModel, IdentityModel, _check_and_print  # noqa
 
 
 @pytest.fixture(
@@ -69,7 +69,7 @@ def training_session(request, BENCHMARK_ROOT, conffile):
             [str(path_to_this_file.parent)] + env.get("PYTHONPATH", "").split(":")
         )
         retcode = subprocess.run(["nequip-train", "conf.yaml"], cwd=tmpdir, env=env)
-        retcode.check_returncode()
+        _check_and_print(retcode)
 
         yield builder, true_config, tmpdir, env
 
@@ -105,7 +105,7 @@ def test_metrics(training_session, do_test_idcs, do_metrics, do_output_fields):
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
-        retcode.check_returncode()
+        _check_and_print(retcode)
 
         # Check the output
         metrics = dict(
