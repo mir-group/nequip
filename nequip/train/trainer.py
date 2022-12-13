@@ -8,7 +8,6 @@ make an interface with ray
 
 """
 import sys
-import os
 import inspect
 import logging
 from copy import deepcopy
@@ -45,6 +44,7 @@ from nequip.utils import (
     dtype_from_name,
 )
 from nequip.utils.versions import check_code_version
+from nequip.utils.sampler import DistributedValidationSampler
 from nequip.model import model_from_config
 
 from .loss import Loss, LossStat
@@ -280,11 +280,17 @@ class Trainer:
 
         # Initialize torch.distributed
         self._local_batch_size = self.batch_size
+        self._local_validation_batch_size = self.validation_batch_size
         if self.distributed:
+            world_size: int = dist.get_world_size()
             assert (
-                self.batch_size % dist.get_world_size() == 0
-            ), "Batch size must be a multiple of the number of nodes"
-            self._local_batch_size //= dist.get_world_size()
+                self.batch_size % world_size == 0
+            ), f"Batch size {self.batch_size} was not a multiple of the world size {world_size}"
+            self._local_batch_size //= world_size
+            assert (
+                self.validation_batch_size % world_size == 0
+            ), f"Validation batch size {self.validation_batch_size} was not a multiple of the world size {world_size}"
+            self._local_validation_batch_size //= world_size
 
         if self.distributed and dist.get_rank() != 0:
             # none of these are used, just here so they exist
@@ -953,6 +959,9 @@ class Trainer:
         self.metrics_dict = {}
         self.loss_dict = {}
 
+        for sampler in [dl.sampler for dl in dataloaders]:
+            sampler.set_epoch(self.iepoch)
+
         for category, dataset in zip(categories, dataloaders):
             if category == VALIDATION and self.use_ema:
                 cm = self.ema.average_parameters()
@@ -1293,18 +1302,20 @@ class Trainer:
         # we use DistributedSampler no matter what.
         # TODO!: what do do with drop_tail??
         train_sampler = torch.utils.data.distributed.DistributedSampler(
-            self.dataset_train,
+            dataset=self.dataset_train,
             num_replicas=dist.get_world_size() if self.distributed else 1,
             rank=dist.get_rank() if self.distributed else 0,
             shuffle=self.shuffle,
             seed=self.dataset_seed,
         )
-        val_sampler = torch.utils.data.distributed.DistributedSampler(
-            self.dataset_val,
+        # we can't, however, use DistributedSampler for validation---
+        # it will repeat some frames in order to make n_val divisible by num_replicas
+        # instead, we follow https://discuss.pytorch.org/t/how-to-validate-in-distributeddataparallel-correctly/94267/11
+        # and use a custom Sampler:
+        val_sampler = DistributedValidationSampler(
+            dataset=self.dataset_val,
             num_replicas=dist.get_world_size() if self.distributed else 1,
             rank=dist.get_rank() if self.distributed else 0,
-            shuffle=False,
-            seed=self.dataset_seed,
         )
 
         self.dl_train = DataLoader(
@@ -1318,6 +1329,7 @@ class Trainer:
         self.dl_val = DataLoader(
             dataset=self.dataset_val,
             sampler=val_sampler,
-            batch_size=self.validation_batch_size,
+            batch_size=self._local_validation_batch_size,
+            drop_last=False,  # don't allow drop_last so we always get exactly the full validation set
             **dl_kwargs,
         )
