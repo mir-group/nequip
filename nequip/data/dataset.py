@@ -46,8 +46,11 @@ class AtomicDataset(Dataset):
         self,
         root: str,
         type_mapper: Optional[TypeMapper] = None,
+        force_use_cached: bool = False,
     ):
-        super().__init__(root=root, transform=type_mapper)
+        super().__init__(
+            root=root, transform=type_mapper, force_use_cached=force_use_cached
+        )
 
     def statistics(
         self,
@@ -72,7 +75,8 @@ class AtomicDataset(Dataset):
         pnames = list(inspect.signature(self.__init__).parameters)
         IGNORE_KEYS = {
             # the type mapper is applied after saving, not before, so doesn't matter to cache validity
-            "type_mapper"
+            "type_mapper",
+            "force_use_cached",
         }
         params = {
             k: getattr(self, k)
