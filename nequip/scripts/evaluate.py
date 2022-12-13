@@ -371,7 +371,6 @@ def main(args=None, running_as_script: bool = True):
         ]
 
     logger.info("Starting...")
-    context_stack = contextlib.ExitStack()
     with contextlib.ExitStack() as context_stack:
         if is_rank_zero:
             # only do output on rank zero

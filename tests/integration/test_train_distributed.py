@@ -44,8 +44,13 @@ def test_metrics(nequip_dataset, BENCHMARK_ROOT, conffile, builder):
         true_config["device"] = device
         true_config["batch_size"] = num_worker * 2
         true_config["validation_batch_size"] = num_worker * 3
+        # for training to be the same, it must be a multiple
+        # otherwise the distributed sampler has to do repeats / drops
+        # TODO: test this with and without a +1 and just ignore training metrics with the +1
         true_config["n_train"] = num_worker * 6
-        true_config["n_val"] = num_worker * 6  # + 3
+        # for validation, it should correctly handle any arbitrary number
+        # TODO: make that so
+        true_config["n_val"] = num_worker * 6
         true_config["max_epochs"] = 3
         true_config["seed"] = 950590
         true_config["dataset_seed"] = 34345

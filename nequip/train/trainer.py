@@ -963,12 +963,19 @@ class Trainer:
             sampler.set_epoch(self.iepoch)
 
         for category, dataset in zip(categories, dataloaders):
-            if category == VALIDATION and self.use_ema:
-                cm = self.ema.average_parameters()
-            else:
-                cm = contextlib.nullcontext()
+            with contextlib.ExitStack() as cm:
+                if category == VALIDATION:
+                    if self.distributed:
+                        # During validation, different workers can have different batch
+                        # sizes, which is incompatibile with DDP weight gradient syncing.
+                        # Because DDP uses generic gradient hooks, it gets called even
+                        # just by the force/stress backprop autograd call, so it tries
+                        # to sync and hangs due to inconsistent sizes.  This CM prevents
+                        # DDP from trying to sync.
+                        cm.enter_context(self.model.no_sync())
+                    if self.use_ema:
+                        cm.enter_context(self.ema.average_parameters())
 
-            with cm:
                 self.reset_metrics()
                 self.n_batches = len(dataset)
                 for self.ibatch, batch in enumerate(dataset):
