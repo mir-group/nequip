@@ -33,7 +33,6 @@ class DistributedValidationSampler(Sampler):
         self.num_samples = len(
             range(self.rank, self.total_size, self.num_replicas)
         )  # true value without extra samples
-
         self.shuffle = False
 
     def __iter__(self):
