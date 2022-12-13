@@ -5,12 +5,9 @@ import torch.nn
 from ._loss import find_loss_function
 from ._key import ABBREV
 
-from torch_runstats import RunningStats, Reduction
+import torch.distributed as dist
 
-try:
-    import horovod.torch as hvd
-except ImportError:
-    pass
+from torch_runstats import RunningStats, Reduction
 
 
 class Loss:
@@ -194,10 +191,14 @@ class LossStat:
         return results
 
     def gather(self):
-        """Use horovod to gather and accumulate state of this LossStat across nodes to rank 0."""
-        state = (hvd.rank(), {k: rs.get_state() for k, rs in self.loss_stat.items()})
-        states = hvd.allgather_object(state, name="gather_lossstats")  # list of dict
-        if hvd.rank() == 0:
+        """Use `torch.distributed` to gather and accumulate state of this LossStat across nodes to rank 0."""
+        state = (
+            dist.get_rank(),
+            {k: rs.get_state() for k, rs in self.loss_stat.items()},
+        )
+        states = [None for _ in range(dist.get_world_size())]
+        dist.all_gather_object(states, state)  # list of dict
+        if dist.get_rank() == 0:
             # accumulate on rank 0
             for from_rank, state in states:
                 if from_rank == 0:

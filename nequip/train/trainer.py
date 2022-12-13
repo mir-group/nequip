@@ -8,6 +8,7 @@ make an interface with ray
 
 """
 import sys
+import os
 import inspect
 import logging
 from copy import deepcopy
@@ -23,13 +24,11 @@ else:
     import contextlib2 as contextlib
 
 import numpy as np
-import torch
-from torch_ema import ExponentialMovingAverage
 
-try:
-    import horovod.torch as hvd
-except ImportError:
-    pass
+import torch
+import torch.distributed as dist
+
+from torch_ema import ExponentialMovingAverage
 
 from nequip.data import DataLoader, AtomicData, AtomicDataDict, AtomicDataset
 from nequip.utils import (
@@ -221,7 +220,7 @@ class Trainer:
         model,
         model_builders: Optional[list] = [],
         device: str = "cuda" if torch.cuda.is_available() else "cpu",
-        horovod: bool = False,
+        distributed: bool = False,
         seed: Optional[int] = None,
         dataset_seed: Optional[int] = None,
         loss_coeffs: Union[dict, str] = AtomicDataDict.TOTAL_ENERGY_KEY,
@@ -279,19 +278,15 @@ class Trainer:
         self.ema = None
         self.torch_device = torch.device(self.device)
 
-        # Initialize horovod
-        if self.horovod:
-            hvd.init()
-            if torch.cuda.is_available() and self.torch_device.type == "cuda":
-                assert self.torch_device.index is None
-                torch.cuda.set_device(hvd.local_rank())
-
+        # Initialize torch.distributed
+        self._local_batch_size = self.batch_size
+        if self.distributed:
             assert (
-                self.batch_size % hvd.size() == 0
+                self.batch_size % dist.get_world_size() == 0
             ), "Batch size must be a multiple of the number of nodes"
-            self.batch_size //= hvd.size()
+            self._local_batch_size //= dist.get_world_size()
 
-        if self.horovod and hvd.rank() != 0:
+        if self.distributed and dist.get_rank() != 0:
             # none of these are used, just here so they exist
             self.logfile = "/dev/null"
             self.epoch_log = "/dev/null"
@@ -400,9 +395,15 @@ class Trainer:
     def init_objects(self):
         # initialize optimizer
         learning_rate = self.learning_rate
-        if self.horovod:
+        if self.distributed:
             # "Scale the learning rate by the number of workers."
-            learning_rate *= hvd.size()
+            learning_rate *= dist.get_world_size()
+            # wrap the model in DDP
+            # DDP syncs initial model state for us:
+            # https://github.com/pytorch/pytorch/blob/master/torch/nn/parallel/distributed.py#L670
+            self.model = torch.nn.parallel.DistributedDataParallel(self.model)
+            dist.barrier()
+
         self.optim, self.optimizer_kwargs = instantiate_from_cls_name(
             module=torch.optim,
             class_name=self.optimizer_name,
@@ -411,11 +412,6 @@ class Trainer:
             all_args=self.kwargs,
             optional_args=self.optimizer_kwargs,
         )
-        if self.horovod:
-            self.optim = hvd.DistributedOptimizer(
-                self.optim,
-                named_parameters=self.model.named_parameters(),
-            )
 
         self.max_gradient_norm = (
             float(self.max_gradient_norm)
@@ -564,7 +560,7 @@ class Trainer:
         return dictionary
 
     def save_config(self, blocking: bool = True) -> None:
-        if self.horovod and hvd.rank() != 0:
+        if self.distributed and dist.get_rank() != 0:
             return
         save_file(
             item=self.as_dict(state_dict=False, training_progress=False),
@@ -582,7 +578,7 @@ class Trainer:
         filename (str): name of the file
         format (str): format of the file. yaml and json format will not save the weights.
         """
-        if self.horovod and hvd.rank() != 0:
+        if self.distributed and dist.get_rank() != 0:
             return
 
         if filename is None:
@@ -818,13 +814,6 @@ class Trainer:
 
         self.init_metrics()
 
-        if self.horovod:
-            for k, v in self.model.state_dict().items():
-                if not v.is_contiguous():
-                    print(k)
-            hvd.broadcast_parameters(self.model.state_dict(), root_rank=0)
-            hvd.broadcast_optimizer_state(self.optim, root_rank=0)
-
         while not self.stop_cond:
 
             self.epoch_step()
@@ -840,7 +829,7 @@ class Trainer:
 
     def batch_step(self, data, validation=False):
         # no need to have gradients from old steps taking up memory
-        if self.horovod:
+        if self.distributed:
             self.optim.zero_grad()
         else:
             self.optim.zero_grad(set_to_none=True)
@@ -881,14 +870,11 @@ class Trainer:
             # Actually do an optimization step, since we're training:
             loss, loss_contrib = self.loss(pred=out, ref=data_unscaled)
             # see https://pytorch.org/tutorials/recipes/recipes/tuning_guide.html#use-parameter-grad-none-instead-of-model-zero-grad-or-optimizer-zero-grad
-            if self.horovod:
+            if self.distributed:
                 self.optim.zero_grad()
             else:
                 self.optim.zero_grad(set_to_none=True)
             loss.backward()
-
-            if self.horovod:
-                self.optim.synchronize()
 
             # See https://stackoverflow.com/a/56069467
             # Has to happen after .backward() so there are grads to clip
@@ -897,12 +883,7 @@ class Trainer:
                     self.model.parameters(), self.max_gradient_norm
                 )
 
-            if self.horovod:
-                # https://horovod.readthedocs.io/en/stable/api.html#horovod.torch.DistributedOptimizer
-                with self.optim.skip_synchronize():
-                    self.optim.step()
-            else:
-                self.optim.step()
+            self.optim.step()
             # optim.step() means we are already sync'd in gradient weight
             # so this is fine, and everyone can maintain it separately
             if self.use_ema:
@@ -910,8 +891,8 @@ class Trainer:
 
             if self.lr_scheduler_name == "CosineAnnealingWarmRestarts":
                 self.lr_sched.step(self.iepoch + self.ibatch / self.n_batches)
-                if self.horovod:
-                    hvd.broadcast_optimizer_state(self.optim, root_rank=0)
+                # if self.distributed:
+                #     hvd.broadcast_optimizer_state(self.optim, root_rank=0)
 
         with torch.no_grad():
             if validation:
@@ -990,7 +971,7 @@ class Trainer:
                     for callback in self._end_of_batch_callbacks:
                         callback(self)
 
-                if self.horovod:
+                if self.distributed:
                     self.metrics.gather()
                     self.loss_stat.gather()
                 self.metrics_dict[category] = self.metrics.current_result()
@@ -1011,8 +992,8 @@ class Trainer:
         # scheduler at the beginning of training.
         if self.iepoch > 0 and self.lr_scheduler_name == "ReduceLROnPlateau":
             self.lr_sched.step(metrics=self.mae_dict[self.metrics_key])
-            if self.horovod:
-                hvd.broadcast_optimizer_state(self.optim, root_rank=0)
+            # if self.distributed:
+            #     hvd.broadcast_optimizer_state(self.optim, root_rank=0)
 
         for callback in self._end_of_epoch_callbacks:
             callback(self)
@@ -1100,7 +1081,7 @@ class Trainer:
                 self.save_ema_model(ckpt_path, blocking=False)
 
     def save_ema_model(self, path, blocking: bool = True):
-        if self.horovod and hvd.rank() != 0:
+        if self.distributed and dist.get_rank() != 0:
             return
 
         if self.use_ema:
@@ -1116,10 +1097,16 @@ class Trainer:
             self.save_model(path, blocking=blocking)
 
     def save_model(self, path, blocking: bool = True):
-        if self.horovod and hvd.rank() != 0:
+        if self.distributed and dist.get_rank() != 0:
             return
         with atomic_write(path, blocking=blocking, binary=True) as write_to:
-            torch.save(self.model.state_dict(), write_to)
+            state_dict = self.model.state_dict()
+            if self.distributed:
+                # make state dict compatible with model w/o DDP
+                torch.nn.modules.utils.consume_prefix_in_state_dict_if_present(
+                    state_dict=state_dict, prefix="module."
+                )
+            torch.save(state_dict, write_to)
 
     def init_log(self):
         if self.iepoch > 0:
@@ -1301,34 +1288,29 @@ class Trainer:
             # use the right randomness
             generator=self.dataset_rng,
         )
-        if self.horovod:
-            # TODO!: what do do with drop_tail??
-            train_sampler = torch.utils.data.distributed.DistributedSampler(
-                self.dataset_train,
-                num_replicas=hvd.size(),
-                rank=hvd.rank(),
-                shuffle=self.shuffle,
-                seed=self.dataset_seed,
-            )
-            val_sampler = torch.utils.data.distributed.DistributedSampler(
-                self.dataset_val,
-                num_replicas=hvd.size(),
-                rank=hvd.rank(),
-                shuffle=False,
-                seed=self.dataset_seed,
-            )
-        else:
-            if self.shuffle:
-                train_sampler = torch.utils.data.RandomSampler(
-                    self.dataset_train, generator=self.dataset_rng
-                )
-            else:
-                train_sampler = torch.utils.data.SequentialSampler(self.dataset_train)
-            val_sampler = torch.utils.data.SequentialSampler(self.dataset_val)
+
+        # For consistancy between distributed and normal training,
+        # we use DistributedSampler no matter what.
+        # TODO!: what do do with drop_tail??
+        train_sampler = torch.utils.data.distributed.DistributedSampler(
+            self.dataset_train,
+            num_replicas=dist.get_world_size() if self.distributed else 1,
+            rank=dist.get_rank() if self.distributed else 0,
+            shuffle=self.shuffle,
+            seed=self.dataset_seed,
+        )
+        val_sampler = torch.utils.data.distributed.DistributedSampler(
+            self.dataset_val,
+            num_replicas=dist.get_world_size() if self.distributed else 1,
+            rank=dist.get_rank() if self.distributed else 0,
+            shuffle=False,
+            seed=self.dataset_seed,
+        )
+
         self.dl_train = DataLoader(
             dataset=self.dataset_train,
             sampler=train_sampler,
-            batch_size=self.batch_size,
+            batch_size=self._local_batch_size,
             **dl_kwargs,
         )
         # validation, on the other hand, shouldn't shuffle

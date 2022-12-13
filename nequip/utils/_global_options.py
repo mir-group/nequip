@@ -1,6 +1,9 @@
 import warnings
+import os
+import sys
 
 import torch
+import torch.distributed as dist
 
 import e3nn
 import e3nn.util.jit
@@ -83,3 +86,17 @@ def _set_global_options(config, warn_on_override: bool = False) -> None:
     # Register fields:
     instantiate(register_fields, all_args=config)
     return
+
+
+def _init_distributed(distributed) -> None:
+    if distributed:
+        # https://pytorch.org/docs/stable/elastic/run.html#launcher-api
+        # if this fails, it means you didn't run with `torchrun`
+        local_rank: int = int(os.environ["LOCAL_RANK"])
+        dist.init_process_group(backend=distributed)
+        if torch.cuda.is_available():
+            torch.cuda.set_device(local_rank)
+        print(
+            f"Using `torch.distributed`; this is rank {dist.get_rank()}/{dist.get_world_size()} (local rank: {local_rank})",
+            file=sys.stderr,
+        )

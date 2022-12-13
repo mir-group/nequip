@@ -8,9 +8,7 @@ import os
 import numpy as np
 import torch
 
-from test_train import LearningFactorModel
-
-hvd = pytest.importorskip("horovod.torch")
+from test_train import LearningFactorModel, _check_and_print
 
 
 @pytest.mark.parametrize(
@@ -59,16 +57,16 @@ def test_metrics(nequip_dataset, BENCHMARK_ROOT, conffile, builder):
         # We need truth labels as inputs for these fake testing models
         true_config["_override_allow_truth_label_inputs"] = True
 
-        horovod_config = true_config.copy()
-        run_name_horovod = "test_train_horovod_" + dtype
-        horovod_config["run_name"] = run_name_horovod
+        distributed_config = true_config.copy()
+        run_name_distributed = "test_train_distributed_" + dtype
+        distributed_config["run_name"] = run_name_distributed
 
         config_path_true = tmpdir + "/conf_true.yaml"
-        config_path_horovod = tmpdir + "/conf_horovod.yaml"
+        config_path_distributed = tmpdir + "/conf_distributed.yaml"
         with open(config_path_true, "w+") as fp:
             yaml.dump(true_config, fp)
-        with open(config_path_horovod, "w+") as fp:
-            yaml.dump(horovod_config, fp)
+        with open(config_path_distributed, "w+") as fp:
+            yaml.dump(distributed_config, fp)
 
         env = dict(os.environ)
         # make this script available so model builders can be loaded
@@ -76,24 +74,29 @@ def test_metrics(nequip_dataset, BENCHMARK_ROOT, conffile, builder):
             [str(path_to_this_file.parent)] + env.get("PYTHONPATH", "").split(":")
         )
 
-        # == run horovod FIRST to make it have to process dataset ==
+        # == run distributed FIRST to make it have to process dataset ==
+        nequip_train_script_path = (
+            subprocess.check_output("which nequip-train", shell=True)
+            .decode("ascii")
+            .strip()
+        )
         retcode = subprocess.run(
             [
-                "horovodrun",
-                "-np",
+                "torchrun",  # TODO
+                "--nnodes",
+                "1",
+                "--nproc_per_node",
                 str(num_worker),
-                "-H",
-                f"localhost:{num_worker}",
-                "nequip-train",
-                "--horovod",
-                "conf_horovod.yaml",
+                nequip_train_script_path,
+                "conf_distributed.yaml",
+                "--distributed",
             ],
             cwd=tmpdir,
             env=env,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
-        retcode.check_returncode()
+        _check_and_print(retcode)
 
         # == Train truth model ==
         retcode = subprocess.run(
@@ -103,25 +106,25 @@ def test_metrics(nequip_dataset, BENCHMARK_ROOT, conffile, builder):
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
-        retcode.check_returncode()
+        _check_and_print(retcode)
 
         # == Load metrics ==
         outdir_true = f"{tmpdir}/{true_config['root']}/{run_name_true}/"
-        outdir_horovod = f"{tmpdir}/{true_config['root']}/{run_name_horovod}/"
+        outdir_distributed = f"{tmpdir}/{true_config['root']}/{run_name_distributed}/"
 
         # epoch metrics
         # only epoch metrics are synced
-        dat_true, dat_horovod = [
+        dat_true, dat_distributed = [
             np.genfromtxt(
                 f"{outdir}/metrics_epoch.csv",
                 delimiter=",",
                 names=True,
                 dtype=None,
             )
-            for outdir in (outdir_true, outdir_horovod)
+            for outdir in (outdir_true, outdir_distributed)
         ]
 
         for key in dat_true.dtype.names:
             if key in {"wall"}:
                 continue
-            assert np.allclose(dat_true[key], dat_horovod[key])
+            assert np.allclose(dat_true[key], dat_distributed[key])

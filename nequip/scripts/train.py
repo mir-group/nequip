@@ -4,6 +4,7 @@ import logging
 import argparse
 import warnings
 import os
+import sys
 
 # This is a weird hack to avoid Intel MKL issues on the cluster when this is called as a subprocess of a process that has itself initialized PyTorch.
 # Since numpy gets imported later anyway for dataset stuff, this shouldn't affect performance.
@@ -13,11 +14,7 @@ from os.path import isdir
 from pathlib import Path
 
 import torch
-
-try:
-    import horovod.torch as hvd
-except ImportError:
-    pass
+import torch.distributed as dist
 
 from nequip.model import model_from_config
 from nequip.utils import Config
@@ -25,7 +22,7 @@ from nequip.data import dataset_from_config, AtomicDataset
 from nequip.utils import load_file
 from nequip.utils.test import assert_AtomicData_equivariant
 from nequip.utils.versions import check_code_version
-from nequip.utils._global_options import _set_global_options
+from nequip.utils._global_options import _set_global_options, _init_distributed
 from nequip.scripts._logger import set_up_script_logger
 
 default_config = dict(
@@ -48,7 +45,7 @@ default_config = dict(
     equivariance_test=False,
     grad_anomaly_mode=False,
     append=False,
-    horovod=False,
+    distributed=False,
     _jit_bailout_depth=2,  # avoid 20 iters of pain, see https://github.com/pytorch/pytorch/issues/52286
     # Quote from eelison in PyTorch slack:
     # https://pytorch.slack.com/archives/CDZD1FANA/p1644259272007529?thread_ts=1644064449.039479&cid=CDZD1FANA
@@ -69,7 +66,7 @@ def main(args=None, running_as_script: bool = True):
         set_up_script_logger(config.get("log", None), config.verbose)
 
     found_restart_file = isdir(f"{config.root}/{config.run_name}")
-    if found_restart_file and not config.append and not config.horovod:
+    if found_restart_file and not config.append and not config.distributed:
         raise RuntimeError(
             f"Training instance exists at {config.root}/{config.run_name}; "
             "either set append to True or use a different root or runname"
@@ -113,9 +110,11 @@ def parse_command_line(args=None):
         action="store_true",
     )
     parser.add_argument(
-        "--horovod",
-        help="Enable Horovod for multi-GPU training (it must be installed and run under `horovodrun`)",
-        action="store_true",
+        "--distributed",
+        help="Whether to distribute with `torch.distributed`.",
+        const="nccl" if torch.cuda.is_available() else "gloo",
+        type=str,
+        nargs="?",
     )
     parser.add_argument(
         "--log",
@@ -130,7 +129,7 @@ def parse_command_line(args=None):
         "model_debug_mode",
         "equivariance_test",
         "grad_anomaly_mode",
-        "horovod",
+        "distributed",
     ):
         config[flag] = getattr(args, flag) or config[flag]
 
@@ -141,11 +140,11 @@ def _load_datasets(
     config, prefixes: List[str], stop_on_first_found: bool = False
 ) -> Dict[str, AtomicDataset]:
     # = Load the dataset =
-    is_rank_zero: bool = True
-    if config.horovod and hvd.rank() != 0:
+    is_rank_zero: bool = True  # if not distributed, we're always rank 0
+    if config.distributed and dist.get_rank() != 0:
         # stall nonzero ranks here so that rank zero can process datasets
         is_rank_zero = False
-        hvd.barrier()
+        dist.barrier()
 
     out: Dict[str, AtomicDataset] = {}
 
@@ -162,13 +161,13 @@ def _load_datasets(
         if stop_on_first_found and dataset is not None:
             break
 
-    if config.horovod and hvd.rank() == 0:
+    if config.distributed and is_rank_zero:
         # ensure that cached datasets are written out before allowing other ranks to load
         os.sync()
         # rank 0 reaches this barrier after loading the dataset, so it's processed
         # then other ranks are allowed to proceed from the L151 barrier and load
         # the cached dataset
-        hvd.barrier()
+        dist.barrier()
 
     return out
 
@@ -177,8 +176,10 @@ def fresh_start(config):
     # we use add_to_config cause it's a fresh start and need to record it
     check_code_version(config, add_to_config=True)
     _set_global_options(config)
+    _init_distributed(config.distributed)
 
     # = Make the trainer =
+    # making the trainer initializes torch.distributed
     if config.wandb:
         import wandb  # noqa: F401
         from nequip.train.trainer_wandb import TrainerWandB
@@ -199,7 +200,7 @@ def fresh_start(config):
     config.update(trainer.params)
 
     # load dataset
-    # (syncs horovod)
+    # (syncs distributed)
     datasets = _load_datasets(config, prefixes=["dataset", "validation_dataset"])
     dataset, validation_dataset = datasets["dataset"], datasets["validation_dataset"]
 
@@ -279,6 +280,7 @@ def restart(config):
 
     # dtype, etc.
     _set_global_options(config)
+    _init_distributed(config.distributed)
 
     # note, the from_dict method will check whether the code version
     # in trainer.pth is consistent and issue warnings

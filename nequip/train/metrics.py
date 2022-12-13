@@ -5,11 +5,7 @@ from typing import Union, Sequence, Tuple
 import yaml
 
 import torch
-
-try:
-    import horovod.torch as hvd
-except ImportError:
-    pass
+import torch.distributed as dist
 
 from nequip.data import AtomicDataDict
 from torch_runstats import RunningStats, Reduction
@@ -268,16 +264,17 @@ class Metrics:
         return flat_dict, skip_keys
 
     def gather(self):
-        """Use horovod to gather and accumulate state of this Metrics across nodes to rank 0."""
+        """Use `torch.distributed` to gather and accumulate state of this Metrics across nodes to rank 0."""
         state = (
-            hvd.rank(),
+            dist.get_rank(),
             {
                 k1: {k2: rs.get_state() for k2, rs in v1.items()}
                 for k1, v1 in self.running_stats.items()
             },
         )
-        states = hvd.allgather_object(state, name="gather_metrics")  # list of dict
-        if hvd.rank() == 0:
+        states = [None for _ in range(dist.get_world_size())]
+        dist.all_gather_object(states, state)  # list of dict
+        if dist.get_rank() == 0:
             # accumulate on rank 0
             for from_rank, state in states:
                 if from_rank == 0:

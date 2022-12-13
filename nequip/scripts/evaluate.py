@@ -13,17 +13,13 @@ from tqdm.auto import tqdm
 import ase.io
 
 import torch
-
-try:
-    import horovod.torch as hvd
-except ImportError:
-    pass
+import torch.distributed as dist
 
 from nequip.data import AtomicData, Collater, register_fields
 from nequip.scripts.deploy import load_deployed_model, R_MAX_KEY
 from nequip.scripts._logger import set_up_script_logger
 from nequip.scripts.train import default_config, check_code_version, _load_datasets
-from nequip.utils._global_options import _set_global_options
+from nequip.utils._global_options import _set_global_options, _init_distributed
 from nequip.train import Trainer, Loss, Metrics
 from nequip.utils import load_file, instantiate, Config
 
@@ -109,10 +105,11 @@ def main(args=None, running_as_script: bool = True):
         default=None,
     )
     parser.add_argument(
-        "--horovod",
-        help="Whether to distribute with horovod.",
-        type=bool,
-        default=False,
+        "--distributed",
+        help="Whether to distribute with `torch.distributed`.",
+        const="nccl" if torch.cuda.is_available() else "gloo",
+        type=str,
+        nargs="?",
     )
     parser.add_argument(
         "--output",
@@ -197,16 +194,6 @@ def main(args=None, running_as_script: bool = True):
     else:
         device = torch.device(args.device)
 
-    if args.horovod:
-        hvd.init()
-        logger.info(f"Using Horovod; this is rank {hvd.rank()}/{hvd.size()}")
-        if device.type == "cuda":
-            assert device == torch.device("cuda")  # no specific index
-            torch.cuda.set_device(hvd.local_rank())
-        if hvd.rank() != 0:
-            # disable outputs
-            logger.handlers = []
-
     logger.info(f"Using device: {device}")
     if device.type == "cuda":
         logger.info(
@@ -218,6 +205,8 @@ def main(args=None, running_as_script: bool = True):
             "Telling PyTorch to try to use deterministic algorithms... please note that this will likely error on CUDA/GPU"
         )
         torch.use_deterministic_algorithms(True)
+
+    _init_distributed(args.distributed)
 
     # Load model:
     logger.info("Loading model... ")
@@ -271,9 +260,9 @@ def main(args=None, running_as_script: bool = True):
 
     dataset_is_validation: bool = False
     # look for validation and only fall back to `dataset` prefix
-    # have to tell the loading function whether to use horovod
-    dataset_config.horovod = args.horovod
-    # this function syncs horovod if it is enabled
+    # have to tell the loading function whether to use distributed
+    dataset_config.distributed = args.distributed
+    # this function syncs distributed if it is enabled
     datasets = _load_datasets(
         dataset_config,
         prefixes=["validation_dataset", "dataset"],
@@ -373,11 +362,13 @@ def main(args=None, running_as_script: bool = True):
     batch_size: int = args.batch_size
 
     is_rank_zero: bool = True
-    if args.horovod:
-        is_rank_zero = hvd.rank() == 0
+    if args.distributed:
+        is_rank_zero = dist.get_rank() == 0
         # divide the frames between ranks
-        n_per_rank = int(math.ceil(len(test_idcs) / hvd.size()))
-        test_idcs = test_idcs[hvd.rank() * n_per_rank : (hvd.rank() + 1) * n_per_rank]
+        n_per_rank = int(math.ceil(len(test_idcs) / dist.get_world_size()))
+        test_idcs = test_idcs[
+            dist.get_rank() * n_per_rank : (dist.get_rank() + 1) * n_per_rank
+        ]
 
     logger.info("Starting...")
     context_stack = contextlib.ExitStack()
@@ -397,13 +388,13 @@ def main(args=None, running_as_script: bool = True):
                 )
 
         if output_type is not None:
-            if args.horovod:
+            if args.distributed:
                 # give each rank its own output and merge later
                 # we do NOT guerantee that the final XYZ is in any order
                 # just that we include the indexes into the original dataset
                 # so this is OK
                 outfile = args.output.parent / (
-                    args.output.stem + f"-rank{hvd.rank()}.xyz"
+                    args.output.stem + f"-rank{dist.get_rank()}.xyz"
                 )
             else:
                 outfile = args.output
@@ -445,7 +436,7 @@ def main(args=None, running_as_script: bool = True):
                 # Accumulate metrics
                 if do_metrics:
                     metrics(out, batch)
-                    if args.horovod:
+                    if args.distributed:
                         # sync metrics across ranks
                         metrics.gather()
                     if is_rank_zero:
@@ -467,14 +458,14 @@ def main(args=None, running_as_script: bool = True):
             if do_metrics:
                 display_bar.close()
 
-    if args.horovod and output_type is not None:
+    if args.distributed and output_type is not None:
         os.sync()
 
         if is_rank_zero:
             logger.info("Merging output files...")
             output_files = [
                 args.output.parent / (args.output.stem + f"-rank{rank}.xyz")
-                for rank in range(hvd.size())
+                for rank in range(dist.get_world_size())
             ]
             with open(args.output, "wb") as wfd:
                 for f in output_files:
