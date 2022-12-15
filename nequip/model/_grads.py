@@ -58,6 +58,7 @@ def StressForceOutput(model: GraphModuleMixin) -> GradientOutput:
         raise ValueError("This model already has force or stress outputs.")
     return StressOutputModule(func=model)
 
+
 def ParaStressForceOutput(model: GraphModuleMixin) -> GradientOutput:
     r"""Add forces and stresses to a model that predicts energy.
 

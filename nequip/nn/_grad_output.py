@@ -403,7 +403,7 @@ class ParaStressOutput(GraphModuleMixin, torch.nn.Module):
 
         did_pos_req_grad: bool = pos.requires_grad
         pos.requires_grad_(True)
-        data[AtomicDataDict.POSITIONS_KEY] = pos 
+        data[AtomicDataDict.POSITIONS_KEY] = pos
         data = AtomicDataDict.with_edge_vectors(data, with_lengths=False)
         data[AtomicDataDict.EDGE_VECTORS_KEY].requires_grad_(True)
 
@@ -423,13 +423,19 @@ class ParaStressOutput(GraphModuleMixin, torch.nn.Module):
             assert False, "failed to compute forces autograd"
         forces = torch.neg(forces)
         data[AtomicDataDict.FORCE_KEY] = forces
-        
+
         # Store virial
         vector_force = grads[1]
-        edge_virial_1 = torch.einsum("zi,zj->zij", vector_force, data[AtomicDataDict.EDGE_VECTORS_KEY])
-        edge_virial_2 = torch.einsum("zi,zj->zji", vector_force, data[AtomicDataDict.EDGE_VECTORS_KEY])
-        edge_virial = (edge_virial_1 + edge_virial_2)/2
-        atom_virial = scatter(edge_virial, data[AtomicDataDict.EDGE_INDEX_KEY][0], dim=0, reduce="sum")
+        edge_virial_1 = torch.einsum(
+            "zi,zj->zij", vector_force, data[AtomicDataDict.EDGE_VECTORS_KEY]
+        )
+        edge_virial_2 = torch.einsum(
+            "zi,zj->zji", vector_force, data[AtomicDataDict.EDGE_VECTORS_KEY]
+        )
+        edge_virial = (edge_virial_1 + edge_virial_2) / 2
+        atom_virial = scatter(
+            edge_virial, data[AtomicDataDict.EDGE_INDEX_KEY][0], dim=0, reduce="sum"
+        )
         virial = scatter(atom_virial, batch, dim=0, reduce="sum")
 
         # virial = grads[1]

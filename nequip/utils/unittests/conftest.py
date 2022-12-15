@@ -138,7 +138,7 @@ def bulks() -> List[Atoms]:
     atoms_list = []
     for i in range(8):
         atoms = bulk("C")
-        atoms = make_supercell(atoms,[[2,0,0],[0,2,0],[0,0,2]])
+        atoms = make_supercell(atoms, [[2, 0, 0], [0, 2, 0], [0, 0, 2]])
         atoms.rattle()
         atoms.calc = SinglePointCalculator(
             energy=np.random.random(),
@@ -165,10 +165,10 @@ def nequip_bulk_dataset(bulks, temp_data, float_tolerance):
         )
         yield a
 
+
 @pytest.fixture(scope="session")
 def atomic_bulk_batch(nequip_bulk_dataset):
     return Batch.from_data_list([nequip_bulk_dataset[0], nequip_bulk_dataset[1]])
-
 
 
 @pytest.fixture(scope="function")
