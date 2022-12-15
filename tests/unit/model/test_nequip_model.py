@@ -152,6 +152,6 @@ class TestNequIPModel(BaseEnergyModelTests):
         output_og = model_og(AtomicData.to_AtomicDataDict(data))
         output_para = model_para(AtomicData.to_AtomicDataDict(data))
         
-        assert torch.allclose(output_og[AtomicDataDict.STRESS_KEY], output_para[AtomicDataDict.STRESS_KEY], atol=5e-6)
-        assert torch.allclose(output_og[AtomicDataDict.VIRIAL_KEY], output_para[AtomicDataDict.VIRIAL_KEY], atol=5e-6)
+        assert torch.allclose(output_og[AtomicDataDict.STRESS_KEY], output_para[AtomicDataDict.STRESS_KEY], atol=1e-6)
+        assert torch.allclose(output_og[AtomicDataDict.VIRIAL_KEY], output_para[AtomicDataDict.VIRIAL_KEY], atol=1e-5) # Little big here caused by the summation over edges.
 
