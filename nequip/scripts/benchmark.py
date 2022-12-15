@@ -6,6 +6,7 @@ import time
 import logging
 import sys
 import pdb
+import traceback
 
 import torch
 from torch.utils.benchmark import Timer, Measurement
@@ -167,6 +168,7 @@ def main(args=None):
             )
         except:  # noqa: E722
             if args.pdb:
+                traceback.print_exc()
                 pdb.post_mortem()
             else:
                 raise
@@ -244,7 +246,8 @@ def main(args=None):
         try:
             for _ in range(args.n):
                 model(next(datas).copy())
-        except:  # noqa: E722)
+        except:  # noqa: E722
+            traceback.print_exc()
             pdb.post_mortem()
         print("Done.")
     elif args.equivariance_test:
