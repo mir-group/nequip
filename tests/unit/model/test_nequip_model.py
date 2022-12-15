@@ -138,20 +138,27 @@ class TestNequIPModel(BaseEnergyModelTests):
         config_og["model_builders"] = ["EnergyModel", "StressForceOutput"]
         model_og = model_from_config(config=config_og, initialize=True)
         nn_state = model_og.state_dict()
-        
+
         config_para = minimal_config2.copy()
         config_para["model_builders"] = ["EnergyModel", "ParaStressForceOutput"]
         model_para = model_from_config(config=config_para, initialize=True)
-        
-        model_para.load_state_dict(nn_state, strict = True)
-        
+
+        model_para.load_state_dict(nn_state, strict=True)
+
         model_og.to(device)
         model_para.to(device)
         data = atomic_bulk_batch.to(device)
-        
+
         output_og = model_og(AtomicData.to_AtomicDataDict(data))
         output_para = model_para(AtomicData.to_AtomicDataDict(data))
-        
-        assert torch.allclose(output_og[AtomicDataDict.STRESS_KEY], output_para[AtomicDataDict.STRESS_KEY], atol=1e-6)
-        assert torch.allclose(output_og[AtomicDataDict.VIRIAL_KEY], output_para[AtomicDataDict.VIRIAL_KEY], atol=1e-5) # Little big here caused by the summation over edges.
 
+        assert torch.allclose(
+            output_og[AtomicDataDict.STRESS_KEY],
+            output_para[AtomicDataDict.STRESS_KEY],
+            atol=1e-6,
+        )
+        assert torch.allclose(
+            output_og[AtomicDataDict.VIRIAL_KEY],
+            output_para[AtomicDataDict.VIRIAL_KEY],
+            atol=1e-5,
+        )  # Little big here caused by the summation over edges.
