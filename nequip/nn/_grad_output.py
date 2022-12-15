@@ -2,6 +2,7 @@ from typing import List, Union, Optional
 import warnings
 
 import torch
+from torch_runstats.scatter import scatter
 
 from e3nn.o3 import Irreps
 from e3nn.util.jit import compile_mode
@@ -329,6 +330,138 @@ class StressOutput(GraphModuleMixin, torch.nn.Module):
 
         # Remove helper
         del data["_displacement"]
+        if not did_pos_req_grad:
+            # don't give later modules one that does
+            pos.requires_grad_(False)
+
+        return data
+
+
+@compile_mode("script")
+class ParaStressOutput(GraphModuleMixin, torch.nn.Module):
+    r"""Compute stress, atomic virial, forces using autograd of an energy model.
+    Design for Lammps parallism.
+
+    See:
+        Knuth et. al. Comput. Phys. Commun 190, 33-50, 2015
+        https://pure.mpg.de/rest/items/item_2085135_9/component/file_2156800/content
+
+    Args:
+        func: the energy model to wrap
+        do_forces: whether to compute forces as well
+    """
+    do_forces: bool
+
+    def __init__(
+        self,
+        func: GraphModuleMixin,
+        do_forces: bool = True,
+    ):
+        super().__init__()
+
+        warnings.warn(
+            "!! Stresses in NequIP are in BETA and UNDER DEVELOPMENT: _please_ carefully check the sanity of your results and report any (potential) issues on the GitHub"
+        )
+
+        if not do_forces:
+            raise NotImplementedError
+        self.do_forces = do_forces
+
+        self.func = func
+
+        # check and init irreps
+        self._init_irreps(
+            irreps_in=self.func.irreps_in.copy(),
+            irreps_out=self.func.irreps_out.copy(),
+        )
+        self.irreps_out[AtomicDataDict.FORCE_KEY] = "1o"
+        self.irreps_out[AtomicDataDict.STRESS_KEY] = "3x1o"
+        self.irreps_out[AtomicDataDict.VIRIAL_KEY] = "3x1o"
+        self.irreps_out[AtomicDataDict.ATOM_VIRIAL_KEY] = "3x1o"
+
+        # for torchscript compat
+        self.register_buffer("_empty", torch.Tensor())
+
+    def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
+        data = AtomicDataDict.with_batch(data)
+
+        batch = data[AtomicDataDict.BATCH_KEY]
+        num_batch: int = int(batch.max().cpu().item()) + 1
+        pos = data[AtomicDataDict.POSITIONS_KEY]
+
+        has_cell: bool = AtomicDataDict.CELL_KEY in data
+
+        if has_cell:
+            orig_cell = data[AtomicDataDict.CELL_KEY]
+            # Make the cell per-batch
+            cell = orig_cell.view(-1, 3, 3).expand(num_batch, 3, 3)
+            data[AtomicDataDict.CELL_KEY] = cell
+        else:
+            # torchscript
+            orig_cell = self._empty
+            cell = self._empty
+
+        did_pos_req_grad: bool = pos.requires_grad
+        pos.requires_grad_(True)
+        data[AtomicDataDict.POSITIONS_KEY] = pos 
+        data = AtomicDataDict.with_edge_vectors(data, with_lengths=False)
+        data[AtomicDataDict.EDGE_VECTORS_KEY].requires_grad_(True)
+
+        # Call model and get gradients
+        data = self.func(data)
+
+        grads = torch.autograd.grad(
+            [data[AtomicDataDict.TOTAL_ENERGY_KEY].sum()],
+            [pos, data[AtomicDataDict.EDGE_VECTORS_KEY]],
+            create_graph=self.training,  # needed to allow gradients of this output during training
+        )
+
+        # Put negative sign on forces
+        forces = grads[0]
+        if forces is None:
+            # condition needed to unwrap optional for torchscript
+            assert False, "failed to compute forces autograd"
+        forces = torch.neg(forces)
+        data[AtomicDataDict.FORCE_KEY] = forces
+        
+        # Store virial
+        vector_force = grads[1]
+        edge_virial_1 = torch.einsum("zi,zj->zij", vector_force, data[AtomicDataDict.EDGE_VECTORS_KEY])
+        edge_virial_2 = torch.einsum("zi,zj->zji", vector_force, data[AtomicDataDict.EDGE_VECTORS_KEY])
+        edge_virial = (edge_virial_1 + edge_virial_2)/2
+        atom_virial = scatter(edge_virial, data[AtomicDataDict.EDGE_INDEX_KEY][0], dim=0, reduce="sum")
+        virial = scatter(atom_virial, batch, dim=0, reduce="sum")
+
+        # virial = grads[1]
+        if virial is None:
+            # condition needed to unwrap optional for torchscript
+            assert False, "failed to compute virial autograd"
+
+        # we only compute the stress (1/V * virial) if we have a cell whose volume we can compute
+        if has_cell:
+            # ^ can only scale by cell volume if we have one...:
+            # Rescale stress tensor
+            # See https://github.com/atomistic-machine-learning/schnetpack/blob/master/src/schnetpack/atomistic/output_modules.py#L180
+            # First dim is batch, second is vec, third is xyz
+            volume = torch.einsum(
+                "zi,zi->z",
+                cell[:, 0, :],
+                torch.cross(cell[:, 1, :], cell[:, 2, :], dim=1),
+            ).unsqueeze(-1)
+            stress = virial / volume.view(-1, 1, 1)
+            data[AtomicDataDict.CELL_KEY] = orig_cell
+        else:
+            stress = self._empty  # torchscript
+        data[AtomicDataDict.STRESS_KEY] = stress
+
+        # see discussion in https://github.com/libAtoms/QUIP/issues/227 about sign convention
+        # they say the standard convention is virial = -stress x volume
+        # looking above this means that we need to pick up another negative sign for the virial
+        # to fit this equation with the stress computed above
+        virial = torch.neg(virial)
+        data[AtomicDataDict.VIRIAL_KEY] = virial
+        data[AtomicDataDict.ATOM_VIRIAL_KEY] = atom_virial
+
         if not did_pos_req_grad:
             # don't give later modules one that does
             pos.requires_grad_(False)

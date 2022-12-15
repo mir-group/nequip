@@ -55,6 +55,7 @@ FORCE_KEY: Final[str] = "forces"
 PARTIAL_FORCE_KEY: Final[str] = "partial_forces"
 STRESS_KEY: Final[str] = "stress"
 VIRIAL_KEY: Final[str] = "virial"
+ATOM_VIRIAL_KEY: Final[str] = "atom_virial"
 
 ALL_ENERGY_KEYS: Final[List[str]] = [
     PER_ATOM_ENERGY_KEY,
@@ -63,6 +64,7 @@ ALL_ENERGY_KEYS: Final[List[str]] = [
     PARTIAL_FORCE_KEY,
     STRESS_KEY,
     VIRIAL_KEY,
+    ATOM_VIRIAL_KEY,
 ]
 
 BATCH_KEY: Final[str] = "batch"

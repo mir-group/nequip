@@ -194,7 +194,7 @@ def assert_AtomicData_equivariant(
             # must be this to actually rotate it
             irps[AtomicDataDict.CELL_KEY] = "3x1o"
 
-    stress_keys = (AtomicDataDict.STRESS_KEY, AtomicDataDict.VIRIAL_KEY)
+    stress_keys = (AtomicDataDict.STRESS_KEY, AtomicDataDict.VIRIAL_KEY, AtomicDataDict.ATOM_VIRIAL_KEY)
     for k in stress_keys:
         irreps_in.pop(k, None)
     if any(k in irreps_out for k in stress_keys):

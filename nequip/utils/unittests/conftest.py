@@ -6,7 +6,7 @@ import tempfile
 import os
 
 from ase.atoms import Atoms
-from ase.build import molecule
+from ase.build import molecule, bulk, make_supercell
 from ase.calculators.singlepoint import SinglePointCalculator
 from ase.io import write
 
@@ -131,6 +131,44 @@ def nequip_dataset(molecules, temp_data, float_tolerance):
 @pytest.fixture(scope="session")
 def atomic_batch(nequip_dataset):
     return Batch.from_data_list([nequip_dataset[0], nequip_dataset[1]])
+
+
+@pytest.fixture(scope="session")
+def bulks() -> List[Atoms]:
+    atoms_list = []
+    for i in range(8):
+        atoms = bulk("C")
+        atoms = make_supercell(atoms,[[2,0,0],[0,2,0],[0,0,2]])
+        atoms.rattle()
+        atoms.calc = SinglePointCalculator(
+            energy=np.random.random(),
+            forces=np.random.random((len(atoms), 3)),
+            stress=np.random.random(6),
+            magmoms=None,
+            atoms=atoms,
+        )
+        atoms_list.append(atoms)
+    return atoms_list
+
+
+@pytest.fixture(scope="session")
+def nequip_bulk_dataset(bulks, temp_data, float_tolerance):
+    with tempfile.NamedTemporaryFile(suffix=".xyz") as fp:
+        for atoms in bulks:
+            write(fp.name, atoms, format="extxyz", append=True)
+        a = ASEDataset(
+            file_name=fp.name,
+            root=temp_data,
+            extra_fixed_fields={"r_max": 5.0},
+            ase_args=dict(format="extxyz"),
+            type_mapper=TypeMapper(chemical_symbol_to_type={"H": 0, "C": 1, "O": 2}),
+        )
+        yield a
+
+@pytest.fixture(scope="session")
+def atomic_bulk_batch(nequip_bulk_dataset):
+    return Batch.from_data_list([nequip_bulk_dataset[0], nequip_bulk_dataset[1]])
+
 
 
 @pytest.fixture(scope="function")

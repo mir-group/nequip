@@ -1,8 +1,9 @@
 import pytest
+import torch
 
 from e3nn import o3
 
-from nequip.data import AtomicDataDict
+from nequip.data import AtomicDataDict, AtomicData
 from nequip.model import model_from_config
 from nequip.nn import AtomwiseLinear
 from nequip.utils.unittests.model_tests import BaseEnergyModelTests
@@ -95,6 +96,17 @@ class TestNequIPModel(BaseEnergyModelTests):
                     AtomicDataDict.VIRIAL_KEY,
                 ],
             ),
+            (
+                ["EnergyModel", "ParaStressForceOutput"],
+                [
+                    AtomicDataDict.TOTAL_ENERGY_KEY,
+                    AtomicDataDict.PER_ATOM_ENERGY_KEY,
+                    AtomicDataDict.FORCE_KEY,
+                    AtomicDataDict.STRESS_KEY,
+                    AtomicDataDict.VIRIAL_KEY,
+                    AtomicDataDict.ATOM_VIRIAL_KEY,
+                ],
+            ),
         ],
         scope="class",
     )
@@ -120,3 +132,26 @@ class TestNequIPModel(BaseEnergyModelTests):
             model.layer0_convnet.irreps_in[model.chemical_embedding.out_field]
             == true_irreps
         )
+
+    def test_stress(self, atomic_bulk_batch, device):
+        config_og = minimal_config2.copy()
+        config_og["model_builders"] = ["EnergyModel", "StressForceOutput"]
+        model_og = model_from_config(config=config_og, initialize=True)
+        nn_state = model_og.state_dict()
+        
+        config_para = minimal_config2.copy()
+        config_para["model_builders"] = ["EnergyModel", "ParaStressForceOutput"]
+        model_para = model_from_config(config=config_para, initialize=True)
+        
+        model_para.load_state_dict(nn_state, strict = True)
+        
+        model_og.to(device)
+        model_para.to(device)
+        data = atomic_bulk_batch.to(device)
+        
+        output_og = model_og(AtomicData.to_AtomicDataDict(data))
+        output_para = model_para(AtomicData.to_AtomicDataDict(data))
+        
+        assert torch.allclose(output_og[AtomicDataDict.STRESS_KEY], output_para[AtomicDataDict.STRESS_KEY], atol=5e-6)
+        assert torch.allclose(output_og[AtomicDataDict.VIRIAL_KEY], output_para[AtomicDataDict.VIRIAL_KEY], atol=5e-6)
+
