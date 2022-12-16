@@ -434,7 +434,7 @@ class ParaStressOutput(GraphModuleMixin, torch.nn.Module):
         )
         edge_virial = (edge_virial + edge_virial.transpose(-1, -2)) / 2 # symmetric
         atom_virial = scatter(
-            edge_virial, data[AtomicDataDict.EDGE_INDEX_KEY][0], dim=0, reduce="sum"
+            edge_virial, data[AtomicDataDict.EDGE_INDEX_KEY][0], dim=0, reduce="sum", dim_size=len(pos)
         )
         virial = scatter(atom_virial, batch, dim=0, reduce="sum")
 
