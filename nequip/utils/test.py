@@ -208,7 +208,8 @@ def assert_AtomicData_equivariant(
         stress_rtp = stress_cart_tensor.reduced_tensor_products().to(device, dtype)
         # symmetric 3x3 cartesian tensor as irreps
         for k in stress_keys:
-            irreps_out[k] = stress_cart_tensor
+            if k in irreps_out:
+                irreps_out[k] = stress_cart_tensor
 
     def wrapper(*args):
         arg_dict = {k: v for k, v in zip(irreps_in, args)}

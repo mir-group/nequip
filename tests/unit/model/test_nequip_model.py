@@ -7,6 +7,7 @@ from nequip.data import AtomicDataDict, AtomicData
 from nequip.model import model_from_config
 from nequip.nn import AtomwiseLinear
 from nequip.utils.unittests.model_tests import BaseEnergyModelTests
+from nequip.utils.test import assert_AtomicData_equivariant
 
 COMMON_CONFIG = {
     "avg_num_neighbors": None,

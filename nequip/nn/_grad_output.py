@@ -426,19 +426,18 @@ class ParaStressOutput(GraphModuleMixin, torch.nn.Module):
 
         # Store virial
         vector_force = grads[1]
-        edge_virial_1 = torch.einsum(
+        if vector_force is None:
+            # condition needed to unwrap optional for torchscript
+            assert False, "failed to compute vector_force autograd"
+        edge_virial = torch.einsum(
             "zi,zj->zij", vector_force, data[AtomicDataDict.EDGE_VECTORS_KEY]
         )
-        edge_virial_2 = torch.einsum(
-            "zi,zj->zji", vector_force, data[AtomicDataDict.EDGE_VECTORS_KEY]
-        )
-        edge_virial = (edge_virial_1 + edge_virial_2) / 2
+        edge_virial = (edge_virial + edge_virial.transpose(-1, -2)) / 2 # symmetric
         atom_virial = scatter(
             edge_virial, data[AtomicDataDict.EDGE_INDEX_KEY][0], dim=0, reduce="sum"
         )
         virial = scatter(atom_virial, batch, dim=0, reduce="sum")
 
-        # virial = grads[1]
         if virial is None:
             # condition needed to unwrap optional for torchscript
             assert False, "failed to compute virial autograd"
@@ -455,7 +454,6 @@ class ParaStressOutput(GraphModuleMixin, torch.nn.Module):
                 torch.cross(cell[:, 1, :], cell[:, 2, :], dim=1),
             ).unsqueeze(-1)
             stress = virial / volume.view(-1, 1, 1)
-            data[AtomicDataDict.CELL_KEY] = orig_cell
         else:
             stress = self._empty  # torchscript
         data[AtomicDataDict.STRESS_KEY] = stress
