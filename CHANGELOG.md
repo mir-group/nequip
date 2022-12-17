@@ -9,8 +9,15 @@ Most recent change on the bottom.
 
 ## [Unreleased] - 0.5.6
 ### Added
+- sklearn dependency removed
 - `nequip-benchmark` and `nequip-train` report number of weights and number of trainable weights
 - `nequip-benchmark --no-compile` and `--verbose` and `--memory-summary`
+- `nequip-benchmark --pdb` for debugging model (builder) errors
+- More information in `nequip-deploy info`
+
+### Changed
+- Minimum e3nn is now 0.4.4
+- `--equivariance-test` now prints much more information, especially when there is a failure
 
 ### Fixed
 - Git utilities when installed as ZIPed `.egg` (#264)

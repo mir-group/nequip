@@ -44,11 +44,10 @@ class BaseModelTests:
     def device(self, request):
         return request.param
 
-    @pytest.fixture(scope="class")
-    def model(self, config, device):
-        config, out_fields = config
-        torch.manual_seed(0)
-        np.random.seed(0)
+    @staticmethod
+    def make_model(config, device, initialize: bool = True, deploy: bool = False):
+        torch.manual_seed(127)
+        np.random.seed(193)
         config = config.copy()
         config.update(
             {
@@ -56,8 +55,14 @@ class BaseModelTests:
                 "types_names": ["H", "C", "O"],
             }
         )
-        model = model_from_config(config)
+        model = model_from_config(config, initialize=initialize, deploy=deploy)
         model = model.to(device)
+        return model
+
+    @pytest.fixture(scope="class")
+    def model(self, config, device):
+        config, out_fields = config
+        model = self.make_model(config, device=device)
         return model, out_fields
 
     # == common tests for all models ==

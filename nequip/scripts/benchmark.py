@@ -5,6 +5,8 @@ import itertools
 import time
 import logging
 import sys
+import pdb
+import traceback
 
 import torch
 from torch.utils.benchmark import Timer, Measurement
@@ -13,9 +15,10 @@ from torch.utils.benchmark.utils.common import trim_sigfig, select_unit
 from e3nn.util.jit import script
 
 from nequip.utils import Config
+from nequip.utils.test import assert_AtomicData_equivariant
 from nequip.data import AtomicData, AtomicDataDict, dataset_from_config
 from nequip.model import model_from_config
-from nequip.scripts.deploy import _compile_for_deploy
+from nequip.scripts.deploy import _compile_for_deploy, load_deployed_model
 from nequip.scripts.train import default_config, check_code_version
 from nequip.utils._global_options import _set_global_options
 
@@ -28,10 +31,21 @@ def main(args=None):
     )
     parser.add_argument("config", help="configuration file")
     parser.add_argument(
+        "--model",
+        help="A deployed model to load instead of building a new one from `config`. ",
+        type=str,
+        default=None,
+    )
+    parser.add_argument(
         "--profile",
         help="Profile instead of timing, creating and outputing a Chrome trace JSON to the given path.",
         type=str,
         default=None,
+    )
+    parser.add_argument(
+        "--equivariance-test",
+        help="test the model's equivariance on `--n-data` frames.",
+        action="store_true",
     )
     parser.add_argument(
         "--device",
@@ -70,9 +84,16 @@ def main(args=None):
     parser.add_argument(
         "--verbose", help="Logging verbosity level", type=str, default="error"
     )
+    parser.add_argument(
+        "--pdb",
+        help="Run model builders and model under debugger to easily drop to debugger to investigate errors.",
+        action="store_true",
+    )
 
     # Parse the args
     args = parser.parse_args(args=args)
+    if args.pdb:
+        assert args.profile is None
 
     root_logger = logging.getLogger()
     root_logger.setLevel(getattr(logging, args.verbose.upper()))
@@ -97,12 +118,12 @@ def main(args=None):
     print(f"    loading dataset took {dataset_time:.4f}s")
     dataset_rng = torch.Generator()
     dataset_rng.manual_seed(config.get("dataset_seed", config.get("seed", 12345)))
-    datas = [
+    datas_list = [
         AtomicData.to_AtomicDataDict(dataset[i].to(device))
         for i in torch.randperm(len(dataset), generator=dataset_rng)[: args.n_data]
     ]
-    n_atom: int = len(datas[0]["pos"])
-    if not all(len(d["pos"]) == n_atom for d in datas):
+    n_atom: int = len(datas_list[0]["pos"])
+    if not all(len(d["pos"]) == n_atom for d in datas_list):
         raise NotImplementedError(
             "nequip-benchmark does not currently handle benchmarking on data frames with variable number of atoms"
         )
@@ -114,7 +135,7 @@ def main(args=None):
     print(f"         number of atoms: {n_atom}")
     print(f"         number of types: {dataset.type_mapper.num_types}")
     print(
-        f"          avg. num edges: {sum(d[AtomicDataDict.EDGE_INDEX_KEY].shape[1] for d in datas) / len(datas)}"
+        f"          avg. num edges: {sum(d[AtomicDataDict.EDGE_INDEX_KEY].shape[1] for d in datas_list) / len(datas_list)}"
     )
     avg_edges_per_atom = torch.mean(
         torch.cat(
@@ -123,14 +144,14 @@ def main(args=None):
                     d[AtomicDataDict.EDGE_INDEX_KEY][0],
                     minlength=d[AtomicDataDict.POSITIONS_KEY].shape[0],
                 ).float()
-                for d in datas
+                for d in datas_list
             ]
         )
     ).item()
     print(f"         avg. neigh/atom: {avg_edges_per_atom}")
 
     # cycle over the datas we loaded
-    datas = itertools.cycle(datas)
+    datas = itertools.cycle(datas_list)
 
     # short circut
     if args.n == 0:
@@ -138,11 +159,30 @@ def main(args=None):
         return
 
     # Load model:
-    print("Building model... ")
-    model_time = time.time()
-    model = model_from_config(config, initialize=True, dataset=dataset, deploy=True)
-    model_time = time.time() - model_time
-    print(f"    building model took {model_time:.4f}s")
+    if args.model is None:
+        print("Building model... ")
+        model_time = time.time()
+        try:
+            model = model_from_config(
+                config, initialize=True, dataset=dataset, deploy=True
+            )
+        except:  # noqa: E722
+            if args.pdb:
+                traceback.print_exc()
+                pdb.post_mortem()
+            else:
+                raise
+        model_time = time.time() - model_time
+        print(f"    building model took {model_time:.4f}s")
+    else:
+        print("Loading model...")
+        model, metadata = load_deployed_model(args.model, device=device, freeze=False)
+        print("    deployed model has metadata:")
+        print(
+            "\n".join(
+                "        %s: %s" % e for e in metadata.items() if e[0] != "config"
+            )
+        )
     print(f"    model has {sum(p.numel() for p in model.parameters())} weights")
     print(
         f"    model has {sum(p.numel() for p in model.parameters() if p.requires_grad)} trainable weights"
@@ -152,6 +192,11 @@ def main(args=None):
     )
 
     model.eval()
+    if args.equivariance_test:
+        args.no_compile = True
+        if args.model is not None:
+            raise RuntimeError("Can't equivariance test a deployed model.")
+
     if args.no_compile:
         model = model.to(device)
     else:
@@ -182,7 +227,7 @@ def main(args=None):
             p.export_chrome_trace(args.profile)
             print(f"Wrote profiling trace to `{args.profile}`")
 
-        print("Starting...")
+        print("Starting profiling...")
         with torch.profiler.profile(
             activities=[
                 torch.profiler.ProfilerActivity.CPU,
@@ -196,6 +241,34 @@ def main(args=None):
             for _ in range(1 + warmup + args.n):
                 model(next(datas).copy())
                 p.step()
+    elif args.pdb:
+        print("Running model under debugger...")
+        try:
+            for _ in range(args.n):
+                model(next(datas).copy())
+        except:  # noqa: E722
+            traceback.print_exc()
+            pdb.post_mortem()
+        print("Done.")
+    elif args.equivariance_test:
+        print("Warmup...")
+        warmup_time = time.time()
+        for _ in range(warmup):
+            model(next(datas).copy())
+        warmup_time = time.time() - warmup_time
+        print(f"    {warmup} calls of warmup took {warmup_time:.4f}s")
+        print("Running equivariance test...")
+        errstr = assert_AtomicData_equivariant(model, datas_list)
+        print(
+            "    Equivariance test passed; equivariance errors:\n"
+            "    Errors are in real units, where relevant.\n"
+            "    Please note that the large scale of the typical\n"
+            "    shifts to the (atomic) energy can cause\n"
+            "    catastrophic cancellation and give incorrectly\n"
+            "    the equivariance error as zero for those fields.\n"
+            f"{errstr}"
+        )
+        del errstr
     else:
         print("Warmup...")
         warmup_time = time.time()
@@ -204,7 +277,7 @@ def main(args=None):
         warmup_time = time.time() - warmup_time
         print(f"    {warmup} calls of warmup took {warmup_time:.4f}s")
 
-        print("Starting...")
+        print("Benchmarking...")
         # just time
         t = Timer(
             stmt="model(next(datas).copy())", globals={"model": model, "datas": datas}

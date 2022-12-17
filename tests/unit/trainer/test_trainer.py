@@ -107,26 +107,6 @@ class TestSaveLoad:
             assert suffix in file_name
 
     @pytest.mark.parametrize("append", [True])  # , False])
-    def test_from_dict(self, trainer, append):
-
-        # torch.save(trainer.model, trainer.best_model_path)
-
-        dictionary = trainer.as_dict(state_dict=True, training_progress=True)
-        trainer1 = Trainer.from_dict(dictionary, append=append)
-
-        for key in [
-            "best_model_path",
-            "last_model_path",
-            "logfile",
-            "epoch_log",
-            "batch_log",
-            "workdir",
-        ]:
-            v1 = getattr(trainer, key, None)
-            v2 = getattr(trainer1, key, None)
-            assert append == (v1 == v2)
-
-    @pytest.mark.parametrize("append", [True])  # , False])
     def test_from_file(self, trainer, append):
 
         format = "torch"
