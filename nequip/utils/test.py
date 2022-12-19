@@ -4,7 +4,7 @@ import torch
 from e3nn import o3
 from e3nn.util.test import equivariance_error, FLOAT_TOLERANCE
 
-from nequip.nn import GraphModuleMixin
+from nequip.nn import GraphModuleMixin, GraphModel
 from nequip.data import (
     AtomicData,
     AtomicDataDict,
@@ -43,7 +43,11 @@ def assert_permutation_equivariant(
     __tracebackhide__ = True
 
     if tolerance is None:
-        atol = PERMUTATION_FLOAT_TOLERANCE[torch.get_default_dtype()]
+        atol = PERMUTATION_FLOAT_TOLERANCE[
+            func.model_dtype
+            if isinstance(func, GraphModel)
+            else torch.get_default_dtype()
+        ]
     else:
         atol = tolerance
 
@@ -193,9 +197,9 @@ def assert_AtomicData_equivariant(
         if AtomicDataDict.CELL_KEY in irps:
             prev_cell_irps = irps[AtomicDataDict.CELL_KEY]
             assert prev_cell_irps is None or o3.Irreps(prev_cell_irps) == o3.Irreps(
-                "3x1o"
+                "1o"
             )
-            # must be this to actually rotate it
+            # must be this to actually rotate it when flattened
             irps[AtomicDataDict.CELL_KEY] = "3x1o"
 
     stress_keys = (AtomicDataDict.STRESS_KEY, AtomicDataDict.VIRIAL_KEY)
@@ -258,7 +262,11 @@ def assert_AtomicData_equivariant(
     errs = {k: torch.max(torch.vstack([e[k] for e in errs]), dim=0)[0] for k in errs[0]}
 
     if o3_tolerance is None:
-        o3_tolerance = FLOAT_TOLERANCE[torch.get_default_dtype()]
+        o3_tolerance = FLOAT_TOLERANCE[
+            func.model_dtype
+            if isinstance(func, GraphModel)
+            else torch.get_default_dtype()
+        ]
     all_errs = []
     for case, err in errs.items():
         for key, this_err in zip(irreps_out.keys(), err):
@@ -270,9 +278,10 @@ def assert_AtomicData_equivariant(
             int(k[0]), str(bool(k[1])), str(k[2]), float(k[3])
         )
         for k, prob in zip(all_errs, is_problem)
+        if irreps_out[str(k[2])] is not None
     )
 
-    if sum(is_problem) > 0 or "FAIL" in permutation_message:
+    if any(is_problem) or "FAIL" in permutation_message:
         raise AssertionError(f"Equivariance test failed for cases:\n{message}")
 
     return message
@@ -322,10 +331,13 @@ def set_irreps_debug(enabled: bool = False) -> None:
                 f"Module {mname} should have received a dict or a torch_geometric Data, instead got a {type(inp).__name__}"
             )
         for k, ir in mod.irreps_in.items():
+            # TODO: don't consider lack of an input to be an error in general?
             if k not in inp:
-                raise KeyError(
-                    f"Field {k} with irreps {ir} expected to be input to {mname}; not present"
-                )
+                # GraphModel keeps all _possible_ inputs in `irreps_in`...
+                if not isinstance(mod, GraphModel):
+                    raise KeyError(
+                        f"Field {k} with irreps {ir} expected to be input to {mname}; not present"
+                    )
             elif isinstance(inp[k], torch.Tensor) and isinstance(ir, o3.Irreps):
                 if inp[k].ndim == 1:
                     raise ValueError(

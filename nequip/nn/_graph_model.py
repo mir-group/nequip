@@ -34,7 +34,7 @@ class GraphModel(GraphModuleMixin, torch.nn.Module):
             AtomicDataDict.POSITIONS_KEY: "1o",
             AtomicDataDict.EDGE_INDEX_KEY: None,
             AtomicDataDict.EDGE_CELL_SHIFT_KEY: None,
-            AtomicDataDict.CELL_KEY: "3x1o",
+            AtomicDataDict.CELL_KEY: "1o",  # 3 of them, but still
             AtomicDataDict.BATCH_KEY: None,
             AtomicDataDict.ATOM_TYPE_KEY: None,
         }
