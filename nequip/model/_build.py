@@ -1,10 +1,12 @@
 import inspect
 from typing import Optional
 
+import torch
+
 from nequip.data import AtomicDataset
 from nequip.data.transforms import TypeMapper
 from nequip.nn import GraphModuleMixin
-from nequip.utils import load_callable, instantiate
+from nequip.utils import load_callable, instantiate, dtype_from_name
 
 
 def model_from_config(
@@ -21,6 +23,8 @@ def model_from_config(
      - ``initialize``: whether to initialize the model
      - ``dataset``: if ``initialize`` is True, the dataset
      - ``deploy``: whether the model object is for deployment / inference
+
+    Note that this function temporarily sets ``torch.set_default_dtype()`` and as such is not thread safe.
 
     Args:
         config
@@ -52,6 +56,11 @@ def model_from_config(
             ), "inconsistant config & dataset"
         config["num_types"] = type_mapper.num_types
         config["type_names"] = type_mapper.type_names
+
+    default_dtype = torch.get_default_dtype()
+    config["model_dtype"] = dtype_from_name(config.get("model_dtype", default_dtype))
+    # set temporarily the default dtype
+    torch.set_default_dtype(config["model_dtype"])
 
     # Build
     builders = [
@@ -98,5 +107,8 @@ def model_from_config(
             raise TypeError(
                 f"Builder {builder.__name__} didn't return a GraphModuleMixin, got {type(model)} instead"
             )
+
+    # reset default dtype
+    torch.set_default_dtype(default_dtype)
 
     return model

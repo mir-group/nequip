@@ -9,7 +9,7 @@ from opt_einsum import contract
 
 def solver(X, y, alpha: Optional[float] = 0.001, stride: Optional[int] = 1, **kwargs):
 
-    dtype = torch.get_default_dtype()
+    dtype = y.dtype  # the floating point targets should have the right dtype
     X = X[::stride].to(dtype)
     y = y[::stride].to(dtype)
 

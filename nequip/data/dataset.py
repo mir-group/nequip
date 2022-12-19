@@ -41,12 +41,14 @@ class AtomicDataset(Dataset):
 
     fixed_fields: Dict[str, Any]
     root: str
+    dtype: torch.dtype
 
     def __init__(
         self,
         root: str,
         type_mapper: Optional[TypeMapper] = None,
     ):
+        self.dtype = torch.get_default_dtype()
         super().__init__(root=root, transform=type_mapper)
 
     def statistics(
@@ -80,7 +82,7 @@ class AtomicDataset(Dataset):
             if k not in IGNORE_KEYS and hasattr(self, k)
         }
         # Add other relevant metadata:
-        params["dtype"] = str(torch.get_default_dtype())
+        params["dtype"] = str(self.dtype)
         params["nequip_version"] = nequip.__version__
         return params
 
@@ -441,9 +443,7 @@ class AtomicInMemoryDataset(AtomicDataset):
             if callable(field):
                 # make a joined thing? so it includes fixed fields
                 arr, arr_is_per = field(data_transformed)
-                arr = arr.to(
-                    torch.get_default_dtype()
-                )  # all statistics must be on floating
+                arr = arr.to(self.dtype)  # all statistics must be on floating
                 assert arr_is_per in ("node", "graph", "edge")
             else:
                 if field not in all_keys:
@@ -475,7 +475,7 @@ class AtomicInMemoryDataset(AtomicDataset):
                 )
             if not isinstance(arr, torch.Tensor):
                 if np.issubdtype(arr.dtype, np.floating):
-                    arr = torch.as_tensor(arr, dtype=torch.get_default_dtype())
+                    arr = torch.as_tensor(arr, dtype=self.dtype)
                 else:
                     arr = torch.as_tensor(arr)
             if arr_is_per == "node":
@@ -583,8 +583,8 @@ class AtomicInMemoryDataset(AtomicDataset):
                 f"{ana_mode} for per-atom analysis is not implemented"
             )
 
-    @staticmethod
     def _per_species_statistics(
+        self,
         ana_mode: str,
         arr: torch.Tensor,
         arr_is_per: str,
@@ -610,12 +610,12 @@ class AtomicInMemoryDataset(AtomicDataset):
                     f"{ana_mode} for per species analysis is not implemented for shape {arr.shape}"
                 )
 
-            N = N.type(torch.get_default_dtype())
+            N = N.type(self.dtype)
 
             return solver(N, arr, **algorithm_kwargs)
 
         elif arr_is_per == "node":
-            arr = arr.type(torch.get_default_dtype())
+            arr = arr.type(self.dtype)
 
             if ana_mode == "mean_std":
                 mean = scatter_mean(arr, atom_types, dim=0)
