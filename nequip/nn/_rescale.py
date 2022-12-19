@@ -1,4 +1,4 @@
-from typing import Sequence, List, Union
+from typing import Sequence, List, Union, Optional
 
 import torch
 
@@ -6,11 +6,14 @@ from e3nn.util.jit import compile_mode
 
 from nequip.data import AtomicDataDict
 from nequip.nn import GraphModuleMixin
+from nequip.utils import dtype_from_name
 
 
 @compile_mode("script")
 class RescaleOutput(GraphModuleMixin, torch.nn.Module):
     """Wrap a model and rescale its outputs when in ``eval()`` mode.
+
+    Note that scaling/shifting is always done (casting into) ``default_dtype``, even if ``model_dtype`` is lower precision.
 
     Args:
         model : GraphModuleMixin
@@ -39,6 +42,8 @@ class RescaleOutput(GraphModuleMixin, torch.nn.Module):
     has_scale: bool
     has_shift: bool
 
+    default_dtype: torch.dtype
+
     def __init__(
         self,
         model: GraphModuleMixin,
@@ -50,6 +55,7 @@ class RescaleOutput(GraphModuleMixin, torch.nn.Module):
         shift_by=None,
         shift_trainable: bool = False,
         scale_trainable: bool = False,
+        default_dtype: Optional[str] = None,
         irreps_in: dict = {},
     ):
         super().__init__()
@@ -84,10 +90,14 @@ class RescaleOutput(GraphModuleMixin, torch.nn.Module):
         self.related_scale_keys = list(set(related_scale_keys).union(scale_keys))
         self.related_shift_keys = list(set(related_shift_keys).union(shift_keys))
 
+        self.default_dtype = dtype_from_name(
+            torch.get_default_dtype() if default_dtype is None else default_dtype
+        )
+
         self.has_scale = scale_by is not None
         self.scale_trainble = scale_trainable
         if self.has_scale:
-            scale_by = torch.as_tensor(scale_by)
+            scale_by = torch.as_tensor(scale_by, dtype=self.default_dtype)
             if self.scale_trainble:
                 self.scale_by = torch.nn.Parameter(scale_by)
             else:
@@ -103,7 +113,7 @@ class RescaleOutput(GraphModuleMixin, torch.nn.Module):
         self.has_shift = shift_by is not None
         self.rescale_trainable = shift_trainable
         if self.has_shift:
-            shift_by = torch.as_tensor(shift_by)
+            shift_by = torch.as_tensor(shift_by, dtype=self.default_dtype)
             if self.rescale_trainable:
                 self.shift_by = torch.nn.Parameter(shift_by)
             else:
@@ -142,6 +152,7 @@ class RescaleOutput(GraphModuleMixin, torch.nn.Module):
             return data
         else:
             # Scale then shift
+            # * and + promote dtypes by default
             if self.has_scale:
                 for field in self.scale_keys:
                     data[field] = data[field] * self.scale_by

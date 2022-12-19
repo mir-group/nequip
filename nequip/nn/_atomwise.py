@@ -9,6 +9,7 @@ from e3nn.o3 import Linear
 
 from nequip.data import AtomicDataDict
 from nequip.data.transforms import TypeMapper
+from nequip.utils import dtype_from_name
 from ._graph_mixin import GraphModuleMixin
 
 
@@ -98,6 +99,8 @@ class AtomwiseReduce(GraphModuleMixin, torch.nn.Module):
 class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
     """Scale and/or shift a predicted per-atom property based on (learnable) per-species/type parameters.
 
+    Note that scaling/shifting is always done (casting into) ``default_dtype``, even if ``model_dtype`` is lower precision.
+
     Args:
         field: the per-atom field to scale/shift.
         num_types: the number of types in the model.
@@ -119,6 +122,7 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
     shifts_trainable: bool
     has_scales: bool
     has_shifts: bool
+    default_dtype: torch.dtype
 
     def __init__(
         self,
@@ -131,6 +135,7 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
         out_field: Optional[str] = None,
         scales_trainable: bool = False,
         shifts_trainable: bool = False,
+        default_dtype: Optional[str] = None,
         irreps_in={},
     ):
         super().__init__()
@@ -144,11 +149,18 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
             irreps_out={self.out_field: irreps_in[self.field]},
         )
 
+        self.default_dtype = dtype_from_name(
+            torch.get_default_dtype() if default_dtype is None else default_dtype
+        )
+
         self.has_shifts = shifts is not None
         if shifts is not None:
-            shifts = torch.as_tensor(shifts)
+            shifts = torch.as_tensor(shifts, dtype=self.default_dtype)
             if len(shifts.reshape([-1])) == 1:
-                shifts = torch.ones(num_types) * shifts
+                shifts = (
+                    torch.ones(num_types, dtype=shifts.dtype, device=shifts.device)
+                    * shifts
+                )
             assert shifts.shape == (num_types,), f"Invalid shape of shifts {shifts}"
             self.shifts_trainable = shifts_trainable
             if shifts_trainable:
@@ -158,9 +170,12 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
 
         self.has_scales = scales is not None
         if scales is not None:
-            scales = torch.as_tensor(scales)
+            scales = torch.as_tensor(scales, dtype=self.default_dtype)
             if len(scales.reshape([-1])) == 1:
-                scales = torch.ones(num_types) * scales
+                scales = (
+                    torch.ones(num_types, dtype=scales.dtype, device=scales.device)
+                    * scales
+                )
             assert scales.shape == (num_types,), f"Invalid shape of scales {scales}"
             self.scales_trainable = scales_trainable
             if scales_trainable:
@@ -180,9 +195,19 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
         assert len(in_field) == len(
             species_idx
         ), "in_field doesnt seem to have correct per-atom shape"
-        if self.has_scales:
+        # multiplication / addition promotes dtypes already, so no cast is needed:
+        if self.has_scales and self.has_shifts:
+            # we can used an FMA for performance
+            # addcmul computes
+            # input + tensor1 * tensor2 elementwise
+            in_field = torch.addcmul(
+                self.shifts[species_idx].view(-1, 1),
+                self.scales[species_idx].view(-1, 1),
+                in_field,
+            )
+        elif self.has_scales:
             in_field = self.scales[species_idx].view(-1, 1) * in_field
-        if self.has_shifts:
+        elif self.has_shifts:
             in_field = self.shifts[species_idx].view(-1, 1) + in_field
         data[self.out_field] = in_field
         return data

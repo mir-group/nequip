@@ -62,6 +62,12 @@ def model_from_config(
     config["model_dtype"] = str(model_dtype)
     # set temporarily the default dtype
     torch.set_default_dtype(model_dtype)
+    # confirm sanity
+    assert default_dtype in (torch.float32, torch.float64)
+    if default_dtype == torch.float32 and model_dtype == torch.float64:
+        raise ValueError(
+            "Overall default_dtype=float32, but model_dtype=float64 is a higher precision- change default_dtype to float64"
+        )
 
     # Build
     builders = [

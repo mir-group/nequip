@@ -127,6 +127,7 @@ def GlobalRescale(
         related_shift_keys=default_related_shift_keys,
         shift_trainable=config.get(f"{module_prefix}_shift_trainable", False),
         scale_trainable=config.get(f"{module_prefix}_scale_trainable", False),
+        default_dtype=config.get("default_dtype", None),
     )
 
 
