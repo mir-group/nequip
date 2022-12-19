@@ -34,6 +34,7 @@ default_config = dict(
         "RescaleEnergyEtc",
     ],
     dataset_statistics_stride=1,
+    device="cuda" if torch.cuda.is_available() else "cpu",
     default_dtype="float32",
     allow_tf32=False,  # TODO: until we understand equivar issues
     verbose="INFO",

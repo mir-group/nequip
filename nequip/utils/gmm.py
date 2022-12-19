@@ -11,14 +11,14 @@ The above copyright notice and this permission notice shall be included in all c
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
+import math
 
 import torch
 import numpy as np
 
-from math import pi
 
-
-def calculate_matmul_n_times(n_components, mat_a, mat_b):
+@torch.jit.script
+def calculate_matmul_n_times(n_components: int, mat_a, mat_b):
     """
     Calculate matrix product of two matrics with mat_a[0] >= mat_b[0].
     Bypasses torch.matmul to reduce memory footprint.
@@ -26,7 +26,7 @@ def calculate_matmul_n_times(n_components, mat_a, mat_b):
         mat_a:      torch.Tensor (n, k, 1, d)
         mat_b:      torch.Tensor (1, k, d, d)
     """
-    res = torch.zeros(mat_a.shape).to(mat_a.device)
+    res = torch.zeros(mat_a.shape, device=mat_a.device)
 
     for i in range(n_components):
         mat_a_i = mat_a[:, i, :, :].squeeze(-2)
@@ -101,7 +101,7 @@ class GaussianMixture(torch.nn.Module):
         self.var_init = var_init
         self.eps = eps
 
-        self.log_likelihood = -np.inf
+        self.log_likelihood = -torch.inf
 
         self.covariance_type = covariance_type
         self.init_params = init_params
@@ -224,7 +224,7 @@ class GaussianMixture(torch.nn.Module):
             self.mu.data = mu
 
         i = 0
-        j = np.inf
+        j = torch.inf
 
         while (i <= n_iter) and (j >= delta):
 
@@ -318,7 +318,7 @@ class GaussianMixture(torch.nn.Module):
         )
 
         # Only iterate over components with non-zero counts
-        for k in np.arange(self.n_components)[counts > 0]:
+        for k in torch.arange(self.n_components)[counts > 0]:
             if self.covariance_type == "diag":
                 x_k = self.mu[0, k] + torch.randn(
                     int(counts[k]), self.n_features, device=x.device
@@ -363,7 +363,7 @@ class GaussianMixture(torch.nn.Module):
             precision = torch.inverse(var)
             d = x.shape[-1]
 
-            log_2pi = d * np.log(2.0 * pi)
+            log_2pi = d * math.log(2.0 * math.pi)
 
             log_det = self._calculate_log_det(precision)
 
@@ -386,7 +386,7 @@ class GaussianMixture(torch.nn.Module):
             )
             log_det = torch.sum(torch.log(prec), dim=2, keepdim=True)
 
-            return -0.5 * (self.n_features * np.log(2.0 * pi) + log_p) + log_det
+            return -0.5 * (self.n_features * math.log(2.0 * math.pi) + log_p) + log_det
 
     def _calculate_log_det(self, var):
         """
@@ -476,7 +476,8 @@ class GaussianMixture(torch.nn.Module):
         self.__update_mu(mu)
         self.__update_var(var)
 
-    def __score(self, x, as_average=True):
+    @torch.jit.export
+    def __score(self, x, as_average: bool = True):
         """
         Computes the log-likelihood of the data under the model.
         args:
@@ -591,7 +592,7 @@ class GaussianMixture(torch.nn.Module):
         x_min, x_max = x.min(), x.max()
         x = (x - x_min) / (x_max - x_min)
 
-        min_cost = np.inf
+        min_cost = torch.inf
 
         for i in range(init_times):
             tmp_center = x[

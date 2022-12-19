@@ -215,7 +215,7 @@ class Trainer:
         self,
         model,
         model_builders: Optional[list] = [],
-        device: str = "cuda" if torch.cuda.is_available() else "cpu",
+        device: str = None,
         seed: Optional[int] = None,
         dataset_seed: Optional[int] = None,
         loss_coeffs: Union[dict, str] = AtomicDataDict.TOTAL_ENERGY_KEY,
@@ -679,10 +679,7 @@ class Trainer:
         else:
             config = Config.from_file(traindir + "/config.yaml")
 
-        model = model_from_config(
-            config=config,
-            initialize=False,
-        )
+        model = model_from_config(config=config, initialize=False)
         if model is not None:  # TODO: why would it be?
             # TODO: this is not exactly equivalent to building with
             # this set as default dtype... does it matter?

@@ -1,5 +1,7 @@
 import torch
 
+from e3nn import o3
+
 from nequip.data import AtomicDataDict
 from ._graph_mixin import GraphModuleMixin
 from nequip.utils.gmm import GaussianMixture
@@ -28,7 +30,7 @@ class GaussianMixtureModelUncertainty(GraphModuleMixin, torch.nn.Module):
             irreps_out={out_field: "0e"},
         )
         feature_irreps = self.irreps_in[self.feature_field].simplify()
-        if not (len(feature_irreps) == 1 and feature_irreps[0].ir == "0e"):
+        if not (len(feature_irreps) == 1 and feature_irreps[0].ir == o3.Irrep("0e")):
             raise ValueError(
                 f"GaussianMixtureModelUncertainty feature_field={feature_field} must be only scalars, instead got {feature_irreps}"
             )
@@ -41,9 +43,9 @@ class GaussianMixtureModelUncertainty(GraphModuleMixin, torch.nn.Module):
         )
 
     def fit(self, X) -> None:
-        self.gmm.fit(X=X)
+        self.gmm.fit(X)
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
-        nll_scores = self.gmm(data[self.feature_field])
+        nll_scores = self.gmm.score_samples(data[self.feature_field])
         data[self.out_field] = nll_scores
         return data
