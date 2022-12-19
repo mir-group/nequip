@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Most recent change on the bottom.
 
 
-## [Unreleased] - 0.5.6
+## [0.5.6] - 2022-12-19
 ### Added
 - sklearn dependency removed
 - `nequip-benchmark` and `nequip-train` report number of weights and number of trainable weights
