@@ -5,7 +5,7 @@ import torch
 
 from nequip.data import AtomicDataset
 from nequip.data.transforms import TypeMapper
-from nequip.nn import GraphModuleMixin
+from nequip.nn import GraphModuleMixin, GraphModel
 from nequip.utils import load_callable, instantiate, dtype_from_name
 
 
@@ -58,9 +58,10 @@ def model_from_config(
         config["type_names"] = type_mapper.type_names
 
     default_dtype = torch.get_default_dtype()
-    config["model_dtype"] = dtype_from_name(config.get("model_dtype", default_dtype))
+    model_dtype: torch.dtype = dtype_from_name(config.get("model_dtype", default_dtype))
+    config["model_dtype"] = str(model_dtype)
     # set temporarily the default dtype
-    torch.set_default_dtype(config["model_dtype"])
+    torch.set_default_dtype(model_dtype)
 
     # Build
     builders = [
@@ -110,5 +111,12 @@ def model_from_config(
 
     # reset default dtype
     torch.set_default_dtype(default_dtype)
+
+    # Wrap the model up
+    model = GraphModel(
+        model,
+        model_dtype=model_dtype,
+        model_input_fields=config.get("model_input_fields", {}),
+    )
 
     return model

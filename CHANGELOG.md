@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Most recent change on the bottom.
 
 ## [Unreleased] - 0.6.0
+### Added
+- Refactor overall model logic into `GraphModel` top-level module
 
 ## [Unreleased] - 0.5.6
 ### Added

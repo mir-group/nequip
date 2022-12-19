@@ -53,7 +53,10 @@ def training_session(request, BENCHMARK_ROOT, conffile):
         true_config["max_epochs"] = 2
         true_config["model_builders"] = [builder]
         # We need truth labels as inputs for these fake testing models
-        true_config["_override_allow_truth_label_inputs"] = True
+        true_config["model_input_fields"] = {
+            AtomicDataDict.FORCE_KEY: "1o",
+            AtomicDataDict.TOTAL_ENERGY_KEY: "0e",
+        }
 
         # to be a true identity, we can't have rescaling
         true_config["global_rescale_shift"] = None

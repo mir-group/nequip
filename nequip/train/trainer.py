@@ -27,6 +27,7 @@ import torch
 from torch_ema import ExponentialMovingAverage
 
 from nequip.data import DataLoader, AtomicData, AtomicDataDict, AtomicDataset
+from nequip.nn import GraphModel
 from nequip.utils import (
     Output,
     Config,
@@ -211,6 +212,8 @@ class Trainer:
     lr_scheduler_module = torch.optim.lr_scheduler
     optim_module = torch.optim
 
+    model: GraphModel
+
     def __init__(
         self,
         model,
@@ -330,23 +333,6 @@ class Trainer:
         self.train_on_keys = self.loss.keys
         if train_on_keys is not None:
             assert set(train_on_keys) == set(self.train_on_keys)
-        self._remove_from_model_input = set(self.train_on_keys)
-        if (
-            len(
-                self._remove_from_model_input.intersection(
-                    AtomicDataDict.ALL_ENERGY_KEYS
-                )
-            )
-            > 0
-        ):
-            # if we are training on _any_ of the energy quantities (energy, force, partials, stress, etc.)
-            # then none of them should be fed into the model
-            self._remove_from_model_input = self._remove_from_model_input.union(
-                AtomicDataDict.ALL_ENERGY_KEYS
-            )
-        if kwargs.get("_override_allow_truth_label_inputs", False):
-            # needed for unit testing models
-            self._remove_from_model_input = set()
 
         # load all callbacks
         self._init_callbacks = [load_callable(callback) for callback in init_callbacks]
@@ -701,6 +687,7 @@ class Trainer:
         """initialize optimizer"""
         if self.model is None:
             return
+        assert isinstance(self.model, GraphModel)
 
         self.model.to(self.torch_device)
 
@@ -709,12 +696,6 @@ class Trainer:
         self.logger.info(
             f"Number of trainable weights: {sum(p.numel() for p in self.model.parameters() if p.requires_grad)}"
         )
-
-        self.rescale_layers = []
-        outer_layer = self.model
-        while hasattr(outer_layer, "unscale"):
-            self.rescale_layers.append(outer_layer)
-            outer_layer = getattr(outer_layer, "model", None)
 
         self.init_objects()
 
@@ -799,32 +780,22 @@ class Trainer:
         data = data.to(self.torch_device)
         data = AtomicData.to_AtomicDataDict(data)
 
-        data_unscaled = data
-        for layer in self.rescale_layers:
-            # This means that self.model is RescaleOutputs
-            # this will normalize the targets
-            # in validation (eval mode), it does nothing
-            # in train mode, if normalizes the targets
-            data_unscaled = layer.unscale(data_unscaled)
+        # this will normalize the targets
+        # in both validation and train we want targets normalized _for the loss_
+        data_for_loss = self.model.unscale(data, force_process=True)
 
         # Run model
         # We make a shallow copy of the input dict in case the model modifies it
-        input_data = {
-            k: v
-            for k, v in data_unscaled.items()
-            if k not in self._remove_from_model_input
-        }
-        out = self.model(input_data)
-        del input_data
+        out = self.model(data_for_loss)
 
         # If we're in evaluation mode (i.e. validation), then
-        # data_unscaled's target prop is unnormalized, and out's has been rescaled to be in the same units
-        # If we're in training, data_unscaled's target prop has been normalized, and out's hasn't been touched, so they're both in normalized units
-        # Note that either way all normalization was handled internally by RescaleOutput
+        # data_for_loss's target prop is unnormalized, and out's has been rescaled to be in the same units
+        # If we're in training, data_for_loss's target prop has been normalized, and out's hasn't been touched, so they're both in normalized units
+        # Note that either way all normalization was handled internally by GraphModel via RescaleOutput
 
         if not validation:
             # Actually do an optimization step, since we're training:
-            loss, loss_contrib = self.loss(pred=out, ref=data_unscaled)
+            loss, loss_contrib = self.loss(pred=out, ref=data_for_loss)
             # see https://pytorch.org/tutorials/recipes/recipes/tuning_guide.html#use-parameter-grad-none-instead-of-model-zero-grad-or-optimizer-zero-grad
             self.optim.zero_grad(set_to_none=True)
             loss.backward()
@@ -846,25 +817,26 @@ class Trainer:
 
         with torch.no_grad():
             if validation:
-                scaled_out = out
-                _data_unscaled = data
-                for layer in self.rescale_layers:
-                    # loss function always needs to be in normalized unit
-                    scaled_out = layer.unscale(scaled_out, force_process=True)
-                    _data_unscaled = layer.unscale(_data_unscaled, force_process=True)
-                loss, loss_contrib = self.loss(pred=scaled_out, ref=_data_unscaled)
+                # loss function always needs to be in normalized unit
+                normalized_units_out = self.model.unscale(out, force_process=True)
+                # data_for_loss is always forced into normalized units
+                loss, loss_contrib = self.loss(
+                    pred=normalized_units_out, ref=data_for_loss
+                )
+                del normalized_units_out
+                # everything else is already in real units for metrics, so do nothing
             else:
                 # If we are in training mode, we need to bring the prediction
-                # into real units
-                for layer in self.rescale_layers[::-1]:
-                    out = layer.scale(out, force_process=True)
+                # into real units for metrics
+                out = self.model.scale(out, force_process=True)
 
             # save metrics stats
             self.batch_losses = self.loss_stat(loss, loss_contrib)
-            # in validation mode, data is in real units and the network scales
+            # in validation mode, reference data is in real units and the network scales
             # out to be in real units interally.
-            # in training mode, data is still in real units, and we rescaled
-            # out to be in real units above.
+            # in training mode, reference data is still in real units, and we rescaled
+            # network predicted out to be in real units right above
+            # thus, we get metrics in real units always:
             self.batch_metrics = self.metrics(pred=out, ref=data)
 
     @property
