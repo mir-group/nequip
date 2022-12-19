@@ -1,4 +1,4 @@
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 import torch
 
@@ -25,7 +25,7 @@ class GraphModel(GraphModuleMixin, torch.nn.Module):
     def __init__(
         self,
         model: GraphModuleMixin,
-        model_dtype: torch.dtype,
+        model_dtype: Optional[torch.dtype] = None,
         model_input_fields: Dict[str, Any] = {},
     ) -> None:
         super().__init__()
@@ -48,7 +48,9 @@ class GraphModel(GraphModuleMixin, torch.nn.Module):
                     f"Model has `{k}` in its irreps_in with irreps `{irreps}`, but `{k}` is missing from/has inconsistent irreps in model_input_fields of `{self.irreps_in.get(k, 'missing')}`"
                 )
         self.model = model
-        self.model_dtype = model_dtype
+        self.model_dtype = (
+            model_dtype if model_dtype is not None else torch.get_default_dtype()
+        )
         self.model_input_fields = list(self.irreps_in.keys())
 
         self._num_rescale_layers = 0
@@ -101,7 +103,7 @@ class GraphModel(GraphModuleMixin, torch.nn.Module):
         for k, v in data.items():
             if k in self.model_input_fields:
                 if v.is_floating_point():
-                    v = v.type(self.model_dtype)
+                    v = v.to(dtype=self.model_dtype)
                 new_data[k] = v
         # run the model
         data = self.model(new_data)

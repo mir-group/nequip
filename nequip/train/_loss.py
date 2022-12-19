@@ -72,12 +72,13 @@ class PerAtomLoss(SimpleLoss):
         key: str,
         mean: bool = True,
     ):
+        ref_dict = ref
         ref = ref[key]
         # make sure prediction is promoted to dtype of reference
         pred = pred[key].to(ref.dtype)
         # zero the nan entries
         has_nan = self.ignore_nan and torch.isnan(ref.sum())
-        N = torch.bincount(ref[AtomicDataDict.BATCH_KEY])
+        N = torch.bincount(ref_dict[AtomicDataDict.BATCH_KEY])
         N = N.reshape((-1, 1))
         if has_nan:
             not_nan = (ref == ref).int()
@@ -119,6 +120,7 @@ class PerSpeciesLoss(SimpleLoss):
             raise NotImplementedError("Cannot handle this yet")
         ref = ref[key]
         # make sure prediction is promoted to dtype of reference
+        pred_dict = pred
         pred = pred[key].to(ref.dtype)
 
         has_nan = self.ignore_nan and torch.isnan(ref.mean())
@@ -131,7 +133,7 @@ class PerSpeciesLoss(SimpleLoss):
 
         reduce_dims = tuple(i + 1 for i in range(len(per_atom_loss.shape) - 1))
 
-        spe_idx = pred[AtomicDataDict.ATOM_TYPE_KEY].squeeze(-1)
+        spe_idx = pred_dict[AtomicDataDict.ATOM_TYPE_KEY].squeeze(-1)
         if has_nan:
             if len(reduce_dims) > 0:
                 per_atom_loss = per_atom_loss.sum(dim=reduce_dims)

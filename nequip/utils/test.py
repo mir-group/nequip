@@ -331,13 +331,8 @@ def set_irreps_debug(enabled: bool = False) -> None:
                 f"Module {mname} should have received a dict or a torch_geometric Data, instead got a {type(inp).__name__}"
             )
         for k, ir in mod.irreps_in.items():
-            # TODO: don't consider lack of an input to be an error in general?
             if k not in inp:
-                # GraphModel keeps all _possible_ inputs in `irreps_in`...
-                if not isinstance(mod, GraphModel):
-                    raise KeyError(
-                        f"Field {k} with irreps {ir} expected to be input to {mname}; not present"
-                    )
+                pass
             elif isinstance(inp[k], torch.Tensor) and isinstance(ir, o3.Irreps):
                 if inp[k].ndim == 1:
                     raise ValueError(
@@ -362,9 +357,7 @@ def set_irreps_debug(enabled: bool = False) -> None:
             )
         for k, ir in mod.irreps_out.items():
             if k not in out:
-                raise KeyError(
-                    f"Field {k} with irreps {ir} expected to be in output from {mname}; not present"
-                )
+                pass
             elif isinstance(out[k], torch.Tensor) and isinstance(ir, o3.Irreps):
                 if out[k].ndim == 1:
                     raise ValueError(

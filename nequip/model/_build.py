@@ -59,7 +59,7 @@ def model_from_config(
 
     default_dtype = torch.get_default_dtype()
     model_dtype: torch.dtype = dtype_from_name(config.get("model_dtype", default_dtype))
-    config["model_dtype"] = str(model_dtype)
+    config["model_dtype"] = str(model_dtype).lstrip("torch.")
     # set temporarily the default dtype
     torch.set_default_dtype(model_dtype)
     # confirm sanity
