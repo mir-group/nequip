@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Most recent change on the bottom.
 
 ## Unreleased - 0.6.0
+### Changed
+- Always require explicit `seed`
+- [Breaking] Set `dataset_seed` to `seed` if it is not explicitly provided
 
 
 ## [0.5.6] - 2022-12-19
