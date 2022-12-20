@@ -8,8 +8,10 @@ from opt_einsum import contract
 
 
 def solver(X, y, alpha: Optional[float] = 0.001, stride: Optional[int] = 1, **kwargs):
-
-    dtype = torch.get_default_dtype()
+    # results are in the same "units" as y, so same dtype too:
+    dtype_out = y.dtype
+    # always solve in float64 for numerical stability
+    dtype = torch.float64
     X = X[::stride].to(dtype)
     y = y[::stride].to(dtype)
 
@@ -40,7 +42,7 @@ def solver(X, y, alpha: Optional[float] = 0.001, stride: Optional[int] = 1, **kw
 
     logging.debug(f"Ridge Regression, residue {sigma2}")
 
-    return mean, cov
+    return mean.to(dtype_out), cov.to(dtype_out)
 
 
 def down_sampling_by_composition(
@@ -61,8 +63,10 @@ def down_sampling_by_composition(
     id_end = torch.cat((node_icomp + 1, torch.as_tensor([len(sort_by)])))
 
     n_points = len(percentage)
-    new_X = torch.zeros((n_types * n_points, X.shape[1]))
-    new_y = torch.zeros((n_types * n_points))
+    new_X = torch.zeros(
+        (n_types * n_points, X.shape[1]), dtype=X.dtype, device=X.device
+    )
+    new_y = torch.zeros((n_types * n_points), dtype=y.dtype, device=y.device)
     for i in range(n_types):
         ids = sort_by[id_start[i] : id_end[i]]
         for j, p in enumerate(percentage):
