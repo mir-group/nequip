@@ -66,13 +66,7 @@ def down_sampling_by_composition(
     for i in range(n_types):
         ids = sort_by[id_start[i] : id_end[i]]
         for j, p in enumerate(percentage):
-            # We comment out `interpolation="linear"` for PyTorch 1.10,
-            # where linear is the default but the `interpolation` option
-            # does not exist:
-            # https://pytorch.org/docs/1.10/generated/torch.quantile.html?highlight=quantile#torch.quantile
-            # https://pytorch.org/docs/1.13/generated/torch.quantile.html?highlight=quantile#torch.quantile
-            # previously, call had `, interpolation="linear")`
-            new_y[i * n_points + j] = torch.quantile(y[ids], p)
+            new_y[i * n_points + j] = torch.quantile(y[ids], p, interpolation="linear"))
             new_X[i * n_points + j] = unique_comps[i]
 
     return new_X, new_y
