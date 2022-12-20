@@ -250,7 +250,7 @@ class Trainer:
         end_of_batch_callbacks: list = [],
         end_of_train_callbacks: list = [],
         final_callbacks: list = [],
-        log_batch_freq: int = 1,
+        log_batch_freq: int = 100,
         log_epoch_freq: int = 1,
         save_checkpoint_freq: int = -1,
         save_ema_checkpoint_freq: int = -1,

@@ -10,6 +10,7 @@ Most recent change on the bottom.
 ### Changed
 - Always require explicit `seed`
 - [Breaking] Set `dataset_seed` to `seed` if it is not explicitly provided
+- Don't log as often by default
 
 
 ## [0.5.6] - 2022-12-19
