@@ -2,7 +2,6 @@ import logging
 import torch
 
 from torch import matmul
-from torch.linalg import solve, inv
 from typing import Optional, Sequence
 from opt_einsum import contract
 
@@ -26,16 +25,20 @@ def solver(X, y, alpha: Optional[float] = 0.001, stride: Optional[int] = 1, **kw
 
     feature_rms = torch.sqrt(torch.mean(X**2, axis=0))
 
-    alpha_mat = torch.diag(feature_rms) * alpha * alpha
+    alpha_mat = torch.diag(feature_rms) * (alpha * alpha)
 
     A = matmul(X.T, X) + alpha_mat
     dy = y - (torch.sum(X, axis=1, keepdim=True) * y_mean).reshape(y.shape)
     Xy = matmul(X.T, dy)
 
-    mean = solve(A, Xy)
+    # A is symmetric positive semidefinite <=> A=(X + alpha*I)^T (X + alpha*I),
+    # so we can use cholesky:
+    A_cholesky = torch.linalg.cholesky(A)
+    mean = torch.cholesky_solve(Xy.unsqueeze(-1), A_cholesky).squeeze(-1)
+    Ainv = torch.cholesky_inverse(A_cholesky)
+    del A_cholesky
 
     sigma2 = torch.var(matmul(X, mean) - dy)
-    Ainv = inv(A)
     cov = torch.sqrt(sigma2 * contract("ij,kj,kl,li->i", Ainv, X, X, Ainv))
 
     mean = mean + y_mean.reshape([-1])
