@@ -16,7 +16,7 @@ jobs:
     strategy:
       matrix:
         python-version: [3.9]
-        torch-version: [1.11.0]
+        torch-version: [1.12.1]
 
     steps:
     - uses: actions/checkout@v2
@@ -44,4 +44,4 @@ jobs:
     - name: Test with pytest
       run: |
         # See https://github.com/pytest-dev/pytest/issues/1075
-        PYTHONHASHSEED=0 pytest -n auto --ignore=docs/ .
+        PYTHONHASHSEED=0 pytest -n auto tests/

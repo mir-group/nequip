@@ -706,6 +706,9 @@ class Trainer:
 
         self.num_weights = sum(p.numel() for p in self.model.parameters())
         self.logger.info(f"Number of weights: {self.num_weights}")
+        self.logger.info(
+            f"Number of trainable weights: {sum(p.numel() for p in self.model.parameters() if p.requires_grad)}"
+        )
 
         self.rescale_layers = []
         outer_layer = self.model
@@ -1177,7 +1180,9 @@ class Trainer:
                 if self.n_train > len(dataset):
                     raise ValueError("Not enough data in dataset for requested n_train")
                 if self.n_val > len(validation_dataset):
-                    raise ValueError("Not enough data in dataset for requested n_train")
+                    raise ValueError(
+                        "Not enough data in validation dataset for requested n_val"
+                    )
                 if self.train_val_split == "random":
                     self.train_idcs = torch.randperm(
                         len(dataset), generator=self.dataset_rng

@@ -295,7 +295,13 @@ class AtomicInMemoryDataset(AtomicDataset):
         # type conversion
         _process_dict(fixed_fields, ignore_fields=["r_max"])
 
-        logging.info(f"Loaded data: {data}")
+        total_MBs = sum(item.numel() * item.element_size() for _, item in data) / (
+            1024 * 1024
+        )
+        logging.info(
+            f"Loaded data: {data}\n    processed data size: ~{total_MBs:.2f} MB"
+        )
+        del total_MBs
 
         # use atomic writes to avoid race conditions between
         # different trainings that use the same dataset
@@ -635,7 +641,7 @@ class NpzDataset(AtomicInMemoryDataset):
     """Load data from an npz file.
 
     To avoid loading unneeded data, keys are ignored by default unless they are in ``key_mapping``, ``include_keys``,
-    ``npz_fixed_fields`` or ``extra_fixed_fields``.
+    ``npz_fixed_fields_keys`` or ``extra_fixed_fields``.
 
     Args:
         key_mapping (Dict[str, str]): mapping of npz keys to ``AtomicData`` keys. Optional
