@@ -231,8 +231,8 @@ class TestPerAtomStatistics:
         if npz_dataset is None:
             return
 
-        torch.manual_seed(0)
-        E = torch.rand((npz_dataset.len(),) + dim)
+        rng = torch.Generator().manual_seed(454)
+        E = torch.rand((npz_dataset.len(),) + dim, generator=rng)
         ref_mean = torch.mean(E / NATOMS, dim=0)
         ref_std = torch.std(E / NATOMS, dim=0)
 
@@ -437,12 +437,14 @@ class TestFromList:
 
 
 def generate_E(N, mean_min, mean_max, std):
-    torch.manual_seed(0)
-    ref_mean = torch.rand((N.shape[1])) * (mean_max - mean_min) + mean_min
+    rng = torch.Generator().manual_seed(568)
+    ref_mean = (
+        torch.rand((N.shape[1]), generator=rng) * (mean_max - mean_min) + mean_min
+    )
     t_mean = torch.ones((N.shape[0], 1)) * ref_mean.reshape([1, -1])
-    ref_std = torch.rand((N.shape[1])) * std
+    ref_std = torch.rand((N.shape[1]), generator=rng) * std
     t_std = torch.ones((N.shape[0], 1)) * ref_std.reshape([1, -1])
-    E = torch.normal(t_mean, t_std)
+    E = torch.normal(t_mean, t_std, generator=rng)
     return ref_mean, ref_std, (N * E).sum(axis=-1)
 
 

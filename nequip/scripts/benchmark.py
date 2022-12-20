@@ -251,6 +251,12 @@ def main(args=None):
             pdb.post_mortem()
         print("Done.")
     elif args.equivariance_test:
+        print("Warmup...")
+        warmup_time = time.time()
+        for _ in range(warmup):
+            model(next(datas).copy())
+        warmup_time = time.time() - warmup_time
+        print(f"    {warmup} calls of warmup took {warmup_time:.4f}s")
         print("Running equivariance test...")
         errstr = assert_AtomicData_equivariant(model, datas_list)
         print(

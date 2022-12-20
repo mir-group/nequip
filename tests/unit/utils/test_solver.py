@@ -11,13 +11,13 @@ def test_random(full_rank, alpha, per_species_set):
     if alpha == 0 and not full_rank:
         return
 
-    torch.manual_seed(0)
+    rng = torch.Generator().manual_seed(343)
 
     ref_mean, ref_std, E, n_samples, n_dim = per_species_set
 
-    dtype = torch.get_default_dtype()
-
-    X = torch.randint(low=1, high=10, size=(n_samples, n_dim)).to(dtype)
+    X = torch.randint(low=1, high=10, size=(n_samples, n_dim), generator=rng).to(
+        torch.get_default_dtype()
+    )
     if not full_rank:
         X[:, n_dim - 2] = X[:, n_dim - 1] * 2
     y = (X * E).sum(axis=-1)

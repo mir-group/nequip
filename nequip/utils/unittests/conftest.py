@@ -174,17 +174,17 @@ def atomic_bulk_batch(nequip_bulk_dataset):
 @pytest.fixture(scope="function")
 def per_species_set():
     dtype = torch.get_default_dtype()
-    torch.manual_seed(0)
+    rng = torch.Generator().manual_seed(127)
     mean_min = 1
     mean_max = 100
     std = 20
     n_sample = 1000
     n_species = 9
-    ref_mean = torch.rand((n_species)) * (mean_max - mean_min) + mean_min
+    ref_mean = torch.rand((n_species), generator=rng) * (mean_max - mean_min) + mean_min
     t_mean = torch.ones((n_sample, 1)) * ref_mean.reshape([1, -1])
-    ref_std = torch.rand((n_species)) * std
+    ref_std = torch.rand((n_species), generator=rng) * std
     t_std = torch.ones((n_sample, 1)) * ref_std.reshape([1, -1])
-    E = torch.normal(t_mean, t_std)
+    E = torch.normal(t_mean, t_std, generator=rng)
     return ref_mean.to(dtype), ref_std.to(dtype), E.to(dtype), n_sample, n_species
 
 

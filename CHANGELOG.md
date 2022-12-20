@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Most recent change on the bottom.
 
 
-## [Unreleased] - 0.5.6
+## [0.5.6] - 2022-12-19
 ### Added
 - `ParaStressForceOutput` Support for atom virial and virial parallism in Lammps.
 - sklearn dependency removed
@@ -15,6 +15,10 @@ Most recent change on the bottom.
 - `nequip-benchmark --no-compile` and `--verbose` and `--memory-summary`
 - `nequip-benchmark --pdb` for debugging model (builder) errors
 - More information in `nequip-deploy info`
+
+### Changed
+- Minimum e3nn is now 0.4.4
+- `--equivariance-test` now prints much more information, especially when there is a failure
 
 ### Fixed
 - Git utilities when installed as ZIPed `.egg` (#264)
