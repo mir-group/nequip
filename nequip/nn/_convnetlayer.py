@@ -39,8 +39,8 @@ class ConvNetLayer(GraphModuleMixin, torch.nn.Module):
         num_layers: int = 3,
         resnet: bool = False,
         nonlinearity_type: str = "gate",
-        nonlinearity_scalars: Dict[int, Callable] = {"e": "ssp", "o": "tanh"},
-        nonlinearity_gates: Dict[int, Callable] = {"e": "ssp", "o": "abs"},
+        nonlinearity_scalars: Dict[int, Callable] = {"e": "silu", "o": "tanh"},
+        nonlinearity_gates: Dict[int, Callable] = {"e": "silu", "o": "tanh"},
     ):
         super().__init__()
         # initialization

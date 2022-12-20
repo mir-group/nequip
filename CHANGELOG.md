@@ -11,6 +11,7 @@ Most recent change on the bottom.
 - Always require explicit `seed`
 - [Breaking] Set `dataset_seed` to `seed` if it is not explicitly provided
 - Don't log as often by default
+- [Breaking] Default nonlinearities are `silu` (`e`) and `tanh` (`o`)
 
 
 ## [0.5.6] - 2022-12-19
