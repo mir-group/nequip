@@ -80,4 +80,4 @@ class EMTTestDataset(AtomicInMemoryDataset):
                     **self.AtomicData_options
                 )
             )
-        return (datas,)
+        return datas
