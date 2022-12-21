@@ -73,7 +73,10 @@ def down_sampling_by_composition(
     for i in range(n_types):
         ids = sort_by[id_start[i] : id_end[i]]
         for j, p in enumerate(percentage):
-            new_y[i * n_points + j] = torch.quantile(y[ids], p, interpolation="linear")
+            # it defaults to linear anyway, and `interpolation` was a 1.11 addition
+            # so we leave out `, interpolation="linear")`
+            # https://pytorch.org/docs/1.11/generated/torch.quantile.html?highlight=quantile#torch.quantile
+            new_y[i * n_points + j] = torch.quantile(y[ids], p)
             new_X[i * n_points + j] = unique_comps[i]
 
     return new_X, new_y
