@@ -10,6 +10,7 @@ from e3nn.o3 import Linear
 from nequip.data import AtomicDataDict
 from nequip.data.transforms import TypeMapper
 from nequip.utils import dtype_from_name
+from nequip.utils.versions import _TORCH_IS_GE_1_13
 from ._graph_mixin import GraphModuleMixin
 
 
@@ -123,6 +124,7 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
     has_scales: bool
     has_shifts: bool
     default_dtype: torch.dtype
+    _use_fma: bool
 
     def __init__(
         self,
@@ -185,6 +187,9 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
 
         self.arguments_in_dataset_units = arguments_in_dataset_units
 
+        # we can use FMA for performance but its type promotion is broken until 1.13
+        self._use_fma = _TORCH_IS_GE_1_13
+
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
 
         if not (self.has_scales or self.has_shifts):
@@ -195,8 +200,8 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
         assert len(in_field) == len(
             species_idx
         ), "in_field doesnt seem to have correct per-atom shape"
-        # multiplication / addition promotes dtypes already, so no cast is needed:
-        if self.has_scales and self.has_shifts:
+
+        if self._use_fma and self.has_scales and self.has_shifts:
             # we can used an FMA for performance
             # addcmul computes
             # input + tensor1 * tensor2 elementwise
@@ -205,10 +210,13 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
                 self.scales[species_idx].view(-1, 1),
                 in_field,
             )
-        elif self.has_scales:
-            in_field = self.scales[species_idx].view(-1, 1) * in_field
-        elif self.has_shifts:
-            in_field = self.shifts[species_idx].view(-1, 1) + in_field
+        else:
+            # fallback path for torch<1.13 OR mix of enabled shifts and scales
+            # multiplication / addition promotes dtypes already, so no cast is needed:
+            if self.has_scales:
+                in_field = self.scales[species_idx].view(-1, 1) * in_field
+            if self.has_shifts:
+                in_field = self.shifts[species_idx].view(-1, 1) + in_field
         data[self.out_field] = in_field
         return data
 
