@@ -7,7 +7,7 @@ import ase
 import ase.build
 from ase.calculators.emt import EMT
 
-from nequip.data import AtomicInMemoryDataset, AtomicData, AtomicDataDict
+from nequip.data import AtomicInMemoryDataset, AtomicData
 from .transforms import TypeMapper
 
 

@@ -39,7 +39,6 @@ from nequip.utils import (
     atomic_write,
     finish_all_writes,
     atomic_write_group,
-    dtype_from_name,
 )
 from nequip.utils.versions import check_code_version
 from nequip.model import model_from_config
