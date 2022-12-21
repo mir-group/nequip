@@ -253,7 +253,7 @@ class Trainer:
         end_of_batch_callbacks: list = [],
         end_of_train_callbacks: list = [],
         final_callbacks: list = [],
-        log_batch_freq: int = 1,
+        log_batch_freq: int = 100,
         log_epoch_freq: int = 1,
         save_checkpoint_freq: int = -1,
         save_ema_checkpoint_freq: int = -1,
@@ -298,13 +298,14 @@ class Trainer:
         self.trainer_save_path = output.generate_file("trainer.pth")
         self.config_path = self.output.generate_file("config.yaml")
 
-        if seed is not None:
-            torch.manual_seed(seed)
-            np.random.seed(seed)
+        if seed is None:
+            raise ValueError("seed is required")
+
+        torch.manual_seed(seed)
+        np.random.seed(seed)
 
         self.dataset_rng = torch.Generator()
-        if dataset_seed is not None:
-            self.dataset_rng.manual_seed(dataset_seed)
+        self.dataset_rng.manual_seed(dataset_seed if dataset_seed is not None else seed)
 
         self.logger.info(f"Torch device: {self.device}")
         self.torch_device = torch.device(self.device)

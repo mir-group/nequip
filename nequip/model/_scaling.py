@@ -137,7 +137,7 @@ def PerSpeciesRescale(
     initialize: bool,
     dataset: Optional[AtomicDataset] = None,
 ):
-    """Add global rescaling for energy(-based quantities).
+    """Add per-atom rescaling (and shifting) for energy.
 
     If ``initialize`` is false, doesn't compute statistics.
     """

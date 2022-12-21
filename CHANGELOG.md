@@ -6,11 +6,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Most recent change on the bottom.
 
-## [Unreleased] - 0.6.0
+## Unreleased - 0.6.0
 ### Added
-- Refactor overall model logic into `GraphModel` top-level module
+- [Breaking] Refactor overall model logic into `GraphModel` top-level module
 
-## [Unreleased] - 0.5.6
+### Changed
+- Always require explicit `seed`
+- [Breaking] Set `dataset_seed` to `seed` if it is not explicitly provided
+- Don't log as often by default
+- [Breaking] Default nonlinearities are `silu` (`e`) and `tanh` (`o`)
+
+
+## [0.5.6] - 2022-12-19
 ### Added
 - sklearn dependency removed
 - `nequip-benchmark` and `nequip-train` report number of weights and number of trainable weights

@@ -2,14 +2,15 @@ import logging
 import torch
 
 from torch import matmul
-from torch.linalg import solve, inv
 from typing import Optional, Sequence
 from opt_einsum import contract
 
 
 def solver(X, y, alpha: Optional[float] = 0.001, stride: Optional[int] = 1, **kwargs):
-
-    dtype = y.dtype  # the floating point targets should have the right dtype
+    # results are in the same "units" as y, so same dtype too:
+    dtype_out = y.dtype
+    # always solve in float64 for numerical stability
+    dtype = torch.float64
     X = X[::stride].to(dtype)
     y = y[::stride].to(dtype)
 
@@ -24,23 +25,27 @@ def solver(X, y, alpha: Optional[float] = 0.001, stride: Optional[int] = 1, **kw
 
     feature_rms = torch.sqrt(torch.mean(X**2, axis=0))
 
-    alpha_mat = torch.diag(feature_rms) * alpha * alpha
+    alpha_mat = torch.diag(feature_rms) * (alpha * alpha)
 
     A = matmul(X.T, X) + alpha_mat
     dy = y - (torch.sum(X, axis=1, keepdim=True) * y_mean).reshape(y.shape)
     Xy = matmul(X.T, dy)
 
-    mean = solve(A, Xy)
+    # A is symmetric positive semidefinite <=> A=(X + alpha*I)^T (X + alpha*I),
+    # so we can use cholesky:
+    A_cholesky = torch.linalg.cholesky(A)
+    mean = torch.cholesky_solve(Xy.unsqueeze(-1), A_cholesky).squeeze(-1)
+    Ainv = torch.cholesky_inverse(A_cholesky)
+    del A_cholesky
 
     sigma2 = torch.var(matmul(X, mean) - dy)
-    Ainv = inv(A)
     cov = torch.sqrt(sigma2 * contract("ij,kj,kl,li->i", Ainv, X, X, Ainv))
 
     mean = mean + y_mean.reshape([-1])
 
     logging.debug(f"Ridge Regression, residue {sigma2}")
 
-    return mean, cov
+    return mean.to(dtype_out), cov.to(dtype_out)
 
 
 def down_sampling_by_composition(
@@ -61,8 +66,10 @@ def down_sampling_by_composition(
     id_end = torch.cat((node_icomp + 1, torch.as_tensor([len(sort_by)])))
 
     n_points = len(percentage)
-    new_X = torch.zeros((n_types * n_points, X.shape[1]))
-    new_y = torch.zeros((n_types * n_points))
+    new_X = torch.zeros(
+        (n_types * n_points, X.shape[1]), dtype=X.dtype, device=X.device
+    )
+    new_y = torch.zeros((n_types * n_points), dtype=y.dtype, device=y.device)
     for i in range(n_types):
         ids = sort_by[id_start[i] : id_end[i]]
         for j, p in enumerate(percentage):
