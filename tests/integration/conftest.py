@@ -137,7 +137,7 @@ def _training_session(conffile, model_dtype, builder, BENCHMARK_ROOT):
 
 
 @pytest.fixture(
-    scope="module",
+    scope="session",
     params=[
         ("minimal.yaml", AtomicDataDict.FORCE_KEY),
         ("minimal_toy_emt.yaml", AtomicDataDict.STRESS_KEY),
@@ -148,7 +148,7 @@ def conffile(request):
 
 
 @pytest.fixture(
-    scope="module",
+    scope="session",
     params=["float32", "float64"],
 )
 def model_dtype(request, float_tolerance):
@@ -158,7 +158,7 @@ def model_dtype(request, float_tolerance):
 
 
 @pytest.fixture(
-    scope="module", params=[ConstFactorModel, LearningFactorModel, IdentityModel]
+    scope="session", params=[ConstFactorModel, LearningFactorModel, IdentityModel]
 )
 def fake_model_training_session(request, BENCHMARK_ROOT, conffile, model_dtype):
     conffile, _ = conffile
