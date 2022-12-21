@@ -6,6 +6,7 @@ from .AtomicData import (
     _NODE_FIELDS,
     _EDGE_FIELDS,
     _GRAPH_FIELDS,
+    _LONG_FIELDS,
 )
 from .dataset import AtomicDataset, AtomicInMemoryDataset, NpzDataset, ASEDataset
 from .dataloader import DataLoader, Collater
@@ -27,5 +28,6 @@ __all__ = [
     _NODE_FIELDS,
     _EDGE_FIELDS,
     _GRAPH_FIELDS,
+    _LONG_FIELDS,
     EMTTestDataset,
 ]
