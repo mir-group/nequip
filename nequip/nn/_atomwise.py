@@ -205,6 +205,7 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
             # we can used an FMA for performance
             # addcmul computes
             # input + tensor1 * tensor2 elementwise
+            # it will promote to widest dtype, which comes from shifts/scales
             in_field = torch.addcmul(
                 self.shifts[species_idx].view(-1, 1),
                 self.scales[species_idx].view(-1, 1),
@@ -212,7 +213,9 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
             )
         else:
             # fallback path for torch<1.13 OR mix of enabled shifts and scales
-            # multiplication / addition promotes dtypes already, so no cast is needed:
+            # multiplication / addition promotes dtypes already, so no cast is needed
+            # this is specifically because self.*[species_idx].view(-1, 1)
+            # is never a scalar (ndim == 0), since it is always [n_atom, 1]
             if self.has_scales:
                 in_field = self.scales[species_idx].view(-1, 1) * in_field
             if self.has_shifts:

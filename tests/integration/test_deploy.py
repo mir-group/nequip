@@ -19,13 +19,13 @@ from nequip.ase import NequIPCalculator
 @pytest.mark.parametrize(
     "device", ["cpu"] + (["cuda"] if torch.cuda.is_available() else [])
 )
-def test_deploy(BENCHMARK_ROOT, device):
+@pytest.mark.parametrize("model_dtype", ["float32", "float64"])
+def test_deploy(BENCHMARK_ROOT, device, model_dtype):
     dtype = str(torch.get_default_dtype())[len("torch.") :]
-    atol = {"float32": 1e-5, "float64": 1e-7}[dtype]
-
-    # if torch.cuda.is_available():
-    #     # TODO: is this true?
-    #     pytest.skip("CUDA and subprocesses have issues")
+    if dtype == "float32" and model_dtype == "float64":
+        pytest.skip("default_dtype=float32 and model_dtype=float64 doesn't make sense")
+    # atol on MODEL dtype, since a mostly float32 model still has float32 variation
+    atol = {"float32": 1e-5, "float64": 1e-7}[model_dtype]
 
     keys = [
         AtomicDataDict.TOTAL_ENERGY_KEY,
@@ -45,6 +45,7 @@ def test_deploy(BENCHMARK_ROOT, device):
             BENCHMARK_ROOT / "aspirin_ccsd-train.npz"
         )
         true_config["default_dtype"] = dtype
+        true_config["model_dtype"] = model_dtype
         true_config["max_epochs"] = 1
         true_config["n_train"] = 1
         true_config["n_val"] = 1
@@ -72,7 +73,7 @@ def test_deploy(BENCHMARK_ROOT, device):
         assert deployed_path.is_file(), "Deploy didn't create file"
 
         # now test predictions the same
-        best_mod, _ = Trainer.load_model_from_training_session(
+        best_mod, train_config = Trainer.load_model_from_training_session(
             traindir=f"{root}/{run_name}/",
             model_name="best_model.pth",
             device=device,

@@ -38,6 +38,7 @@ class RescaleOutput(GraphModuleMixin, torch.nn.Module):
     related_shift_keys: List[str]
     scale_trainble: bool
     rescale_trainable: bool
+    _all_keys: List[str]
 
     has_scale: bool
     has_shift: bool
@@ -87,6 +88,7 @@ class RescaleOutput(GraphModuleMixin, torch.nn.Module):
 
         self.scale_keys = list(scale_keys)
         self.shift_keys = list(shift_keys)
+        self._all_keys = list(all_keys)
         self.related_scale_keys = list(set(related_scale_keys).union(scale_keys))
         self.related_shift_keys = list(set(related_shift_keys).union(shift_keys))
 
@@ -149,17 +151,32 @@ class RescaleOutput(GraphModuleMixin, torch.nn.Module):
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
         data = self.model(data)
         if self.training:
-            return data
+            # no scaling, but still need to promote for consistent dtype behavior
+            # this is hopefully a no-op in most circumstances due to a
+            # preceeding PerSpecies rescaling:
+            for field in self._all_keys:
+                data[field] = data[field].to(dtype=self.default_dtype)
         else:
             # Scale then shift
-            # * and + promote dtypes by default
+            # * and + promote dtypes by default, but not when the other
+            # operand is a scalar, which `scale/shift_by` are.
+            # The .to(dtype=self.default_dtype) should be a free no-op
+            # under most circumstances, since if this RescaleOutput
+            # is preceeded by a PerSpecies, that will cast up to
+            # default_dtype through promotion in the per-atom
+            # * and +, which are always between tensors and always
+            # promote. Still, we include it just to be sure
             if self.has_scale:
                 for field in self.scale_keys:
-                    data[field] = data[field] * self.scale_by
+                    data[field] = (
+                        data[field].to(dtype=self.default_dtype) * self.scale_by
+                    )
             if self.has_shift:
                 for field in self.shift_keys:
-                    data[field] = data[field] + self.shift_by
-            return data
+                    data[field] = (
+                        data[field].to(dtype=self.default_dtype) + self.shift_by
+                    )
+        return data
 
     @torch.jit.export
     def scale(

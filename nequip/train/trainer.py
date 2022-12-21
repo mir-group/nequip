@@ -658,6 +658,19 @@ class Trainer:
         device="cpu",
         config_dictionary: Optional[dict] = None,
     ) -> Tuple[torch.nn.Module, Config]:
+        """Load a model from a training session.
+
+        Note that this uses ``model_from_config`` internally and is thus not thread safe.
+
+        Args:
+            traindir: the training session
+            model_name: which checkpoint to load; defaults to ``best_model.pth``
+            device: target device to load to, defaults to ``cpu``
+            config_dictionary: optionally use this config instead of ``traindir/config.yaml``
+
+        Returns:
+            (model, config)
+        """
         traindir = str(traindir)
         model_name = str(model_name)
 
@@ -666,21 +679,14 @@ class Trainer:
         else:
             config = Config.from_file(traindir + "/config.yaml")
 
+        # model_from_config takes care of dtypes already
         model = model_from_config(
             config=config,
             initialize=False,
         )
-        if model is not None:  # TODO: why would it be?
-            # TODO: this is not exactly equivalent to building with
-            # this set as default dtype... does it matter?
-            model.to(
-                device=torch.device(device),
-                dtype=dtype_from_name(config.default_dtype),
-            )
-            model_state_dict = torch.load(
-                traindir + "/" + model_name, map_location=device
-            )
-            model.load_state_dict(model_state_dict)
+        model.to(device=torch.device(device))
+        model_state_dict = torch.load(traindir + "/" + model_name, map_location=device)
+        model.load_state_dict(model_state_dict)
 
         return model, config
 
