@@ -121,7 +121,7 @@ def nequip_dataset(molecules, temp_data, float_tolerance):
         a = ASEDataset(
             file_name=fp.name,
             root=temp_data,
-            extra_fixed_fields={"r_max": 3.0},
+            AtomicData_options={"r_max": 3.0},
             ase_args=dict(format="extxyz"),
             type_mapper=TypeMapper(chemical_symbol_to_type={"H": 0, "C": 1, "O": 2}),
         )

@@ -53,16 +53,6 @@ url
     | Type: NoneType
     | Default: ``None``
 
-force_fixed_keys
-^^^^^^^^^^^^^^^^
-    | Type: list
-    | Default: ``[]``
-
-extra_fixed_fields
-^^^^^^^^^^^^^^^^^^
-    | Type: dict
-    | Default: ``{}``
-
 include_frames
 ^^^^^^^^^^^^^^
     | Type: NoneType
