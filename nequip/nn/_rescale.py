@@ -153,29 +153,26 @@ class RescaleOutput(GraphModuleMixin, torch.nn.Module):
         if self.training:
             # no scaling, but still need to promote for consistent dtype behavior
             # this is hopefully a no-op in most circumstances due to a
-            # preceeding PerSpecies rescaling:
+            # preceeding PerSpecies rescale promoting to default_dtype anyway:
             for field in self._all_keys:
                 data[field] = data[field].to(dtype=self.default_dtype)
         else:
             # Scale then shift
             # * and + promote dtypes by default, but not when the other
             # operand is a scalar, which `scale/shift_by` are.
-            # The .to(dtype=self.default_dtype) should be a free no-op
-            # under most circumstances, since if this RescaleOutput
-            # is preceeded by a PerSpecies, that will cast up to
-            # default_dtype through promotion in the per-atom
-            # * and +, which are always between tensors and always
-            # promote. Still, we include it just to be sure
+            # We solve this by expanding `scale/shift_by` to tensors
+            # This is free and doesn't allocate new memory on CUDA:
+            # https://pytorch.org/docs/stable/generated/torch.Tensor.expand.html#torch.Tensor.expand
+            # confirmed in PyTorch slack
+            # https://pytorch.slack.com/archives/C3PDTEV8E/p1671652283801129
             if self.has_scale:
                 for field in self.scale_keys:
-                    data[field] = (
-                        data[field].to(dtype=self.default_dtype) * self.scale_by
-                    )
+                    v = data[field]
+                    data[field] = v * self.scale_by.expand(v.shape)
             if self.has_shift:
                 for field in self.shift_keys:
-                    data[field] = (
-                        data[field].to(dtype=self.default_dtype) + self.shift_by
-                    )
+                    v = data[field]
+                    data[field] = v + self.shift_by.expand(v.shape)
         return data
 
     @torch.jit.export
