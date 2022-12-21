@@ -6,7 +6,12 @@ import torch
 from nequip.data import AtomicDataset
 from nequip.data.transforms import TypeMapper
 from nequip.nn import GraphModuleMixin, GraphModel
-from nequip.utils import load_callable, instantiate, dtype_from_name
+from nequip.utils import (
+    load_callable,
+    instantiate,
+    dtype_from_name,
+    torch_default_dtype,
+)
 
 
 def model_from_config(
@@ -60,63 +65,63 @@ def model_from_config(
     default_dtype = torch.get_default_dtype()
     model_dtype: torch.dtype = dtype_from_name(config.get("model_dtype", default_dtype))
     config["model_dtype"] = str(model_dtype).lstrip("torch.")
-    # set temporarily the default dtype
-    torch.set_default_dtype(model_dtype)
     # confirm sanity
     assert default_dtype in (torch.float32, torch.float64)
     if default_dtype == torch.float32 and model_dtype == torch.float64:
         raise ValueError(
             "Overall default_dtype=float32, but model_dtype=float64 is a higher precision- change default_dtype to float64"
         )
+    # temporarily set the default dtype
+    with torch_default_dtype(model_dtype):
 
-    # Build
-    builders = [
-        load_callable(b, prefix="nequip.model")
-        for b in config.get("model_builders", [])
-    ]
+        # Build
+        builders = [
+            load_callable(b, prefix="nequip.model")
+            for b in config.get("model_builders", [])
+        ]
 
-    model = None
+        model = None
 
-    for builder in builders:
-        pnames = inspect.signature(builder).parameters
-        params = {}
-        if "initialize" in pnames:
-            params["initialize"] = initialize
-        if "deploy" in pnames:
-            params["deploy"] = deploy
-        if "config" in pnames:
-            params["config"] = config
-        if "dataset" in pnames:
-            if "initialize" not in pnames:
-                raise ValueError("Cannot request dataset without requesting initialize")
-            if (
-                initialize
-                and pnames["dataset"].default == inspect.Parameter.empty
-                and dataset is None
-            ):
-                raise RuntimeError(
-                    f"Builder {builder.__name__} requires the dataset, initialize is true, but no dataset was provided to `model_from_config`."
+        for builder in builders:
+            pnames = inspect.signature(builder).parameters
+            params = {}
+            if "initialize" in pnames:
+                params["initialize"] = initialize
+            if "deploy" in pnames:
+                params["deploy"] = deploy
+            if "config" in pnames:
+                params["config"] = config
+            if "dataset" in pnames:
+                if "initialize" not in pnames:
+                    raise ValueError(
+                        "Cannot request dataset without requesting initialize"
+                    )
+                if (
+                    initialize
+                    and pnames["dataset"].default == inspect.Parameter.empty
+                    and dataset is None
+                ):
+                    raise RuntimeError(
+                        f"Builder {builder.__name__} requires the dataset, initialize is true, but no dataset was provided to `model_from_config`."
+                    )
+                params["dataset"] = dataset
+            if "model" in pnames:
+                if model is None:
+                    raise RuntimeError(
+                        f"Builder {builder.__name__} asked for the model as an input, but no previous builder has returned a model"
+                    )
+                params["model"] = model
+            else:
+                if model is not None:
+                    raise RuntimeError(
+                        f"All model_builders after the first one that returns a model must take the model as an argument; {builder.__name__} doesn't"
+                    )
+            model = builder(**params)
+            if model is not None and not isinstance(model, GraphModuleMixin):
+                raise TypeError(
+                    f"Builder {builder.__name__} didn't return a GraphModuleMixin, got {type(model)} instead"
                 )
-            params["dataset"] = dataset
-        if "model" in pnames:
-            if model is None:
-                raise RuntimeError(
-                    f"Builder {builder.__name__} asked for the model as an input, but no previous builder has returned a model"
-                )
-            params["model"] = model
-        else:
-            if model is not None:
-                raise RuntimeError(
-                    f"All model_builders after the first one that returns a model must take the model as an argument; {builder.__name__} doesn't"
-                )
-        model = builder(**params)
-        if model is not None and not isinstance(model, GraphModuleMixin):
-            raise TypeError(
-                f"Builder {builder.__name__} didn't return a GraphModuleMixin, got {type(model)} instead"
-            )
-
-    # reset default dtype
-    torch.set_default_dtype(default_dtype)
+    # reset to default dtype by context manager
 
     # Wrap the model up
     model = GraphModel(
