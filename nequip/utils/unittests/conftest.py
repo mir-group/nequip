@@ -25,7 +25,17 @@ from nequip.utils.misc import dtype_from_name
 _is_pytest_xdist: bool = os.environ.get("PYTEST_XDIST_WORKER", "master") != "master"
 if _is_pytest_xdist and torch.cuda.is_available():
     _xdist_worker_rank: int = int(os.environ["PYTEST_XDIST_WORKER"].lstrip("gw"))
-    torch.cuda.set_device(_xdist_worker_rank % torch.cuda.device_count())
+    _cuda_vis_devs = os.environ.get(
+        "CUDA_VISIBLE_DEVICES",
+        ",".join(str(e) for e in range(torch.cuda.device_count())),
+    ).split(",")
+    _cuda_vis_devs = [int(e) for e in _cuda_vis_devs]
+    # set this for tests that run in this process
+    _local_gpu_rank = _xdist_worker_rank % torch.cuda.device_count()
+    torch.cuda.set_device(_local_gpu_rank)
+    # set this for launched child processes
+    os.environ["CUDA_VISIBLE_DEVICES"] = str(_cuda_vis_devs[_local_gpu_rank])
+    del _xdist_worker_rank, _cuda_vis_devs, _local_gpu_rank
 
 
 if "NEQUIP_NUM_TASKS" not in os.environ:
