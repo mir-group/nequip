@@ -19,6 +19,15 @@ from nequip.utils.torch_geometric import Batch
 from nequip.utils._global_options import _set_global_options
 from nequip.utils.misc import dtype_from_name
 
+# Sometimes we run parallel using pytest-xdist, and want to be able to use
+# as many GPUs as are available
+# https://pytest-xdist.readthedocs.io/en/latest/how-to.html#identifying-the-worker-process-during-a-test
+_is_pytest_xdist: bool = os.environ.get("PYTEST_XDIST_WORKER", "master") != "master"
+if _is_pytest_xdist and torch.cuda.is_available():
+    _xdist_worker_rank: int = int(os.environ["PYTEST_XDIST_WORKER"].lstrip("gw"))
+    torch.cuda.set_device(_xdist_worker_rank % torch.cuda.device_count())
+
+
 if "NEQUIP_NUM_TASKS" not in os.environ:
     # Test parallelization, but don't waste time spawning tons of workers if lots of cores available
     os.environ["NEQUIP_NUM_TASKS"] = "2"
