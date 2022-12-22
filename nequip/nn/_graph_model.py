@@ -2,6 +2,8 @@ from typing import List, Dict, Any, Optional
 
 import torch
 
+from e3nn.util._argtools import _get_device
+
 from nequip.data import AtomicDataDict
 
 from ._graph_mixin import GraphModuleMixin
@@ -108,3 +110,8 @@ class GraphModel(GraphModuleMixin, torch.nn.Module):
         # run the model
         data = self.model(new_data)
         return data
+
+    # == Helpers ==
+
+    def get_device(self) -> torch.device:
+        return _get_device(self)
