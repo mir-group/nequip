@@ -72,6 +72,7 @@ def model_from_config(
             "Overall default_dtype=float32, but model_dtype=float64 is a higher precision- change default_dtype to float64"
         )
     # temporarily set the default dtype
+    start_graph_model_builders = None
     with torch_default_dtype(model_dtype):
 
         # Build
@@ -82,9 +83,13 @@ def model_from_config(
 
         model = None
 
-        for builder in builders:
+        for builder_i, builder in enumerate(builders):
             pnames = inspect.signature(builder).parameters
             params = {}
+            if "graph_model" in pnames:
+                # start graph_model builders, which happen later
+                start_graph_model_builders = builder_i
+                break
             if "initialize" in pnames:
                 params["initialize"] = initialize
             if "deploy" in pnames:
@@ -129,5 +134,43 @@ def model_from_config(
         model_dtype=model_dtype,
         model_input_fields=config.get("model_input_fields", {}),
     )
+
+    # Run GraphModel builders
+    if start_graph_model_builders is not None:
+        for builder in builders[start_graph_model_builders:]:
+            pnames = inspect.signature(builder).parameters
+            params = {}
+            assert "graph_model" in pnames
+            params["graph_model"] = model
+            if "model" in pnames:
+                raise ValueError(
+                    f"Once any builder requests `graph_model` (first requested by {builders[start_graph_model_builders].__name__}), no builder can request `model`, but {builder.__name__} did"
+                )
+            if "initialize" in pnames:
+                params["initialize"] = initialize
+            if "deploy" in pnames:
+                params["deploy"] = deploy
+            if "config" in pnames:
+                params["config"] = config
+            if "dataset" in pnames:
+                if "initialize" not in pnames:
+                    raise ValueError(
+                        "Cannot request dataset without requesting initialize"
+                    )
+                if (
+                    initialize
+                    and pnames["dataset"].default == inspect.Parameter.empty
+                    and dataset is None
+                ):
+                    raise RuntimeError(
+                        f"Builder {builder.__name__} requires the dataset, initialize is true, but no dataset was provided to `model_from_config`."
+                    )
+                params["dataset"] = dataset
+
+            model = builder(**params)
+            if not isinstance(model, GraphModel):
+                raise TypeError(
+                    f"Builder {builder.__name__} didn't return a GraphModel, got {type(model)} instead"
+                )
 
     return model
