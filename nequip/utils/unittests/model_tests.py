@@ -60,7 +60,7 @@ class BaseModelTests:
         return model
 
     @pytest.fixture(scope="class")
-    def model(self, config, device):
+    def model(self, config, device, float_tolerance):
         config, out_fields = config
         model = self.make_model(config, device=device)
         return model, out_fields
@@ -199,7 +199,9 @@ class BaseModelTests:
             # For example, an Allegro edge feature is many body so will be affected
             assert torch.allclose(edge_embed[:2], edge_embed2[:2])
         assert edge_embed[2:].abs().sum() > 1e-6  # some nonzero terms
-        assert torch.allclose(edge_embed2[2:], torch.zeros(1, device=device))
+        assert torch.allclose(
+            edge_embed2[2:], torch.zeros(1, device=device, dtype=edge_embed2.dtype)
+        )
 
         # test gradients
         in_dict = AtomicData.to_AtomicDataDict(data)
@@ -214,7 +216,9 @@ class BaseModelTests:
                 inputs=in_dict[AtomicDataDict.POSITIONS_KEY],
                 retain_graph=True,
             )[0]
-            assert torch.allclose(grads, torch.zeros(1, device=device))
+            assert torch.allclose(
+                grads, torch.zeros(1, device=device, dtype=grads.dtype)
+            )
 
             if AtomicDataDict.PER_ATOM_ENERGY_KEY in out:
                 # are the first two atom's energies unaffected by atom at the cutoff?

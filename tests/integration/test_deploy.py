@@ -15,6 +15,8 @@ from nequip.scripts import deploy
 from nequip.train import Trainer
 from nequip.ase import NequIPCalculator
 
+from conftest import _check_and_print
+
 
 @pytest.mark.parametrize(
     "device", ["cpu"] + (["cuda"] if torch.cuda.is_available() else [])
@@ -55,7 +57,7 @@ def test_deploy(BENCHMARK_ROOT, device, model_dtype):
             yaml.dump(true_config, fp)
         # Train model
         retcode = subprocess.run(["nequip-train", str(config_path)], cwd=tmpdir)
-        retcode.check_returncode()
+        _check_and_print(retcode)
         # Deploy
         deployed_path = pathlib.Path(f"deployed_{dtype}.pth")
         retcode = subprocess.run(
@@ -68,7 +70,7 @@ def test_deploy(BENCHMARK_ROOT, device, model_dtype):
             ],
             cwd=tmpdir,
         )
-        retcode.check_returncode()
+        _check_and_print(retcode)
         deployed_path = tmpdir / deployed_path
         assert deployed_path.is_file(), "Deploy didn't create file"
 
@@ -120,7 +122,7 @@ def test_deploy(BENCHMARK_ROOT, device, model_dtype):
             stdout=subprocess.PIPE,
             **text,
         )
-        retcode.check_returncode()
+        _check_and_print(retcode)
         # Try to load extract config
         config = yaml.load(retcode.stdout, Loader=yaml.Loader)
         del config

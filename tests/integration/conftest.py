@@ -4,11 +4,22 @@ import pathlib
 import yaml
 import subprocess
 import os
+import sys
 
 import torch
 
 from nequip.data import AtomicDataDict
 from nequip.nn import GraphModuleMixin
+
+
+def _check_and_print(retcode):
+    __tracebackhide__ = True
+    if retcode.returncode:
+        if len(retcode.stdout) > 0:
+            print(retcode.stdout.decode("ascii"))
+        if len(retcode.stderr) > 0:
+            print(retcode.stderr.decode("ascii"), file=sys.stderr)
+        retcode.check_returncode()
 
 
 class IdentityModel(GraphModuleMixin, torch.nn.Module):
@@ -131,7 +142,7 @@ def _training_session(conffile, model_dtype, builder, BENCHMARK_ROOT):
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
-        retcode.check_returncode()
+        _check_and_print(retcode)
 
         yield true_config, tmpdir, env
 

@@ -10,7 +10,12 @@ import torch
 
 from nequip.data import AtomicDataDict
 
-from conftest import IdentityModel, ConstFactorModel, LearningFactorModel
+from conftest import (
+    IdentityModel,
+    ConstFactorModel,
+    LearningFactorModel,
+    _check_and_print,
+)
 
 
 def test_metrics(fake_model_training_session, model_dtype):
@@ -162,7 +167,7 @@ def test_requeue(nequip_dataset, BENCHMARK_ROOT, conffile):
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
             )
-            retcode.check_returncode()
+            _check_and_print(retcode)
 
             # == Load metrics ==
             dat = np.genfromtxt(

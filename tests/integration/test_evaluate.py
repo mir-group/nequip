@@ -10,7 +10,7 @@ import torch
 
 from nequip.data import AtomicDataDict
 
-from conftest import IdentityModel, ConstFactorModel
+from conftest import IdentityModel, ConstFactorModel, _check_and_print
 
 
 @pytest.mark.parametrize("do_test_idcs", [True, False])
@@ -51,7 +51,7 @@ def test_metrics(
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
-        retcode.check_returncode()
+        _check_and_print(retcode)
 
         # Check the output
         metrics = dict(
