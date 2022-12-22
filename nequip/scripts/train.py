@@ -124,6 +124,10 @@ def fresh_start(config):
     # we use add_to_config cause it's a fresh start and need to record it
     check_code_version(config, add_to_config=True)
     _set_global_options(config)
+    if config["default_dtype"] != "float64":
+        warnings.warn(
+            f"default_dtype={config['default_dtype']} but we strongly recommend float64"
+        )
 
     # = Make the trainer =
     if config.wandb:
