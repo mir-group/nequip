@@ -282,7 +282,7 @@ def assert_AtomicData_equivariant(
 
     if any(is_problem) or " FAIL" in permutation_message:
         raise AssertionError(
-            f"Equivariance test of {type(func).__name__} failed:\n   default/model dtype: {current_dtype}  E(3) tolerance: {e3_tolerance}\n{message}"
+            f"Equivariance test of {type(func).__name__} failed:\n   default dtype: {torch.get_default_dtype()} (assumed) model dtype: {current_dtype}  E(3) tolerance: {e3_tolerance}\n{message}"
         )
 
     return message
