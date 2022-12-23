@@ -340,9 +340,13 @@ class StressOutput(GraphModuleMixin, torch.nn.Module):
 @compile_mode("script")
 class ParaStressOutput(GraphModuleMixin, torch.nn.Module):
     r"""Compute stress, atomic virial, forces using autograd of an energy model.
+    Edge-vector based atomic virial.
     Design for Lammps parallism.
 
     See:
+        H. Yu, Y. Zhong, J. Ji, X. Gong, and H. Xiang, Time-Reversal Equivariant Neural Network Potential and Hamiltonian for Magnetic Materials, arXiv:2211.11403.
+        https://arxiv.org/abs/2211.11403
+
         Knuth et. al. Comput. Phys. Commun 190, 33-50, 2015
         https://pure.mpg.de/rest/items/item_2085135_9/component/file_2156800/content
 
