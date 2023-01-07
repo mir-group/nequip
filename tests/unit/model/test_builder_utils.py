@@ -27,7 +27,7 @@ def test_avg_num(molecules, temp_data, r_max, subset, to_test):
         nequip_dataset = ASEDataset(
             file_name=fp.name,
             root=temp_data,
-            extra_fixed_fields={"r_max": r_max},
+            AtomicData_options={"r_max": r_max},
             ase_args=dict(format="extxyz"),
             type_mapper=TypeMapper(chemical_symbol_to_type={"H": 0, "C": 1, "O": 2}),
         )

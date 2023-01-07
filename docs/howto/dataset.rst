@@ -25,14 +25,6 @@ NequIP will not automatically update the cached data.
 Key concepts
 ------------
 
-fixed_fields
-~~~~~~~~~~~~
-Fixed fields are the quantities that are shared among all the configurations in the dataset.
-For example, if the dataset is a trajectory of an NVT MD simulation, the super cell size and the atomic species 
-are indeed a constant matrix/vector through out the whole dataset.
-In this case, in stead of repeating the same values for many times, 
-we specify the cell and species as fixed fields and only provide them once.
-
 yaml interface
 ~~~~~~~~~~~~~~
 ``nequip-train`` and ``nequip-evaluate`` automatically construct the AtomicDataset based on the yaml arguments.
@@ -107,6 +99,12 @@ If your dataset constitute configurations that always have the same number of at
 In the npz file, all the values should have the same row as the number of the configurations. 
 For example, the force array of 36 atomic configurations of an N-atom system should have the shape of (36, N, 3);
 their total_energy array should have the shape of (36).
+
+NPZ also supports "fixed fields." Fixed fields are the quantities that are shared among all the configurations in the dataset.
+For example, if the dataset is a trajectory of an NVT MD simulation, the super cell size and the atomic species 
+are indeed a constant matrix/vector through out the whole dataset.
+In this case, in stead of repeating the same values for many times, 
+we specify the cell and species as fixed fields and only provide them once.
 
 Below is an example of the yaml specification.
 

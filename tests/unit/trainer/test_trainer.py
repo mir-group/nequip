@@ -318,6 +318,7 @@ def scale_train(nequip_dataset):
     with tempfile.TemporaryDirectory(prefix="output") as path:
         trainer = Trainer(
             model=DummyScale(AtomicDataDict.FORCE_KEY, scale=1.3, shift=1),
+            seed=9,
             n_train=4,
             n_val=4,
             max_epochs=0,
