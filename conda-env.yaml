@@ -1,0 +1,24 @@
+name: nequip
+channels:
+  - conda-forge
+  - defaults
+  - pytorch
+  - pyg
+dependencies:
+  - pip
+  - numpy
+  - ase
+  - tqdm
+  - pytorch==1.11
+  - pyyaml
+  - python=3.9.12
+  - cudatoolkit=11.3
+  - gcc=12.1.0
+  - scipy==1.9.1
+  - tensorboard
+  - typing_extensions
+  - pip:
+    - e3nn>=0.4.4,<0.6.0
+    - torch-runstats>=0.2.0
+    - torch-ema>=0.3.0
+    - -e ./
