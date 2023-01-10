@@ -19,6 +19,8 @@ Most recent change on the bottom.
 ### Removed
 - [Breaking] `fixed_fields` machinery (`npz_fixed_field_keys` is still supported, but through a more straightforward implementation)
 
+### Added
+- add Tensorboard as logger option
 
 ## [0.5.6] - 2022-12-19
 ### Added

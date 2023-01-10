@@ -175,6 +175,18 @@ class BaseModelTests:
 
     def test_embedding_cutoff(self, model, config, device):
         instance, out_fields = model
+
+        # make all weights nonzero in order to have the most robust test
+        # default init weights can sometimes be zero (e.g. biases) but we want
+        # to ensure smoothness for nonzero values
+        # assumes any trainable parameter will be trained and thus that
+        # nonzero values are valid
+        with torch.no_grad():
+            all_params = list(instance.parameters())
+            old_state = [p.detach().clone() for p in all_params]
+            for p in all_params:
+                p.uniform_(-1.0, 1.0)
+
         config, out_fields = config
         r_max = config["r_max"]
 
@@ -230,6 +242,11 @@ class BaseModelTests:
                 # only care about gradient wrt moved atom
                 assert grads.shape == (3, 3)
                 assert torch.allclose(grads[2], torch.zeros(1, device=device))
+
+        # restore previous model state
+        with torch.no_grad():
+            for p, v in zip(all_params, old_state):
+                p.copy_(v)
 
 
 class BaseEnergyModelTests(BaseModelTests):
