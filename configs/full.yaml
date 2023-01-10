@@ -161,6 +161,9 @@ wandb: true                                                                     
 wandb_project: toluene-example                                                     # project name used in wandb
 wandb_watch: false
 
+# # using tensorboard for logging
+# tensorboard: true
+
 # see https://docs.wandb.ai/ref/python/watch
 # wandb_watch_kwargs:
 #   log: all
