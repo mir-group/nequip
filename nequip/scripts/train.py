@@ -24,6 +24,7 @@ from nequip.scripts._logger import set_up_script_logger
 default_config = dict(
     root="./",
     run_name="NequIP",
+    tensorboard=False,
     wandb=False,
     wandb_project="NequIP",
     model_builders=[
@@ -126,19 +127,21 @@ def fresh_start(config):
 
     # = Make the trainer =
     if config.wandb:
+
         import wandb  # noqa: F401
-        from nequip.train.trainer_wandb import TrainerWandB
+        from nequip.train.trainer_wandb import TrainerWandB as Trainer
 
         # download parameters from wandb in case of sweeping
         from nequip.utils.wandb import init_n_update
 
         config = init_n_update(config)
 
-        trainer = TrainerWandB(model=None, **dict(config))
+    elif config.tensorboard:
+        from nequip.train.trainer_tensorboard import TrainerTensorBoard as Trainer
     else:
         from nequip.train.trainer import Trainer
 
-        trainer = Trainer(model=None, **dict(config))
+    trainer = Trainer(model=None, **dict(config))
 
     # what is this
     # to update wandb data?

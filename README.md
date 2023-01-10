@@ -17,11 +17,16 @@ NequIP requires:
 
 To install:
 
-* We use [Weights&Biases](https://wandb.ai) to keep track of experiments. This is not a strict requirement — you can use our package without it — but it may make your life easier. If you want to use it, create an account [here](https://wandb.ai) and install the Python package:
+* We use [Weights&Biases](https://wandb.ai) (or TensorBoard) to keep track of experiments. This is not a strict requirement — you can use our package without it — but it may make your life easier. If you want to use it, create an account [here](https://wandb.ai) and install the Python package:
 
   ```
-  pip install wandb
+  pip install wandb # tensorboard
   ```
+
+  * for TensorBoard users
+    * On your local computer, build an ssh tunnel to your compute node by `ssh -L 6006:127.0.0.1:6006 username@ip`
+    * On the compute node, go to the `{root}` folder specify in the config file, and run `tensorboard --logdir tb_summary`
+    * Use your local computer browser to log on `http://localhost:6006`
 
 * Install NequIP
 
