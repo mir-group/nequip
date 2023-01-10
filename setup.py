@@ -29,7 +29,7 @@ setup(
         "numpy",
         "ase",
         "tqdm",
-        "torch>=1.10.0,<1.13,!=1.9.0",
+        "torch==1.11",
         "e3nn>=0.4.4,<0.6.0",
         "pyyaml",
         "contextlib2;python_version<'3.7'",  # backport of nullcontext
