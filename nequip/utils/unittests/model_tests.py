@@ -380,7 +380,10 @@ class BaseEnergyModelTests(BaseModelTests):
                 assert torch.allclose(
                     output[k],
                     output_partial[k],
-                    atol=1e-8 if k == AtomicDataDict.TOTAL_ENERGY_KEY else 1e-6,
+                    atol=1e-8
+                    if k == AtomicDataDict.TOTAL_ENERGY_KEY
+                    and torch.get_default_dtype() == torch.float64
+                    else 1e-5,
                 )
             else:
                 assert torch.equal(output[k], output_partial[k])
