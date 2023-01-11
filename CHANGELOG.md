@@ -15,6 +15,7 @@ Most recent change on the bottom.
 - [Breaking] Set `dataset_seed` to `seed` if it is not explicitly provided
 - Don't log as often by default
 - [Breaking] Default nonlinearities are `silu` (`e`) and `tanh` (`o`)
+- Will not reproduce previous versions' data shuffling order (for all practical purposes this does not matter, the `shuffle` option is unchanged)
 
 ### Removed
 - [Breaking] `fixed_fields` machinery (`npz_fixed_field_keys` is still supported, but through a more straightforward implementation)

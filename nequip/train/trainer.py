@@ -26,7 +26,13 @@ import numpy as np
 import torch
 from torch_ema import ExponentialMovingAverage
 
-from nequip.data import DataLoader, AtomicData, AtomicDataDict, AtomicDataset
+from nequip.data import (
+    DataLoader,
+    PartialSampler,
+    AtomicData,
+    AtomicDataDict,
+    AtomicDataset,
+)
 from nequip.nn import GraphModel
 from nequip.utils import (
     Output,
@@ -150,6 +156,7 @@ class Trainer:
         validation_batch_size (int): batch size for evaluating the model for validation
         shuffle (bool): parameters for dataloader
         n_train (int): # of frames for training
+        n_train_per_epoch (optional int): how many frames from `n_train` to use each epoch; see `PartialSampler`. When `None`, all `n_train` frames will be used each epoch.
         n_val (int): # of frames for validation
         exclude_keys (list):  fields from dataset to ignore.
         dataloader_num_workers (int): `num_workers` for the `DataLoader`s
@@ -242,6 +249,7 @@ class Trainer:
         validation_batch_size: int = 5,
         shuffle: bool = True,
         n_train: Optional[int] = None,
+        n_train_per_epoch: Optional[int] = None,
         n_val: Optional[int] = None,
         dataloader_num_workers: int = 0,
         train_idcs: Optional[list] = None,
@@ -878,6 +886,10 @@ class Trainer:
         dataloaders = [
             dataloaders[c] for c in categories
         ]  # get the right dataloaders for the catagories we actually run
+        if TRAIN in categories:
+            # We have to step the sampler so it knows what epoch it is
+            self.dl_train_sampler.step_epoch(self.iepoch)
+
         self.metrics_dict = {}
         self.loss_dict = {}
 
@@ -1199,10 +1211,19 @@ class Trainer:
             # use the right randomness
             generator=self.dataset_rng,
         )
+        self.dl_train_sampler = PartialSampler(
+            data_source=self.dataset_train,
+            # training should shuffle (if enabled)
+            shuffle=self.shuffle,
+            # if n_train_per_epoch is None (default), it's set to len(self.dataset_train) == n_train
+            # i.e. use all `n_train` frames each epoch
+            num_samples_per_segment=self.n_train_per_epoch,
+            generator=self.dataset_rng,
+        )
         self.dl_train = DataLoader(
             dataset=self.dataset_train,
-            shuffle=self.shuffle,  # training should shuffle
             batch_size=self.batch_size,
+            sampler=self.dl_train_sampler,
             **dl_kwargs,
         )
         # validation, on the other hand, shouldn't shuffle
