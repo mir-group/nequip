@@ -57,7 +57,7 @@ def main(args=None):
         "-n",
         help="Number of trials.",
         type=int,
-        default=30,
+        default=None,
     )
     parser.add_argument(
         "--n-data",
@@ -157,6 +157,9 @@ def main(args=None):
     if args.n == 0:
         print("Got -n 0, so quitting without running benchmark.")
         return
+    elif args.n is None:
+        args.n = 5 if args.profile else 30
+    print(args.n)
 
     # Load model:
     if args.model is None:
@@ -239,8 +242,11 @@ def main(args=None):
             on_trace_ready=trace_handler,
         ) as p:
             for _ in range(1 + warmup + args.n):
-                model(next(datas).copy())
+                out = model(next(datas).copy())
+                out[AtomicDataDict.TOTAL_ENERGY_KEY].item()
                 p.step()
+
+        print(p.key_averages().table(sort_by="cuda_time_total", row_limit=100))
     elif args.pdb:
         print("Running model under debugger...")
         try:
@@ -280,7 +286,8 @@ def main(args=None):
         print("Benchmarking...")
         # just time
         t = Timer(
-            stmt="model(next(datas).copy())", globals={"model": model, "datas": datas}
+            stmt="model(next(datas).copy())['total_energy'].item()",
+            globals={"model": model, "datas": datas},
         )
         perloop: Measurement = t.timeit(args.n)
 
