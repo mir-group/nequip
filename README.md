@@ -13,15 +13,22 @@ NequIP is an open-source code for building E(3)-equivariant interatomic potentia
 NequIP requires:
 
 * Python >= 3.7
-* PyTorch >= 1.8, !=1.9, <=1.11.*. PyTorch can be installed following the [instructions from their documentation](https://pytorch.org/get-started/locally/). Note that neither `torchvision` nor `torchaudio`, included in the default install command, are needed for NequIP.
+* PyTorch == 1.10.* or 1.13.*. PyTorch can be installed following the [instructions from their documentation](https://pytorch.org/get-started/locally/). Note that neither `torchvision` nor `torchaudio`, included in the default install command, are needed for NequIP.
+
+**You must install PyTorch before installing NequIP, however it is not marked as a dependency of `nequip` to prevent `pip` from trying to overwrite your PyTorch installation.**
 
 To install:
 
-* We use [Weights&Biases](https://wandb.ai) to keep track of experiments. This is not a strict requirement — you can use our package without it — but it may make your life easier. If you want to use it, create an account [here](https://wandb.ai) and install the Python package:
+* We use [Weights&Biases](https://wandb.ai) (or TensorBoard) to keep track of experiments. This is not a strict requirement — you can use our package without it — but it may make your life easier. If you want to use it, create an account [here](https://wandb.ai) and install the Python package:
 
   ```
-  pip install wandb
+  pip install wandb # tensorboard
   ```
+
+  * for TensorBoard users
+    * On your local computer, build an ssh tunnel to your compute node by `ssh -L 6006:127.0.0.1:6006 username@ip`
+    * On the compute node, go to the `{root}` folder specify in the config file, and run `tensorboard --logdir tb_summary`
+    * Use your local computer browser to log on `http://localhost:6006`
 
 * Install NequIP
 
