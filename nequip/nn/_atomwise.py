@@ -90,7 +90,11 @@ class AtomwiseReduce(GraphModuleMixin, torch.nn.Module):
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
         data = AtomicDataDict.with_batch(data)
         data[self.out_field] = scatter(
-            data[self.field], data[AtomicDataDict.BATCH_KEY], dim=0, reduce=self.reduce
+            data[self.field],
+            data[AtomicDataDict.BATCH_KEY],
+            dim=0,
+            dim_size=len(data[AtomicDataDict.BATCH_PTR_KEY]) - 1,
+            reduce=self.reduce,
         )
         if self.constant != 1.0:
             data[self.out_field] = data[self.out_field] * self.constant
@@ -195,7 +199,7 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
         if not (self.has_scales or self.has_shifts):
             return data
 
-        species_idx = data[AtomicDataDict.ATOM_TYPE_KEY]
+        species_idx = data[AtomicDataDict.ATOM_TYPE_KEY].squeeze(-1)
         in_field = data[self.field]
         assert len(in_field) == len(
             species_idx
@@ -207,8 +211,8 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
             # input + tensor1 * tensor2 elementwise
             # it will promote to widest dtype, which comes from shifts/scales
             in_field = torch.addcmul(
-                self.shifts[species_idx].view(-1, 1),
-                self.scales[species_idx].view(-1, 1),
+                torch.index_select(self.shifts, 0, species_idx).view(-1, 1),
+                torch.index_select(self.scales, 0, species_idx).view(-1, 1),
                 in_field,
             )
         else:
@@ -217,9 +221,15 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
             # this is specifically because self.*[species_idx].view(-1, 1)
             # is never a scalar (ndim == 0), since it is always [n_atom, 1]
             if self.has_scales:
-                in_field = self.scales[species_idx].view(-1, 1) * in_field
+                in_field = (
+                    torch.index_select(self.scales, 0, species_idx).view(-1, 1)
+                    * in_field
+                )
             if self.has_shifts:
-                in_field = self.shifts[species_idx].view(-1, 1) + in_field
+                in_field = (
+                    torch.index_select(self.shifts, 0, species_idx).view(-1, 1)
+                    + in_field
+                )
         data[self.out_field] = in_field
         return data
 
