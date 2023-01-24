@@ -1211,13 +1211,15 @@ class Trainer:
             # use the right randomness
             generator=self.dataset_rng,
         )
+        if self.n_train_per_epoch is not None:
+            assert self.n_train_per_epoch % self.batch_size == 0
         self.dl_train_sampler = PartialSampler(
             data_source=self.dataset_train,
             # training should shuffle (if enabled)
             shuffle=self.shuffle,
             # if n_train_per_epoch is None (default), it's set to len(self.dataset_train) == n_train
             # i.e. use all `n_train` frames each epoch
-            num_samples_per_segment=self.n_train_per_epoch,
+            num_samples_per_epoch=self.n_train_per_epoch,
             generator=self.dataset_rng,
         )
         self.dl_train = DataLoader(
