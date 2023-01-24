@@ -137,6 +137,12 @@ pair_coeff	* * deployed.pth <NequIP type for LAMMPS type 1> <NequIP type for LAM
 
 For installation instructions, please see the [`pair_nequip` repository](https://github.com/mir-group/pair_nequip).
 
+## Plugins / extending `nequip`
+
+`nequip` is a modular framework and extension packages can provide new model components, architectures, etc. The main extension package(s) currently available are:
+ - [Allegro](https://github.com/mir-group/allegro): implements the highly parallelizable Allegro model architecture.
+
+Details on writing and using plugins can be found in the [Allegro tutorial](https://colab.research.google.com/drive/1yq2UwnET4loJYg_Fptt9kpklVaZvoHnq).
 
 ## References & citing
 
