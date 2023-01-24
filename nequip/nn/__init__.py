@@ -6,7 +6,7 @@ from ._atomwise import (  # noqa: F401
     PerSpeciesScaleShift,
 )  # noqa: F401
 from ._interaction_block import InteractionBlock  # noqa: F401
-from ._grad_output import ( # noqa: F401
+from ._grad_output import (  # noqa: F401
     GradientOutput,
     PartialForceOutput,
     StressOutput,
