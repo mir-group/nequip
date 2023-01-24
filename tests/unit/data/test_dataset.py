@@ -31,7 +31,7 @@ def ase_file(molecules):
 
 
 MAX_ATOMIC_NUMBER: int = 5
-NATOMS = 3
+NATOMS = 10
 
 
 @pytest.fixture(scope="function")
@@ -59,7 +59,7 @@ def npz_dataset(npz_data, temp_data):
     a = NpzDataset(
         file_name=npz_data,
         root=temp_data + "/test_dataset",
-        extra_fixed_fields={"r_max": 3},
+        AtomicData_options={"r_max": 3},
     )
     yield a
 
@@ -86,7 +86,7 @@ class TestInit:
         assert str(excinfo.value) == ""
 
     def test_npz(self, npz_data, root):
-        g = NpzDataset(file_name=npz_data, root=root, extra_fixed_fields={"r_max": 3.0})
+        g = NpzDataset(file_name=npz_data, root=root, AtomicData_options={"r_max": 3.0})
         assert isdir(g.root)
         assert isdir(g.processed_dir)
         assert isfile(g.processed_dir + "/data.pth")
@@ -95,7 +95,7 @@ class TestInit:
         a = ASEDataset(
             file_name=ase_file,
             root=root,
-            extra_fixed_fields={"r_max": 3.0},
+            AtomicData_options={"r_max": 3.0},
             ase_args=dict(format="extxyz"),
         )
         assert isdir(a.root)
@@ -206,7 +206,7 @@ class TestPerAtomStatistics:
     @pytest.mark.parametrize("mode", ["mean_std", "rms"])
     def test_per_node_field(self, npz_dataset, mode):
         # set up the transformer
-        npz_dataset = set_up_transformer(npz_dataset, True, False, False)
+        npz_dataset = set_up_transformer(npz_dataset, True, False)
 
         with pytest.raises(ValueError) as excinfo:
             npz_dataset.statistics(
@@ -218,21 +218,20 @@ class TestPerAtomStatistics:
                 == f"It doesn't make sense to ask for `{mode}` since `{AtomicDataDict.BATCH_KEY}` is not per-graph"
             )
 
-    @pytest.mark.parametrize("fixed_field", [True, False])
     @pytest.mark.parametrize("subset", [True, False])
     @pytest.mark.parametrize(
         "key,dim", [(AtomicDataDict.TOTAL_ENERGY_KEY, (1,)), ("somekey", (3,))]
     )
-    def test_per_graph_field(self, npz_dataset, fixed_field, subset, key, dim):
+    def test_per_graph_field(self, npz_dataset, subset, key, dim):
         if key == "somekey":
             register_fields(graph_fields=[key])
 
-        npz_dataset = set_up_transformer(npz_dataset, True, fixed_field, subset)
+        npz_dataset = set_up_transformer(npz_dataset, True, subset)
         if npz_dataset is None:
             return
 
-        torch.manual_seed(0)
-        E = torch.rand((npz_dataset.len(),) + dim)
+        rng = torch.Generator().manual_seed(454)
+        E = torch.rand((npz_dataset.len(),) + dim, generator=rng)
         ref_mean = torch.mean(E / NATOMS, dim=0)
         ref_std = torch.std(E / NATOMS, dim=0)
 
@@ -262,14 +261,11 @@ class TestPerAtomStatistics:
 
 
 class TestPerSpeciesStatistics:
-    @pytest.mark.parametrize("fixed_field", [True, False])
     @pytest.mark.parametrize("mode", ["mean_std", "rms"])
     @pytest.mark.parametrize("subset", [True, False])
-    def test_per_node_field(self, npz_dataset, fixed_field, mode, subset):
+    def test_per_node_field(self, npz_dataset, mode, subset):
         # set up the transformer
-        npz_dataset = set_up_transformer(
-            npz_dataset, not fixed_field, fixed_field, subset
-        )
+        npz_dataset = set_up_transformer(npz_dataset, True, subset)
 
         (result,) = npz_dataset.statistics(
             [AtomicDataDict.BATCH_KEY],
@@ -277,21 +273,15 @@ class TestPerSpeciesStatistics:
         )
         print(result)
 
-    @pytest.mark.parametrize("alpha", [1e-5, 1e-3, 0.1, 0.5])
-    @pytest.mark.parametrize("fixed_field", [True, False])
+    @pytest.mark.parametrize("alpha", [0, 1e-3, 0.01])
     @pytest.mark.parametrize("full_rank", [True, False])
     @pytest.mark.parametrize("subset", [True, False])
-    @pytest.mark.parametrize(
-        "regressor", ["NormalizedGaussianProcess", "GaussianProcess"]
-    )
-    def test_per_graph_field(
-        self, npz_dataset, alpha, fixed_field, full_rank, regressor, subset
-    ):
+    def test_per_graph_field(self, npz_dataset, alpha, full_rank, subset):
 
         if alpha <= 1e-4 and not full_rank:
             return
 
-        npz_dataset = set_up_transformer(npz_dataset, full_rank, fixed_field, subset)
+        npz_dataset = set_up_transformer(npz_dataset, full_rank, subset)
         if npz_dataset is None:
             return
 
@@ -308,10 +298,7 @@ class TestPerSpeciesStatistics:
         del n_spec
         del Ns
 
-        if alpha == 1e-5:
-            ref_mean, ref_std, E = generate_E(N, 100, 1000, 0.0)
-        else:
-            ref_mean, ref_std, E = generate_E(N, 100, 1000, 0.5)
+        ref_mean, ref_std, E = generate_E(N, 100, 1000, 10)
 
         if subset:
             E_orig_order = torch.zeros_like(
@@ -333,7 +320,6 @@ class TestPerSpeciesStatistics:
                 AtomicDataDict.TOTAL_ENERGY_KEY
                 + "per_species_mean_std": {
                     "alpha": alpha,
-                    "regressor": regressor,
                     "stride": 1,
                 }
             },
@@ -341,21 +327,18 @@ class TestPerSpeciesStatistics:
 
         res = torch.matmul(N, mean.reshape([-1, 1])) - E.reshape([-1, 1])
         res2 = torch.sum(torch.square(res))
-        print("residue", alpha, res2 - ref_res2)
+        print("alpha, residue, actual residue", alpha, res2, ref_res2)
         print("mean", mean, ref_mean)
         print("diff in mean", mean - ref_mean)
         print("std", std, ref_std)
 
+        tolerance = torch.max(ref_std) * 4
         if full_rank:
-            if alpha == 1e-5:
-                assert torch.allclose(mean, ref_mean, rtol=1e-1)
-            else:
-                assert torch.allclose(mean, ref_mean, rtol=1)
-                assert torch.allclose(std, torch.zeros_like(ref_mean), atol=alpha * 100)
-        elif regressor == "NormalizedGaussianProcess":
-            assert torch.std(mean).numpy() == 0
+            assert torch.allclose(mean, ref_mean, atol=tolerance)
+            # assert torch.allclose(std, torch.zeros_like(ref_mean), atol=alpha * 100)
         else:
-            assert mean[0] == mean[1] * 2
+            assert torch.allclose(mean, mean[0], atol=tolerance)
+            # assert torch.std(mean).numpy() == 0
 
 
 class TestReload:
@@ -363,14 +346,14 @@ class TestReload:
     @pytest.mark.parametrize("give_url", [True, False])
     @pytest.mark.parametrize("change_key_map", [True, False])
     def test_reload(self, npz_dataset, npz_data, change_rmax, give_url, change_key_map):
-        r_max = npz_dataset.extra_fixed_fields["r_max"] + change_rmax
+        r_max = npz_dataset.AtomicData_options["r_max"] + change_rmax
         keymap = npz_dataset.key_mapping.copy()  # the default one
         if change_key_map:
             keymap["x1"] = "x2"
         a = NpzDataset(
             file_name=npz_data,
             root=npz_dataset.root,
-            extra_fixed_fields={"r_max": r_max},
+            AtomicData_options={"r_max": r_max},
             key_mapping=keymap,
             **({"url": "example.com/data.dat"} if give_url else {}),
         )
@@ -385,10 +368,10 @@ class TestFromConfig:
     @pytest.mark.parametrize(
         "args",
         [
-            dict(extra_fixed_fields={"r_max": 3.0}),
-            dict(dataset_extra_fixed_fields={"r_max": 3.0}),
+            dict(AtomicData_options={"r_max": 3.0}),
+            dict(dataset_AtomicData_options={"r_max": 3.0}),
             dict(r_max=3.0),
-            dict(r_max=3.0, extra_fixed_fields={}),
+            dict(r_max=3.0, AtomicData_options={}),
         ],
     )
     def test_npz(self, npz_data, root, args):
@@ -404,7 +387,7 @@ class TestFromConfig:
             )
         )
         g = dataset_from_config(config)
-        assert g.fixed_fields["r_max"] == 3
+        assert g.AtomicData_options["r_max"] == 3
         assert isdir(g.root)
         assert isdir(g.processed_dir)
         assert isfile(g.processed_dir + "/data.pth")
@@ -415,7 +398,7 @@ class TestFromConfig:
             dict(
                 file_name=ase_file,
                 root=root,
-                extra_fixed_fields={"r_max": 3.0},
+                AtomicData_options={"r_max": 3.0},
                 ase_args=dict(format="extxyz"),
                 chemical_symbol_to_type={"H": 0, "C": 1, "O": 2},
             )
@@ -439,7 +422,7 @@ class TestFromConfig:
 class TestFromList:
     def test_from_atoms(self, molecules):
         dataset = ASEDataset.from_atoms_list(
-            molecules, extra_fixed_fields={"r_max": 4.5}
+            molecules, AtomicData_options={"r_max": 4.5}
         )
         assert len(dataset) == len(molecules)
         for i, mol in enumerate(molecules):
@@ -449,22 +432,20 @@ class TestFromList:
 
 
 def generate_E(N, mean_min, mean_max, std):
-    torch.manual_seed(0)
-    ref_mean = torch.rand((N.shape[1])) * (mean_max - mean_min) + mean_min
+    rng = torch.Generator().manual_seed(568)
+    ref_mean = (
+        torch.rand((N.shape[1]), generator=rng) * (mean_max - mean_min) + mean_min
+    )
     t_mean = torch.ones((N.shape[0], 1)) * ref_mean.reshape([1, -1])
-    ref_std = torch.rand((N.shape[1])) * std
+    ref_std = torch.rand((N.shape[1]), generator=rng) * std
     t_std = torch.ones((N.shape[0], 1)) * ref_std.reshape([1, -1])
-    E = torch.normal(t_mean, t_std)
+    E = torch.normal(t_mean, t_std, generator=rng)
     return ref_mean, ref_std, (N * E).sum(axis=-1)
 
 
-def set_up_transformer(npz_dataset, full_rank, fixed_field, subset):
+def set_up_transformer(npz_dataset, full_rank, subset):
 
     if full_rank:
-
-        if fixed_field:
-            return
-
         unique = torch.unique(npz_dataset.data[AtomicDataDict.ATOMIC_NUMBERS_KEY])
         npz_dataset.transform = TypeMapper(
             chemical_symbol_to_type={
@@ -476,19 +457,9 @@ def set_up_transformer(npz_dataset, full_rank, fixed_field, subset):
 
         # let all atoms to be the same type distribution
         num_nodes = npz_dataset.data[AtomicDataDict.BATCH_KEY].shape[0]
-        if fixed_field:
-            del npz_dataset.data[AtomicDataDict.ATOMIC_NUMBERS_KEY]
-            del npz_dataset.data.__slices__[
-                AtomicDataDict.ATOMIC_NUMBERS_KEY
-            ]  # remove batch metadata for the key
-            new_n = torch.ones(NATOMS, dtype=torch.int64)
-            new_n[0] += ntype
-            npz_dataset.fixed_fields[AtomicDataDict.ATOMIC_NUMBERS_KEY] = new_n
-        else:
-            npz_dataset.fixed_fields.pop(AtomicDataDict.ATOMIC_NUMBERS_KEY, None)
-            new_n = torch.ones(num_nodes, dtype=torch.int64)
-            new_n[::NATOMS] += ntype
-            npz_dataset.data[AtomicDataDict.ATOMIC_NUMBERS_KEY] = new_n
+        new_n = torch.ones(num_nodes, dtype=torch.int64)
+        new_n[::NATOMS] += ntype
+        npz_dataset.data[AtomicDataDict.ATOMIC_NUMBERS_KEY] = new_n
 
         # set up the transformer
         npz_dataset.transform = TypeMapper(

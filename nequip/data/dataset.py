@@ -27,19 +27,18 @@ from nequip.data import (
     _NODE_FIELDS,
     _EDGE_FIELDS,
     _GRAPH_FIELDS,
+    _LONG_FIELDS,
 )
 from nequip.utils.batch_ops import bincount
 from nequip.utils.regressor import solver
 from nequip.utils.savenload import atomic_write
 from nequip.utils.multiprocessing import num_tasks
 from .transforms import TypeMapper
-from .AtomicData import _process_dict
 
 
 class AtomicDataset(Dataset):
     """The base class for all NequIP datasets."""
 
-    fixed_fields: Dict[str, Any]
     root: str
 
     def __init__(
@@ -117,8 +116,7 @@ class AtomicInMemoryDataset(AtomicDataset):
         root (str, optional): Root directory where the dataset should be saved. Defaults to current working directory.
         file_name (str, optional): file name of data source. only used in children class
         url (str, optional): url to download data source
-        force_fixed_keys (list, optional): keys to move from AtomicData to fixed_fields dictionary
-        extra_fixed_fields (dict, optional): extra key that are not stored in data but needed for AtomicData initialization
+        AtomicData_options (dict, optional): extra key that are not stored in data but needed for AtomicData initialization
         include_frames (list, optional): the frames to process with the constructor.
         type_mapper (TypeMapper): the transformation to map atomic information to species index. Optional
     """
@@ -128,8 +126,7 @@ class AtomicInMemoryDataset(AtomicDataset):
         root: str,
         file_name: Optional[str] = None,
         url: Optional[str] = None,
-        force_fixed_keys: List[str] = [],
-        extra_fixed_fields: Dict[str, Any] = {},
+        AtomicData_options: Dict[str, Any] = {},
         include_frames: Optional[List[int]] = None,
         type_mapper: Optional[TypeMapper] = None,
     ):
@@ -138,17 +135,12 @@ class AtomicInMemoryDataset(AtomicDataset):
         self.file_name = (
             getattr(type(self), "FILE_NAME", None) if file_name is None else file_name
         )
-        force_fixed_keys = set(force_fixed_keys).union(
-            getattr(type(self), "FORCE_FIXED_KEYS", [])
-        )
         self.url = getattr(type(self), "URL", url)
 
-        self.force_fixed_keys = force_fixed_keys
-        self.extra_fixed_fields = extra_fixed_fields
+        self.AtomicData_options = AtomicData_options
         self.include_frames = include_frames
 
         self.data = None
-        self.fixed_fields = None
 
         # !!! don't delete this block.
         # otherwise the inherent children class
@@ -165,9 +157,7 @@ class AtomicInMemoryDataset(AtomicDataset):
         # Then pre-process the data if disk files are not found
         super().__init__(root=root, type_mapper=type_mapper)
         if self.data is None:
-            self.data, self.fixed_fields, include_frames = torch.load(
-                self.processed_paths[0]
-            )
+            self.data, include_frames = torch.load(self.processed_paths[0])
             if not np.all(include_frames == self.include_frames):
                 raise ValueError(
                     f"the include_frames is changed. "
@@ -195,11 +185,9 @@ class AtomicInMemoryDataset(AtomicDataset):
         Note that parameters for graph construction such as ``pbc`` and ``r_max`` should be included here as (likely, but not necessarily, fixed) fields.
 
         Returns:
-        A two-tuple of:
+        A dict:
             fields: dict
                 mapping a field name ('pos', 'cell') to a list-like sequence of tensor-like objects giving that field's value for each example.
-            fixed_fields: dict
-                mapping field names to their constant values for every example in the dataset.
         Or:
             data_list: List[AtomicData]
         """
@@ -216,45 +204,27 @@ class AtomicInMemoryDataset(AtomicDataset):
 
     def process(self):
         data = self.get_data()
-        if len(data) == 1:
+        if isinstance(data, list):
 
             # It's a data list
-            data_list = data[0]
-            if not (self.include_frames is None or data[0] is None):
+            data_list = data
+            if not (self.include_frames is None or data_list is None):
                 data_list = [data_list[i] for i in self.include_frames]
             assert all(isinstance(e, AtomicData) for e in data_list)
             assert all(AtomicDataDict.BATCH_KEY not in e for e in data_list)
 
-            fields, fixed_fields = {}, {}
+            fields = {}
 
-            # take the force_fixed_keys away from the fields
-            for key in self.force_fixed_keys:
-                if key in data_list[0]:
-                    fixed_fields[key] = data_list[0][key]
-
-            fixed_fields.update(self.extra_fixed_fields)
-
-        elif len(data) == 2:
-
-            # It's fields and fixed_fields
+        elif isinstance(data, dict):
+            # It's fields
             # Get our data
-            fields, fixed_fields = data
-
-            fixed_fields.update(self.extra_fixed_fields)
+            fields = data
 
             # check keys
-            all_keys = set(fields.keys()).union(fixed_fields.keys())
-            assert len(all_keys) == len(fields) + len(
-                fixed_fields
-            ), "No overlap in keys between data and fixed fields allowed!"
+            all_keys = set(fields.keys())
             assert AtomicDataDict.BATCH_KEY not in all_keys
             # Check bad key combinations, but don't require that this be a graph yet.
             AtomicDataDict.validate_keys(all_keys, graph_required=False)
-
-            # take the force_fixed_keys away from the fields
-            for key in self.force_fixed_keys:
-                if key in fields:
-                    fixed_fields[key] = fields.pop(key)[0]
 
             # check dimesionality
             num_examples = set([len(a) for a in fields.values()])
@@ -275,11 +245,16 @@ class AtomicInMemoryDataset(AtomicDataset):
             else:
                 # do neighborlist from points
                 constructor = AtomicData.from_points
-                assert "r_max" in all_keys
+                assert "r_max" in self.AtomicData_options
                 assert AtomicDataDict.POSITIONS_KEY in all_keys
 
             data_list = [
-                constructor(**{**{f: v[i] for f, v in fields.items()}, **fixed_fields})
+                constructor(
+                    **{
+                        **{f: v[i] for f, v in fields.items()},
+                        **self.AtomicData_options,
+                    }
+                )
                 for i in include_frames
             ]
 
@@ -288,14 +263,17 @@ class AtomicInMemoryDataset(AtomicDataset):
 
         # Batch it for efficient saving
         # This limits an AtomicInMemoryDataset to a maximum of LONG_MAX atoms _overall_, but that is a very big number and any dataset that large is probably not "InMemory" anyway
-        data = Batch.from_data_list(data_list, exclude_keys=fixed_fields.keys())
+        data = Batch.from_data_list(data_list)
         del data_list
         del fields
 
-        # type conversion
-        _process_dict(fixed_fields, ignore_fields=["r_max"])
-
-        logging.info(f"Loaded data: {data}")
+        total_MBs = sum(item.numel() * item.element_size() for _, item in data) / (
+            1024 * 1024
+        )
+        logging.info(
+            f"Loaded data: {data}\n    processed data size: ~{total_MBs:.2f} MB"
+        )
+        del total_MBs
 
         # use atomic writes to avoid race conditions between
         # different trainings that use the same dataset
@@ -304,21 +282,45 @@ class AtomicInMemoryDataset(AtomicDataset):
         # datasets. It only matters that they don't simultaneously try
         # to write the _same_ file, corrupting it.
         with atomic_write(self.processed_paths[0], binary=True) as f:
-            torch.save((data, fixed_fields, self.include_frames), f)
+            torch.save((data, self.include_frames), f)
         with atomic_write(self.processed_paths[1], binary=False) as f:
             yaml.dump(self._get_parameters(), f)
 
         logging.info("Cached processed data to disk")
 
         self.data = data
-        self.fixed_fields = fixed_fields
 
     def get(self, idx):
-        out = self.data.get_example(idx)
-        # Add back fixed fields
-        for f, v in self.fixed_fields.items():
-            out[f] = v
-        return out
+        return self.data.get_example(idx)
+
+    def _selectors(
+        self,
+        stride: int = 1,
+    ):
+        if self._indices is not None:
+            graph_selector = torch.as_tensor(self._indices)[::stride]
+            # note that self._indices is _not_ necessarily in order,
+            # while self.data --- which we take our arrays from ---
+            # is always in the original order.
+            # In particular, the values of `self.data.batch`
+            # are indexes in the ORIGINAL order
+            # thus we need graph level properties to also be in the original order
+            # so that batch values index into them correctly
+            # since self.data.batch is always sorted & contiguous
+            # (because of Batch.from_data_list)
+            # we sort it:
+            graph_selector, _ = torch.sort(graph_selector)
+        else:
+            graph_selector = torch.arange(0, self.len(), stride)
+
+        node_selector = torch.as_tensor(
+            np.in1d(self.data.batch.numpy(), graph_selector.numpy())
+        )
+
+        edge_index = self.data[AtomicDataDict.EDGE_INDEX_KEY]
+        edge_selector = node_selector[edge_index[0]] & node_selector[edge_index[1]]
+
+        return (graph_selector, node_selector, edge_selector)
 
     def statistics(
         self,
@@ -368,45 +370,22 @@ class AtomicInMemoryDataset(AtomicDataset):
         if len(fields) == 0:
             return []
 
-        if self._indices is not None:
-            graph_selector = torch.as_tensor(self._indices)[::stride]
-            # note that self._indices is _not_ necessarily in order,
-            # while self.data --- which we take our arrays from ---
-            # is always in the original order.
-            # In particular, the values of `self.data.batch`
-            # are indexes in the ORIGINAL order
-            # thus we need graph level properties to also be in the original order
-            # so that batch values index into them correctly
-            # since self.data.batch is always sorted & contiguous
-            # (because of Batch.from_data_list)
-            # we sort it:
-            graph_selector, _ = torch.sort(graph_selector)
-        else:
-            graph_selector = torch.arange(0, self.len(), stride)
+        graph_selector, node_selector, edge_selector = self._selectors(stride=stride)
+
         num_graphs = len(graph_selector)
-
-        node_selector = torch.as_tensor(
-            np.in1d(self.data.batch.numpy(), graph_selector.numpy())
-        )
         num_nodes = node_selector.sum()
-
-        edge_index = self.data[AtomicDataDict.EDGE_INDEX_KEY]
-        edge_selector = node_selector[edge_index[0]] & node_selector[edge_index[1]]
         num_edges = edge_selector.sum()
-        del edge_index
 
         if self.transform is not None:
-            # pre-transform the fixed fields and data so that statistics process transformed data
-            ff_transformed = self.transform(self.fixed_fields, types_required=False)
+            # pre-transform the data so that statistics process transformed data
             data_transformed = self.transform(self.data.to_dict(), types_required=False)
         else:
-            ff_transformed = self.fixed_fields
             data_transformed = self.data.to_dict()
         # pre-select arrays
         # this ensures that all following computations use the right data
         all_keys = set()
         selectors = {}
-        for k in list(ff_transformed.keys()) + list(data_transformed.keys()):
+        for k in data_transformed.keys():
             all_keys.add(k)
             if k in _NODE_FIELDS:
                 selectors[k] = node_selector
@@ -419,9 +398,6 @@ class AtomicInMemoryDataset(AtomicDataset):
         # TODO: do the batch indexes, edge_indexes, etc. after selection need to be
         # "compacted" to subtract out their offsets? For now, we just punt this
         # onto the writer of the callable field.
-        # do not actually select on fixed fields, since they are constant
-        # but still only select fields that are correctly registered
-        ff_transformed = {k: v for k, v in ff_transformed.items() if k in selectors}
         # apply selector to actual data
         data_transformed = {
             k: data_transformed[k][selectors[k]]
@@ -449,10 +425,7 @@ class AtomicInMemoryDataset(AtomicDataset):
                     raise RuntimeError(
                         f"Only per-node and per-graph fields can have statistics computed; `{field}` has not been registered as either. If it is per-node or per-graph, please register it as such using `nequip.data.register_fields`"
                     )
-                if field in ff_transformed:
-                    arr = ff_transformed[field]
-                else:
-                    arr = data_transformed[field]
+                arr = data_transformed[field]
                 if field in _NODE_FIELDS:
                     arr_is_per = "node"
                 elif field in _GRAPH_FIELDS:
@@ -504,15 +477,7 @@ class AtomicInMemoryDataset(AtomicDataset):
                 ana_mode = ana_mode[len("per_species_") :]
 
                 if atom_types is None:
-                    if AtomicDataDict.ATOM_TYPE_KEY in data_transformed:
-                        atom_types = data_transformed[AtomicDataDict.ATOM_TYPE_KEY]
-                    elif AtomicDataDict.ATOM_TYPE_KEY in ff_transformed:
-                        atom_types = ff_transformed[AtomicDataDict.ATOM_TYPE_KEY]
-                        atom_types = (
-                            atom_types.unsqueeze(0)
-                            .expand((num_graphs,) + atom_types.shape)
-                            .reshape(-1)
-                        )
+                    atom_types = data_transformed[AtomicDataDict.ATOM_TYPE_KEY]
 
                 results = self._per_species_statistics(
                     ana_mode,
@@ -635,7 +600,7 @@ class NpzDataset(AtomicInMemoryDataset):
     """Load data from an npz file.
 
     To avoid loading unneeded data, keys are ignored by default unless they are in ``key_mapping``, ``include_keys``,
-    ``npz_fixed_fields`` or ``extra_fixed_fields``.
+    or ``npz_fixed_fields_keys``.
 
     Args:
         key_mapping (Dict[str, str]): mapping of npz keys to ``AtomicData`` keys. Optional
@@ -670,6 +635,10 @@ class NpzDataset(AtomicInMemoryDataset):
       force: forces
       energy: total_energy
       Z: atomic_numbers
+    graph_fields:
+      - user_label1
+    node_fields:
+      - user_label2
     ```
 
     """
@@ -689,8 +658,7 @@ class NpzDataset(AtomicInMemoryDataset):
         npz_fixed_field_keys: List[str] = [],
         file_name: Optional[str] = None,
         url: Optional[str] = None,
-        force_fixed_keys: List[str] = [],
-        extra_fixed_fields: Dict[str, Any] = {},
+        AtomicData_options: Dict[str, Any] = {},
         include_frames: Optional[List[int]] = None,
         type_mapper: TypeMapper = None,
     ):
@@ -702,8 +670,7 @@ class NpzDataset(AtomicInMemoryDataset):
             file_name=file_name,
             url=url,
             root=root,
-            force_fixed_keys=force_fixed_keys,
-            extra_fixed_fields=extra_fixed_fields,
+            AtomicData_options=AtomicData_options,
             include_frames=include_frames,
             type_mapper=type_mapper,
         )
@@ -724,26 +691,42 @@ class NpzDataset(AtomicInMemoryDataset):
         keys = set(list(self.key_mapping.keys()))
         keys.update(self.npz_fixed_field_keys)
         keys.update(self.include_keys)
-        keys.update(list(self.extra_fixed_fields.keys()))
         keys = keys.intersection(set(list(data.keys())))
 
         mapped = {self.key_mapping.get(k, k): data[k] for k in keys}
 
-        # TODO: generalize this?
-        for intkey in (
-            AtomicDataDict.ATOMIC_NUMBERS_KEY,
-            AtomicDataDict.ATOM_TYPE_KEY,
-            AtomicDataDict.EDGE_INDEX_KEY,
-        ):
+        for intkey in _LONG_FIELDS:
             if intkey in mapped:
                 mapped[intkey] = mapped[intkey].astype(np.int64)
 
         fields = {k: v for k, v in mapped.items() if k not in self.npz_fixed_field_keys}
-        # note that we don't deal with extra_fixed_fields here; AtomicInMemoryDataset does that.
-        fixed_fields = {
-            k: v for k, v in mapped.items() if k in self.npz_fixed_field_keys
-        }
-        return fields, fixed_fields
+        num_examples, num_atoms, n_dim = fields[AtomicDataDict.POSITIONS_KEY].shape
+        assert n_dim == 3
+
+        # now we replicate and add the fixed fields:
+        for fixed_field in self.npz_fixed_field_keys:
+            orig = mapped[fixed_field]
+            if fixed_field in _NODE_FIELDS:
+                assert orig.ndim >= 1  # [n_atom, feature_dims]
+                assert orig.shape[0] == num_atoms
+                replicated = np.expand_dims(orig, 0)
+                replicated = np.tile(
+                    replicated,
+                    (num_examples,) + (1,) * len(replicated.shape[1:]),
+                )  # [n_example, n_atom, feature_dims]
+            elif fixed_field in _GRAPH_FIELDS:
+                # orig is [feature_dims]
+                replicated = np.expand_dims(orig, 0)
+                replicated = np.tile(
+                    replicated,
+                    (num_examples,) + (1,) * len(replicated.shape[1:]),
+                )  # [n_example, feature_dims]
+            else:
+                raise KeyError(
+                    f"npz_fixed_field_keys contains `{fixed_field}`, but it isn't registered as a node or graph field"
+                )
+            fields[fixed_field] = replicated
+        return fields
 
 
 def _ase_dataset_reader(
@@ -855,8 +838,7 @@ class ASEDataset(AtomicInMemoryDataset):
         ase_args: dict = {},
         file_name: Optional[str] = None,
         url: Optional[str] = None,
-        force_fixed_keys: List[str] = [],
-        extra_fixed_fields: Dict[str, Any] = {},
+        AtomicData_options: Dict[str, Any] = {},
         include_frames: Optional[List[int]] = None,
         type_mapper: TypeMapper = None,
         key_mapping: Optional[dict] = None,
@@ -875,8 +857,7 @@ class ASEDataset(AtomicInMemoryDataset):
             file_name=file_name,
             url=url,
             root=root,
-            force_fixed_keys=force_fixed_keys,
-            extra_fixed_fields=extra_fixed_fields,
+            AtomicData_options=AtomicData_options,
             include_frames=include_frames,
             type_mapper=type_mapper,
         )
@@ -934,7 +915,7 @@ class ASEDataset(AtomicInMemoryDataset):
             key_mapping=self.key_mapping,
         )
         kwargs = {k: v for k, v in kwargs.items() if v is not None}
-        kwargs.update(self.extra_fixed_fields)
+        kwargs.update(self.AtomicData_options)
         n_proc = num_tasks()
         with tempfile.TemporaryDirectory() as tmpdir:
             from nequip.utils._global_options import _get_latest_global_options
@@ -966,4 +947,4 @@ class ASEDataset(AtomicInMemoryDataset):
                 # datas here is already in order, stride 1 start 0
                 # no need to un-interleave
         # return list of AtomicData:
-        return ([e[1] for e in datas],)
+        return [e[1] for e in datas]

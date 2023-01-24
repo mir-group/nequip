@@ -6,15 +6,18 @@ dataset_seed: 456
 
 # network
 model_builders:
+  - SimpleIrrepsConfig
   - EnergyModel
   - PerSpeciesRescale
   - StressForceOutput
   - RescaleEnergyEtc
+
 num_basis: 8
 r_max: 4.0
-irreps_edge_sh: 0e + 1o
-conv_to_output_hidden_irreps_out: 16x0e
-feature_irreps_hidden: 16x0o + 16x0e + 16x1o + 16x1e
+l_max: 1
+parity: true
+num_features: 16
+num_layers: 4
 
 # data set
 dataset: EMTTest                                                                       # type of data set, can be npz or ase
@@ -22,10 +25,6 @@ dataset_element: Cu
 dataset_num_frames: 100
 chemical_symbols:
   - Cu
-
-global_rescale_scale: dataset_total_energy_std
-per_species_rescale_shifts: dataset_per_atom_total_energy_mean
-per_species_rescale_scales: dataset_per_atom_total_energy_std
 
 # logging
 wandb: false

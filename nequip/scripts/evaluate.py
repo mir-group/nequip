@@ -30,13 +30,13 @@ def main(args=None, running_as_script: bool = True):
         description=textwrap.dedent(
             """Compute the error of a model on a test set using various metrics.
 
-            The model, metrics, dataset, etc. can specified individually, or a training session can be indicated with `--train-dir`.
+            The model, metrics, dataset, etc. can specified in individual YAML config files, or a training session can be indicated with `--train-dir`.
             In order of priority, the global settings (dtype, TensorFloat32, etc.) are taken from:
-              1. The model config (for a training session)
-              2. The dataset config (for a deployed model)
-              3. The defaults
+              (1) the model config (for a training session),
+              (2) the dataset config (for a deployed model),
+              or (3) the defaults.
 
-            Prints only the final result in `name = num` format to stdout; all other information is logging.debuged to stderr.
+            Prints only the final result in `name = num` format to stdout; all other information is `logging.debug`ed to stderr.
 
             WARNING: Please note that results of CUDA models are rarely exactly reproducible, and that even CPU models can be nondeterministic.
             """
@@ -68,7 +68,7 @@ def main(args=None, running_as_script: bool = True):
     )
     parser.add_argument(
         "--test-indexes",
-        help="Path to a file containing the indexes in the dataset that make up the test set. If omitted, all data frames *not* used as training or validation data in the training session `train_dir` will be used.",
+        help="Path to a file containing the indexes in the dataset that make up the test set. If omitted, all data frames *not* used as training or validation data in the training session `train_dir` will be used. PyTorch, YAML, and JSON formats containing a list of integers are supported.",
         type=Path,
         default=None,
     )

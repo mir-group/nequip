@@ -69,7 +69,7 @@ def npz_dataset():
         a = NpzDataset(
             file_name=folder + "/npzdata.npz",
             root=folder,
-            extra_fixed_fields={"r_max": 3},
+            AtomicData_options={"r_max": 3},
         )
         yield a
 

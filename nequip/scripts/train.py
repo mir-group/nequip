@@ -24,6 +24,7 @@ from nequip.scripts._logger import set_up_script_logger
 default_config = dict(
     root="./",
     run_name="NequIP",
+    tensorboard=False,
     wandb=False,
     wandb_project="NequIP",
     model_builders=[
@@ -97,8 +98,12 @@ def main(args=None, running_as_script: bool = True):
 
 
 def parse_command_line(args=None):
-    parser = argparse.ArgumentParser(description="Train a NequIP model.")
-    parser.add_argument("config", help="configuration file")
+    parser = argparse.ArgumentParser(
+        description="Train (or restart training of) a NequIP model."
+    )
+    parser.add_argument(
+        "config", help="YAML file configuring the model, dataset, and other options"
+    )
     parser.add_argument(
         "--equivariance-test",
         help="test the model's equivariance before training on n (default 1) random frames from the dataset",
@@ -148,19 +153,21 @@ def fresh_start(config):
 
     # = Make the trainer =
     if config.wandb:
+
         import wandb  # noqa: F401
-        from nequip.train.trainer_wandb import TrainerWandB
+        from nequip.train.trainer_wandb import TrainerWandB as Trainer
 
         # download parameters from wandb in case of sweeping
         from nequip.utils.wandb import init_n_update
 
         config = init_n_update(config)
 
-        trainer = TrainerWandB(model=None, **dict(config))
+    elif config.tensorboard:
+        from nequip.train.trainer_tensorboard import TrainerTensorBoard as Trainer
     else:
         from nequip.train.trainer import Trainer
 
-        trainer = Trainer(model=None, **dict(config))
+    trainer = Trainer(model=None, **dict(config))
 
     # what is this
     # to update wandb data?

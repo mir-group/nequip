@@ -57,10 +57,10 @@ def dataset_from_config(config, prefix: str = "dataset") -> AtomicDataset:
         raise NameError(f"dataset type {dataset_name} does not exists")
 
     # if dataset r_max is not found, use the universal r_max
-    eff_key = "extra_fixed_fields"
-    prefixed_eff_key = f"{prefix}_{eff_key}"
+    atomicdata_options_key = "AtomicData_options"
+    prefixed_eff_key = f"{prefix}_{atomicdata_options_key}"
     config[prefixed_eff_key] = get_w_prefix(
-        eff_key, {}, prefix=prefix, arg_dicts=config
+        atomicdata_options_key, {}, prefix=prefix, arg_dicts=config
     )
     config[prefixed_eff_key]["r_max"] = get_w_prefix(
         "r_max",
