@@ -1,5 +1,4 @@
 from typing import List, Optional, Iterator
-import math
 
 import torch
 from torch.utils.data import Sampler
