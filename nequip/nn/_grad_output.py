@@ -209,8 +209,8 @@ class StressOutput(GraphModuleMixin, torch.nn.Module):
             irreps_out=self.func.irreps_out.copy(),
         )
         self.irreps_out[AtomicDataDict.FORCE_KEY] = "1o"
-        self.irreps_out[AtomicDataDict.STRESS_KEY] = "3x1o"
-        self.irreps_out[AtomicDataDict.VIRIAL_KEY] = "3x1o"
+        self.irreps_out[AtomicDataDict.STRESS_KEY] = "1o"
+        self.irreps_out[AtomicDataDict.VIRIAL_KEY] = "1o"
 
         # for torchscript compat
         self.register_buffer("_empty", torch.Tensor())
@@ -316,9 +316,9 @@ class StressOutput(GraphModuleMixin, torch.nn.Module):
             ).unsqueeze(-1)
             stress = virial / volume.view(-1, 1, 1)
             data[AtomicDataDict.CELL_KEY] = orig_cell
+            data[AtomicDataDict.STRESS_KEY] = stress
         else:
             stress = self._empty  # torchscript
-        data[AtomicDataDict.STRESS_KEY] = stress
 
         # see discussion in https://github.com/libAtoms/QUIP/issues/227 about sign convention
         # they say the standard convention is virial = -stress x volume

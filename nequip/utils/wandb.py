@@ -1,5 +1,6 @@
 import wandb
 import logging
+import secrets
 from wandb.util import json_friendly_val
 
 
@@ -11,9 +12,11 @@ def init_n_update(config):
             "Due to wandb limitations, only string keys are supported in configurations."
         )
 
-    # download from wandb set up
-    config.run_id = wandb.util.generate_id()
+    # create a run id
+    # see https://github.com/wandb/wandb/pull/4676
+    config.run_id = secrets.token_urlsafe()
 
+    # download from wandb set up
     wandb.init(
         project=config.wandb_project,
         config=conf_dict,

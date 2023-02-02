@@ -1,4 +1,5 @@
 from ._graph_mixin import GraphModuleMixin, SequentialGraphNetwork
+from ._graph_model import GraphModel
 from ._atomwise import (
     AtomwiseOperation,
     AtomwiseReduce,
@@ -14,6 +15,7 @@ from ._concat import Concat
 from ._gmm import GaussianMixtureModelUncertainty
 
 __all__ = [
+    GraphModel,
     GraphModuleMixin,
     SequentialGraphNetwork,
     AtomwiseOperation,

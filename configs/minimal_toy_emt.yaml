@@ -22,7 +22,7 @@ num_layers: 4
 # data set
 dataset: EMTTest                                                                       # type of data set, can be npz or ase
 dataset_element: Cu
-dataset_num_frames: 100
+dataset_num_frames: 50
 chemical_symbols:
   - Cu
 
@@ -31,8 +31,8 @@ wandb: false
 # verbose: debug
 
 # training
-n_train: 90
-n_val: 10
+n_train: 20
+n_val: 5
 batch_size: 1
 max_epochs: 100
 

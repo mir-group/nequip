@@ -60,7 +60,7 @@ class BaseModelTests:
         return model
 
     @pytest.fixture(scope="class")
-    def model(self, config, device):
+    def model(self, config, device, float_tolerance):
         config, out_fields = config
         model = self.make_model(config, device=device)
         return model, out_fields
@@ -96,8 +96,9 @@ class BaseModelTests:
 
             atol = {
                 # tight, but not that tight, since GPU nondet has to pass
+                # plus model insides are still float32 with global dtype float64 in the tests
                 torch.float32: 1e-6,
-                torch.float64: 1e-10,
+                torch.float64: 5e-7,
             }[torch.get_default_dtype()]
 
             for out_field in out_fields:
@@ -175,6 +176,18 @@ class BaseModelTests:
 
     def test_embedding_cutoff(self, model, config, device):
         instance, out_fields = model
+
+        # make all weights nonzero in order to have the most robust test
+        # default init weights can sometimes be zero (e.g. biases) but we want
+        # to ensure smoothness for nonzero values
+        # assumes any trainable parameter will be trained and thus that
+        # nonzero values are valid
+        with torch.no_grad():
+            all_params = list(instance.parameters())
+            old_state = [p.detach().clone() for p in all_params]
+            for p in all_params:
+                p.uniform_(-1.0, 1.0)
+
         config, out_fields = config
         r_max = config["r_max"]
 
@@ -199,7 +212,9 @@ class BaseModelTests:
             # For example, an Allegro edge feature is many body so will be affected
             assert torch.allclose(edge_embed[:2], edge_embed2[:2])
         assert edge_embed[2:].abs().sum() > 1e-6  # some nonzero terms
-        assert torch.allclose(edge_embed2[2:], torch.zeros(1, device=device))
+        assert torch.allclose(
+            edge_embed2[2:], torch.zeros(1, device=device, dtype=edge_embed2.dtype)
+        )
 
         # test gradients
         in_dict = AtomicData.to_AtomicDataDict(data)
@@ -214,7 +229,9 @@ class BaseModelTests:
                 inputs=in_dict[AtomicDataDict.POSITIONS_KEY],
                 retain_graph=True,
             )[0]
-            assert torch.allclose(grads, torch.zeros(1, device=device))
+            assert torch.allclose(
+                grads, torch.zeros(1, device=device, dtype=grads.dtype)
+            )
 
             if AtomicDataDict.PER_ATOM_ENERGY_KEY in out:
                 # are the first two atom's energies unaffected by atom at the cutoff?
@@ -226,6 +243,11 @@ class BaseModelTests:
                 # only care about gradient wrt moved atom
                 assert grads.shape == (3, 3)
                 assert torch.allclose(grads[2], torch.zeros(1, device=device))
+
+        # restore previous model state
+        with torch.no_grad():
+            for p, v in zip(all_params, old_state):
+                p.copy_(v)
 
 
 class BaseEnergyModelTests(BaseModelTests):
@@ -359,7 +381,10 @@ class BaseEnergyModelTests(BaseModelTests):
                 assert torch.allclose(
                     output[k],
                     output_partial[k],
-                    atol=1e-8 if k == AtomicDataDict.TOTAL_ENERGY_KEY else 1e-6,
+                    atol=1e-8
+                    if k == AtomicDataDict.TOTAL_ENERGY_KEY
+                    and torch.get_default_dtype() == torch.float64
+                    else 1e-5,
                 )
             else:
                 assert torch.equal(output[k], output_partial[k])

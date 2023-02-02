@@ -161,6 +161,9 @@ wandb: true                                                                     
 wandb_project: toluene-example                                                     # project name used in wandb
 wandb_watch: false
 
+# # using tensorboard for logging
+# tensorboard: true
+
 # see https://docs.wandb.ai/ref/python/watch
 # wandb_watch_kwargs:
 #   log: all
@@ -168,7 +171,7 @@ wandb_watch: false
 #   log_graph: true
 
 verbose: info                                                                      # the same as python logging, e.g. warning, info, debug, error. case insensitive
-log_batch_freq: 1                                                                  # batch frequency, how often to print training errors withinin the same epoch
+log_batch_freq: 100                                                                # batch frequency, how often to print training errors withinin the same epoch
 log_epoch_freq: 1                                                                  # epoch frequency, how often to print 
 save_checkpoint_freq: -1                                                           # frequency to save the intermediate checkpoint. no saving of intermediate checkpoints when the value is not positive.
 save_ema_checkpoint_freq: -1                                                       # frequency to save the intermediate ema checkpoint. no saving of intermediate checkpoints when the value is not positive.

@@ -109,12 +109,12 @@ nonlinearity_type
 nonlinearity_scalars
 ^^^^^^^^^^^^^^^^^^^^
     | Type: dict
-    | Default: ``{'e': 'ssp', 'o': 'tanh'}``
+    | Default: ``{'e': 'silu', 'o': 'tanh'}``
 
 nonlinearity_gates
 ^^^^^^^^^^^^^^^^^^
     | Type: dict
-    | Default: ``{'e': 'ssp', 'o': 'abs'}``
+    | Default: ``{'e': 'silu', 'o': 'tanh'}``
 
 use_sc
 ^^^^^^

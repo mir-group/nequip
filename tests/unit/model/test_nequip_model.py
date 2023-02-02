@@ -109,14 +109,14 @@ class TestNequIPModel(BaseEnergyModelTests):
         config = minimal_config2.copy()
         config["model_builders"] = ["EnergyModel"]
         model = model_from_config(config=config, initialize=True)
-        assert isinstance(model.chemical_embedding, AtomwiseLinear)
+        chemical_embedding = model.model.chemical_embedding
+        assert isinstance(chemical_embedding, AtomwiseLinear)
         true_irreps = o3.Irreps(minimal_config2["chemical_embedding_irreps_out"])
         assert (
-            model.chemical_embedding.irreps_out[model.chemical_embedding.out_field]
-            == true_irreps
+            chemical_embedding.irreps_out[chemical_embedding.out_field] == true_irreps
         )
         # Make sure it propagates
         assert (
-            model.layer0_convnet.irreps_in[model.chemical_embedding.out_field]
+            model.model.layer0_convnet.irreps_in[chemical_embedding.out_field]
             == true_irreps
         )

@@ -1,4 +1,5 @@
-from typing import Tuple
+from typing import Tuple, Final
+import packaging.version
 
 import logging
 
@@ -7,6 +8,10 @@ import e3nn
 import nequip
 
 from .git import get_commit
+
+_TORCH_IS_GE_1_13: Final[bool] = packaging.version.parse(
+    torch.__version__
+) >= packaging.version.parse("1.13.0")
 
 _DEFAULT_VERSION_CODES = [torch, e3nn, nequip]
 _DEFAULT_COMMIT_CODES = ["e3nn", "nequip"]

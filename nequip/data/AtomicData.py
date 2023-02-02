@@ -56,6 +56,7 @@ _DEFAULT_GRAPH_FIELDS: Set[str] = {
     AtomicDataDict.VIRIAL_KEY,
     AtomicDataDict.PBC_KEY,
     AtomicDataDict.CELL_KEY,
+    AtomicDataDict.BATCH_PTR_KEY,
 }
 _NODE_FIELDS: Set[str] = set(_DEFAULT_NODE_FIELDS)
 _EDGE_FIELDS: Set[str] = set(_DEFAULT_EDGE_FIELDS)

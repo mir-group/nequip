@@ -68,7 +68,7 @@ def main(args=None, running_as_script: bool = True):
     )
     parser.add_argument(
         "--test-indexes",
-        help="Path to a file containing the indexes in the dataset that make up the test set. If omitted, all data frames *not* used as training or validation data in the training session `train_dir` will be used.",
+        help="Path to a file containing the indexes in the dataset that make up the test set. If omitted, all data frames *not* used as training or validation data in the training session `train_dir` will be used. PyTorch, YAML, and JSON formats containing a list of integers are supported.",
         type=Path,
         default=None,
     )
