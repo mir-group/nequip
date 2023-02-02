@@ -146,11 +146,17 @@ class TestSaveLoad:
 class TestData:
     @pytest.mark.parametrize("mode", ["random", "sequential"])
     def test_split(self, trainer, nequip_dataset, mode):
-
         trainer.train_val_split = mode
         trainer.set_dataset(nequip_dataset)
-        for i, batch in enumerate(trainer.dl_train):
-            print(i, batch)
+        for epoch_i in range(3):
+            trainer.dl_train_sampler.step_epoch(epoch_i)
+            n_samples: int = 0
+            for i, batch in enumerate(trainer.dl_train):
+                n_samples += batch[AtomicDataDict.BATCH_PTR_KEY].shape[0] - 1
+            if trainer.n_train_per_epoch is not None:
+                assert n_samples == trainer.n_train_per_epoch
+            else:
+                assert n_samples == trainer.n_train
 
 
 class TestTrain:
