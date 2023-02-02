@@ -9,6 +9,8 @@ Most recent change on the bottom.
 ## Unreleased - 0.6.0
 ### Added
 - [Breaking] Refactor overall model logic into `GraphModel` top-level module
+- [Breaking] Added `model_dtype`
+- `BATCH_PTR_KEY` in `AtomicDataDict`
 
 ### Changed
 - Always require explicit `seed`
@@ -16,6 +18,7 @@ Most recent change on the bottom.
 - Don't log as often by default
 - [Breaking] Default nonlinearities are `silu` (`e`) and `tanh` (`o`)
 - Will not reproduce previous versions' data shuffling order (for all practical purposes this does not matter, the `shuffle` option is unchanged)
+- [Breaking] `default_dtype` defaults to `float64` (`model_dtype` default `float32`)
 
 ### Fixed
 - Work with `wandb>=0.13.8`
