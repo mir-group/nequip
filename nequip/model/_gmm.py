@@ -62,6 +62,7 @@ def GaussianMixtureModelUncertainty(
             "validation_batch_size", config.batch_size
         )  # TODO: better default?
         stride: int = config.get("dataset_statistics_stride", 1)
+        # TODO: guard TQDM on interactive?
         for batch_start_i in tqdm(
             range(0, len(dataset), stride * batch_size),
             desc="GMM eval features on train set",
@@ -76,16 +77,13 @@ def GaussianMixtureModelUncertainty(
                 .detach()
                 .to("cpu")  # offload to not run out of GPU RAM
             )
-        # put it back on device for faster fitting
-        features = torch.cat(features, dim=0).to(device=device)
+        features = torch.cat(features, dim=0)
         assert features.ndim == 2
         # restore model
         model.train(mode=prev_training)
         model.to(device=prev_device)
         # fit GMM
-        gmm.to(device=device)
         gmm.fit(features)
-        gmm.to(device=prev_device)
         del features
 
     return model

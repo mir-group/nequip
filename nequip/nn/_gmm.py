@@ -1,3 +1,5 @@
+from typing import Optional
+
 import torch
 
 from e3nn import o3
@@ -8,15 +10,21 @@ from nequip.utils.gmm import GaussianMixture
 
 
 class GaussianMixtureModelUncertainty(GraphModuleMixin, torch.nn.Module):
+    """Compute GMM NLL uncertainties based on some input featurization.
+
+    Args:
+        gmm_n_components (int or None): if None, use the BIC to determine the number of components.
+    """
+
     feature_field: str
     out_field: str
     n_components: int
 
     def __init__(
         self,
-        gmm_n_components: int,
         feature_field: str,
         out_field: str,
+        gmm_n_components: Optional[int] = None,
         gmm_covariance_type: str = "full",
         irreps_in=None,
     ):
@@ -42,10 +50,11 @@ class GaussianMixtureModelUncertainty(GraphModuleMixin, torch.nn.Module):
             covariance_type=gmm_covariance_type,
         )
 
+    @torch.jit.unused
     def fit(self, X) -> None:
         self.gmm.fit(X)
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
-        nll_scores = self.gmm.score_samples(data[self.feature_field])
+        nll_scores = self.gmm(data[self.feature_field])
         data[self.out_field] = nll_scores
         return data
