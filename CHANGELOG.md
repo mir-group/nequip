@@ -17,6 +17,9 @@ Most recent change on the bottom.
 - [Breaking] Default nonlinearities are `silu` (`e`) and `tanh` (`o`)
 - Will not reproduce previous versions' data shuffling order (for all practical purposes this does not matter, the `shuffle` option is unchanged)
 
+### Fixed
+- Work with `wandb>=0.13.8`
+
 ### Removed
 - [Breaking] `fixed_fields` machinery (`npz_fixed_field_keys` is still supported, but through a more straightforward implementation)
 

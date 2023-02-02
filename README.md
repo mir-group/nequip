@@ -13,7 +13,9 @@ NequIP is an open-source code for building E(3)-equivariant interatomic potentia
 NequIP requires:
 
 * Python >= 3.7
-* PyTorch >= 1.8, !=1.9, <=1.11.*. PyTorch can be installed following the [instructions from their documentation](https://pytorch.org/get-started/locally/). Note that neither `torchvision` nor `torchaudio`, included in the default install command, are needed for NequIP.
+* PyTorch == 1.10.* or 1.13.*. PyTorch can be installed following the [instructions from their documentation](https://pytorch.org/get-started/locally/). Note that neither `torchvision` nor `torchaudio`, included in the default install command, are needed for NequIP.
+
+**You must install PyTorch before installing NequIP, however it is not marked as a dependency of `nequip` to prevent `pip` from trying to overwrite your PyTorch installation.**
 
 To install:
 
@@ -135,6 +137,12 @@ pair_coeff	* * deployed.pth <NequIP type for LAMMPS type 1> <NequIP type for LAM
 
 For installation instructions, please see the [`pair_nequip` repository](https://github.com/mir-group/pair_nequip).
 
+## Plugins / extending `nequip`
+
+`nequip` is a modular framework and extension packages can provide new model components, architectures, etc. The main extension package(s) currently available are:
+ - [Allegro](https://github.com/mir-group/allegro): implements the highly parallelizable Allegro model architecture.
+
+Details on writing and using plugins can be found in the [Allegro tutorial](https://colab.research.google.com/drive/1yq2UwnET4loJYg_Fptt9kpklVaZvoHnq).
 
 ## References & citing
 
