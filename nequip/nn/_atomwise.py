@@ -12,6 +12,7 @@ from nequip.data.transforms import TypeMapper
 from nequip.utils import dtype_from_name
 from nequip.utils.versions import _TORCH_IS_GE_1_13
 from ._graph_mixin import GraphModuleMixin
+from ._rescale import RescaleOutput
 
 
 class AtomwiseOperation(GraphModuleMixin, torch.nn.Module):
@@ -233,10 +234,18 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
         data[self.out_field] = in_field
         return data
 
-    def update_for_rescale(self, rescale_module):
-        if hasattr(rescale_module, "related_scale_keys"):
-            if self.out_field not in rescale_module.related_scale_keys:
-                return
+    def update_for_rescale(self, rescale_module: RescaleOutput):
+        if not self.arguments_in_dataset_units:
+            # nothing to rescale, arguments are in normalized units already / unitless
+            return
+        # are we scaling something related to the global rescaling?
+        if self.field not in rescale_module.scale_keys:
+            return
+        # now check that we have the right rescaling in the specific energy case
+        if self.field == AtomicDataDict.PER_ATOM_ENERGY_KEY and not (
+            set(rescale_module.scale_keys) <= set(AtomicDataDict.ALL_ENERGY_KEYS)
+        ):
+            raise AssertionError("Some unsupported energy scaling arangement...")
         if self.arguments_in_dataset_units and rescale_module.has_scale:
             logging.debug(
                 f"PerSpeciesScaleShift's arguments were in dataset units; rescaling:\n  "

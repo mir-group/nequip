@@ -22,8 +22,6 @@ class RescaleOutput(GraphModuleMixin, torch.nn.Module):
             Which fields to rescale.
         shift_keys : list of keys, default []
             Which fields to shift after rescaling.
-        related_scale_keys: list of keys that could be contingent to this rescale
-        related_shift_keys: list of keys that could be contingent to this rescale
         scale_by : floating or Tensor, default 1.
             The scaling factor by which to multiply fields in ``scale``.
         shift_by : floating or Tensor, default 0.
@@ -34,8 +32,6 @@ class RescaleOutput(GraphModuleMixin, torch.nn.Module):
 
     scale_keys: List[str]
     shift_keys: List[str]
-    related_scale_keys: List[str]
-    related_shift_keys: List[str]
     scale_trainble: bool
     rescale_trainable: bool
     _all_keys: List[str]
@@ -50,8 +46,6 @@ class RescaleOutput(GraphModuleMixin, torch.nn.Module):
         model: GraphModuleMixin,
         scale_keys: Union[Sequence[str], str] = [],
         shift_keys: Union[Sequence[str], str] = [],
-        related_shift_keys: Union[Sequence[str], str] = [],
-        related_scale_keys: Union[Sequence[str], str] = [],
         scale_by=None,
         shift_by=None,
         shift_trainable: bool = False,
@@ -89,8 +83,6 @@ class RescaleOutput(GraphModuleMixin, torch.nn.Module):
         self.scale_keys = list(scale_keys)
         self.shift_keys = list(shift_keys)
         self._all_keys = list(all_keys)
-        self.related_scale_keys = list(set(related_scale_keys).union(scale_keys))
-        self.related_shift_keys = list(set(related_shift_keys).union(shift_keys))
 
         self.default_dtype = dtype_from_name(
             torch.get_default_dtype() if default_dtype is None else default_dtype
