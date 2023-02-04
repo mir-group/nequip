@@ -48,6 +48,7 @@ from nequip.utils import (
 )
 from nequip.utils.versions import check_code_version
 from nequip.model import model_from_config
+from nequip.utils.config import _GLOBAL_ALL_ASKED_FOR_KEYS
 
 from .loss import Loss, LossStat
 from .metrics import Metrics
@@ -279,6 +280,8 @@ class Trainer:
         for key in self.init_keys:
             setattr(self, key, locals()[key])
             _local_kwargs[key] = locals()[key]
+            # all init_keys of the Trainer are valid config keys
+            _GLOBAL_ALL_ASKED_FOR_KEYS.add(key)
 
         self.ema = None
 

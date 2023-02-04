@@ -35,7 +35,7 @@ def _set_global_options(config, warn_on_override: bool = False) -> None:
     """
     # update these options into the latest global config.
     global _latest_global_config
-    _latest_global_config.update(dict(config))
+    _latest_global_config.update(config.as_dict())
     # Set TF32 support
     # See https://pytorch.org/docs/stable/notes/cuda.html#tensorfloat-32-tf32-on-ampere-devices
     if torch.cuda.is_available() and "allow_tf32" in config:

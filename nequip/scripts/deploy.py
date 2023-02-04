@@ -255,7 +255,7 @@ def main(args=None):
                 "%s,%i" % e for e in config[JIT_FUSION_STRATEGY]
             )
         metadata[TF32_KEY] = str(int(config["allow_tf32"]))
-        metadata[CONFIG_KEY] = yaml.dump(dict(config))
+        metadata[CONFIG_KEY] = yaml.dump(config.as_dict())
 
         metadata = {k: v.encode("ascii") for k, v in metadata.items()}
         torch.jit.save(model, args.out_file, _extra_files=metadata)

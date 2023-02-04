@@ -5,7 +5,7 @@ from wandb.util import json_friendly_val
 
 
 def init_n_update(config):
-    conf_dict = dict(config)
+    conf_dict = config.as_dict()
     # wandb mangles keys (in terms of type) as well, but we can't easily correct that because there are many ambiguous edge cases. (E.g. string "-1" vs int -1 as keys, are they different config keys?)
     if any(not isinstance(k, str) for k in conf_dict.keys()):
         raise TypeError(
@@ -30,7 +30,9 @@ def init_n_update(config):
         skip = False
         if k in config.keys():
             # double check the one sanitized by wandb
-            v_old = json_friendly_val(config[k])
+            # because we're preprocessing the config and looping over
+            # _every_ key, don't mark accessed keys as valid => _get_nomark
+            v_old = json_friendly_val(config._get_nomark(k))
             if repr(v_new) == repr(v_old):
                 skip = True
         if skip:
