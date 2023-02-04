@@ -283,6 +283,16 @@ class BaseEnergyModelTests(BaseModelTests):
             out_both[AtomicDataDict.TOTAL_ENERGY_KEY],
             atol=atol,
         )
+        if AtomicDataDict.FORCE_KEY in out1:
+            # check forces if it's a force model
+            assert torch.allclose(
+                torch.cat(
+                    (out1[AtomicDataDict.FORCE_KEY], out2[AtomicDataDict.FORCE_KEY]),
+                    dim=0,
+                ),
+                out_both[AtomicDataDict.FORCE_KEY],
+                atol=atol,
+            )
 
         atoms_both2 = atoms1.copy()
         atoms3 = atoms2.copy()
