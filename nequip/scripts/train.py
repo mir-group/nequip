@@ -44,6 +44,7 @@ default_config = dict(
     equivariance_test=False,
     grad_anomaly_mode=False,
     append=False,
+    warn_unused=False,
     _jit_bailout_depth=2,  # avoid 20 iters of pain, see https://github.com/pytorch/pytorch/issues/52286
     # Quote from eelison in PyTorch slack:
     # https://pytorch.slack.com/archives/CDZD1FANA/p1644259272007529?thread_ts=1644064449.039479&cid=CDZD1FANA
@@ -115,10 +116,20 @@ def parse_command_line(args=None):
         type=Path,
         default=None,
     )
+    parser.add_argument(
+        "--warn-unused",
+        help="Warn instead of error when the config contains unused keys",
+        action="store_true",
+    )
     args = parser.parse_args(args=args)
 
     config = Config.from_file(args.config, defaults=default_config)
-    for flag in ("model_debug_mode", "equivariance_test", "grad_anomaly_mode"):
+    for flag in (
+        "model_debug_mode",
+        "equivariance_test",
+        "grad_anomaly_mode",
+        "warn_unused",
+    ):
         config[flag] = getattr(args, flag) or config[flag]
 
     return config
@@ -205,9 +216,11 @@ def fresh_start(config):
 
     unused = config._unused_keys()
     if len(unused) > 0:
-        warnings.warn(
-            f"The following keys in the config file were not used, did you make a typo?: {', '.join(unused)}. (If this sounds wrong, please file an issue: the detection of unused keys is in beta.)"
-        )
+        message = f"The following keys in the config file were not used, did you make a typo?: {', '.join(unused)}. (If this sounds wrong, please file an issue: the detection of unused keys is in beta. You can turn this error into a warning with `--warn-unused`.)"
+        if config.warn_unused:
+            warnings.warn(message)
+        else:
+            raise KeyError(message)
 
     return trainer
 
