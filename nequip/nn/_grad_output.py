@@ -219,7 +219,7 @@ class StressOutput(GraphModuleMixin, torch.nn.Module):
         data = AtomicDataDict.with_batch(data)
 
         batch = data[AtomicDataDict.BATCH_KEY]
-        num_batch: int = int(batch.max().cpu().item()) + 1
+        num_batch: int = len(data[AtomicDataDict.BATCH_PTR_KEY]) - 1
         pos = data[AtomicDataDict.POSITIONS_KEY]
 
         has_cell: bool = AtomicDataDict.CELL_KEY in data
@@ -265,7 +265,7 @@ class StressOutput(GraphModuleMixin, torch.nn.Module):
         pos.requires_grad_(True)
         # bmm is natom in batch
         data[AtomicDataDict.POSITIONS_KEY] = pos + torch.bmm(
-            pos.unsqueeze(-2), symmetric_displacement[batch]
+            pos.unsqueeze(-2), torch.index_select(symmetric_displacement, 0, batch)
         ).squeeze(-2)
         # we only displace the cell if we have one:
         if has_cell:
