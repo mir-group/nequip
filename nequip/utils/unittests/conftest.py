@@ -6,7 +6,7 @@ import tempfile
 import os
 
 from ase.atoms import Atoms
-from ase.build import molecule
+from ase.build import molecule, bulk
 from ase.calculators.singlepoint import SinglePointCalculator
 from ase.io import write
 
@@ -112,6 +112,16 @@ def CH3CHO(CH3CHO_no_typemap) -> Tuple[Atoms, AtomicData]:
 def CH3CHO_no_typemap(float_tolerance) -> Tuple[Atoms, AtomicData]:
     atoms = molecule("CH3CHO")
     data = AtomicData.from_ase(atoms, r_max=2.0)
+    return atoms, data
+
+
+@pytest.fixture(scope="session")
+def Cu_bulk(float_tolerance) -> Tuple[Atoms, AtomicData]:
+    atoms = bulk("Cu") * (2, 2, 1)
+    atoms.rattle()
+    data = AtomicData.from_ase(atoms, r_max=3.5)
+    tm = TypeMapper(chemical_symbol_to_type={"Cu": 0})
+    data = tm(data)
     return atoms, data
 
 

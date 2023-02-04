@@ -116,6 +116,45 @@ class BaseModelTests:
         for out_field in out_fields:
             assert out_field in output
 
+    def test_wrapped_unwrapped(self, model, device, Cu_bulk, float_tolerance):
+        atoms, data_orig = Cu_bulk
+        instance, out_fields = model
+        data = AtomicData.from_ase(atoms, r_max=3.5)
+        data[AtomicDataDict.ATOM_TYPE_KEY] = data_orig[AtomicDataDict.ATOM_TYPE_KEY]
+        data.to(device)
+        out_ref = instance(AtomicData.to_AtomicDataDict(data))
+        # now put things in other periodic images
+        cell_shifts = torch.randint(
+            0,
+            3,
+            (len(atoms), 3),
+            device=device,
+            dtype=data[AtomicDataDict.POSITIONS_KEY].dtype,
+        )
+        shifts = torch.einsum("zi,ix->zx", cell_shifts, data[AtomicDataDict.CELL_KEY])
+        atoms.positions += shifts.detach().cpu().numpy()
+        # must recompute the neighborlist for this, since the edge_cell_shifts changed
+        data2 = AtomicData.from_ase(atoms, r_max=3.5)
+        data2[AtomicDataDict.ATOM_TYPE_KEY] = data[AtomicDataDict.ATOM_TYPE_KEY]
+        data2.to(device)
+        assert torch.equal(
+            data[AtomicDataDict.EDGE_INDEX_KEY], data2[AtomicDataDict.EDGE_INDEX_KEY]
+        )
+        tmp = (
+            data[AtomicDataDict.EDGE_CELL_SHIFT_KEY]
+            + cell_shifts[data[AtomicDataDict.EDGE_INDEX_KEY][0]]
+            - cell_shifts[data[AtomicDataDict.EDGE_INDEX_KEY][1]]
+        )
+        assert torch.equal(
+            tmp,
+            data2[AtomicDataDict.EDGE_CELL_SHIFT_KEY],
+        )
+        out_unwrapped = instance(AtomicData.to_AtomicDataDict(data2))
+        for out_field in out_fields:
+            assert torch.allclose(
+                out_ref[out_field], out_unwrapped[out_field], atol=float_tolerance
+            )
+
     def test_batch(self, model, atomic_batch, device, float_tolerance):
         """Confirm that the results for individual examples are the same regardless of whether they are batched."""
         allclose = functools.partial(torch.allclose, atol=float_tolerance)
