@@ -11,6 +11,7 @@ Most recent change on the bottom.
 - [Breaking] Refactor overall model logic into `GraphModel` top-level module
 - [Breaking] Added `model_dtype`
 - `BATCH_PTR_KEY` in `AtomicDataDict`
+- `AtomicInMemoryDataset.rdf()`
 
 ### Changed
 - Always require explicit `seed`

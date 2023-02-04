@@ -6,6 +6,7 @@ import functools
 import itertools
 import yaml
 import hashlib
+import math
 from os.path import dirname, basename, abspath
 from typing import Tuple, Dict, Any, List, Callable, Union, Optional, Sequence
 
@@ -594,6 +595,58 @@ class AtomicInMemoryDataset(AtomicDataset):
 
         else:
             raise NotImplementedError
+
+    def rdf(
+        self, bin_width: float, stride: int = 1
+    ) -> Dict[Tuple[int, int], Tuple[np.ndarray, np.ndarray]]:
+        """Compute the pairwise RDFs of the dataset.
+
+        Args:
+            bin_width: width of the histogram bin in distance units
+            stride: stride of data to include
+
+        Returns:
+            dictionary mapping `(type1, type2)` to tuples of `(hist, bin_edges)` in the style of `np.histogram`.
+        """
+        graph_selector, node_selector, edge_selector = self._selectors(stride=stride)
+
+        data = AtomicData.to_AtomicDataDict(self.data)
+        data = AtomicDataDict.with_edge_vectors(data, with_lengths=True)
+
+        results = {}
+
+        types = self.type_mapper(data)[AtomicDataDict.ATOM_TYPE_KEY]
+
+        edge_types = torch.index_select(
+            types, 0, data[AtomicDataDict.EDGE_INDEX_KEY].reshape(-1)
+        ).view(2, -1)
+        types_center = edge_types[0].numpy()
+        types_neigh = edge_types[1].numpy()
+
+        r_max: float = self.AtomicData_options["r_max"]
+        # + 1 to always have a zero bin at the end
+        n_bins: int = int(math.ceil(r_max / bin_width)) + 1
+        # +1 since these are bin_edges including rightmost
+        bins = bin_width * np.arange(n_bins + 1)
+
+        for type1, type2 in itertools.combinations(
+            range(self.type_mapper.num_types), 2
+        ):
+            # Try to do as much of this as possible in-place
+            mask = types_center == type1
+            np.logical_and(mask, types_neigh == type2, out=mask)
+            np.logical_and(mask, edge_selector, out=mask)
+            mask = mask.astype(np.int32)
+            results[(type1, type2)] = np.histogram(
+                data[AtomicDataDict.EDGE_LENGTH_KEY],
+                weights=mask,
+                bins=bins,
+                density=True,
+            )
+            # RDF is symmetric
+            results[(type2, type1)] = results[(type1, type2)]
+
+        return results
 
 
 class NpzDataset(AtomicInMemoryDataset):
