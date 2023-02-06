@@ -471,6 +471,7 @@ class ParaStressOutput(GraphModuleMixin, torch.nn.Module):
         # looking above this means that we need to pick up another negative sign for the virial
         # to fit this equation with the stress computed above
         virial = torch.neg(virial)
+        atom_virial = torch.neg(atom_virial)
         data[AtomicDataDict.VIRIAL_KEY] = virial
         data[AtomicDataDict.ATOM_VIRIAL_KEY] = atom_virial
 
