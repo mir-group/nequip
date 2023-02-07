@@ -247,14 +247,8 @@ class StressOutput(GraphModuleMixin, torch.nn.Module):
         # Paper they worked from:
         # Knuth et. al. Comput. Phys. Commun 190, 33-50, 2015
         # https://pure.mpg.de/rest/items/item_2085135_9/component/file_2156800/content
-        # However, unlike the above approach, we make a slight change for efficiency
-        # by using the displacement as the identity rather than zero, and removing the
-        # sums.  This works out identically in the math because:
-        # d[(I + eps)r]/d[eps]
-        # (chain rule)         = d[(I + eps)r]/d[I + eps] * d[I + eps]/d[eps]
-        # (simplify)           = d[(I + eps)r]/d[I + eps] * 1
-        displacement = torch.eye(
-            3,
+        displacement = torch.zeros(
+            (3, 3),
             dtype=pos.dtype,
             device=pos.device,
         )
@@ -280,12 +274,14 @@ class StressOutput(GraphModuleMixin, torch.nn.Module):
         if num_batch > 1:
             # bmm is natom in batch
             # batched [natom, 1, 3] @ [natom, 3, 3] -> [natom, 1, 3] -> [natom, 3]
-            data[AtomicDataDict.POSITIONS_KEY] = torch.bmm(
+            data[AtomicDataDict.POSITIONS_KEY] = pos + torch.bmm(
                 pos.unsqueeze(-2), torch.index_select(symmetric_displacement, 0, batch)
             ).squeeze(-2)
         else:
             # [natom, 3] @ [3, 3] -> [natom, 3]
-            data[AtomicDataDict.POSITIONS_KEY] = torch.mm(pos, symmetric_displacement)
+            data[AtomicDataDict.POSITIONS_KEY] = torch.addmm(
+                pos, pos, symmetric_displacement
+            )
         # we only displace the cell if we have one:
         if has_cell:
             # bmm is num_batch in batch
@@ -297,12 +293,16 @@ class StressOutput(GraphModuleMixin, torch.nn.Module):
             # no effect due to equivariance/invariance.
             if num_batch > 1:
                 # [n_batch, 3, 3] @ [n_batch, 3, 3]
-                data[AtomicDataDict.CELL_KEY] = torch.bmm(cell, symmetric_displacement)
+                data[AtomicDataDict.CELL_KEY] = cell + torch.bmm(
+                    cell, symmetric_displacement
+                )
             else:
                 # [3, 3] @ [3, 3] --- enforced to these shapes
-                data[AtomicDataDict.CELL_KEY] = torch.mm(
-                    cell.squeeze(0), symmetric_displacement
+                tmpcell = cell.squeeze(0)
+                data[AtomicDataDict.CELL_KEY] = torch.addmm(
+                    tmpcell, tmpcell, symmetric_displacement
                 ).unsqueeze(0)
+                del tmpcell
 
         # Call model and get gradients
         data = self.func(data)
