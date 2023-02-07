@@ -282,6 +282,7 @@ class StressOutput(GraphModuleMixin, torch.nn.Module):
             data[AtomicDataDict.POSITIONS_KEY] = torch.addmm(
                 pos, pos, symmetric_displacement
             )
+        # assert torch.equal(pos, data[AtomicDataDict.POSITIONS_KEY])
         # we only displace the cell if we have one:
         if has_cell:
             # bmm is num_batch in batch
@@ -302,7 +303,7 @@ class StressOutput(GraphModuleMixin, torch.nn.Module):
                 data[AtomicDataDict.CELL_KEY] = torch.addmm(
                     tmpcell, tmpcell, symmetric_displacement
                 ).unsqueeze(0)
-                del tmpcell
+            # assert torch.equal(cell, data[AtomicDataDict.CELL_KEY])
 
         # Call model and get gradients
         data = self.func(data)
