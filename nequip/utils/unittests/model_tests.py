@@ -124,36 +124,44 @@ class BaseModelTests:
         data.to(device)
         out_ref = instance(AtomicData.to_AtomicDataDict(data))
         # now put things in other periodic images
-        cell_shifts = torch.randint(
-            0,
-            3,
-            (len(atoms), 3),
-            device=device,
-            dtype=data[AtomicDataDict.POSITIONS_KEY].dtype,
-        )
-        shifts = torch.einsum("zi,ix->zx", cell_shifts, data[AtomicDataDict.CELL_KEY])
-        atoms.positions += shifts.detach().cpu().numpy()
-        # must recompute the neighborlist for this, since the edge_cell_shifts changed
-        data2 = AtomicData.from_ase(atoms, r_max=3.5)
-        data2[AtomicDataDict.ATOM_TYPE_KEY] = data[AtomicDataDict.ATOM_TYPE_KEY]
-        data2.to(device)
-        assert torch.equal(
-            data[AtomicDataDict.EDGE_INDEX_KEY], data2[AtomicDataDict.EDGE_INDEX_KEY]
-        )
-        tmp = (
-            data[AtomicDataDict.EDGE_CELL_SHIFT_KEY]
-            + cell_shifts[data[AtomicDataDict.EDGE_INDEX_KEY][0]]
-            - cell_shifts[data[AtomicDataDict.EDGE_INDEX_KEY][1]]
-        )
-        assert torch.equal(
-            tmp,
-            data2[AtomicDataDict.EDGE_CELL_SHIFT_KEY],
-        )
-        out_unwrapped = instance(AtomicData.to_AtomicDataDict(data2))
-        for out_field in out_fields:
-            assert torch.allclose(
-                out_ref[out_field], out_unwrapped[out_field], atol=float_tolerance
+        rng = torch.Generator(device=device).manual_seed(12345)
+        # try a few different shifts
+        for _ in range(3):
+            cell_shifts = torch.randint(
+                -5,
+                5,
+                (len(atoms), 3),
+                device=device,
+                dtype=data[AtomicDataDict.POSITIONS_KEY].dtype,
+                generator=rng,
             )
+            shifts = torch.einsum(
+                "zi,ix->zx", cell_shifts, data[AtomicDataDict.CELL_KEY]
+            )
+            atoms2 = atoms.copy()
+            atoms2.positions += shifts.detach().cpu().numpy()
+            # must recompute the neighborlist for this, since the edge_cell_shifts changed
+            data2 = AtomicData.from_ase(atoms2, r_max=3.5)
+            data2[AtomicDataDict.ATOM_TYPE_KEY] = data[AtomicDataDict.ATOM_TYPE_KEY]
+            data2.to(device)
+            assert torch.equal(
+                data[AtomicDataDict.EDGE_INDEX_KEY],
+                data2[AtomicDataDict.EDGE_INDEX_KEY],
+            )
+            tmp = (
+                data[AtomicDataDict.EDGE_CELL_SHIFT_KEY]
+                + cell_shifts[data[AtomicDataDict.EDGE_INDEX_KEY][0]]
+                - cell_shifts[data[AtomicDataDict.EDGE_INDEX_KEY][1]]
+            )
+            assert torch.equal(
+                tmp,
+                data2[AtomicDataDict.EDGE_CELL_SHIFT_KEY],
+            )
+            out_unwrapped = instance(AtomicData.to_AtomicDataDict(data2))
+            for out_field in out_fields:
+                assert torch.allclose(
+                    out_ref[out_field], out_unwrapped[out_field], atol=float_tolerance
+                )
 
     def test_batch(self, model, atomic_batch, device, float_tolerance):
         """Confirm that the results for individual examples are the same regardless of whether they are batched."""
