@@ -216,6 +216,7 @@ class StressOutput(GraphModuleMixin, torch.nn.Module):
         self.register_buffer("_empty", torch.Tensor())
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
+        assert AtomicDataDict.EDGE_VECTORS_KEY not in data
 
         if AtomicDataDict.BATCH_KEY in data:
             batch = data[AtomicDataDict.BATCH_KEY]
