@@ -159,7 +159,6 @@ def main(args=None):
         return
     elif args.n is None:
         args.n = 5 if args.profile else 30
-    print(args.n)
 
     # Load model:
     if args.model is None:
