@@ -242,10 +242,20 @@ class StressOutput(GraphModuleMixin, torch.nn.Module):
         # Paper they worked from:
         # Knuth et. al. Comput. Phys. Commun 190, 33-50, 2015
         # https://pure.mpg.de/rest/items/item_2085135_9/component/file_2156800/content
-        displacement = torch.zeros(
-            (num_batch, 3, 3),
-            dtype=pos.dtype,
-            device=pos.device,
+        # However, unlike the above approach, we make a slight change for efficiency
+        # by using the displacement as the identity rather than zero, and removing the
+        # sums.  This works out identically in the math because:
+        # d[(I + eps)r]/d[eps]
+        # (chain rule)         = d[(I + eps)r]/d[I + eps] * d[I + eps]/d[eps]
+        # (simplify)           = d[(I + eps)r]/d[I + eps] * 1
+        displacement = (
+            torch.eye(
+                3,
+                dtype=pos.dtype,
+                device=pos.device,
+            )
+            .view(-1, 3, 3)
+            .expand(num_batch, 3, 3)
         )
         displacement.requires_grad_(True)
         data["_displacement"] = displacement
@@ -264,7 +274,7 @@ class StressOutput(GraphModuleMixin, torch.nn.Module):
         did_pos_req_grad: bool = pos.requires_grad
         pos.requires_grad_(True)
         # bmm is natom in batch
-        data[AtomicDataDict.POSITIONS_KEY] = pos + torch.bmm(
+        data[AtomicDataDict.POSITIONS_KEY] = torch.bmm(
             pos.unsqueeze(-2), torch.index_select(symmetric_displacement, 0, batch)
         ).squeeze(-2)
         # we only displace the cell if we have one:
@@ -276,9 +286,7 @@ class StressOutput(GraphModuleMixin, torch.nn.Module):
             # there would then be an infinitesimal rotation of the positions
             # but not cell, and it thus wouldn't be global and have
             # no effect due to equivariance/invariance.
-            data[AtomicDataDict.CELL_KEY] = cell + torch.bmm(
-                cell, symmetric_displacement
-            )
+            data[AtomicDataDict.CELL_KEY] = torch.bmm(cell, symmetric_displacement)
 
         # Call model and get gradients
         data = self.func(data)
