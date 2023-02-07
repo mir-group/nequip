@@ -89,16 +89,26 @@ class AtomwiseReduce(GraphModuleMixin, torch.nn.Module):
         )
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
-        data = AtomicDataDict.with_batch(data)
-        data[self.out_field] = scatter(
-            data[self.field],
-            data[AtomicDataDict.BATCH_KEY],
-            dim=0,
-            dim_size=len(data[AtomicDataDict.BATCH_PTR_KEY]) - 1,
-            reduce=self.reduce,
-        )
+        field = data[self.field]
+        if AtomicDataDict.BATCH_KEY in data:
+            result = scatter(
+                field,
+                data[AtomicDataDict.BATCH_KEY],
+                dim=0,
+                dim_size=len(data[AtomicDataDict.BATCH_PTR_KEY]) - 1,
+                reduce=self.reduce,
+            )
+        else:
+            # We can significantly simplify and avoid scatters
+            if self.reduce == "sum":
+                result = field.sum(dim=0)
+            elif self.reduce == "mean":
+                result = field.mean(dim=0)
+            else:
+                assert False
         if self.constant != 1.0:
-            data[self.out_field] = data[self.out_field] * self.constant
+            result = result * self.constant
+        data[self.out_field] = result
         return data
 
 
