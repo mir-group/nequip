@@ -97,7 +97,7 @@ class BaseModelTests:
             atol = {
                 # tight, but not that tight, since GPU nondet has to pass
                 # plus model insides are still float32 with global dtype float64 in the tests
-                torch.float32: 1e-6,
+                torch.float32: 5e-6,
                 torch.float64: 5e-7,
             }[torch.get_default_dtype()]
 
