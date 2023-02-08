@@ -1,0 +1,77 @@
+# Minimal example of training a pair potential.
+
+# general
+root: results/aspirin
+run_name: minimal-pair
+seed: 123
+dataset_seed: 456
+
+# network
+# For only a pair potential:
+# model_builders:
+#   - PairPotential
+#   - StressForceOutput
+#   - RescaleEnergyEtc
+# For a pair potential term with a neural network model on top:
+model_builders:
+  - SimpleIrrepsConfig
+  - EnergyModel
+  - PerSpeciesRescale
+  - PairPotentialTerm   # MUST come after PerSpeciesRescale
+  - StressForceOutput
+  - RescaleEnergyEtc
+
+# neural network
+num_basis: 8
+r_max: 4.0
+l_max: 2
+parity: true
+num_features: 16
+
+# pair potential
+# pair_style: LJ
+# lj_sigma: 0.5
+# lj_delta: 0.0
+# lj_epsilon: 0.05
+# lj_sigma_trainable: true
+# lj_delta_trainable: false
+# lj_epsilon_trainable: true
+pair_style: ZBL
+
+# data set
+# the keys used need to be stated at least once in key_mapping, npz_fixed_field_keys or npz_keys
+# key_mapping is used to map the key in the npz file to the NequIP default values (see data/_key.py)
+# all arrays are expected to have the shape of (nframe, natom, ?) except the fixed fields
+# note that if your data set uses pbc, you need to also pass an array that maps to the nequip "pbc" key
+dataset: npz                                                                       # type of data set, can be npz or ase
+dataset_url: http://quantum-machine.org/gdml/data/npz/aspirin_ccsd.zip             # url to download the npz. optional
+dataset_file_name: ./benchmark_data/aspirin_ccsd-train.npz                         # path to data set file
+key_mapping:
+  z: atomic_numbers                                                                # atomic species, integers
+  E: total_energy                                                                  # total potential eneriges to train to
+  F: forces                                                                        # atomic forces to train to
+  R: pos                                                                           # raw atomic positions
+npz_fixed_field_keys:                                                              # fields that are repeated across different examples
+  - atomic_numbers
+
+chemical_symbols:
+  - H
+  - O
+  - C
+
+# logging
+wandb: false
+# verbose: debug
+
+# training
+n_train: 5
+n_val: 5
+batch_size: 1
+validation_batch_size: 5
+max_epochs: 10
+
+# loss function
+loss_coeffs: forces
+
+# optimizer
+optimizer_name: Adam

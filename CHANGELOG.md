@@ -12,6 +12,8 @@ Most recent change on the bottom.
 - [Breaking] Added `model_dtype`
 - `BATCH_PTR_KEY` in `AtomicDataDict`
 - `AtomicInMemoryDataset.rdf()`
+- `type_to_chemical_symbol`
+- Pair potential terms
 
 ### Changed
 - Always require explicit `seed`
