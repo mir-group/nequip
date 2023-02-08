@@ -186,6 +186,12 @@ def assert_AtomicData_equivariant(
     irreps_in.update(func.irreps_in)
     irreps_in = {k: v for k, v in irreps_in.items() if k in data_in[0]}
     irreps_out = func.irreps_out.copy()
+    # Remove batch-related keys from the irreps_out, if we aren't using batched inputs
+    irreps_out = {
+        k: v
+        for k, v in irreps_out.items()
+        if not (k in ("batch", "ptr") and "batch" not in data_in)
+    }
     # for certain things, we don't care what the given irreps are...
     # make sure that we test correctly for equivariance:
     for irps in (irreps_in, irreps_out):
