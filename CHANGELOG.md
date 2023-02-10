@@ -22,6 +22,7 @@ Most recent change on the bottom.
 - [Breaking] Default nonlinearities are `silu` (`e`) and `tanh` (`o`)
 - Will not reproduce previous versions' data shuffling order (for all practical purposes this does not matter, the `shuffle` option is unchanged)
 - [Breaking] `default_dtype` defaults to `float64` (`model_dtype` default `float32`)
+- `nequip-benchmark` now only uses `--n-data` frames to build the model
 
 ### Fixed
 - Work with `wandb>=0.13.8`
