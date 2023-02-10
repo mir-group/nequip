@@ -116,20 +116,22 @@ def main(args=None):
     dataset = dataset_from_config(config)
     dataset_time = time.time() - dataset_time
     print(f"    loading dataset took {dataset_time:.4f}s")
+    print(
+        f"    loaded dataset of size {len(dataset)} and sampled --n-data={args.n_data} frames"
+    )
     dataset_rng = torch.Generator()
     dataset_rng.manual_seed(config.get("dataset_seed", config.get("seed", 12345)))
+    dataset = dataset.index_select(
+        torch.randperm(len(dataset), generator=dataset_rng)[: args.n_data]
+    )
     datas_list = [
-        AtomicData.to_AtomicDataDict(dataset[i].to(device))
-        for i in torch.randperm(len(dataset), generator=dataset_rng)[: args.n_data]
+        AtomicData.to_AtomicDataDict(dataset[i].to(device)) for i in range(args.n_data)
     ]
     n_atom: int = len(datas_list[0]["pos"])
     if not all(len(d["pos"]) == n_atom for d in datas_list):
         raise NotImplementedError(
             "nequip-benchmark does not currently handle benchmarking on data frames with variable number of atoms"
         )
-    print(
-        f"    loaded dataset of size {len(dataset)} and sampled --n-data={args.n_data} frames"
-    )
     # print some dataset information
     print("    benchmark frames statistics:")
     print(f"         number of atoms: {n_atom}")
