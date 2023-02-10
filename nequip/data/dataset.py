@@ -629,7 +629,7 @@ class AtomicInMemoryDataset(AtomicDataset):
         # +1 since these are bin_edges including rightmost
         bins = bin_width * np.arange(n_bins + 1)
 
-        for type1, type2 in itertools.combinations(
+        for type1, type2 in itertools.combinations_with_replacement(
             range(self.type_mapper.num_types), 2
         ):
             # Try to do as much of this as possible in-place
