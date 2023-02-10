@@ -17,8 +17,6 @@ import numpy as np  # noqa: F401
 
 import torch
 
-import ase.data
-
 from e3nn.util.jit import script
 
 from nequip.model import model_from_config
@@ -26,6 +24,7 @@ from nequip.train import Trainer
 from nequip.utils import Config
 from nequip.utils.versions import check_code_version, get_config_code_versions
 from nequip.scripts.train import default_config
+from nequip.utils.misc import dtype_to_name
 from nequip.utils._global_options import _set_global_options
 
 CONFIG_KEY: Final[str] = "config"
@@ -39,6 +38,8 @@ TYPE_NAMES_KEY: Final[str] = "type_names"
 JIT_BAILOUT_KEY: Final[str] = "_jit_bailout_depth"
 JIT_FUSION_STRATEGY: Final[str] = "_jit_fusion_strategy"
 TF32_KEY: Final[str] = "allow_tf32"
+DEFAULT_DTYPE_KEY: Final[str] = "default_dtype"
+MODEL_DTYPE_KEY: Final[str] = "model_dtype"
 
 _ALL_METADATA_KEYS = [
     CONFIG_KEY,
@@ -51,6 +52,8 @@ _ALL_METADATA_KEYS = [
     JIT_BAILOUT_KEY,
     JIT_FUSION_STRATEGY,
     TF32_KEY,
+    DEFAULT_DTYPE_KEY,
+    MODEL_DTYPE_KEY,
 ]
 
 
@@ -105,6 +108,7 @@ def load_deployed_model(
     if set_global_options:
         global_config_dict = {}
         global_config_dict["allow_tf32"] = bool(int(metadata[TF32_KEY]))
+        global_config_dict["default_dtype"] = str(metadata[DEFAULT_DTYPE_KEY])
         # JIT strategy
         strategy = metadata.get(JIT_FUSION_STRATEGY, "")
         if strategy != "":
@@ -235,17 +239,8 @@ def main(args=None):
             )
 
         metadata[R_MAX_KEY] = str(float(config["r_max"]))
-        if "allowed_species" in config:
-            # This is from before the atomic number updates
-            n_species = len(config["allowed_species"])
-            type_names = {
-                type: ase.data.chemical_symbols[atomic_num]
-                for type, atomic_num in enumerate(config["allowed_species"])
-            }
-        else:
-            # The new atomic number setup
-            n_species = str(config["num_types"])
-            type_names = config["type_names"]
+        n_species = str(config["num_types"])
+        type_names = config["type_names"]
         metadata[N_SPECIES_KEY] = str(n_species)
         metadata[TYPE_NAMES_KEY] = " ".join(type_names)
 
@@ -255,6 +250,8 @@ def main(args=None):
                 "%s,%i" % e for e in config[JIT_FUSION_STRATEGY]
             )
         metadata[TF32_KEY] = str(int(config["allow_tf32"]))
+        metadata[DEFAULT_DTYPE_KEY] = dtype_to_name(config["default_dtype"])
+        metadata[MODEL_DTYPE_KEY] = dtype_to_name(config["model_dtype"])
         metadata[CONFIG_KEY] = yaml.dump(dict(config))
 
         metadata = {k: v.encode("ascii") for k, v in metadata.items()}
