@@ -209,19 +209,19 @@ def _zbl(
 class ZBL(GraphModuleMixin, torch.nn.Module):
     """Add a ZBL pair potential to the edge energy.
 
-    PLEASE NOTE: This class is parameterized for ASE units of Å and eV (i.e. LAMMPS `metal` units)
-    and will give nonsense results if you are training in other units.
+    Args:
+        units (str): what units the model/data are in using LAMMPS names.
     """
 
     num_types: int
     r_max: float
     PolynomialCutoff_p: float
-    _qqr2exesquare: float
 
     def __init__(
         self,
         num_types: int,
         r_max: float,
+        units: str,
         type_to_chemical_symbol: Optional[Dict[int, str]] = None,
         PolynomialCutoff_p: float = 6.0,
         irreps_in=None,
@@ -258,8 +258,17 @@ class ZBL(GraphModuleMixin, torch.nn.Module):
         # we have a value for that in eV and Angstrom
         # See https://github.com/lammps/lammps/blob/c415385ab4b0983fa1c72f9e92a09a8ed7eebe4a/src/update.cpp#L187 for values from LAMMPS
         # LAMMPS uses `force->qqr2e * force->qelectron * force->qelectron`
-        # Allow other units later
-        self._qqr2exesquare = {"metal": 14.399645 * (1.0) ** 2}["metal"]
+        # Make it a buffer so rescalings are persistent, it still acts as a scalar Tensor
+        self.register_buffer(
+            "_qqr2exesquare",
+            torch.as_tensor(
+                {"metal": 14.399645 * (1.0) ** 2, "real": 332.06371 * (1.0) ** 2}[
+                    units
+                ],
+                dtype=torch.float64,
+            )
+            * 0.5,  # Put half the energy on each of ij, ji
+        )
         self.r_max = float(r_max)
         self.PolynomialCutoff_p = float(PolynomialCutoff_p)
 
