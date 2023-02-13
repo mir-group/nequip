@@ -40,6 +40,7 @@ Most recent change on the bottom.
 - `nequip-benchmark --no-compile` and `--verbose` and `--memory-summary`
 - `nequip-benchmark --pdb` for debugging model (builder) errors
 - More information in `nequip-deploy info`
+- GPU OOM offloading mode
 
 ### Changed
 - Minimum e3nn is now 0.4.4
