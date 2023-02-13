@@ -13,7 +13,6 @@ from nequip.data.transforms import TypeMapper
 from nequip.data import AtomicDataDict
 from nequip.model import model_from_config
 from nequip.ase import NequIPCalculator
-from nequip.nn import GraphModel
 from nequip.utils import Config
 from nequip.utils.unittests.model_tests import BaseEnergyModelTests
 
