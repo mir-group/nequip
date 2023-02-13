@@ -156,6 +156,8 @@ class LennardJones(GraphModuleMixin, torch.nn.Module):
     def update_for_rescale(self, rescale_module: RescaleOutput):
         if AtomicDataDict.PER_ATOM_ENERGY_KEY not in rescale_module.scale_keys:
             return
+        if not rescale_module.has_scale:
+            return
         with torch.no_grad():
             # Our energy will be scaled by scale_by later, so we have to divide here to cancel out:
             self.epsilon.copy_(self.epsilon / rescale_module.scale_by.item())
@@ -298,6 +300,8 @@ class ZBL(GraphModuleMixin, torch.nn.Module):
 
     def update_for_rescale(self, rescale_module: RescaleOutput):
         if AtomicDataDict.PER_ATOM_ENERGY_KEY not in rescale_module.scale_keys:
+            return
+        if not rescale_module.has_scale:
             return
         # Our energy will be scaled by scale_by later, so we have to divide here to cancel out:
         self._qqr2exesquare /= rescale_module.scale_by.item()
