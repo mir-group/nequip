@@ -19,6 +19,7 @@ from nequip.data import (
 from nequip.data.transforms import TypeMapper
 from nequip.model import model_from_config
 from nequip.nn import GraphModuleMixin
+from nequip.utils import Config
 from nequip.utils.test import assert_AtomicData_equivariant
 
 
@@ -55,7 +56,9 @@ class BaseModelTests:
                 "types_names": ["H", "C", "O"],
             }
         )
-        model = model_from_config(config, initialize=initialize, deploy=deploy)
+        model = model_from_config(
+            Config.from_dict(config), initialize=initialize, deploy=deploy
+        )
         model = model.to(device)
         return model
 
@@ -248,8 +251,10 @@ class BaseModelTests:
         edge_embed = instance(AtomicData.to_AtomicDataDict(data))
         if AtomicDataDict.EDGE_FEATURES_KEY in edge_embed:
             key = AtomicDataDict.EDGE_FEATURES_KEY
-        else:
+        elif AtomicDataDict.EDGE_EMBEDDING_KEY in edge_embed:
             key = AtomicDataDict.EDGE_EMBEDDING_KEY
+        else:
+            pytest.skip()
         edge_embed = edge_embed[key]
         data.pos[2, 1] = r_max  # put it past the cutoff
         edge_embed2 = instance(AtomicData.to_AtomicDataDict(data))[key]
@@ -464,3 +469,38 @@ class BaseEnergyModelTests(BaseModelTests):
                 AtomicDataDict.BATCH_KEY
             ].view(1, -1)
         assert torch.equal(adjacency, torch.any(partial_forces != 0, dim=-1))
+
+    def test_force_smoothness(self, model, config, device):
+        instance, out_fields = model
+        if AtomicDataDict.FORCE_KEY not in out_fields:
+            pytest.skip()
+        # see test_embedding_cutoff
+        with torch.no_grad():
+            all_params = list(instance.parameters())
+            old_state = [p.detach().clone() for p in all_params]
+            for p in all_params:
+                p.uniform_(-2.0, 2.0)
+        config, out_fields = config
+        r_max = config["r_max"]
+
+        # make a synthetic three atom example
+        data = AtomicData(
+            atom_types=np.random.choice([0, 1, 2], size=3),
+            pos=np.array([[0.0, 0.0, 0.0], [0.0, 1.0, 0.0], [r_max, 0.0, 0.0]]),
+            edge_index=np.array([[0, 1, 0, 2], [1, 0, 2, 0]]),
+        )
+        data = data.to(device)
+        out = instance(AtomicData.to_AtomicDataDict(data))
+        forces = out[AtomicDataDict.FORCE_KEY]
+        assert (
+            forces[:2].abs().sum() > 1e-4
+        )  # some nonzero terms on the two connected atoms
+        assert torch.allclose(
+            forces[2],
+            torch.zeros(1, device=device, dtype=forces.dtype),
+        )  # the atom at the cutoff should be zero
+
+        # restore previous model state
+        with torch.no_grad():
+            for p, v in zip(all_params, old_state):
+                p.copy_(v)
