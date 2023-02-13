@@ -185,9 +185,12 @@ def _zbl(
     d3: float = -0.94229
     d4: float = -3.19980
     # compute
-    edge_types = torch.index_select(atom_types, 0, edge_index.reshape(-1)).view(2, -1)
-    Zi = torch.index_select(Z, 0, edge_types[0])
-    Zj = torch.index_select(Z, 0, edge_types[1])
+    edge_types = torch.index_select(atom_types, 0, edge_index.reshape(-1))
+    Z = torch.index_select(Z, 0, edge_types.view(-1)).view(
+        2, -1
+    )  # [center/neigh, n_edge]
+    Zi, Zj = Z[0], Z[1]
+    del edge_types, Z
     x = ((torch.pow(Zi, pzbl) + torch.pow(Zj, pzbl)) * r) / a0
     psi = (
         c1 * (d1 * x).exp()
