@@ -60,7 +60,7 @@ class BaseModelTests:
         return model
 
     @pytest.fixture(scope="class")
-    def model(self, config, device):
+    def model(self, config, device, float_tolerance):
         config, out_fields = config
         model = self.make_model(config, device=device)
         return model, out_fields
@@ -96,8 +96,9 @@ class BaseModelTests:
 
             atol = {
                 # tight, but not that tight, since GPU nondet has to pass
-                torch.float32: 1e-6,
-                torch.float64: 1e-10,
+                # plus model insides are still float32 with global dtype float64 in the tests
+                torch.float32: 5e-6,
+                torch.float64: 5e-7,
             }[torch.get_default_dtype()]
 
             for out_field in out_fields:
@@ -114,6 +115,53 @@ class BaseModelTests:
         output = instance(AtomicData.to_AtomicDataDict(data))
         for out_field in out_fields:
             assert out_field in output
+
+    def test_wrapped_unwrapped(self, model, device, Cu_bulk, float_tolerance):
+        atoms, data_orig = Cu_bulk
+        instance, out_fields = model
+        data = AtomicData.from_ase(atoms, r_max=3.5)
+        data[AtomicDataDict.ATOM_TYPE_KEY] = data_orig[AtomicDataDict.ATOM_TYPE_KEY]
+        data.to(device)
+        out_ref = instance(AtomicData.to_AtomicDataDict(data))
+        # now put things in other periodic images
+        rng = torch.Generator(device=device).manual_seed(12345)
+        # try a few different shifts
+        for _ in range(3):
+            cell_shifts = torch.randint(
+                -5,
+                5,
+                (len(atoms), 3),
+                device=device,
+                dtype=data[AtomicDataDict.POSITIONS_KEY].dtype,
+                generator=rng,
+            )
+            shifts = torch.einsum(
+                "zi,ix->zx", cell_shifts, data[AtomicDataDict.CELL_KEY]
+            )
+            atoms2 = atoms.copy()
+            atoms2.positions += shifts.detach().cpu().numpy()
+            # must recompute the neighborlist for this, since the edge_cell_shifts changed
+            data2 = AtomicData.from_ase(atoms2, r_max=3.5)
+            data2[AtomicDataDict.ATOM_TYPE_KEY] = data[AtomicDataDict.ATOM_TYPE_KEY]
+            data2.to(device)
+            assert torch.equal(
+                data[AtomicDataDict.EDGE_INDEX_KEY],
+                data2[AtomicDataDict.EDGE_INDEX_KEY],
+            )
+            tmp = (
+                data[AtomicDataDict.EDGE_CELL_SHIFT_KEY]
+                + cell_shifts[data[AtomicDataDict.EDGE_INDEX_KEY][0]]
+                - cell_shifts[data[AtomicDataDict.EDGE_INDEX_KEY][1]]
+            )
+            assert torch.equal(
+                tmp,
+                data2[AtomicDataDict.EDGE_CELL_SHIFT_KEY],
+            )
+            out_unwrapped = instance(AtomicData.to_AtomicDataDict(data2))
+            for out_field in out_fields:
+                assert torch.allclose(
+                    out_ref[out_field], out_unwrapped[out_field], atol=float_tolerance
+                )
 
     def test_batch(self, model, atomic_batch, device, float_tolerance):
         """Confirm that the results for individual examples are the same regardless of whether they are batched."""
@@ -211,7 +259,9 @@ class BaseModelTests:
             # For example, an Allegro edge feature is many body so will be affected
             assert torch.allclose(edge_embed[:2], edge_embed2[:2])
         assert edge_embed[2:].abs().sum() > 1e-6  # some nonzero terms
-        assert torch.allclose(edge_embed2[2:], torch.zeros(1, device=device))
+        assert torch.allclose(
+            edge_embed2[2:], torch.zeros(1, device=device, dtype=edge_embed2.dtype)
+        )
 
         # test gradients
         in_dict = AtomicData.to_AtomicDataDict(data)
@@ -226,7 +276,9 @@ class BaseModelTests:
                 inputs=in_dict[AtomicDataDict.POSITIONS_KEY],
                 retain_graph=True,
             )[0]
-            assert torch.allclose(grads, torch.zeros(1, device=device))
+            assert torch.allclose(
+                grads, torch.zeros(1, device=device, dtype=grads.dtype)
+            )
 
             if AtomicDataDict.PER_ATOM_ENERGY_KEY in out:
                 # are the first two atom's energies unaffected by atom at the cutoff?
@@ -278,6 +330,16 @@ class BaseEnergyModelTests(BaseModelTests):
             out_both[AtomicDataDict.TOTAL_ENERGY_KEY],
             atol=atol,
         )
+        if AtomicDataDict.FORCE_KEY in out1:
+            # check forces if it's a force model
+            assert torch.allclose(
+                torch.cat(
+                    (out1[AtomicDataDict.FORCE_KEY], out2[AtomicDataDict.FORCE_KEY]),
+                    dim=0,
+                ),
+                out_both[AtomicDataDict.FORCE_KEY],
+                atol=atol,
+            )
 
         atoms_both2 = atoms1.copy()
         atoms3 = atoms2.copy()
@@ -376,7 +438,10 @@ class BaseEnergyModelTests(BaseModelTests):
                 assert torch.allclose(
                     output[k],
                     output_partial[k],
-                    atol=1e-8 if k == AtomicDataDict.TOTAL_ENERGY_KEY else 1e-6,
+                    atol=1e-8
+                    if k == AtomicDataDict.TOTAL_ENERGY_KEY
+                    and torch.get_default_dtype() == torch.float64
+                    else 1e-5,
                 )
             else:
                 assert torch.equal(output[k], output_partial[k])

@@ -35,8 +35,9 @@ default_config = dict(
         "RescaleEnergyEtc",
     ],
     dataset_statistics_stride=1,
-    default_dtype="float32",
-    allow_tf32=False,  # TODO: until we understand equivar issues
+    default_dtype="float64",
+    model_dtype="float32",
+    allow_tf32=False,
     verbose="INFO",
     model_debug_mode=False,
     equivariance_test=False,
@@ -150,6 +151,10 @@ def fresh_start(config):
     # we use add_to_config cause it's a fresh start and need to record it
     check_code_version(config, add_to_config=True)
     _set_global_options(config)
+    if config["default_dtype"] != "float64":
+        warnings.warn(
+            f"default_dtype={config['default_dtype']} but we strongly recommend float64"
+        )
 
     # = Make the trainer =
     if config.wandb:

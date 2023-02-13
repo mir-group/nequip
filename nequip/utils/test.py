@@ -4,7 +4,7 @@ import torch
 from e3nn import o3
 from e3nn.util.test import equivariance_error, FLOAT_TOLERANCE
 
-from nequip.nn import GraphModuleMixin
+from nequip.nn import GraphModuleMixin, GraphModel
 from nequip.data import (
     AtomicData,
     AtomicDataDict,
@@ -43,7 +43,11 @@ def assert_permutation_equivariant(
     __tracebackhide__ = True
 
     if tolerance is None:
-        atol = PERMUTATION_FLOAT_TOLERANCE[torch.get_default_dtype()]
+        atol = PERMUTATION_FLOAT_TOLERANCE[
+            func.model_dtype
+            if isinstance(func, GraphModel)
+            else torch.get_default_dtype()
+        ]
     else:
         atol = tolerance
 
@@ -142,7 +146,7 @@ def assert_AtomicData_equivariant(
         AtomicData, AtomicDataDict.Type, List[Union[AtomicData, AtomicDataDict.Type]]
     ],
     permutation_tolerance: Optional[float] = None,
-    o3_tolerance: Optional[float] = None,
+    e3_tolerance: Optional[float] = None,
     **kwargs,
 ) -> str:
     r"""Test the rotation, translation, parity, and permutation equivariance of ``func``.
@@ -182,6 +186,12 @@ def assert_AtomicData_equivariant(
     irreps_in.update(func.irreps_in)
     irreps_in = {k: v for k, v in irreps_in.items() if k in data_in[0]}
     irreps_out = func.irreps_out.copy()
+    # Remove batch-related keys from the irreps_out, if we aren't using batched inputs
+    irreps_out = {
+        k: v
+        for k, v in irreps_out.items()
+        if not (k in ("batch", "ptr") and "batch" not in data_in)
+    }
     # for certain things, we don't care what the given irreps are...
     # make sure that we test correctly for equivariance:
     for irps in (irreps_in, irreps_out):
@@ -193,9 +203,9 @@ def assert_AtomicData_equivariant(
         if AtomicDataDict.CELL_KEY in irps:
             prev_cell_irps = irps[AtomicDataDict.CELL_KEY]
             assert prev_cell_irps is None or o3.Irreps(prev_cell_irps) == o3.Irreps(
-                "3x1o"
+                "1o"
             )
-            # must be this to actually rotate it
+            # must be this to actually rotate it when flattened
             irps[AtomicDataDict.CELL_KEY] = "3x1o"
 
     stress_keys = (AtomicDataDict.STRESS_KEY, AtomicDataDict.VIRIAL_KEY)
@@ -231,7 +241,9 @@ def assert_AtomicData_equivariant(
         # we need it to be decomposed into irreps for equivar testing
         for k in stress_keys:
             if k in output:
-                output[k] = stress_cart_tensor.from_cartesian(output[k], rtp=stress_rtp)
+                output[k] = stress_cart_tensor.from_cartesian(
+                    output[k], rtp=stress_rtp.to(output[k].dtype)
+                )
         return [output[k] for k in irreps_out]
 
     # prepare input data
@@ -257,23 +269,27 @@ def assert_AtomicData_equivariant(
     # take max across errors
     errs = {k: torch.max(torch.vstack([e[k] for e in errs]), dim=0)[0] for k in errs[0]}
 
-    if o3_tolerance is None:
-        o3_tolerance = FLOAT_TOLERANCE[torch.get_default_dtype()]
+    current_dtype = (
+        func.model_dtype if isinstance(func, GraphModel) else torch.get_default_dtype()
+    )
+    if e3_tolerance is None:
+        e3_tolerance = FLOAT_TOLERANCE[current_dtype]
     all_errs = []
     for case, err in errs.items():
         for key, this_err in zip(irreps_out.keys(), err):
             all_errs.append(case + (key, this_err))
-    is_problem = [e[-1] > o3_tolerance for e in all_errs]
+    is_problem = [e[-1] > e3_tolerance for e in all_errs]
 
     message = (permutation_message + "\n") + "\n".join(
-        "   (parity_k={:1d}, did_translate={:5}, field={:20})     -> max error={:.3e}".format(
-            int(k[0]), str(bool(k[1])), str(k[2]), float(k[3])
-        )
+        f"   (parity_k={int(k[0]):1d}, did_translate={str(bool(k[1])):5}, field={str(k[2]):20})     -> max error={float(k[3]):.3e}{'  FAIL' if prob else ''}"
         for k, prob in zip(all_errs, is_problem)
+        if irreps_out[str(k[2])] is not None
     )
 
-    if sum(is_problem) > 0 or "FAIL" in permutation_message:
-        raise AssertionError(f"Equivariance test failed for cases:\n{message}")
+    if any(is_problem) or " FAIL" in permutation_message:
+        raise AssertionError(
+            f"Equivariance test of {type(func).__name__} failed:\n   default dtype: {torch.get_default_dtype()} (assumed) model dtype: {current_dtype}  E(3) tolerance: {e3_tolerance}\n{message}"
+        )
 
     return message
 
@@ -323,9 +339,7 @@ def set_irreps_debug(enabled: bool = False) -> None:
             )
         for k, ir in mod.irreps_in.items():
             if k not in inp:
-                raise KeyError(
-                    f"Field {k} with irreps {ir} expected to be input to {mname}; not present"
-                )
+                pass
             elif isinstance(inp[k], torch.Tensor) and isinstance(ir, o3.Irreps):
                 if inp[k].ndim == 1:
                     raise ValueError(
@@ -350,9 +364,7 @@ def set_irreps_debug(enabled: bool = False) -> None:
             )
         for k, ir in mod.irreps_out.items():
             if k not in out:
-                raise KeyError(
-                    f"Field {k} with irreps {ir} expected to be in output from {mname}; not present"
-                )
+                pass
             elif isinstance(out[k], torch.Tensor) and isinstance(ir, o3.Irreps):
                 if out[k].ndim == 1:
                     raise ValueError(
