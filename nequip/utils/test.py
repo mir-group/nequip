@@ -186,6 +186,12 @@ def assert_AtomicData_equivariant(
     irreps_in.update(func.irreps_in)
     irreps_in = {k: v for k, v in irreps_in.items() if k in data_in[0]}
     irreps_out = func.irreps_out.copy()
+    # Remove batch-related keys from the irreps_out, if we aren't using batched inputs
+    irreps_out = {
+        k: v
+        for k, v in irreps_out.items()
+        if not (k in ("batch", "ptr") and "batch" not in data_in)
+    }
     # for certain things, we don't care what the given irreps are...
     # make sure that we test correctly for equivariance:
     for irps in (irreps_in, irreps_out):
@@ -335,11 +341,11 @@ def set_irreps_debug(enabled: bool = False) -> None:
             if k not in inp:
                 pass
             elif isinstance(inp[k], torch.Tensor) and isinstance(ir, o3.Irreps):
-                if inp[k].ndim == 1:
+                if inp[k].ndim == 1 and inp[k].numel() > 0:
                     raise ValueError(
                         f"Field {k} in input to module {mname} has only one dimension (assumed to be batch-like); it must have a second irreps dimension even if irreps.dim == 1 (i.e. a single per atom scalar must have shape [N_at, 1], not [N_at])"
                     )
-                elif inp[k].shape[-1] != ir.dim:
+                elif inp[k].shape[-1] != ir.dim and inp[k].numel() > 0:
                     raise ValueError(
                         f"Field {k} in input to module {mname} has last dimension {inp[k].shape[-1]} but its irreps {ir} indicate last dimension {ir.dim}"
                     )
@@ -360,11 +366,11 @@ def set_irreps_debug(enabled: bool = False) -> None:
             if k not in out:
                 pass
             elif isinstance(out[k], torch.Tensor) and isinstance(ir, o3.Irreps):
-                if out[k].ndim == 1:
+                if out[k].ndim == 1 and out[k].numel() > 0:
                     raise ValueError(
                         f"Field {k} in output from module {mname} has only one dimension (assumed to be batch-like); it must have a second irreps dimension even if irreps.dim == 1 (i.e. a single per atom scalar must have shape [N_at, 1], not [N_at])"
                     )
-                elif out[k].shape[-1] != ir.dim:
+                elif out[k].shape[-1] != ir.dim and out[k].numel() > 0:
                     raise ValueError(
                         f"Field {k} in output from {mname} has last dimension {out[k].shape[-1]} but its irreps {ir} indicate last dimension {ir.dim}"
                     )

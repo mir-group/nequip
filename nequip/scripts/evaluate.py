@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Tuple, List
 import sys
 import argparse
 import logging
@@ -12,7 +12,7 @@ import ase.io
 import torch
 
 from nequip.data import AtomicData, Collater, dataset_from_config, register_fields
-from nequip.scripts.deploy import load_deployed_model, R_MAX_KEY
+from nequip.scripts.deploy import load_deployed_model, R_MAX_KEY, TYPE_NAMES_KEY
 from nequip.scripts._logger import set_up_script_logger
 from nequip.scripts.train import default_config, check_code_version
 from nequip.utils._global_options import _set_global_options
@@ -22,6 +22,48 @@ from nequip.utils import load_file, instantiate, Config
 
 ORIGINAL_DATASET_INDEX_KEY: str = "original_dataset_index"
 register_fields(graph_fields=[ORIGINAL_DATASET_INDEX_KEY])
+
+
+def _load_deployed_or_traindir(
+    path: Path, device
+) -> Tuple[torch.nn.Module, bool, float, List[str]]:
+    loaded_deployed_model: bool = False
+    model_r_max = None
+    type_names = None
+    try:
+        model, metadata = load_deployed_model(
+            path,
+            device=device,
+            set_global_options=True,  # don't warn that setting
+        )
+        # the global settings for a deployed model are set by
+        # set_global_options in the call to load_deployed_model
+        # above
+        model_r_max = float(metadata[R_MAX_KEY])
+        type_names = metadata[TYPE_NAMES_KEY].split(" ")
+        loaded_deployed_model = True
+    except ValueError:  # its not a deployed model
+        loaded_deployed_model = False
+    # we don't do this in the `except:` block to avoid "during handing of this exception another exception"
+    # chains if there is an issue loading the training session model. This makes the error messages more
+    # comprehensible:
+    if not loaded_deployed_model:
+        # Use the model config, regardless of dataset config
+        global_config = path.parent / "config.yaml"
+        global_config = Config.from_file(str(global_config), defaults=default_config)
+        _set_global_options(global_config)
+        check_code_version(global_config)
+        del global_config
+
+        # load a training session model
+        model, model_config = Trainer.load_model_from_training_session(
+            traindir=path.parent, model_name=path.name
+        )
+        model = model.to(device)
+        model_r_max = model_config["r_max"]
+        type_names = model_config["type_names"]
+    model.eval()
+    return model, load_deployed_model, model_r_max, type_names
 
 
 def main(args=None, running_as_script: bool = True):
@@ -196,41 +238,10 @@ def main(args=None, running_as_script: bool = True):
 
     # Load model:
     logger.info("Loading model... ")
-    loaded_deployed_model: bool = False
-    model_r_max = None
-    try:
-        model, metadata = load_deployed_model(
-            args.model,
-            device=device,
-            set_global_options=True,  # don't warn that setting
-        )
-        logger.info("loaded deployed model.")
-        # the global settings for a deployed model are set by
-        # set_global_options in the call to load_deployed_model
-        # above
-        model_r_max = float(metadata[R_MAX_KEY])
-        loaded_deployed_model = True
-    except ValueError:  # its not a deployed model
-        loaded_deployed_model = False
-    # we don't do this in the `except:` block to avoid "during handing of this exception another exception"
-    # chains if there is an issue loading the training session model. This makes the error messages more
-    # comprehensible:
-    if not loaded_deployed_model:
-        # Use the model config, regardless of dataset config
-        global_config = args.model.parent / "config.yaml"
-        global_config = Config.from_file(str(global_config), defaults=default_config)
-        _set_global_options(global_config)
-        check_code_version(global_config)
-        del global_config
-
-        # load a training session model
-        model, model_config = Trainer.load_model_from_training_session(
-            traindir=args.model.parent, model_name=args.model.name
-        )
-        model = model.to(device)
-        logger.info("loaded model from training session")
-        model_r_max = model_config["r_max"]
-    model.eval()
+    model, loaded_deployed_model, model_r_max, _ = _load_deployed_or_traindir(
+        args.model, device=device
+    )
+    logger.info(f"    loaded{' deployed' if loaded_deployed_model else ''} model")
 
     # Load a config file
     logger.info(

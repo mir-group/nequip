@@ -1,3 +1,8 @@
+Lennard-Jones Custom Module Example
+===================================
+
+Note: for production simulations, a more appropriate Lennard-Jones energy term is provided in `nequip.model.PairPotentialTerm` / `nequip.model.PairPotential`.
+
 Run commands with
 ```
 PYTHONPATH=`pwd`:$PYTHONPATH nequip-* ...

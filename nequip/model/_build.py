@@ -11,11 +11,12 @@ from nequip.utils import (
     instantiate,
     dtype_from_name,
     torch_default_dtype,
+    Config,
 )
 
 
 def model_from_config(
-    config,
+    config: Config,
     initialize: bool = False,
     dataset: Optional[AtomicDataset] = None,
     deploy: bool = False,
@@ -40,6 +41,8 @@ def model_from_config(
     Returns:
         The build model.
     """
+    if isinstance(config, dict):
+        config = Config.from_dict(config)
     # Pre-process config
     type_mapper = None
     if dataset is not None:
@@ -61,6 +64,7 @@ def model_from_config(
             ), "inconsistant config & dataset"
         config["num_types"] = type_mapper.num_types
         config["type_names"] = type_mapper.type_names
+        config["type_to_chemical_symbol"] = type_mapper.type_to_chemical_symbol
 
     default_dtype = torch.get_default_dtype()
     model_dtype: torch.dtype = dtype_from_name(config.get("model_dtype", default_dtype))
