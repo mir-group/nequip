@@ -11,11 +11,12 @@ from nequip.utils import (
     instantiate,
     dtype_from_name,
     torch_default_dtype,
+    Config,
 )
 
 
 def model_from_config(
-    config,
+    config: Config,
     initialize: bool = False,
     dataset: Optional[AtomicDataset] = None,
     deploy: bool = False,
@@ -40,6 +41,8 @@ def model_from_config(
     Returns:
         The build model.
     """
+    if isinstance(config, dict):
+        config = Config.from_dict(config)
     # Pre-process config
     type_mapper = None
     if dataset is not None:
