@@ -8,10 +8,11 @@ Most recent change on the bottom.
 
 ## Unreleased - 0.6.0
 ### Added
+- add Tensorboard as logger option
 - [Breaking] Refactor overall model logic into `GraphModel` top-level module
 - [Breaking] Added `model_dtype`
 - `BATCH_PTR_KEY` in `AtomicDataDict`
-- `AtomicInMemoryDataset.rdf()`
+- `AtomicInMemoryDataset.rdf()` and `examples/rdf.py`
 - `type_to_chemical_symbol`
 - Pair potential terms
 - `nequip-evaluate --output-fields-from-original-dataset`
@@ -31,9 +32,6 @@ Most recent change on the bottom.
 
 ### Removed
 - [Breaking] `fixed_fields` machinery (`npz_fixed_field_keys` is still supported, but through a more straightforward implementation)
-
-### Added
-- add Tensorboard as logger option
 
 ## [0.5.6] - 2022-12-19
 ### Added
