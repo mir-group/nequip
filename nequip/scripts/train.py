@@ -182,7 +182,7 @@ def fresh_start(config):
     else:
         from nequip.train.trainer import Trainer
 
-    trainer = Trainer(model=None, **config.as_dict())
+    trainer = Trainer(model=None, **Config.as_dict(config))
 
     # what is this
     # to update wandb data?

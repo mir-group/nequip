@@ -83,10 +83,16 @@ class Config(object):
     def _as_dict(self):
         return self._items
 
-    def as_dict(self):
+    @staticmethod
+    def as_dict(obj):
         # don't use `dict(self)`, since that
         # calls __getitem__
-        return self._items.copy()
+        if isinstance(obj, dict):
+            return obj.copy()
+        elif isinstance(obj, Config):
+            return obj._items.copy()
+        else:
+            raise TypeError
 
     def __getitem__(self, key):
         # any requested key is a valid key

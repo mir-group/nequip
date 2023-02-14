@@ -36,12 +36,12 @@ class TestConfigSetUp:
     @config_testlist
     def test_set_attr(self, config):
 
-        dict_config = config.as_dict()
+        dict_config = Config.as_dict(config)
         config.intv = 2
         dict_config["intv"] = 2
 
-        assert config.as_dict() == dict_config
-        print("dict", config.as_dict())
+        assert Config.as_dict(config) == dict_config
+        print("dict", Config.as_dict(config))
 
     @config_testlist
     def test_get_attr(self, config):
@@ -69,7 +69,7 @@ class TestConfigIO:
     @one_test
     def test_load_yaml(self, config):
         config2 = config.load(filename=f"{self.filename}.yaml")
-        assert config.as_dict() == dict(config2)
+        assert Config.as_dict(config) == dict(config2)
         remove(f"{self.filename}.yaml")
 
 
@@ -81,14 +81,14 @@ class TestConfigUpdate:
     @config_testlist
     def test_update(self, config):
 
-        dict_config = config.as_dict()
+        dict_config = Config.as_dict(config)
         dict_config["new_intv"] = 9
 
         newdict = {"new_intv": 9}
 
         config.update(newdict)
 
-        assert config.as_dict() == dict_config
+        assert Config.as_dict(config) == dict_config
 
     @config_testlist
     def test_update_settype(self, config):

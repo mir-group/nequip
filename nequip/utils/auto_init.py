@@ -140,7 +140,7 @@ def instantiate(
             if k not in key_mapping["optional"]
         }
 
-    final_optional_args = config.as_dict()
+    final_optional_args = Config.as_dict(config)
 
     # for nested argument, it is possible that the positional args contain unnecesary keys
     if len(parent_builders) > 0:

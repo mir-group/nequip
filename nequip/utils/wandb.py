@@ -1,11 +1,14 @@
-import wandb
 import logging
 import secrets
+
+from nequip.utils import Config
+
+import wandb
 from wandb.util import json_friendly_val
 
 
 def init_n_update(config):
-    conf_dict = config.as_dict()
+    conf_dict = Config.as_dict(config)
     # wandb mangles keys (in terms of type) as well, but we can't easily correct that because there are many ambiguous edge cases. (E.g. string "-1" vs int -1 as keys, are they different config keys?)
     if any(not isinstance(k, str) for k in conf_dict.keys()):
         raise TypeError(
