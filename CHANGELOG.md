@@ -15,6 +15,7 @@ Most recent change on the bottom.
 - `type_to_chemical_symbol`
 - Pair potential terms
 - `nequip-evaluate --output-fields-from-original-dataset`
+- Error (or warn) on unused options in YAML that likely indicate typos
 
 ### Changed
 - Always require explicit `seed`
