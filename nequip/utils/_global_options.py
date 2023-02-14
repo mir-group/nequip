@@ -74,7 +74,13 @@ def _set_global_options(config, warn_on_override: bool = False) -> None:
     if config.get("model_debug_mode", False):
         set_irreps_debug(enabled=True)
     if "default_dtype" in config:
-        torch.set_default_dtype(dtype_from_name(config["default_dtype"]))
+        old_dtype = torch.get_default_dtype()
+        new_dtype = dtype_from_name(config["default_dtype"])
+        if warn_on_override and old_dtype != new_dtype:
+            warnings.warn(
+                f"Setting the GLOBAL value for torch.set_default_dtype to `{new_dtype}` which is different than the previous value of `{old_dtype}`"
+            )
+        torch.set_default_dtype(new_dtype)
     if config.get("grad_anomaly_mode", False):
         torch.autograd.set_detect_anomaly(True)
 

@@ -10,7 +10,10 @@ from nequip.utils.unittests.model_tests import BaseEnergyModelTests
 COMMON_CONFIG = {
     "avg_num_neighbors": None,
     "num_types": 3,
-    "types_names": ["H", "C", "O"],
+    "chemical_symbol_to_type": {"H": 0, "C": 1, "O": 2},
+    # Just in case for when that builder exists:
+    "pair_style": "ZBL",
+    "units": "metal",
 }
 r_max = 3
 minimal_config1 = dict(
@@ -78,15 +81,26 @@ class TestNequIPModel(BaseEnergyModelTests):
                     AtomicDataDict.FORCE_KEY,
                 ],
             ),
+            # # Save some time in the tests
+            # (
+            #     ["EnergyModel"],
+            #     [
+            #         AtomicDataDict.TOTAL_ENERGY_KEY,
+            #         AtomicDataDict.PER_ATOM_ENERGY_KEY,
+            #     ],
+            # ),
             (
-                ["EnergyModel"],
+                ["EnergyModel", "StressForceOutput"],
                 [
                     AtomicDataDict.TOTAL_ENERGY_KEY,
                     AtomicDataDict.PER_ATOM_ENERGY_KEY,
+                    AtomicDataDict.FORCE_KEY,
+                    AtomicDataDict.STRESS_KEY,
+                    AtomicDataDict.VIRIAL_KEY,
                 ],
             ),
             (
-                ["EnergyModel", "StressForceOutput"],
+                ["EnergyModel", "PairPotentialTerm", "StressForceOutput"],
                 [
                     AtomicDataDict.TOTAL_ENERGY_KEY,
                     AtomicDataDict.PER_ATOM_ENERGY_KEY,

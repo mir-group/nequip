@@ -12,6 +12,9 @@ Most recent change on the bottom.
 - [Breaking] Added `model_dtype`
 - `BATCH_PTR_KEY` in `AtomicDataDict`
 - `AtomicInMemoryDataset.rdf()`
+- `type_to_chemical_symbol`
+- Pair potential terms
+- `nequip-evaluate --output-fields-from-original-dataset`
 
 ### Changed
 - Always require explicit `seed`
@@ -20,6 +23,7 @@ Most recent change on the bottom.
 - [Breaking] Default nonlinearities are `silu` (`e`) and `tanh` (`o`)
 - Will not reproduce previous versions' data shuffling order (for all practical purposes this does not matter, the `shuffle` option is unchanged)
 - [Breaking] `default_dtype` defaults to `float64` (`model_dtype` default `float32`)
+- `nequip-benchmark` now only uses `--n-data` frames to build the model
 
 ### Fixed
 - Work with `wandb>=0.13.8`
@@ -37,6 +41,7 @@ Most recent change on the bottom.
 - `nequip-benchmark --no-compile` and `--verbose` and `--memory-summary`
 - `nequip-benchmark --pdb` for debugging model (builder) errors
 - More information in `nequip-deploy info`
+- GPU OOM offloading mode
 
 ### Changed
 - Minimum e3nn is now 0.4.4
