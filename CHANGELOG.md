@@ -14,6 +14,7 @@ Most recent change on the bottom.
 - `AtomicInMemoryDataset.rdf()`
 - `type_to_chemical_symbol`
 - Pair potential terms
+- `nequip-evaluate --output-fields-from-original-dataset`
 
 ### Changed
 - Always require explicit `seed`

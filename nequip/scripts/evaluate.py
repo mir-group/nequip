@@ -11,7 +11,13 @@ import ase.io
 
 import torch
 
-from nequip.data import AtomicData, Collater, dataset_from_config, register_fields
+from nequip.data import (
+    AtomicData,
+    Collater,
+    dataset_from_config,
+    register_fields,
+    _register_field_prefix,
+)
 from nequip.scripts.deploy import load_deployed_model, R_MAX_KEY, TYPE_NAMES_KEY
 from nequip.scripts._logger import set_up_script_logger
 from nequip.scripts.train import default_config, check_code_version
@@ -19,8 +25,8 @@ from nequip.utils._global_options import _set_global_options
 from nequip.train import Trainer, Loss, Metrics
 from nequip.utils import load_file, instantiate, Config
 
-
-ORIGINAL_DATASET_INDEX_KEY: str = "original_dataset_index"
+ORIGINAL_DATASET_PREFIX: str = "original_dataset_"
+ORIGINAL_DATASET_INDEX_KEY: str = ORIGINAL_DATASET_PREFIX + "index"
 register_fields(graph_fields=[ORIGINAL_DATASET_INDEX_KEY])
 
 
@@ -155,6 +161,12 @@ def main(args=None, running_as_script: bool = True):
         default="",
     )
     parser.add_argument(
+        "--output-fields-from-original-dataset",
+        help="Extra fields from the ORIGINAL REFERENCE DATASET (names comma separated with no spaces) to write to the `--output` with the added prefix `original_dataset_*`",
+        type=str,
+        default="",
+    )
+    parser.add_argument(
         "--log",
         help="log file to store all the metrics and screen logging.debug",
         type=Path,
@@ -206,9 +218,20 @@ def main(args=None, running_as_script: bool = True):
     if args.output is not None:
         if args.output.suffix != ".xyz":
             raise ValueError("Only .xyz format for `--output` is supported.")
-        args.output_fields = [e for e in args.output_fields.split(",") if e != ""] + [
-            ORIGINAL_DATASET_INDEX_KEY
+        args.output_fields_from_original_dataset = [
+            e for e in args.output_fields_from_original_dataset.split(",") if e != ""
         ]
+        args.output_fields = [e for e in args.output_fields.split(",") if e != ""]
+        ase_all_fields = (
+            args.output_fields
+            + [
+                ORIGINAL_DATASET_PREFIX + e
+                for e in args.output_fields_from_original_dataset
+            ]
+            + [ORIGINAL_DATASET_INDEX_KEY]
+        )
+        if len(args.output_fields_from_original_dataset) > 0:
+            _register_field_prefix(ORIGINAL_DATASET_PREFIX)
         output_type = "xyz"
     else:
         assert args.output_fields == ""
@@ -385,22 +408,27 @@ def main(args=None, running_as_script: bool = True):
             with torch.no_grad():
                 # Write output
                 if output_type == "xyz":
+                    output_out = out.copy()
                     # add test frame to the output:
-                    out[ORIGINAL_DATASET_INDEX_KEY] = torch.LongTensor(
+                    output_out[ORIGINAL_DATASET_INDEX_KEY] = torch.LongTensor(
                         this_batch_test_indexes
                     )
+                    for field in args.output_fields_from_original_dataset:
+                        # batch is from the original dataset
+                        output_out[ORIGINAL_DATASET_PREFIX + field] = batch[field]
                     # append to the file
                     ase.io.write(
                         output,
-                        AtomicData.from_AtomicDataDict(out)
+                        AtomicData.from_AtomicDataDict(output_out)
                         .to(device="cpu")
                         .to_ase(
                             type_mapper=dataset.type_mapper,
-                            extra_fields=args.output_fields,
+                            extra_fields=ase_all_fields,
                         ),
                         format="extxyz",
                         append=True,
                     )
+                    del output_out
 
                 # Accumulate metrics
                 if do_metrics:
