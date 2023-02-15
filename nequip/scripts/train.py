@@ -16,6 +16,7 @@ from nequip.model import model_from_config
 from nequip.utils import Config
 from nequip.data import dataset_from_config
 from nequip.utils import load_file
+from nequip.utils.config import _GLOBAL_ALL_ASKED_FOR_KEYS
 from nequip.utils.test import assert_AtomicData_equivariant
 from nequip.utils.versions import check_code_version
 from nequip.utils._global_options import _set_global_options
@@ -44,6 +45,7 @@ default_config = dict(
     grad_anomaly_mode=False,
     gpu_oom_offload=False,
     append=False,
+    warn_unused=False,
     _jit_bailout_depth=2,  # avoid 20 iters of pain, see https://github.com/pytorch/pytorch/issues/52286
     # Quote from eelison in PyTorch slack:
     # https://pytorch.slack.com/archives/CDZD1FANA/p1644259272007529?thread_ts=1644064449.039479&cid=CDZD1FANA
@@ -55,6 +57,8 @@ default_config = dict(
     # even if the number of atoms is fixed:
     _jit_fusion_strategy=[("DYNAMIC", 3)],
 )
+# All default_config keys are valid / requested
+_GLOBAL_ALL_ASKED_FOR_KEYS.update(default_config.keys())
 
 
 def main(args=None, running_as_script: bool = True):
@@ -133,6 +137,11 @@ def parse_command_line(args=None):
         type=Path,
         default=None,
     )
+    parser.add_argument(
+        "--warn-unused",
+        help="Warn instead of error when the config contains unused keys",
+        action="store_true",
+    )
     args = parser.parse_args(args=args)
 
     config = Config.from_file(args.config, defaults=default_config)
@@ -140,6 +149,7 @@ def parse_command_line(args=None):
         "model_debug_mode",
         "equivariance_test",
         "grad_anomaly_mode",
+        "warn_unused",
         "gpu_oom_offload",
     ):
         config[flag] = getattr(args, flag) or config[flag]
@@ -172,7 +182,7 @@ def fresh_start(config):
     else:
         from nequip.train.trainer import Trainer
 
-    trainer = Trainer(model=None, **dict(config))
+    trainer = Trainer(model=None, **Config.as_dict(config))
 
     # what is this
     # to update wandb data?
@@ -198,9 +208,6 @@ def fresh_start(config):
         config=config, initialize=True, dataset=trainer.dataset_train
     )
     logging.info("Successfully built the network...")
-
-    # by doing this here we check also any keys custom builders may have added
-    _check_old_keys(config)
 
     # Equivar test
     if config.equivariance_test > 0:
@@ -228,6 +235,14 @@ def fresh_start(config):
 
     # Store any updated config information in the trainer
     trainer.update_kwargs(config)
+
+    unused = config._unused_keys()
+    if len(unused) > 0:
+        message = f"The following keys in the config file were not used, did you make a typo?: {', '.join(unused)}. (If this sounds wrong, please file an issue: the detection of unused keys is in beta. You can turn this error into a warning with `--warn-unused`.)"
+        if config.warn_unused:
+            warnings.warn(message)
+        else:
+            raise KeyError(message)
 
     return trainer
 
@@ -294,17 +309,6 @@ def restart(config):
     trainer.set_dataset(dataset, validation_dataset)
 
     return trainer
-
-
-def _check_old_keys(config) -> None:
-    """check ``config`` for old/depricated keys and emit corresponding errors/warnings"""
-    # compile_model
-    k = "compile_model"
-    if k in config:
-        if config[k]:
-            raise ValueError("the `compile_model` option has been removed")
-        else:
-            warnings.warn("the `compile_model` option has been removed")
 
 
 if __name__ == "__main__":

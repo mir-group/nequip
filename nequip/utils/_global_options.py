@@ -9,6 +9,7 @@ from nequip.data import register_fields
 from .misc import dtype_from_name
 from .auto_init import instantiate
 from .test import set_irreps_debug
+from .config import Config
 
 
 # for multiprocessing, we need to keep track of our latest global options so
@@ -35,7 +36,7 @@ def _set_global_options(config, warn_on_override: bool = False) -> None:
     """
     # update these options into the latest global config.
     global _latest_global_config
-    _latest_global_config.update(dict(config))
+    _latest_global_config.update(Config.as_dict(config))
     # Set TF32 support
     # See https://pytorch.org/docs/stable/notes/cuda.html#tensorfloat-32-tf32-on-ampere-devices
     if torch.cuda.is_available() and "allow_tf32" in config:

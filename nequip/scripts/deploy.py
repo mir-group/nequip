@@ -252,7 +252,7 @@ def main(args=None):
         metadata[TF32_KEY] = str(int(config["allow_tf32"]))
         metadata[DEFAULT_DTYPE_KEY] = dtype_to_name(config["default_dtype"])
         metadata[MODEL_DTYPE_KEY] = dtype_to_name(config["model_dtype"])
-        metadata[CONFIG_KEY] = yaml.dump(dict(config))
+        metadata[CONFIG_KEY] = yaml.dump(Config.as_dict(config))
 
         metadata = {k: v.encode("ascii") for k, v in metadata.items()}
         torch.jit.save(model, args.out_file, _extra_files=metadata)

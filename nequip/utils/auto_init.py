@@ -2,7 +2,7 @@ from typing import Optional, Union, List
 import inspect
 import logging
 
-from .config import Config
+from .config import Config, _GLOBAL_ALL_ASKED_FOR_KEYS
 
 
 def instantiate_from_cls_name(
@@ -140,7 +140,7 @@ def instantiate(
             if k not in key_mapping["optional"]
         }
 
-    final_optional_args = dict(config)
+    final_optional_args = Config.as_dict(config)
 
     # for nested argument, it is possible that the positional args contain unnecesary keys
     if len(parent_builders) > 0:
@@ -221,6 +221,10 @@ def instantiate(
     for t in key_mapping:
         for k, v in key_mapping[t].items():
             string = f" {t:>10s}_args :  {k:>50s}"
+            # key mapping tells us how values got from the
+            # users config (v) to the object being built (k)
+            # thus v is by definition a valid key
+            _GLOBAL_ALL_ASKED_FOR_KEYS.add(v)
             if k != v:
                 string += f" <- {v:>50s}"
             logging.debug(string)

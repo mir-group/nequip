@@ -15,9 +15,9 @@ from nequip.nn import GraphModuleMixin
 def _check_and_print(retcode):
     __tracebackhide__ = True
     if retcode.returncode:
-        if len(retcode.stdout) > 0:
+        if retcode.stdout is not None and len(retcode.stdout) > 0:
             print(retcode.stdout.decode("ascii"))
-        if len(retcode.stderr) > 0:
+        if retcode.stderr is not None and len(retcode.stderr) > 0:
             print(retcode.stderr.decode("ascii"), file=sys.stderr)
         retcode.check_returncode()
 
@@ -136,7 +136,8 @@ def _training_session(conffile, model_dtype, builder, BENCHMARK_ROOT):
         )
 
         retcode = subprocess.run(
-            ["nequip-train", "conf.yaml"],
+            # we use --warn-unused because we are using configs with many unused keys for testing
+            ["nequip-train", "conf.yaml", "--warn-unused"],
             cwd=tmpdir,
             env=env,
             stdout=subprocess.PIPE,
