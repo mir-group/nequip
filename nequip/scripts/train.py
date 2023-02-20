@@ -24,10 +24,8 @@ from nequip.scripts._logger import set_up_script_logger
 
 default_config = dict(
     root="./",
-    run_name="NequIP",
     tensorboard=False,
     wandb=False,
-    wandb_project="NequIP",
     model_builders=[
         "SimpleIrrepsConfig",
         "EnergyModel",

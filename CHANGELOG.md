@@ -32,6 +32,7 @@ Most recent change on the bottom.
 
 ### Removed
 - [Breaking] `fixed_fields` machinery (`npz_fixed_field_keys` is still supported, but through a more straightforward implementation)
+- Default run name/WandB project name of `NequIP`, they must now always be provided explicitly
 
 ## [0.5.6] - 2022-12-19
 ### Added
