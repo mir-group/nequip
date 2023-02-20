@@ -771,6 +771,9 @@ class Trainer:
 
         self.init_metrics()
 
+        if getattr(self, "_post_init_callback", None) is not None:
+            self._post_init_callback()
+
         while not self.stop_cond:
 
             self.epoch_step()

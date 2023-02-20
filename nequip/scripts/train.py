@@ -236,13 +236,18 @@ def fresh_start(config):
     # Store any updated config information in the trainer
     trainer.update_kwargs(config)
 
-    unused = config._unused_keys()
-    if len(unused) > 0:
-        message = f"The following keys in the config file were not used, did you make a typo?: {', '.join(unused)}. (If this sounds wrong, please file an issue: the detection of unused keys is in beta. You can turn this error into a warning with `--warn-unused`.)"
-        if config.warn_unused:
-            warnings.warn(message)
-        else:
-            raise KeyError(message)
+    # Only run the unused check as a callback after the trainer has
+    # initialized everything (metrics, early stopping, etc.)
+    def _unused_check():
+        unused = config._unused_keys()
+        if len(unused) > 0:
+            message = f"The following keys in the config file were not used, did you make a typo?: {', '.join(unused)}. (If this sounds wrong, please file an issue: the detection of unused keys is in beta. You can turn this error into a warning with `--warn-unused`.)"
+            if config.warn_unused:
+                warnings.warn(message)
+            else:
+                raise KeyError(message)
+
+    trainer._post_init_callback = _unused_check
 
     return trainer
 
