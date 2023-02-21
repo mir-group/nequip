@@ -10,6 +10,8 @@ import pathlib
 import logging
 import yaml
 import itertools
+import packaging.version
+import warnings
 
 # This is a weird hack to avoid Intel MKL issues on the cluster when this is called as a subprocess of a process that has itself initialized PyTorch.
 # Since numpy gets imported later anyway for dataset stuff, this shouldn't affect performance.
@@ -108,7 +110,18 @@ def load_deployed_model(
     if set_global_options:
         global_config_dict = {}
         global_config_dict["allow_tf32"] = bool(int(metadata[TF32_KEY]))
-        global_config_dict["default_dtype"] = str(metadata[DEFAULT_DTYPE_KEY])
+        if DEFAULT_DTYPE_KEY in metadata:
+            default_dtype = metadata[DEFAULT_DTYPE_KEY]
+        else:
+            default_dtype = "float32"
+            warnings.warn(
+                "Models deployed before v0.6.0 don't contain information about their default_dtype; assuming the old default of float32, but this might not be right if you had explicitly set float64."
+            )
+            # If there isn't a dtype, it should be older than 0.6.0:
+            assert packaging.version.parse(
+                metadata[NEQUIP_VERSION_KEY]
+            ) < packaging.version.parse("0.6.0")
+        global_config_dict["default_dtype"] = str(default_dtype)
         # JIT strategy
         strategy = metadata.get(JIT_FUSION_STRATEGY, "")
         if strategy != "":
