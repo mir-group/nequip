@@ -479,7 +479,7 @@ class BaseEnergyModelTests(BaseModelTests):
             all_params = list(instance.parameters())
             old_state = [p.detach().clone() for p in all_params]
             for p in all_params:
-                p.uniform_(-2.0, 2.0)
+                p.uniform_(-3.0, 3.0)
         config, out_fields = config
         r_max = config["r_max"]
 
