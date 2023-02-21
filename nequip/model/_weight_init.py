@@ -5,12 +5,14 @@ import torch
 import e3nn.o3
 import e3nn.nn
 
-from nequip.nn import GraphModuleMixin
+from nequip.nn import GraphModuleMixin, GraphModel
 from nequip.utils import Config
 
 
 # == Load old state ==
-def initialize_from_state(config: Config, model: GraphModuleMixin, initialize: bool):
+def initialize_from_state(
+    config: Config, graph_model: GraphModel, initialize: bool
+) -> GraphModel:
     """Initialize the model from the state dict file given by the config options `initial_model_state`.
 
     Only loads the state dict if `initialize` is `True`; this is meant for, say, starting a training from a previous state.
@@ -22,18 +24,21 @@ def initialize_from_state(config: Config, model: GraphModuleMixin, initialize: b
     See https://pytorch.org/docs/stable/generated/torch.nn.Module.html?highlight=load_state_dict#torch.nn.Module.load_state_dict.
     """
     if not initialize:
-        return model  # do nothing
+        return graph_model  # do nothing
     return load_model_state(
-        config=config, model=model, initialize=initialize, _prefix="initial_model_state"
+        config=config,
+        model=graph_model,
+        initialize=initialize,
+        _prefix="initial_model_state",
     )
 
 
 def load_model_state(
     config: Config,
-    model: GraphModuleMixin,
+    graph_model: GraphModel,
     initialize: bool,
     _prefix: str = "load_model_state",
-):
+) -> GraphModel:
     """Load the model from the state dict file given by the config options `load_model_state`.
 
     Loads the state dict always; this is meant, for example, for building a new model to deploy with a given state dict.
@@ -49,8 +54,8 @@ def load_model_state(
             f"initialize_from_state requires the `{_prefix}` option specifying the state to initialize from"
         )
     state = torch.load(config[_prefix])
-    model.load_state_dict(state, strict=config.get(_prefix + "_strict", True))
-    return model
+    graph_model.load_state_dict(state, strict=config.get(_prefix + "_strict", True))
+    return graph_model
 
 
 # == Init functions ==

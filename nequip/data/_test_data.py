@@ -38,7 +38,7 @@ class EMTTestDataset(AtomicInMemoryDataset):
         assert element in ("Cu", "Pd", "Au", "Pt", "Al", "Ni", "Ag")
         self.element = element
         self.sigma = sigma
-        self.supercell = supercell
+        self.supercell = tuple(supercell)
         self.num_frames = num_frames
         self.dataset_seed = dataset_seed
 
@@ -80,4 +80,4 @@ class EMTTestDataset(AtomicInMemoryDataset):
                     **self.AtomicData_options
                 )
             )
-        return (datas,)
+        return datas

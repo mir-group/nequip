@@ -57,7 +57,7 @@ def main(args=None):
         "-n",
         help="Number of trials.",
         type=int,
-        default=30,
+        default=None,
     )
     parser.add_argument(
         "--n-data",
@@ -116,20 +116,22 @@ def main(args=None):
     dataset = dataset_from_config(config)
     dataset_time = time.time() - dataset_time
     print(f"    loading dataset took {dataset_time:.4f}s")
+    print(
+        f"    loaded dataset of size {len(dataset)} and sampled --n-data={args.n_data} frames"
+    )
     dataset_rng = torch.Generator()
     dataset_rng.manual_seed(config.get("dataset_seed", config.get("seed", 12345)))
+    dataset = dataset.index_select(
+        torch.randperm(len(dataset), generator=dataset_rng)[: args.n_data]
+    )
     datas_list = [
-        AtomicData.to_AtomicDataDict(dataset[i].to(device))
-        for i in torch.randperm(len(dataset), generator=dataset_rng)[: args.n_data]
+        AtomicData.to_AtomicDataDict(dataset[i].to(device)) for i in range(args.n_data)
     ]
     n_atom: int = len(datas_list[0]["pos"])
     if not all(len(d["pos"]) == n_atom for d in datas_list):
         raise NotImplementedError(
             "nequip-benchmark does not currently handle benchmarking on data frames with variable number of atoms"
         )
-    print(
-        f"    loaded dataset of size {len(dataset)} and sampled --n-data={args.n_data} frames"
-    )
     # print some dataset information
     print("    benchmark frames statistics:")
     print(f"         number of atoms: {n_atom}")
@@ -157,6 +159,8 @@ def main(args=None):
     if args.n == 0:
         print("Got -n 0, so quitting without running benchmark.")
         return
+    elif args.n is None:
+        args.n = 5 if args.profile else 30
 
     # Load model:
     if args.model is None:
@@ -239,8 +243,11 @@ def main(args=None):
             on_trace_ready=trace_handler,
         ) as p:
             for _ in range(1 + warmup + args.n):
-                model(next(datas).copy())
+                out = model(next(datas).copy())
+                out[AtomicDataDict.TOTAL_ENERGY_KEY].item()
                 p.step()
+
+        print(p.key_averages().table(sort_by="cuda_time_total", row_limit=100))
     elif args.pdb:
         print("Running model under debugger...")
         try:
@@ -280,7 +287,8 @@ def main(args=None):
         print("Benchmarking...")
         # just time
         t = Timer(
-            stmt="model(next(datas).copy())", globals={"model": model, "datas": datas}
+            stmt="model(next(datas).copy())['total_energy'].item()",
+            globals={"model": model, "datas": datas},
         )
         perloop: Measurement = t.timeit(args.n)
 

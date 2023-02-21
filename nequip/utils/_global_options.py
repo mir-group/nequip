@@ -9,6 +9,7 @@ from nequip.data import register_fields
 from .misc import dtype_from_name
 from .auto_init import instantiate
 from .test import set_irreps_debug
+from .config import Config
 
 
 # for multiprocessing, we need to keep track of our latest global options so
@@ -35,7 +36,7 @@ def _set_global_options(config, warn_on_override: bool = False) -> None:
     """
     # update these options into the latest global config.
     global _latest_global_config
-    _latest_global_config.update(dict(config))
+    _latest_global_config.update(Config.as_dict(config))
     # Set TF32 support
     # See https://pytorch.org/docs/stable/notes/cuda.html#tensorfloat-32-tf32-on-ampere-devices
     if torch.cuda.is_available() and "allow_tf32" in config:
@@ -74,7 +75,13 @@ def _set_global_options(config, warn_on_override: bool = False) -> None:
     if config.get("model_debug_mode", False):
         set_irreps_debug(enabled=True)
     if "default_dtype" in config:
-        torch.set_default_dtype(dtype_from_name(config["default_dtype"]))
+        old_dtype = torch.get_default_dtype()
+        new_dtype = dtype_from_name(config["default_dtype"])
+        if warn_on_override and old_dtype != new_dtype:
+            warnings.warn(
+                f"Setting the GLOBAL value for torch.set_default_dtype to `{new_dtype}` which is different than the previous value of `{old_dtype}`"
+            )
+        torch.set_default_dtype(new_dtype)
     if config.get("grad_anomaly_mode", False):
         torch.autograd.set_detect_anomaly(True)
 

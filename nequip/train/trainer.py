@@ -26,7 +26,14 @@ import numpy as np
 import torch
 from torch_ema import ExponentialMovingAverage
 
-from nequip.data import DataLoader, AtomicData, AtomicDataDict, AtomicDataset
+from nequip.data import (
+    DataLoader,
+    PartialSampler,
+    AtomicData,
+    AtomicDataDict,
+    AtomicDataset,
+)
+from nequip.nn import GraphModel
 from nequip.utils import (
     Output,
     Config,
@@ -38,10 +45,10 @@ from nequip.utils import (
     atomic_write,
     finish_all_writes,
     atomic_write_group,
-    dtype_from_name,
 )
 from nequip.utils.versions import check_code_version
 from nequip.model import model_from_config
+from nequip.utils.config import _GLOBAL_ALL_ASKED_FOR_KEYS
 
 from .loss import Loss, LossStat
 from .metrics import Metrics
@@ -150,6 +157,7 @@ class Trainer:
         validation_batch_size (int): batch size for evaluating the model for validation
         shuffle (bool): parameters for dataloader
         n_train (int): # of frames for training
+        n_train_per_epoch (optional int): how many frames from `n_train` to use each epoch; see `PartialSampler`. When `None`, all `n_train` frames will be used each epoch.
         n_val (int): # of frames for validation
         exclude_keys (list):  fields from dataset to ignore.
         dataloader_num_workers (int): `num_workers` for the `DataLoader`s
@@ -211,6 +219,8 @@ class Trainer:
     lr_scheduler_module = torch.optim.lr_scheduler
     optim_module = torch.optim
 
+    model: GraphModel
+
     def __init__(
         self,
         model,
@@ -240,6 +250,7 @@ class Trainer:
         validation_batch_size: int = 5,
         shuffle: bool = True,
         n_train: Optional[int] = None,
+        n_train_per_epoch: Optional[int] = None,
         n_val: Optional[int] = None,
         dataloader_num_workers: int = 0,
         train_idcs: Optional[list] = None,
@@ -269,6 +280,8 @@ class Trainer:
         for key in self.init_keys:
             setattr(self, key, locals()[key])
             _local_kwargs[key] = locals()[key]
+            # all init_keys of the Trainer are valid config keys
+            _GLOBAL_ALL_ASKED_FOR_KEYS.add(key)
 
         self.ema = None
 
@@ -331,23 +344,6 @@ class Trainer:
         self.train_on_keys = self.loss.keys
         if train_on_keys is not None:
             assert set(train_on_keys) == set(self.train_on_keys)
-        self._remove_from_model_input = set(self.train_on_keys)
-        if (
-            len(
-                self._remove_from_model_input.intersection(
-                    AtomicDataDict.ALL_ENERGY_KEYS
-                )
-            )
-            > 0
-        ):
-            # if we are training on _any_ of the energy quantities (energy, force, partials, stress, etc.)
-            # then none of them should be fed into the model
-            self._remove_from_model_input = self._remove_from_model_input.union(
-                AtomicDataDict.ALL_ENERGY_KEYS
-            )
-        if kwargs.get("_override_allow_truth_label_inputs", False):
-            # needed for unit testing models
-            self._remove_from_model_input = set()
 
         # load all callbacks
         self._init_callbacks = [load_callable(callback) for callback in init_callbacks]
@@ -672,6 +668,19 @@ class Trainer:
         device="cpu",
         config_dictionary: Optional[dict] = None,
     ) -> Tuple[torch.nn.Module, Config]:
+        """Load a model from a training session.
+
+        Note that this uses ``model_from_config`` internally and is thus not thread safe.
+
+        Args:
+            traindir: the training session
+            model_name: which checkpoint to load; defaults to ``best_model.pth``
+            device: target device to load to, defaults to ``cpu``
+            config_dictionary: optionally use this config instead of ``traindir/config.yaml``
+
+        Returns:
+            (model, config)
+        """
         traindir = str(traindir)
         model_name = str(model_name)
 
@@ -680,21 +689,14 @@ class Trainer:
         else:
             config = Config.from_file(traindir + "/config.yaml")
 
+        # model_from_config takes care of dtypes already
         model = model_from_config(
             config=config,
             initialize=False,
         )
-        if model is not None:  # TODO: why would it be?
-            # TODO: this is not exactly equivalent to building with
-            # this set as default dtype... does it matter?
-            model.to(
-                device=torch.device(device),
-                dtype=dtype_from_name(config.default_dtype),
-            )
-            model_state_dict = torch.load(
-                traindir + "/" + model_name, map_location=device
-            )
-            model.load_state_dict(model_state_dict)
+        model.to(device=torch.device(device))
+        model_state_dict = torch.load(traindir + "/" + model_name, map_location=device)
+        model.load_state_dict(model_state_dict)
 
         return model, config
 
@@ -702,6 +704,7 @@ class Trainer:
         """initialize optimizer"""
         if self.model is None:
             return
+        assert isinstance(self.model, GraphModel)
 
         self.model.to(self.torch_device)
 
@@ -710,12 +713,6 @@ class Trainer:
         self.logger.info(
             f"Number of trainable weights: {sum(p.numel() for p in self.model.parameters() if p.requires_grad)}"
         )
-
-        self.rescale_layers = []
-        outer_layer = self.model
-        while hasattr(outer_layer, "unscale"):
-            self.rescale_layers.append(outer_layer)
-            outer_layer = getattr(outer_layer, "model", None)
 
         self.init_objects()
 
@@ -774,6 +771,9 @@ class Trainer:
 
         self.init_metrics()
 
+        if getattr(self, "_post_init_callback", None) is not None:
+            self._post_init_callback()
+
         while not self.stop_cond:
 
             self.epoch_step()
@@ -800,32 +800,22 @@ class Trainer:
         data = data.to(self.torch_device)
         data = AtomicData.to_AtomicDataDict(data)
 
-        data_unscaled = data
-        for layer in self.rescale_layers:
-            # This means that self.model is RescaleOutputs
-            # this will normalize the targets
-            # in validation (eval mode), it does nothing
-            # in train mode, if normalizes the targets
-            data_unscaled = layer.unscale(data_unscaled)
+        # this will normalize the targets
+        # in both validation and train we want targets normalized _for the loss_
+        data_for_loss = self.model.unscale(data, force_process=True)
 
         # Run model
         # We make a shallow copy of the input dict in case the model modifies it
-        input_data = {
-            k: v
-            for k, v in data_unscaled.items()
-            if k not in self._remove_from_model_input
-        }
-        out = self.model(input_data)
-        del input_data
+        out = self.model(data_for_loss)
 
         # If we're in evaluation mode (i.e. validation), then
-        # data_unscaled's target prop is unnormalized, and out's has been rescaled to be in the same units
-        # If we're in training, data_unscaled's target prop has been normalized, and out's hasn't been touched, so they're both in normalized units
-        # Note that either way all normalization was handled internally by RescaleOutput
+        # data_for_loss's target prop is unnormalized, and out's has been rescaled to be in the same units
+        # If we're in training, data_for_loss's target prop has been normalized, and out's hasn't been touched, so they're both in normalized units
+        # Note that either way all normalization was handled internally by GraphModel via RescaleOutput
 
         if not validation:
             # Actually do an optimization step, since we're training:
-            loss, loss_contrib = self.loss(pred=out, ref=data_unscaled)
+            loss, loss_contrib = self.loss(pred=out, ref=data_for_loss)
             # see https://pytorch.org/tutorials/recipes/recipes/tuning_guide.html#use-parameter-grad-none-instead-of-model-zero-grad-or-optimizer-zero-grad
             self.optim.zero_grad(set_to_none=True)
             loss.backward()
@@ -847,25 +837,26 @@ class Trainer:
 
         with torch.no_grad():
             if validation:
-                scaled_out = out
-                _data_unscaled = data
-                for layer in self.rescale_layers:
-                    # loss function always needs to be in normalized unit
-                    scaled_out = layer.unscale(scaled_out, force_process=True)
-                    _data_unscaled = layer.unscale(_data_unscaled, force_process=True)
-                loss, loss_contrib = self.loss(pred=scaled_out, ref=_data_unscaled)
+                # loss function always needs to be in normalized unit
+                normalized_units_out = self.model.unscale(out, force_process=True)
+                # data_for_loss is always forced into normalized units
+                loss, loss_contrib = self.loss(
+                    pred=normalized_units_out, ref=data_for_loss
+                )
+                del normalized_units_out
+                # everything else is already in real units for metrics, so do nothing
             else:
                 # If we are in training mode, we need to bring the prediction
-                # into real units
-                for layer in self.rescale_layers[::-1]:
-                    out = layer.scale(out, force_process=True)
+                # into real units for metrics
+                out = self.model.scale(out, force_process=True)
 
             # save metrics stats
             self.batch_losses = self.loss_stat(loss, loss_contrib)
-            # in validation mode, data is in real units and the network scales
+            # in validation mode, reference data is in real units and the network scales
             # out to be in real units interally.
-            # in training mode, data is still in real units, and we rescaled
-            # out to be in real units above.
+            # in training mode, reference data is still in real units, and we rescaled
+            # network predicted out to be in real units right above
+            # thus, we get metrics in real units always:
             self.batch_metrics = self.metrics(pred=out, ref=data)
 
     @property
@@ -901,6 +892,10 @@ class Trainer:
         dataloaders = [
             dataloaders[c] for c in categories
         ]  # get the right dataloaders for the catagories we actually run
+        if TRAIN in categories:
+            # We have to step the sampler so it knows what epoch it is
+            self.dl_train_sampler.step_epoch(self.iepoch)
+
         self.metrics_dict = {}
         self.loss_dict = {}
 
@@ -1222,10 +1217,21 @@ class Trainer:
             # use the right randomness
             generator=self.dataset_rng,
         )
+        if self.n_train_per_epoch is not None:
+            assert self.n_train_per_epoch % self.batch_size == 0
+        self.dl_train_sampler = PartialSampler(
+            data_source=self.dataset_train,
+            # training should shuffle (if enabled)
+            shuffle=self.shuffle,
+            # if n_train_per_epoch is None (default), it's set to len(self.dataset_train) == n_train
+            # i.e. use all `n_train` frames each epoch
+            num_samples_per_epoch=self.n_train_per_epoch,
+            generator=self.dataset_rng,
+        )
         self.dl_train = DataLoader(
             dataset=self.dataset_train,
-            shuffle=self.shuffle,  # training should shuffle
             batch_size=self.batch_size,
+            sampler=self.dl_train_sampler,
             **dl_kwargs,
         )
         # validation, on the other hand, shouldn't shuffle

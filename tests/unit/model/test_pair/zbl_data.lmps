@@ -1,0 +1,46 @@
+units metal
+atom_style	atomic
+atom_modify map yes
+thermo 1
+
+region 1 block 0 10 0 10 0 10
+boundary s s s
+create_box 2 1
+create_atoms 1 single 0.0 0.0 0.0
+create_atoms 2 single 0.1 0.0 0.0
+
+mass 1 1.0
+mass 2 1.0
+
+group 2 type 2
+
+neighbor	1.0 nsq  # tiny box
+neigh_modify    delay 0 every 1 check no
+
+variable rmax string 8.0
+variable N string 50
+
+pair_style zbl $(v_rmax) $(v_rmax)
+print "r Zi Zj pe fxi fxj" file zbl.dat
+
+variable Zi index 1.0 6.0 7.0 8.0 29.0 79.0
+label Ziloop
+
+  variable Zj index 1.0 6.0 7.0 8.0 29.0 79.0
+  label Zjloop
+    pair_coeff 1 1 $(v_Zi) $(v_Zi)
+    pair_coeff 2 2 $(v_Zj) $(v_Zj)
+
+    variable i loop $(v_N)
+    label rloop
+      set atom 2 x $(v_i * v_rmax / v_N)
+      run 0
+      print "$(x[2]) $(v_Zi) $(v_Zj) $(pe) $(fx[1]) $(fx[2])" append zbl.dat
+    next i
+    jump SELF rloop
+
+  next Zj
+  jump SELF Zjloop
+
+next Zi
+jump SELF Ziloop

@@ -11,7 +11,10 @@ from nequip.utils.unittests.model_tests import BaseEnergyModelTests
 COMMON_CONFIG = {
     "avg_num_neighbors": None,
     "num_types": 3,
-    "types_names": ["H", "C", "O"],
+    "chemical_symbol_to_type": {"H": 0, "C": 1, "O": 2},
+    # Just in case for when that builder exists:
+    "pair_style": "ZBL",
+    "units": "metal",
 }
 r_max = 3
 minimal_config1 = dict(
@@ -79,15 +82,26 @@ class TestNequIPModel(BaseEnergyModelTests):
                     AtomicDataDict.FORCE_KEY,
                 ],
             ),
+            # # Save some time in the tests
+            # (
+            #     ["EnergyModel"],
+            #     [
+            #         AtomicDataDict.TOTAL_ENERGY_KEY,
+            #         AtomicDataDict.PER_ATOM_ENERGY_KEY,
+            #     ],
+            # ),
             (
-                ["EnergyModel"],
+                ["EnergyModel", "StressForceOutput"],
                 [
                     AtomicDataDict.TOTAL_ENERGY_KEY,
                     AtomicDataDict.PER_ATOM_ENERGY_KEY,
+                    AtomicDataDict.FORCE_KEY,
+                    AtomicDataDict.STRESS_KEY,
+                    AtomicDataDict.VIRIAL_KEY,
                 ],
             ),
             (
-                ["EnergyModel", "StressForceOutput"],
+                ["EnergyModel", "PairPotentialTerm", "StressForceOutput"],
                 [
                     AtomicDataDict.TOTAL_ENERGY_KEY,
                     AtomicDataDict.PER_ATOM_ENERGY_KEY,
@@ -121,15 +135,15 @@ class TestNequIPModel(BaseEnergyModelTests):
         config = minimal_config2.copy()
         config["model_builders"] = ["EnergyModel"]
         model = model_from_config(config=config, initialize=True)
-        assert isinstance(model.chemical_embedding, AtomwiseLinear)
+        chemical_embedding = model.model.chemical_embedding
+        assert isinstance(chemical_embedding, AtomwiseLinear)
         true_irreps = o3.Irreps(minimal_config2["chemical_embedding_irreps_out"])
         assert (
-            model.chemical_embedding.irreps_out[model.chemical_embedding.out_field]
-            == true_irreps
+            chemical_embedding.irreps_out[chemical_embedding.out_field] == true_irreps
         )
         # Make sure it propagates
         assert (
-            model.layer0_convnet.irreps_in[model.chemical_embedding.out_field]
+            model.model.layer0_convnet.irreps_in[chemical_embedding.out_field]
             == true_irreps
         )
 

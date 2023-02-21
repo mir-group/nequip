@@ -14,7 +14,7 @@ from nequip.model import model_from_config
 from nequip.data import AtomicDataDict
 from nequip.train.trainer import Trainer
 from nequip.utils.savenload import load_file
-from nequip.nn import GraphModuleMixin
+from nequip.nn import GraphModuleMixin, GraphModel, RescaleOutput
 
 
 def dummy_builder():
@@ -45,16 +45,17 @@ minimal_config = dict(
 )
 
 
-@pytest.fixture(scope="class")
-def trainer():
+@pytest.fixture(scope="function")
+def trainer(float_tolerance):
     """
     Generate a class instance with minimal configurations
     """
-    minimal_config["default_dtype"] = str(torch.get_default_dtype())[len("torch.") :]
-    model = model_from_config(minimal_config)
+    conf = minimal_config.copy()
+    conf["default_dtype"] = str(torch.get_default_dtype())[len("torch.") :]
+    model = model_from_config(conf)
     with tempfile.TemporaryDirectory(prefix="output") as path:
-        minimal_config["root"] = path
-        c = Trainer(model=model, **minimal_config)
+        conf["root"] = path
+        c = Trainer(model=model, **conf)
         yield c
 
 
@@ -73,14 +74,14 @@ class TestDuplicateError:
         check whether the Output class can automatically
         insert timestr when a workdir has pre-existed
         """
+        conf = minimal_config.copy()
+        conf["root"] = temp_data
 
-        minimal_config["root"] = temp_data
-
-        model = DummyNet(3)
-        Trainer(model=model, **minimal_config)
+        model = GraphModel(DummyNet(3))
+        Trainer(model=model, **conf)
 
         with pytest.raises(RuntimeError):
-            Trainer(model=model, **minimal_config)
+            Trainer(model=model, **conf)
 
 
 class TestSaveLoad:
@@ -145,11 +146,17 @@ class TestSaveLoad:
 class TestData:
     @pytest.mark.parametrize("mode", ["random", "sequential"])
     def test_split(self, trainer, nequip_dataset, mode):
-
         trainer.train_val_split = mode
         trainer.set_dataset(nequip_dataset)
-        for i, batch in enumerate(trainer.dl_train):
-            print(i, batch)
+        for epoch_i in range(3):
+            trainer.dl_train_sampler.step_epoch(epoch_i)
+            n_samples: int = 0
+            for i, batch in enumerate(trainer.dl_train):
+                n_samples += batch[AtomicDataDict.BATCH_PTR_KEY].shape[0] - 1
+            if trainer.n_train_per_epoch is not None:
+                assert n_samples == trainer.n_train_per_epoch
+            else:
+                assert n_samples == trainer.n_train
 
 
 class TestTrain:
@@ -281,15 +288,19 @@ class DummyNet(GraphModuleMixin, torch.nn.Module):
         return data
 
 
-class DummyScale(torch.nn.Module):
+# subclass to make sure it gets picked up by GraphModel
+class DummyScale(RescaleOutput):
     """mimic the rescale model"""
 
     def __init__(self, key, scale, shift) -> None:
-        super().__init__()
+        torch.nn.Module.__init__(self)  # skip RescaleOutput's __init__
         self.key = key
         self.scale_by = torch.as_tensor(scale, dtype=torch.get_default_dtype())
         self.shift_by = torch.as_tensor(shift, dtype=torch.get_default_dtype())
         self.linear2 = Linear(3, 3)
+        self.irreps_in = {}
+        self.irreps_out = {key: "3x0e"}
+        self.model = None
 
     def forward(self, data):
         out = self.linear2(data["pos"])
@@ -317,7 +328,7 @@ class DummyScale(torch.nn.Module):
 def scale_train(nequip_dataset):
     with tempfile.TemporaryDirectory(prefix="output") as path:
         trainer = Trainer(
-            model=DummyScale(AtomicDataDict.FORCE_KEY, scale=1.3, shift=1),
+            model=GraphModel(DummyScale(AtomicDataDict.FORCE_KEY, scale=1.3, shift=1)),
             seed=9,
             n_train=4,
             n_val=4,

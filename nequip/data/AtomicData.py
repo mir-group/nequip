@@ -57,6 +57,7 @@ _DEFAULT_GRAPH_FIELDS: Set[str] = {
     AtomicDataDict.VIRIAL_KEY,
     AtomicDataDict.PBC_KEY,
     AtomicDataDict.CELL_KEY,
+    AtomicDataDict.BATCH_PTR_KEY,
 }
 _NODE_FIELDS: Set[str] = set(_DEFAULT_NODE_FIELDS)
 _EDGE_FIELDS: Set[str] = set(_DEFAULT_EDGE_FIELDS)
@@ -79,6 +80,7 @@ def register_fields(
     node_fields: set = set(node_fields)
     edge_fields: set = set(edge_fields)
     graph_fields: set = set(graph_fields)
+    long_fields: set = set(long_fields)
     allfields = node_fields.union(edge_fields, graph_fields)
     assert len(allfields) == len(node_fields) + len(edge_fields) + len(graph_fields)
     _NODE_FIELDS.update(node_fields)
@@ -108,6 +110,17 @@ def deregister_fields(*fields: Sequence[str]) -> None:
         _NODE_FIELDS.discard(f)
         _EDGE_FIELDS.discard(f)
         _GRAPH_FIELDS.discard(f)
+
+
+def _register_field_prefix(prefix: str) -> None:
+    """Re-register all registered fields as the same type, but with `prefix` added on."""
+    assert prefix.endswith("_")
+    register_fields(
+        node_fields=[prefix + e for e in _NODE_FIELDS],
+        edge_fields=[prefix + e for e in _EDGE_FIELDS],
+        graph_fields=[prefix + e for e in _GRAPH_FIELDS],
+        long_fields=[prefix + e for e in _LONG_FIELDS],
+    )
 
 
 def _process_dict(kwargs, ignore_fields=[]):
