@@ -105,23 +105,28 @@ def load_deployed_model(
         model = torch.jit.freeze(model)
     # Everything we store right now is ASCII, so decode for printing
     metadata = {k: v.decode("ascii") for k, v in metadata.items()}
+    # Update metadata for backward compatibility
+    if metadata[DEFAULT_DTYPE_KEY] == "":
+        # Default and model go together
+        assert metadata[MODEL_DTYPE_KEY] == ""
+        # If there isn't a dtype, it should be older than 0.6.0:
+        assert packaging.version.parse(
+            metadata[NEQUIP_VERSION_KEY]
+        ) < packaging.version.parse("0.6.0")
+        # i.e. no value due to L85 above
+        # The old pre-0.6.0 defaults:
+        metadata[DEFAULT_DTYPE_KEY] = "float32"
+        metadata[MODEL_DTYPE_KEY] = "float32"
+        warnings.warn(
+            "Models deployed before v0.6.0 don't contain information about their default_dtype or model_dtype; assuming the old default of float32 for both, but this might not be right if you had explicitly set default_dtype=float64."
+        )
+
     # Set up global settings:
     assert set_global_options in (True, False, "warn")
     if set_global_options:
         global_config_dict = {}
         global_config_dict["allow_tf32"] = bool(int(metadata[TF32_KEY]))
-        if DEFAULT_DTYPE_KEY in metadata:
-            default_dtype = metadata[DEFAULT_DTYPE_KEY]
-        else:
-            default_dtype = "float32"
-            warnings.warn(
-                "Models deployed before v0.6.0 don't contain information about their default_dtype; assuming the old default of float32, but this might not be right if you had explicitly set float64."
-            )
-            # If there isn't a dtype, it should be older than 0.6.0:
-            assert packaging.version.parse(
-                metadata[NEQUIP_VERSION_KEY]
-            ) < packaging.version.parse("0.6.0")
-        global_config_dict["default_dtype"] = str(default_dtype)
+        global_config_dict["default_dtype"] = str(metadata[DEFAULT_DTYPE_KEY])
         # JIT strategy
         strategy = metadata.get(JIT_FUSION_STRATEGY, "")
         if strategy != "":
