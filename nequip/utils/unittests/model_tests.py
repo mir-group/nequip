@@ -79,11 +79,18 @@ class BaseModelTests:
         instance = instance.to(device=device)
         model_script = script(instance)
 
+        atol = {
+            # tight, but not that tight, since GPU nondet has to pass
+            # plus model insides are still float32 with global dtype float64 in the tests
+            torch.float32: 5e-6,
+            torch.float64: 5e-7,
+        }[torch.get_default_dtype()]
+
         for out_field in out_fields:
             assert torch.allclose(
                 instance(data)[out_field],
                 model_script(data)[out_field],
-                atol=1e-6,
+                atol=atol,
             )
 
         # - Try saving, loading in another process, and running -
@@ -96,13 +103,6 @@ class BaseModelTests:
             # So instead we do a slightly less complete test, loading the saved model here in the original process:
             load_model = torch.jit.load(tmpdir + "/model.pt")
             load_dat = torch.load(tmpdir + "/dat.pt")
-
-            atol = {
-                # tight, but not that tight, since GPU nondet has to pass
-                # plus model insides are still float32 with global dtype float64 in the tests
-                torch.float32: 5e-6,
-                torch.float64: 5e-7,
-            }[torch.get_default_dtype()]
 
             for out_field in out_fields:
                 assert torch.allclose(
