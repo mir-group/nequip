@@ -471,6 +471,9 @@ class AtomicInMemoryDataset(AtomicDataset):
                 std = torch.std(arr, dim=0, unbiased=unbiased)
                 out.append((mean, std))
 
+            elif ana_mode == "absmax":
+                out.append((arr.abs().max(),))
+
             elif ana_mode.startswith("per_species_"):
                 # per-species
                 algorithm_kwargs = kwargs.pop(field + ana_mode, {})

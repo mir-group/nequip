@@ -17,6 +17,7 @@ Most recent change on the bottom.
 - Pair potential terms
 - `nequip-evaluate --output-fields-from-original-dataset`
 - Error (or warn) on unused options in YAML that likely indicate typos
+- `dataset_*_absmax` statistics option
 
 ### Changed
 - Always require explicit `seed`
