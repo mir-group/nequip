@@ -541,6 +541,8 @@ class AtomicInMemoryDataset(AtomicDataset):
             return mean, std
         elif ana_mode == "rms":
             return (torch.sqrt(torch.mean(arr.square())),)
+        elif ana_mode == "absmax":
+            return (torch.max(arr.abs()),)
         else:
             raise NotImplementedError(
                 f"{ana_mode} for per-atom analysis is not implemented"
@@ -595,6 +597,10 @@ class AtomicInMemoryDataset(AtomicDataset):
                 for i in range(dims):
                     square = square.mean(axis=-1)
                 return (torch.sqrt(square),)
+            else:
+                raise NotImplementedError(
+                    f"Statistics mode {ana_mode} isn't yet implemented for per_species_"
+                )
 
         else:
             raise NotImplementedError
