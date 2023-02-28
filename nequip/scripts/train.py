@@ -30,7 +30,7 @@ default_config = dict(
         "SimpleIrrepsConfig",
         "EnergyModel",
         "PerSpeciesRescale",
-        "ForceOutput",
+        "StressForceOutput",
         "RescaleEnergyEtc",
     ],
     dataset_statistics_stride=1,
