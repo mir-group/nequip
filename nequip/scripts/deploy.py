@@ -263,7 +263,11 @@ def main(args=None):
         metadata[TYPE_NAMES_KEY] = " ".join(type_names)
 
         metadata[JIT_BAILOUT_KEY] = str(config[JIT_BAILOUT_KEY])
-        if int(torch.__version__.split(".")[1]) >= 11 and JIT_FUSION_STRATEGY in config:
+        if (
+            packaging.version.parse(torch.__version__)
+            >= packaging.version.parse("1.11")
+            and JIT_FUSION_STRATEGY in config
+        ):
             metadata[JIT_FUSION_STRATEGY] = ";".join(
                 "%s,%i" % e for e in config[JIT_FUSION_STRATEGY]
             )
