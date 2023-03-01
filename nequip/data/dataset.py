@@ -467,6 +467,10 @@ class AtomicInMemoryDataset(AtomicDataset):
 
             elif ana_mode == "mean_std":
                 # mean and std
+                if len(arr) < 2:
+                    raise ValueError(
+                        "Can't do per species standard deviation without at least two samples"
+                    )
                 mean = torch.mean(arr, dim=0)
                 std = torch.std(arr, dim=0, unbiased=unbiased)
                 out.append((mean, std))
@@ -536,6 +540,10 @@ class AtomicInMemoryDataset(AtomicDataset):
         arr = arr / N
         assert arr.shape == (len(N),) + data_dim
         if ana_mode == "mean_std":
+            if len(arr) < 2:
+                raise ValueError(
+                    "Can't do standard deviation without at least two samples"
+                )
             mean = torch.mean(arr, dim=0)
             std = torch.std(arr, unbiased=unbiased, dim=0)
             return mean, std
@@ -583,6 +591,10 @@ class AtomicInMemoryDataset(AtomicDataset):
             arr = arr.type(self.dtype)
 
             if ana_mode == "mean_std":
+                if torch.any(N < 2):
+                    raise ValueError(
+                        "Can't do per species standard deviation without at least two samples per species"
+                    )
                 mean = scatter_mean(arr, atom_types, dim=0)
                 assert mean.shape[1:] == arr.shape[1:]  # [N, dims] -> [type, dims]
                 assert len(mean) == N.shape[1]

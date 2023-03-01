@@ -31,6 +31,7 @@ Most recent change on the bottom.
 
 ### Fixed
 - Work with `wandb>=0.13.8`
+- Better error for standard deviation with too few data
 
 ### Removed
 - [Breaking] `fixed_fields` machinery (`npz_fixed_field_keys` is still supported, but through a more straightforward implementation)
