@@ -591,7 +591,9 @@ class AtomicInMemoryDataset(AtomicDataset):
             arr = arr.type(self.dtype)
 
             if ana_mode == "mean_std":
-                if torch.any(N < 2):
+                # There need to be at least two occurances of each atom type in the
+                # WHOLE dataset, not in any given frame:
+                if torch.any(N.sum(dim=0) < 2):
                     raise ValueError(
                         "Can't do per species standard deviation without at least two samples per species"
                     )
