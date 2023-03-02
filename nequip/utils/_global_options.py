@@ -78,7 +78,9 @@ def _set_global_options(config, warn_on_override: bool = False) -> None:
     # See https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/OVERVIEW.md#fusers
     # And https://github.com/pytorch/pytorch/blob/e0a0f37a11164f59b42bc80a6f95b54f722d47ce/torch/jit/_fuser.py#L46
     default_fuser = (
-        "fuser2"
+        "fuser2"  # TODO: does this make sense for ROCm?
+        if torch.cuda.is_available()
+        else "fuser1"  # default to NNC on CPU for now no matter what
         if version.parse(torch.__version__) >= version.parse("1.12")
         else "fuser1"
     )

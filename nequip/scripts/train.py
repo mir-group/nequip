@@ -55,6 +55,8 @@ default_config = dict(
     # even if the number of atoms is fixed:
     _jit_fusion_strategy=[("DYNAMIC", 3)],
     # Due to what appear to be ongoing bugs with nvFuser, we default to NNC (fuser1) for now:
+    # TODO: still default to NNC on CPU regardless even if change this for GPU
+    # TODO: default for ROCm?
     _jit_fuser="fuser1",
 )
 # All default_config keys are valid / requested
