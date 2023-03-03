@@ -17,7 +17,20 @@ default_dtype: float32                                                          
 allow_tf32: false                                                                 # whether to use TensorFloat32 if it is available
 # device:  cuda                                                                   # which device to use. Default: automatically detected cuda or "cpu"
 
-# network
+# == network ==
+
+# `model_builders` defines a series of functions that will be called to construct the model
+# each model builder has the opportunity to update the model, the config, or both
+# model builders from other packages are allowed (see mir-group/allegro for an example); those from `nequip.model` don't require a prefix
+# these are the default model builders:
+model_builders:
+ - SimpleIrrepsConfig         # update the config with all the irreps for the network if using the simplified `l_max` / `num_features` / `parity` syntax
+ - EnergyModel                # build a full NequIP model
+ - PerSpeciesRescale          # add per-atom / per-species scaling and shifting to the NequIP model before the total energy sum
+ - ForceOutput                # wrap the energy model in a module that uses autodifferention to compute the forces
+ - RescaleEnergyEtc           # wrap the entire model in the appropriate global rescaling of the energy, forces, etc.
+#   ^ global rescaling blocks must always go last!
+
 r_max: 4.0                                                                        # cutoff radius in length units, here Angstrom, this is an important hyperparamter to scan
 num_layers: 4                                                                     # number of interaction blocks, we find 3-5 to work best
 
@@ -148,6 +161,9 @@ wandb: true                                                                     
 wandb_project: toluene-example                                                     # project name used in wandb
 wandb_watch: false
 
+# # using tensorboard for logging
+# tensorboard: true
+
 # see https://docs.wandb.ai/ref/python/watch
 # wandb_watch_kwargs:
 #   log: all
@@ -155,7 +171,7 @@ wandb_watch: false
 #   log_graph: true
 
 verbose: info                                                                      # the same as python logging, e.g. warning, info, debug, error. case insensitive
-log_batch_freq: 1                                                                  # batch frequency, how often to print training errors withinin the same epoch
+log_batch_freq: 100                                                                # batch frequency, how often to print training errors withinin the same epoch
 log_epoch_freq: 1                                                                  # epoch frequency, how often to print 
 save_checkpoint_freq: -1                                                           # frequency to save the intermediate checkpoint. no saving of intermediate checkpoints when the value is not positive.
 save_ema_checkpoint_freq: -1                                                       # frequency to save the intermediate ema checkpoint. no saving of intermediate checkpoints when the value is not positive.
@@ -198,6 +214,8 @@ loss_coeffs:                                                                    
   total_energy:                                                                    
     - 1
     - PerAtomMSELoss
+# note that the ratio between force and energy loss matters for the training process. One may consider using 1:1 with the PerAtomMSELoss. If the energy loss still significantly dominate the loss function at the initial epochs, tune the energy loss weight lower helps the training a lot.
+
 
 # # default loss function is MSELoss, the name has to be exactly the same as those in torch.nn.
 # the only supprted targets are forces and total_energy
@@ -296,16 +314,17 @@ per_species_rescale_scales: dataset_forces_rms
 # initial atomic energy scale for each species. Optional.
 # the value can be a constant float value, an array for each species, or a string
 # string option include: 
+# *  "dataset_forces_absmax", which computes the dataset maxmimum force component magnitude
 # *  "dataset_per_atom_total_energy_std", which computes the per atom energy std
 # *  "dataset_per_species_total_energy_std", which uses the GP model uncertainty
 # *  "dataset_per_species_forces_rms", which compute the force rms for each species
 # If not provided, defaults to dataset_per_species_force_rms or dataset_per_atom_total_energy_std, depending on whether forces are being trained.
 # per_species_rescale_kwargs: 
 #   total_energy: 
-#     alpha: 0.1
+#     alpha: 0.001
 #     max_iteration: 20
 #     stride: 100
-# keywords for GP decomposition of per specie energy. Optional. Defaults to 0.1
+# keywords for ridge regression decomposition of per specie energy. Optional. Defaults to 0.001. The value should be in the range of 1e-3 to 1e-2
 # per_species_rescale_arguments_in_dataset_units: True
 # if explicit numbers are given for the shifts/scales, this parameter must specify whether the given numbers are unitless shifts/scales or are in the units of the dataset. If ``True``, any global rescalings will correctly be applied to the per-species values.
 
@@ -314,7 +333,10 @@ per_species_rescale_scales: dataset_forces_rms
 # Warning: if this value is not None, the model is no longer size extensive
 global_rescale_shift: null
 
-# global energy scale. When "dataset_force_rms", the RMS of force components in the dataset. When "dataset_total_energy_std", the stdev of energies in the dataset. When null, disables the global scale. When a number, used directly.
+# global energy scale. When "dataset_force_rms", the RMS of force components in the dataset.
+# When "dataset_forces_absmax", the maximum force component magnitude in the dataset.
+# When "dataset_total_energy_std", the stdev of energies in the dataset.
+# When null, disables the global scale. When a number, used directly.
 # If not provided, defaults to either dataset_force_rms or dataset_total_energy_std, depending on whether forces are being trained.
 global_rescale_scale: dataset_forces_rms
 
@@ -329,9 +351,10 @@ global_rescale_scale_trainable: false
 # global_rescale_shift_trainable: false
 # global_rescale_scale: dataset_forces_rms
 # global_rescale_scale_trainable: false
-# per_species_rescale_trainable: true
-# per_species_rescale_shifts: dataset_per_atom_total_energy_mean
-# per_species_rescale_scales: dataset_per_atom_total_energy_std
+# per_species_rescale_shifts_trainable: false
+# per_species_rescale_scales_trainable: true
+# per_species_rescale_shifts: dataset_per_species_total_energy_mean
+# per_species_rescale_scales: dataset_per_species_forces_rms
 
 # # full block needed for global rescale
 # global_rescale_shift: dataset_total_energy_mean

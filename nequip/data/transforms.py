@@ -13,6 +13,7 @@ class TypeMapper:
 
     num_types: int
     chemical_symbol_to_type: Optional[Dict[str, int]]
+    type_to_chemical_symbol: Optional[Dict[int, str]]
     type_names: List[str]
     _min_Z: int
 
@@ -20,6 +21,7 @@ class TypeMapper:
         self,
         type_names: Optional[List[str]] = None,
         chemical_symbol_to_type: Optional[Dict[str, int]] = None,
+        type_to_chemical_symbol: Optional[Dict[int, str]] = None,
         chemical_symbols: Optional[List[str]] = None,
     ):
         if chemical_symbols is not None:
@@ -75,6 +77,14 @@ class TypeMapper:
             for sym, type_idx in self.chemical_symbol_to_type.items():
                 self._index_to_Z[type_idx] = ase.data.atomic_numbers[sym]
             self._valid_set = set(valid_atomic_numbers)
+            true_type_to_chemical_symbol = {
+                type_id: sym for sym, type_id in self.chemical_symbol_to_type.items()
+            }
+            if type_to_chemical_symbol is not None:
+                assert type_to_chemical_symbol == true_type_to_chemical_symbol
+            else:
+                type_to_chemical_symbol = true_type_to_chemical_symbol
+
         # check
         if type_names is None:
             raise ValueError(
@@ -88,6 +98,11 @@ class TypeMapper:
         self.num_types = len(type_names)
         # Check type_names
         self.type_names = type_names
+        if type_to_chemical_symbol is not None:
+            assert set(type_to_chemical_symbol.keys()) == set(range(self.num_types))
+            self.type_to_chemical_symbol = type_to_chemical_symbol
+        else:
+            self.type_to_chemical_symbol = None
 
     def __call__(
         self, data: Union[AtomicDataDict.Type, AtomicData], types_required: bool = True
@@ -121,11 +136,13 @@ class TypeMapper:
                 f"Data included atomic numbers {bad_set} that are not part of the atomic number -> type mapping!"
             )
 
-        return self._Z_to_index[atomic_numbers - self._min_Z]
+        return self._Z_to_index.to(device=atomic_numbers.device)[
+            atomic_numbers - self._min_Z
+        ]
 
     def untransform(self, atom_types):
         """Transform atom types back into atomic numbers"""
-        return self._index_to_Z[atom_types]
+        return self._index_to_Z[atom_types].to(device=atom_types.device)
 
     @property
     def has_chemical_symbols(self) -> bool:

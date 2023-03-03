@@ -7,7 +7,7 @@ import ase
 import ase.build
 from ase.calculators.emt import EMT
 
-from nequip.data import AtomicInMemoryDataset, AtomicData, AtomicDataDict
+from nequip.data import AtomicInMemoryDataset, AtomicData
 from .transforms import TypeMapper
 
 
@@ -30,7 +30,7 @@ class EMTTestDataset(AtomicInMemoryDataset):
         dataset_seed: int = 123456,
         file_name: Optional[str] = None,
         url: Optional[str] = None,
-        extra_fixed_fields: Dict[str, Any] = {},
+        AtomicData_options: Dict[str, Any] = {},
         include_frames: Optional[List[int]] = None,
         type_mapper: TypeMapper = None,
     ):
@@ -38,7 +38,7 @@ class EMTTestDataset(AtomicInMemoryDataset):
         assert element in ("Cu", "Pd", "Au", "Pt", "Al", "Ni", "Ag")
         self.element = element
         self.sigma = sigma
-        self.supercell = supercell
+        self.supercell = tuple(supercell)
         self.num_frames = num_frames
         self.dataset_seed = dataset_seed
 
@@ -46,8 +46,7 @@ class EMTTestDataset(AtomicInMemoryDataset):
             file_name=file_name,
             url=url,
             root=root,
-            force_fixed_keys=[AtomicDataDict.CELL_KEY, AtomicDataDict.PBC_KEY],
-            extra_fixed_fields=extra_fixed_fields,
+            AtomicData_options=AtomicData_options,
             include_frames=include_frames,
             type_mapper=type_mapper,
         )
@@ -78,7 +77,7 @@ class EMTTestDataset(AtomicInMemoryDataset):
                     forces=base_atoms.get_forces(),
                     total_energy=base_atoms.get_potential_energy(),
                     stress=base_atoms.get_stress(voigt=False),
-                    **self.extra_fixed_fields
+                    **self.AtomicData_options
                 )
             )
-        return (datas,)
+        return datas

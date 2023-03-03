@@ -9,14 +9,15 @@ import argparse
 import pathlib
 import logging
 import yaml
+import itertools
+import packaging.version
+import warnings
 
 # This is a weird hack to avoid Intel MKL issues on the cluster when this is called as a subprocess of a process that has itself initialized PyTorch.
 # Since numpy gets imported later anyway for dataset stuff, this shouldn't affect performance.
 import numpy as np  # noqa: F401
 
 import torch
-
-import ase.data
 
 from e3nn.util.jit import script
 
@@ -25,6 +26,7 @@ from nequip.train import Trainer
 from nequip.utils import Config
 from nequip.utils.versions import check_code_version, get_config_code_versions
 from nequip.scripts.train import default_config
+from nequip.utils.misc import dtype_to_name
 from nequip.utils._global_options import _set_global_options
 
 CONFIG_KEY: Final[str] = "config"
@@ -38,6 +40,8 @@ TYPE_NAMES_KEY: Final[str] = "type_names"
 JIT_BAILOUT_KEY: Final[str] = "_jit_bailout_depth"
 JIT_FUSION_STRATEGY: Final[str] = "_jit_fusion_strategy"
 TF32_KEY: Final[str] = "allow_tf32"
+DEFAULT_DTYPE_KEY: Final[str] = "default_dtype"
+MODEL_DTYPE_KEY: Final[str] = "model_dtype"
 
 _ALL_METADATA_KEYS = [
     CONFIG_KEY,
@@ -50,6 +54,8 @@ _ALL_METADATA_KEYS = [
     JIT_BAILOUT_KEY,
     JIT_FUSION_STRATEGY,
     TF32_KEY,
+    DEFAULT_DTYPE_KEY,
+    MODEL_DTYPE_KEY,
 ]
 
 
@@ -99,11 +105,28 @@ def load_deployed_model(
         model = torch.jit.freeze(model)
     # Everything we store right now is ASCII, so decode for printing
     metadata = {k: v.decode("ascii") for k, v in metadata.items()}
+    # Update metadata for backward compatibility
+    if metadata[DEFAULT_DTYPE_KEY] == "":
+        # Default and model go together
+        assert metadata[MODEL_DTYPE_KEY] == ""
+        # If there isn't a dtype, it should be older than 0.6.0:
+        assert packaging.version.parse(
+            metadata[NEQUIP_VERSION_KEY]
+        ) < packaging.version.parse("0.6.0")
+        # i.e. no value due to L85 above
+        # The old pre-0.6.0 defaults:
+        metadata[DEFAULT_DTYPE_KEY] = "float32"
+        metadata[MODEL_DTYPE_KEY] = "float32"
+        warnings.warn(
+            "Models deployed before v0.6.0 don't contain information about their default_dtype or model_dtype; assuming the old default of float32 for both, but this might not be right if you had explicitly set default_dtype=float64."
+        )
+
     # Set up global settings:
     assert set_global_options in (True, False, "warn")
     if set_global_options:
         global_config_dict = {}
         global_config_dict["allow_tf32"] = bool(int(metadata[TF32_KEY]))
+        global_config_dict["default_dtype"] = str(metadata[DEFAULT_DTYPE_KEY])
         # JIT strategy
         strategy = metadata.get(JIT_FUSION_STRATEGY, "")
         if strategy != "":
@@ -129,7 +152,7 @@ def load_deployed_model(
 
 def main(args=None):
     parser = argparse.ArgumentParser(
-        description="Create and view information about deployed NequIP potentials."
+        description="Deploy and view information about previously deployed NequIP models."
     )
     # backward compat for 3.6
     if sys.version_info[1] > 6:
@@ -145,6 +168,11 @@ def main(args=None):
         "model_path",
         help="Path to a deployed model file.",
         type=pathlib.Path,
+    )
+    info_parser.add_argument(
+        "--print-config",
+        help="Print the full config of the model.",
+        action="store_true",
     )
 
     build_parser = subparsers.add_parser("build", help="Build a deployment model")
@@ -169,13 +197,25 @@ def main(args=None):
     logging.basicConfig(level=getattr(logging, args.verbose.upper()))
 
     if args.command == "info":
-        model, metadata = load_deployed_model(args.model_path, set_global_options=False)
-        del model
+        model, metadata = load_deployed_model(
+            args.model_path, set_global_options=False, freeze=False
+        )
         config = metadata.pop(CONFIG_KEY)
-        metadata_str = "\n".join("  %s: %s" % e for e in metadata.items())
-        logging.info(f"Loaded TorchScript model with metadata:\n{metadata_str}\n")
-        logging.info("Model was built with config:")
-        print(config)
+        if args.print_config:
+            print(config)
+        else:
+            metadata_str = "\n".join("  %s: %s" % e for e in metadata.items())
+            logging.info(f"Loaded TorchScript model with metadata:\n{metadata_str}\n")
+            logging.info(
+                f"Model has {sum(p.numel() for p in model.parameters())} weights"
+            )
+            logging.info(
+                f"Model has {sum(p.numel() for p in model.parameters() if p.requires_grad)} trainable weights"
+            )
+            logging.info(
+                f"Model weights and buffers take {sum(p.numel() * p.element_size() for p in itertools.chain(model.parameters(), model.buffers())) / (1024 * 1024):.2f} MB"
+            )
+            logging.debug(f"Model had config:\n{config}")
 
     elif args.command == "build":
         if args.model and args.train_dir:
@@ -198,7 +238,7 @@ def main(args=None):
                 args.train_dir, model_name="best_model.pth", device="cpu"
             )
         elif args.model is not None:
-            model = model_from_config(config)
+            model = model_from_config(config, deploy=True)
         else:
             raise AssertionError
 
@@ -217,27 +257,24 @@ def main(args=None):
             )
 
         metadata[R_MAX_KEY] = str(float(config["r_max"]))
-        if "allowed_species" in config:
-            # This is from before the atomic number updates
-            n_species = len(config["allowed_species"])
-            type_names = {
-                type: ase.data.chemical_symbols[atomic_num]
-                for type, atomic_num in enumerate(config["allowed_species"])
-            }
-        else:
-            # The new atomic number setup
-            n_species = str(config["num_types"])
-            type_names = config["type_names"]
+        n_species = str(config["num_types"])
+        type_names = config["type_names"]
         metadata[N_SPECIES_KEY] = str(n_species)
         metadata[TYPE_NAMES_KEY] = " ".join(type_names)
 
         metadata[JIT_BAILOUT_KEY] = str(config[JIT_BAILOUT_KEY])
-        if int(torch.__version__.split(".")[1]) >= 11 and JIT_FUSION_STRATEGY in config:
+        if (
+            packaging.version.parse(torch.__version__)
+            >= packaging.version.parse("1.11")
+            and JIT_FUSION_STRATEGY in config
+        ):
             metadata[JIT_FUSION_STRATEGY] = ";".join(
                 "%s,%i" % e for e in config[JIT_FUSION_STRATEGY]
             )
         metadata[TF32_KEY] = str(int(config["allow_tf32"]))
-        metadata[CONFIG_KEY] = yaml.dump(dict(config))
+        metadata[DEFAULT_DTYPE_KEY] = dtype_to_name(config["default_dtype"])
+        metadata[MODEL_DTYPE_KEY] = dtype_to_name(config["model_dtype"])
+        metadata[CONFIG_KEY] = yaml.dump(Config.as_dict(config))
 
         metadata = {k: v.encode("ascii") for k, v in metadata.items()}
         torch.jit.save(model, args.out_file, _extra_files=metadata)

@@ -44,6 +44,7 @@ EDGE_LENGTH_KEY: Final[str] = "edge_lengths"
 EDGE_ATTRS_KEY: Final[str] = "edge_attrs"
 # [n_edge, dim] invariant embedding of the edges
 EDGE_EMBEDDING_KEY: Final[str] = "edge_embedding"
+EDGE_FEATURES_KEY: Final[str] = "edge_features"
 
 NODE_FEATURES_KEY: Final[str] = "node_features"
 NODE_ATTRS_KEY: Final[str] = "node_attrs"
@@ -65,6 +66,7 @@ ALL_ENERGY_KEYS: Final[List[str]] = [
 ]
 
 BATCH_KEY: Final[str] = "batch"
+BATCH_PTR_KEY: Final[str] = "ptr"
 
 # Make a list of allowed keys
 ALLOWED_KEYS: List[str] = [
