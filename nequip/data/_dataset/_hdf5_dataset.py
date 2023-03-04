@@ -12,24 +12,53 @@ from ._base_datasets import AtomicDataset
 
 
 class HDF5Dataset(AtomicDataset):
+    """A dataset that loads data from a HDF5 file.
+
+    This class is useful for very large datasets that cannot fit in memory.  It
+    efficiently loads data from disk as needed without everything needing to be
+    in memory at once.
+
+    To use this, ``file_name`` should point to the HDF5 file, or alternatively a
+    semicolon separated list of multiple files.  Each group in the file contains
+    samples that all have the same number of atoms.  Typically there is one
+    group for each unique number of atoms, but that is not required.  Each group
+    should contain arrays whose length equals the number of samples, one for each
+    type of data.  The names of the arrays can be specified with ``key_mapping``.
+
+    Args:
+        key_mapping (Dict[str, str]): mapping of array names in the HDF5 file to ``AtomicData`` keys
+        file_name (string): a semicolon separated list of HDF5 files.
+    """
     def __init__(
         self,
         root: str,
+        key_mapping: Dict[str, str] = {
+            "pos": AtomicDataDict.POSITIONS_KEY,
+            "energy": AtomicDataDict.TOTAL_ENERGY_KEY,
+            "forces": AtomicDataDict.FORCE_KEY,
+            "atomic_numbers": AtomicDataDict.ATOMIC_NUMBERS_KEY,
+            "types": AtomicDataDict.ATOM_TYPE_KEY,
+        },
         file_name: Optional[str] = None,
-        extra_fixed_fields: Dict[str, Any] = {},
+        AtomicData_options: Dict[str, Any] = {},
         type_mapper: Optional[TypeMapper] = None,
     ):
         super().__init__(root=root, type_mapper=type_mapper)
+        self.key_mapping = key_mapping
+        self.key_list = list(key_mapping.keys())
         self.file_name = file_name
-        self.r_max = extra_fixed_fields["r_max"]
+        self.r_max = AtomicData_options["r_max"]
         self.index = None
-        self.num_molecules = 0
+        self.num_frames = 0
         import h5py
 
         files = [h5py.File(f, "r") for f in self.file_name.split(";")]
         for file in files:
             for group_name in file:
-                self.num_molecules += len(file[group_name]["energy"])
+                for key in self.key_list:
+                    if key in file[group_name]:
+                        self.num_frames += len(file[group_name][key])
+                        break
             file.close()
 
     def setup_index(self):
@@ -41,34 +70,27 @@ class HDF5Dataset(AtomicDataset):
         for file in files:
             for group_name in file:
                 group = file[group_name]
-                types = np.array(group["types"])
-                pos = np.array(group["pos"])
-                energy = np.array(group["energy"])
-                if "forces" in group:
-                    self.has_forces = True
-                    forces = -np.array(group["forces"])
-                    for i in range(len(energy)):
-                        self.index.append((types, pos, energy, forces, i))
-                else:
-                    for i in range(len(energy)):
-                        self.index.append((types, pos, energy, i))
+                values = [None]*len(self.key_list)
+                samples = 0
+                for i, key in enumerate(self.key_list):
+                    if key in group:
+                        values[i] = np.array(group[key])
+                        samples = len(values[i])
+                for i in range(samples):
+                    self.index.append(tuple(values+[i]))
 
     def len(self) -> int:
-        return self.num_molecules
+        return self.num_frames
 
     def get(self, idx: int) -> AtomicData:
         if self.index is None:
             self.setup_index()
         data = self.index[idx]
         i = data[-1]
-        args = {
-            "pos": data[1][i],
-            "r_max": self.r_max,
-            AtomicDataDict.ATOM_TYPE_KEY: data[0][i],
-            AtomicDataDict.TOTAL_ENERGY_KEY: data[2][i],
-        }
-        if self.has_forces:
-            args[AtomicDataDict.FORCE_KEY] = data[3][i]
+        args = {"r_max": self.r_max}
+        for j, key in enumerate(self.key_list):
+            if data[j][i] is not None:
+                args[self.key_mapping[self.key_list[j]]] = data[j][i]
         return AtomicData.from_points(**args)
 
     def statistics(
