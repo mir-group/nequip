@@ -46,6 +46,7 @@ class HDF5Dataset(AtomicDataset):
         super().__init__(root=root, type_mapper=type_mapper)
         self.key_mapping = key_mapping
         self.key_list = list(key_mapping.keys())
+        self.value_list = list(key_mapping.values())
         self.file_name = file_name
         self.r_max = AtomicData_options["r_max"]
         self.index = None
@@ -74,7 +75,7 @@ class HDF5Dataset(AtomicDataset):
                 samples = 0
                 for i, key in enumerate(self.key_list):
                     if key in group:
-                        values[i] = np.array(group[key])
+                        values[i] = group[key]
                         samples = len(values[i])
                 for i in range(samples):
                     self.index.append(tuple(values+[i]))
@@ -88,9 +89,9 @@ class HDF5Dataset(AtomicDataset):
         data = self.index[idx]
         i = data[-1]
         args = {"r_max": self.r_max}
-        for j, key in enumerate(self.key_list):
-            if data[j][i] is not None:
-                args[self.key_mapping[self.key_list[j]]] = data[j][i]
+        for j, value in enumerate(self.value_list):
+            if data[j] is not None:
+                args[value] = data[j][i]
         return AtomicData.from_points(**args)
 
     def statistics(
@@ -119,10 +120,8 @@ class HDF5Dataset(AtomicDataset):
             for index in range(0, self.len(), stride):
                 data = self.index[index]
                 i = data[-1]
-                if field == AtomicDataDict.FORCE_KEY:
-                    values = data[3][i]
-                elif field == AtomicDataDict.TOTAL_ENERGY_KEY:
-                    values = data[2][i]
+                if field in self.value_list:
+                    values = data[self.value_list.index(field)][i]
                 elif callable(field):
                     values, _ = field(self.get(index))
                     values = np.asarray(values)
