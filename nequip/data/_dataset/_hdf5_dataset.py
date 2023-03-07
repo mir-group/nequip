@@ -1,4 +1,5 @@
 from typing import Dict, Any, List, Callable, Union, Optional
+from collections import defaultdict
 import numpy as np
 
 import torch
@@ -109,15 +110,20 @@ class HDF5Dataset(AtomicDataset):
         if self.index is None:
             self.setup_index()
         results = []
+        indices = self.indices()
+        if stride != 1:
+            indices = list(indices)[::stride]
         for field, mode in zip(fields, modes):
             count = 0
             if mode == "rms":
                 total = 0.0
             elif mode in ("mean_std", "per_atom_mean_std"):
                 total = [0.0, 0.0]
+            elif mode == "count":
+                counts = defaultdict(int)
             else:
                 raise NotImplementedError(f"Analysis mode '{mode}' is not implemented")
-            for index in range(0, self.len(), stride):
+            for index in indices:
                 data = self.index[index]
                 i = data[-1]
                 if field in self.value_list:
@@ -129,26 +135,31 @@ class HDF5Dataset(AtomicDataset):
                     raise RuntimeError(
                         f"The field key `{field}` is not present in this dataset"
                     )
+                length = len(values.flatten())
+                if length == 1:
+                    values = np.array([values])
                 if mode == "rms":
                     total += np.sum(values * values)
-                    count += len(values.flatten())
+                    count += length
+                elif mode == "count":
+                    for v in values:
+                        counts[v] += 1
                 else:
-                    length = len(values.flatten())
                     if mode == "per_atom_mean_std":
                         values /= len(data[0][i])
-                    sample_mean = np.mean(values)
-                    new_mean = (total[0] * count + sample_mean * length) / (
-                        count + length
-                    )
-                    total[1] += (
-                        length * (sample_mean - total[0]) * (sample_mean - new_mean)
-                    )
-                    total[0] = new_mean
-                    count += length
+                    for v in values:
+                        count += 1
+                        delta1 = v - total[0]
+                        total[0] += delta1 / count
+                        delta2 = v - total[0]
+                        total[1] += delta1 * delta2
             if mode == "rms":
                 results.append(torch.tensor((np.sqrt(total / count),)))
+            elif mode == "count":
+                values = sorted(counts.keys())
+                results.append((torch.tensor(values), torch.tensor([counts[v] for v in values])))
             else:
                 results.append(
-                    (torch.tensor(total[0]), torch.tensor(np.sqrt(total[1] / count)))
+                    (torch.tensor(total[0]), torch.tensor(np.sqrt(total[1] / (count-1))))
                 )
         return results
