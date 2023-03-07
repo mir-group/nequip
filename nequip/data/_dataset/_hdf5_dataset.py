@@ -30,6 +30,7 @@ class HDF5Dataset(AtomicDataset):
         key_mapping (Dict[str, str]): mapping of array names in the HDF5 file to ``AtomicData`` keys
         file_name (string): a semicolon separated list of HDF5 files.
     """
+
     def __init__(
         self,
         root: str,
@@ -72,14 +73,14 @@ class HDF5Dataset(AtomicDataset):
         for file in files:
             for group_name in file:
                 group = file[group_name]
-                values = [None]*len(self.key_list)
+                values = [None] * len(self.key_list)
                 samples = 0
                 for i, key in enumerate(self.key_list):
                     if key in group:
                         values[i] = group[key]
                         samples = len(values[i])
                 for i in range(samples):
-                    self.index.append(tuple(values+[i]))
+                    self.index.append(tuple(values + [i]))
 
     def len(self) -> int:
         return self.num_frames
@@ -157,9 +158,14 @@ class HDF5Dataset(AtomicDataset):
                 results.append(torch.tensor((np.sqrt(total / count),)))
             elif mode == "count":
                 values = sorted(counts.keys())
-                results.append((torch.tensor(values), torch.tensor([counts[v] for v in values])))
+                results.append(
+                    (torch.tensor(values), torch.tensor([counts[v] for v in values]))
+                )
             else:
                 results.append(
-                    (torch.tensor(total[0]), torch.tensor(np.sqrt(total[1] / (count-1))))
+                    (
+                        torch.tensor(total[0]),
+                        torch.tensor(np.sqrt(total[1] / (count - 1))),
+                    )
                 )
         return results
