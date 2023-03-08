@@ -67,7 +67,10 @@ def npz_dataset(npz_data, temp_data):
 
 @pytest.fixture(scope="function")
 def hdf5_dataset(npz, temp_data):
-    import h5py
+    try:
+        import h5py
+    except ModuleNotFoundError:
+        pytest.skip("h5py is not installed")
 
     with tempfile.NamedTemporaryFile(suffix=".hdf5") as path:
         f = h5py.File(path.name, "w")
