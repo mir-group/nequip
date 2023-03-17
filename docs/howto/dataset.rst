@@ -37,7 +37,7 @@ For example, ``dataset_file_name`` is used for training data and ``validation_da
 
 Python interface
 ~~~~~~~~~~~~~~~~
-See ``nequip.data.dataset.AtomicInMemoryDataset``.
+See ``nequip.data.AtomicInMemoryDataset``.
 
 Prepare dataset and specify in yaml config
 ------------------------------------------

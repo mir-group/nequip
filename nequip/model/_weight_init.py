@@ -53,7 +53,10 @@ def load_model_state(
         raise KeyError(
             f"initialize_from_state requires the `{_prefix}` option specifying the state to initialize from"
         )
-    state = torch.load(config[_prefix])
+    # Make sure we map to CPU if there is no GPU, otherwise just leave it alone
+    state = torch.load(
+        config[_prefix], map_location=None if torch.cuda.is_available() else "cpu"
+    )
     graph_model.load_state_dict(state, strict=config.get(_prefix + "_strict", True))
     return graph_model
 

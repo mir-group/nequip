@@ -161,7 +161,8 @@ def test_requeue(nequip_dataset, BENCHMARK_ROOT, conffile):
             )
 
             retcode = subprocess.run(
-                ["nequip-train", "conf.yaml"],
+                # Supress the warning cause we use general config for all the fake models
+                ["nequip-train", "conf.yaml", "--warn-unused"],
                 cwd=tmpdir,
                 env=env,
                 stdout=subprocess.PIPE,

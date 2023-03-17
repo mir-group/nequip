@@ -1,4 +1,5 @@
 import warnings
+from packaging import version
 
 import torch
 
@@ -9,6 +10,7 @@ from nequip.data import register_fields
 from .misc import dtype_from_name
 from .auto_init import instantiate
 from .test import set_irreps_debug
+from .config import Config
 
 
 # for multiprocessing, we need to keep track of our latest global options so
@@ -35,7 +37,7 @@ def _set_global_options(config, warn_on_override: bool = False) -> None:
     """
     # update these options into the latest global config.
     global _latest_global_config
-    _latest_global_config.update(dict(config))
+    _latest_global_config.update(Config.as_dict(config))
     # Set TF32 support
     # See https://pytorch.org/docs/stable/notes/cuda.html#tensorfloat-32-tf32-on-ampere-devices
     if torch.cuda.is_available() and "allow_tf32" in config:
@@ -48,7 +50,7 @@ def _set_global_options(config, warn_on_override: bool = False) -> None:
             torch.backends.cuda.matmul.allow_tf32 = config["allow_tf32"]
             torch.backends.cudnn.allow_tf32 = config["allow_tf32"]
 
-    if int(torch.__version__.split(".")[1]) >= 11:
+    if version.parse(torch.__version__) >= version.parse("1.11"):
         # PyTorch >= 1.11
         k = "_jit_fusion_strategy"
         if k in config:
@@ -69,6 +71,27 @@ def _set_global_options(config, warn_on_override: bool = False) -> None:
                 warnings.warn(
                     f"Setting the GLOBAL value for jit bailout depth to `{new_depth}` which is different than the previous value of `{old_depth}`"
                 )
+
+    # Deal with fusers
+    # The default PyTorch fuser changed to nvFuser in 1.12
+    # fuser1 is NNC, fuser2 is nvFuser
+    # See https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/OVERVIEW.md#fusers
+    # And https://github.com/pytorch/pytorch/blob/e0a0f37a11164f59b42bc80a6f95b54f722d47ce/torch/jit/_fuser.py#L46
+    default_fuser = (
+        "fuser2"  # TODO: does this make sense for ROCm?
+        if torch.cuda.is_available()
+        else "fuser1"  # default to NNC on CPU for now no matter what
+        if version.parse(torch.__version__) >= version.parse("1.12")
+        else "fuser1"
+    )
+    fuser = config.get("_jit_fuser", default_fuser)
+    # context manager just restores old fuser afterwards
+    torch.jit.fuser(fuser).__enter__()
+    if warn_on_override and fuser != default_fuser:
+        # ^ meh assumption, but better than hardcoding getting the old state
+        warnings.warn(
+            f"Setting the GLOBAL value for JIT fuser to `{fuser}`, which is different than the default for your current PyTorch version ({torch.__version__}) of `{default_fuser}`"
+        )
 
     # TODO: warn_on_override for the rest here?
     if config.get("model_debug_mode", False):
