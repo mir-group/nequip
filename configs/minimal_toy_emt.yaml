@@ -20,7 +20,10 @@ num_features: 16
 num_layers: 4
 
 # data set
-dataset: EMTTest                                                                       # type of data set, can be npz or ase
+# A toy dataset of metalic bulks using ASE's toy EMT potential
+# Useful for quick tests, but NOT REAL DATA
+dataset: EMTTest
+dataset_supercell: [4, 4, 4]
 dataset_element: Cu
 dataset_num_frames: 50
 chemical_symbols:

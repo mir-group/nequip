@@ -49,7 +49,7 @@ def test_deploy(BENCHMARK_ROOT, device, model_dtype):
         true_config["default_dtype"] = dtype
         true_config["model_dtype"] = model_dtype
         true_config["max_epochs"] = 1
-        true_config["n_train"] = 1
+        true_config["n_train"] = 2
         true_config["n_val"] = 1
         config_path = "conf.yaml"
         full_config_path = f"{tmpdir}/{config_path}"

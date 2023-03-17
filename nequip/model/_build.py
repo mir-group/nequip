@@ -13,6 +13,7 @@ from nequip.utils import (
     torch_default_dtype,
     Config,
 )
+from nequip.utils.config import _GLOBAL_ALL_ASKED_FOR_KEYS
 
 
 def model_from_config(
@@ -65,6 +66,10 @@ def model_from_config(
         config["num_types"] = type_mapper.num_types
         config["type_names"] = type_mapper.type_names
         config["type_to_chemical_symbol"] = type_mapper.type_to_chemical_symbol
+        # We added them, so they are by definition valid:
+        _GLOBAL_ALL_ASKED_FOR_KEYS.update(
+            {"num_types", "type_names", "type_to_chemical_symbol"}
+        )
 
     default_dtype = torch.get_default_dtype()
     model_dtype: torch.dtype = dtype_from_name(config.get("model_dtype", default_dtype))

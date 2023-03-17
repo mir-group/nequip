@@ -10,6 +10,8 @@ import pathlib
 import logging
 import yaml
 import itertools
+import packaging.version
+import warnings
 
 # This is a weird hack to avoid Intel MKL issues on the cluster when this is called as a subprocess of a process that has itself initialized PyTorch.
 # Since numpy gets imported later anyway for dataset stuff, this shouldn't affect performance.
@@ -103,6 +105,22 @@ def load_deployed_model(
         model = torch.jit.freeze(model)
     # Everything we store right now is ASCII, so decode for printing
     metadata = {k: v.decode("ascii") for k, v in metadata.items()}
+    # Update metadata for backward compatibility
+    if metadata[DEFAULT_DTYPE_KEY] == "":
+        # Default and model go together
+        assert metadata[MODEL_DTYPE_KEY] == ""
+        # If there isn't a dtype, it should be older than 0.6.0:
+        assert packaging.version.parse(
+            metadata[NEQUIP_VERSION_KEY]
+        ) < packaging.version.parse("0.6.0")
+        # i.e. no value due to L85 above
+        # The old pre-0.6.0 defaults:
+        metadata[DEFAULT_DTYPE_KEY] = "float32"
+        metadata[MODEL_DTYPE_KEY] = "float32"
+        warnings.warn(
+            "Models deployed before v0.6.0 don't contain information about their default_dtype or model_dtype; assuming the old default of float32 for both, but this might not be right if you had explicitly set default_dtype=float64."
+        )
+
     # Set up global settings:
     assert set_global_options in (True, False, "warn")
     if set_global_options:
@@ -262,14 +280,18 @@ def main(args=None):
         metadata[TYPE_NAMES_KEY] = " ".join(type_names)
 
         metadata[JIT_BAILOUT_KEY] = str(config[JIT_BAILOUT_KEY])
-        if int(torch.__version__.split(".")[1]) >= 11 and JIT_FUSION_STRATEGY in config:
+        if (
+            packaging.version.parse(torch.__version__)
+            >= packaging.version.parse("1.11")
+            and JIT_FUSION_STRATEGY in config
+        ):
             metadata[JIT_FUSION_STRATEGY] = ";".join(
                 "%s,%i" % e for e in config[JIT_FUSION_STRATEGY]
             )
         metadata[TF32_KEY] = str(int(config["allow_tf32"]))
         metadata[DEFAULT_DTYPE_KEY] = dtype_to_name(config["default_dtype"])
         metadata[MODEL_DTYPE_KEY] = dtype_to_name(config["model_dtype"])
-        metadata[CONFIG_KEY] = yaml.dump(dict(config))
+        metadata[CONFIG_KEY] = yaml.dump(Config.as_dict(config))
 
         metadata = {k: v.encode("ascii") for k, v in metadata.items()}
         torch.jit.save(model, args.out_file, _extra_files=metadata)
