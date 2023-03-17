@@ -18,6 +18,7 @@ Most recent change on the bottom.
 - `nequip-evaluate --output-fields-from-original-dataset`
 - Error (or warn) on unused options in YAML that likely indicate typos
 - `dataset_*_absmax` statistics option
+- `HDF5Dataset` (#227)
 
 ### Changed
 - Always require explicit `seed`

@@ -14,6 +14,7 @@ from nequip.data import (
     AtomicInMemoryDataset,
     NpzDataset,
     ASEDataset,
+    HDF5Dataset,
     dataset_from_config,
     register_fields,
     deregister_fields,
@@ -62,6 +63,27 @@ def npz_dataset(npz_data, temp_data):
         AtomicData_options={"r_max": 3},
     )
     yield a
+
+
+@pytest.fixture(scope="function")
+def hdf5_dataset(npz, temp_data):
+    try:
+        import h5py
+    except ModuleNotFoundError:
+        pytest.skip("h5py is not installed")
+
+    with tempfile.NamedTemporaryFile(suffix=".hdf5") as path:
+        f = h5py.File(path.name, "w")
+        group = f.create_group("samples")
+        group.create_dataset("atomic_numbers", data=npz["Z"], dtype=np.int8)
+        group.create_dataset("pos", data=npz["positions"], dtype=np.float32)
+        group.create_dataset("energy", data=npz["energy"], dtype=np.float32)
+        group.create_dataset("forces", data=npz["force"], dtype=np.float32)
+        yield HDF5Dataset(
+            file_name=path.name,
+            root=temp_data + "/test_dataset",
+            AtomicData_options={"r_max": 3},
+        )
 
 
 @pytest.fixture(scope="function")
@@ -118,9 +140,10 @@ class TestStatistics:
         # By default we follow torch convention of defaulting to the unbiased std
         assert np.allclose(np.std(f_raveled, ddof=1), f_std)
 
-    def test_statistics(self, npz_dataset, npz):
-
-        (eng_mean, eng_std), (Z_unique, Z_count) = npz_dataset.statistics(
+    @pytest.mark.parametrize("dataset_type", ["npz_dataset", "hdf5_dataset"])
+    def test_statistics(self, dataset_type, npz, request):
+        dataset = request.getfixturevalue(dataset_type)
+        (eng_mean, eng_std), (Z_unique, Z_count) = dataset.statistics(
             fields=[AtomicDataDict.TOTAL_ENERGY_KEY, AtomicDataDict.ATOMIC_NUMBERS_KEY],
             modes=["mean_std", "count"],
         )
@@ -138,9 +161,9 @@ class TestStatistics:
         assert np.all(Z_unique == uniq)
         assert np.all(Z_count == count)
 
-    def test_with_subset(self, npz_dataset, npz):
-
-        dataset = npz_dataset.index_select([0])
+    @pytest.mark.parametrize("dataset_type", ["npz_dataset", "hdf5_dataset"])
+    def test_with_subset(self, dataset_type, npz, request):
+        dataset = request.getfixturevalue(dataset_type).index_select([0])
 
         ((Z_unique, Z_count), (force_rms,)) = dataset.statistics(
             [AtomicDataDict.ATOMIC_NUMBERS_KEY, AtomicDataDict.FORCE_KEY],
@@ -155,8 +178,10 @@ class TestStatistics:
             force_rms.numpy(), np.sqrt(np.mean(np.square(npz["force"][0])))
         )
 
-    def test_atom_types(self, npz_dataset):
-        ((avg_num_neigh, _),) = npz_dataset.statistics(
+    @pytest.mark.parametrize("dataset_type", ["npz_dataset", "hdf5_dataset"])
+    def test_atom_types(self, dataset_type, request):
+        dataset = request.getfixturevalue(dataset_type)
+        ((avg_num_neigh, _),) = dataset.statistics(
             fields=[
                 lambda data: (
                     torch.unique(
@@ -170,11 +195,13 @@ class TestStatistics:
         # They are all homogenous in this dataset:
         assert (
             avg_num_neigh
-            == torch.bincount(npz_dataset[0][AtomicDataDict.EDGE_INDEX_KEY][0])[0]
+            == torch.bincount(dataset[0][AtomicDataDict.EDGE_INDEX_KEY][0])[0]
         )
 
-    def test_edgewise_stats(self, npz_dataset):
-        ((avg_edge_length, std_edge_len),) = npz_dataset.statistics(
+    @pytest.mark.parametrize("dataset_type", ["npz_dataset", "hdf5_dataset"])
+    def test_edgewise_stats(self, dataset_type, request):
+        dataset = request.getfixturevalue(dataset_type)
+        ((avg_edge_length, std_edge_len),) = dataset.statistics(
             fields=[
                 lambda data: (
                     (
@@ -190,15 +217,21 @@ class TestStatistics:
             ],
             modes=["mean_std"],
         )
-        collater = Collater.for_dataset(npz_dataset)
-        all_data = collater([npz_dataset[i] for i in range(len(npz_dataset))])
+        collater = Collater.for_dataset(dataset)
+        all_data = collater([dataset[i] for i in range(len(dataset))])
         all_data = AtomicData.to_AtomicDataDict(all_data)
         all_data = AtomicDataDict.with_edge_vectors(all_data, with_lengths=True)
         assert torch.allclose(
-            avg_edge_length, torch.mean(all_data[AtomicDataDict.EDGE_LENGTH_KEY])
+            avg_edge_length,
+            torch.mean(all_data[AtomicDataDict.EDGE_LENGTH_KEY]).to(
+                avg_edge_length.dtype
+            ),
         )
         assert torch.allclose(
-            std_edge_len, torch.std(all_data[AtomicDataDict.EDGE_LENGTH_KEY])
+            std_edge_len,
+            torch.std(all_data[AtomicDataDict.EDGE_LENGTH_KEY]).to(
+                avg_edge_length.dtype
+            ),
         )
 
 
@@ -277,7 +310,6 @@ class TestPerSpeciesStatistics:
     @pytest.mark.parametrize("full_rank", [True, False])
     @pytest.mark.parametrize("subset", [True, False])
     def test_per_graph_field(self, npz_dataset, alpha, full_rank, subset):
-
         if alpha <= 1e-4 and not full_rank:
             return
 
@@ -444,7 +476,6 @@ def generate_E(N, mean_min, mean_max, std):
 
 
 def set_up_transformer(npz_dataset, full_rank, subset):
-
     if full_rank:
         unique = torch.unique(npz_dataset.data[AtomicDataDict.ATOMIC_NUMBERS_KEY])
         npz_dataset.transform = TypeMapper(
