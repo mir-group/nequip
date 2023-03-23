@@ -86,7 +86,7 @@ def main(args=None, running_as_script: bool = True):
 
             Prints only the final result in `name = num` format to stdout; all other information is `logging.debug`ed to stderr.
 
-            WARNING: Please note that results of CUDA models are rarely exactly reproducible, and that even CPU models can be nondeterministic.
+            Please note that results of CUDA models are rarely exactly reproducible, and that even CPU models can be nondeterministic. This is very rarely important in practice, but can be unintuitive.
             """
         )
     )
@@ -250,7 +250,7 @@ def main(args=None, running_as_script: bool = True):
     logger.info(f"Using device: {device}")
     if device.type == "cuda":
         logger.info(
-            "WARNING: please note that models running on CUDA are usually nondeterministc and that this manifests in the final test errors; for a _more_ deterministic result, please use `--device cpu`",
+            "Please note that _all_ machine learning models running on CUDA hardware are generally somewhat nondeterministic and that this can manifest in small, generally unimportant variation in the final test errors.",
         )
 
     if args.use_deterministic_algorithms:
