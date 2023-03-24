@@ -1,9 +1,9 @@
 import sys
 
 if sys.version_info[1] >= 8:
-    from typing import Final
+    from typing import Final, Optional
 else:
-    from typing_extensions import Final
+    from typing_extensions import Final, Optional
 from typing import Tuple, Dict, Union
 import argparse
 import pathlib
@@ -57,6 +57,24 @@ _ALL_METADATA_KEYS = [
     DEFAULT_DTYPE_KEY,
     MODEL_DTYPE_KEY,
 ]
+
+
+def _register_metadata_key(key: str) -> None:
+    _ALL_METADATA_KEYS.append(key)
+
+
+_current_metadata: Optional[dict] = None
+
+
+def _set_deploy_metadata(key: str, value) -> None:
+    # TODO: not thread safe but who cares?
+    global _current_metadata
+    if _current_metadata is None:
+        pass  # not deploying right now
+    elif key in _current_metadata:
+        raise RuntimeError(f"{key} already set in the deployment metadata")
+    else:
+        _current_metadata[key] = value
 
 
 def _compile_for_deploy(model):
@@ -233,6 +251,8 @@ def main(args=None):
         check_code_version(config)
 
         # -- load model --
+        global _current_metadata
+        _current_metadata = {}
         if args.train_dir is not None:
             model, _ = Trainer.load_model_from_training_session(
                 args.train_dir, model_name="best_model.pth", device="cpu"
@@ -276,7 +296,14 @@ def main(args=None):
         metadata[MODEL_DTYPE_KEY] = dtype_to_name(config["model_dtype"])
         metadata[CONFIG_KEY] = yaml.dump(Config.as_dict(config))
 
+        for k, v in _current_metadata.items():
+            if k in metadata:
+                raise RuntimeError(f"Custom deploy key {k} was already set")
+            metadata[k] = v
+        _current_metadata = None
+
         metadata = {k: v.encode("ascii") for k, v in metadata.items()}
+
         torch.jit.save(model, args.out_file, _extra_files=metadata)
     else:
         raise ValueError
