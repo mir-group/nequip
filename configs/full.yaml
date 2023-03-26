@@ -266,8 +266,11 @@ metrics_components:
 
 # optimizer, may be any optimizer defined in torch.optim
 # the name `optimizer_name`is case sensitive
-optimizer_name: Adam                                                               # default optimizer is Adam 
-optimizer_amsgrad: false
+# IMPORTANT: for NequIP (not for Allegro), we find that in most cases AMSGrad strongly improves
+# out-of-distribution generalization over Adam. We highly recommed trying both AMSGrad (by setting
+# optimizer_amsgrad: true) and Adam (by setting optimizer_amsgrad: false)
+optimizer_name: Adam                                                          
+optimizer_amsgrad: true
 optimizer_betas: !!python/tuple
   - 0.9
   - 0.999
