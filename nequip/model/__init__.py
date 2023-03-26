@@ -6,6 +6,7 @@ from ._weight_init import (
     initialize_from_state,
     load_model_state,
 )
+from ._pair_potential import PairPotential, PairPotentialTerm
 
 from ._build import model_from_config
 
@@ -23,5 +24,7 @@ __all__ = [
     initialize_from_state,
     load_model_state,
     model_from_config,
+    PairPotential,
+    PairPotentialTerm,
     builder_utils,
 ]

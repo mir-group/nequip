@@ -29,8 +29,6 @@ def RescaleEnergyEtc(
         default_shift=None,
         default_scale_keys=AtomicDataDict.ALL_ENERGY_KEYS,
         default_shift_keys=[AtomicDataDict.TOTAL_ENERGY_KEY],
-        default_related_scale_keys=[AtomicDataDict.PER_ATOM_ENERGY_KEY],
-        default_related_shift_keys=[],
     )
 
 
@@ -43,8 +41,6 @@ def GlobalRescale(
     default_shift: Union[str, float, list],
     default_scale_keys: list,
     default_shift_keys: list,
-    default_related_scale_keys: list,
-    default_related_shift_keys: list,
     dataset: Optional[AtomicDataset] = None,
 ):
     """Add global rescaling for energy(-based quantities).
@@ -113,8 +109,6 @@ def GlobalRescale(
     error_string = "keys need to be a list"
     assert isinstance(default_scale_keys, list), error_string
     assert isinstance(default_shift_keys, list), error_string
-    assert isinstance(default_related_scale_keys, list), error_string
-    assert isinstance(default_related_shift_keys, list), error_string
 
     # == Build the model ==
     return RescaleOutput(
@@ -123,10 +117,9 @@ def GlobalRescale(
         scale_by=global_scale,
         shift_keys=[k for k in default_shift_keys if k in model.irreps_out],
         shift_by=global_shift,
-        related_scale_keys=default_related_scale_keys,
-        related_shift_keys=default_related_shift_keys,
         shift_trainable=config.get(f"{module_prefix}_shift_trainable", False),
         scale_trainable=config.get(f"{module_prefix}_scale_trainable", False),
+        default_dtype=config.get("default_dtype", None),
     )
 
 
@@ -136,7 +129,7 @@ def PerSpeciesRescale(
     initialize: bool,
     dataset: Optional[AtomicDataset] = None,
 ):
-    """Add global rescaling for energy(-based quantities).
+    """Add per-atom rescaling (and shifting) for energy.
 
     If ``initialize`` is false, doesn't compute statistics.
     """
@@ -288,7 +281,7 @@ def _compute_stats(
     stat_strs = []
     ids = []
     tuple_ids = []
-    tuple_id_map = {"mean": 0, "std": 1, "rms": 0}
+    tuple_id_map = {"mean": 0, "std": 1, "rms": 0, "absmax": 0}
     input_kwargs = {}
     for name in str_names:
 
@@ -309,9 +302,9 @@ def _compute_stats(
         if stat in ["mean", "std"]:
             stat_mode = prefix + "mean_std"
             stat_str = field + prefix + "mean_std"
-        elif stat in ["rms"]:
-            stat_mode = prefix + "rms"
-            stat_str = field + prefix + "rms"
+        elif stat in ["rms", "absmax"]:
+            stat_mode = prefix + stat
+            stat_str = field + prefix + stat
         else:
             raise ValueError(f"Cannot handle {stat} type quantity")
 

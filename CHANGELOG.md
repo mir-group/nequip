@@ -6,13 +6,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Most recent change on the bottom.
 
+## Unreleased - 0.6.0
+### Added
+- add Tensorboard as logger option
+- [Breaking] Refactor overall model logic into `GraphModel` top-level module
+- [Breaking] Added `model_dtype`
+- `BATCH_PTR_KEY` in `AtomicDataDict`
+- `AtomicInMemoryDataset.rdf()` and `examples/rdf.py`
+- `type_to_chemical_symbol`
+- Pair potential terms
+- `nequip-evaluate --output-fields-from-original-dataset`
+- Error (or warn) on unused options in YAML that likely indicate typos
+- `dataset_*_absmax` statistics option
+- `HDF5Dataset` (#227)
 
-## [Unreleased] - 0.5.6
+### Changed
+- Always require explicit `seed`
+- [Breaking] Set `dataset_seed` to `seed` if it is not explicitly provided
+- Don't log as often by default
+- [Breaking] Default nonlinearities are `silu` (`e`) and `tanh` (`o`)
+- Will not reproduce previous versions' data shuffling order (for all practical purposes this does not matter, the `shuffle` option is unchanged)
+- [Breaking] `default_dtype` defaults to `float64` (`model_dtype` default `float32`)
+- `nequip-benchmark` now only uses `--n-data` frames to build the model
+- [Breaking] By default models now use `StressForceOutput`, not `ForceOutput`
+
+### Fixed
+- Work with `wandb>=0.13.8`
+- Better error for standard deviation with too few data
+- `load_model_state` GPU -> CPU
+
+### Removed
+- [Breaking] `fixed_fields` machinery (`npz_fixed_field_keys` is still supported, but through a more straightforward implementation)
+- Default run name/WandB project name of `NequIP`, they must now always be provided explicitly
+
+## [0.5.6] - 2022-12-19
 ### Added
 - sklearn dependency removed
 - `nequip-benchmark` and `nequip-train` report number of weights and number of trainable weights
 - `nequip-benchmark --no-compile` and `--verbose` and `--memory-summary`
 - `nequip-benchmark --pdb` for debugging model (builder) errors
+- More information in `nequip-deploy info`
+- GPU OOM offloading mode
+
+### Changed
+- Minimum e3nn is now 0.4.4
+- `--equivariance-test` now prints much more information, especially when there is a failure
 
 ### Fixed
 - Git utilities when installed as ZIPed `.egg` (#264)

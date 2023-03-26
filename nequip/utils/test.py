@@ -4,7 +4,7 @@ import torch
 from e3nn import o3
 from e3nn.util.test import equivariance_error, FLOAT_TOLERANCE
 
-from nequip.nn import GraphModuleMixin
+from nequip.nn import GraphModuleMixin, GraphModel
 from nequip.data import (
     AtomicData,
     AtomicDataDict,
@@ -13,7 +13,8 @@ from nequip.data import (
 )
 
 
-PERMUTATION_FLOAT_TOLERANCE = {torch.float32: 1e-5, torch.float64: 1e-10}
+# This has to be somewhat large because of float32 sum reductions over many edges/atoms
+PERMUTATION_FLOAT_TOLERANCE = {torch.float32: 1e-4, torch.float64: 1e-10}
 
 
 # https://discuss.pytorch.org/t/how-to-quickly-inverse-a-permutation-by-using-pytorch/116205/4
@@ -28,7 +29,7 @@ def assert_permutation_equivariant(
     data_in: AtomicDataDict.Type,
     tolerance: Optional[float] = None,
     raise_error: bool = True,
-):
+) -> str:
     r"""Test the permutation equivariance of ``func``.
 
     Standard fields are assumed to be equivariant to node or edge permutations according to their standard interpretions; all other fields are assumed to be invariant to all permutations. Non-standard fields can be registered as node/edge permutation equivariant using ``register_fields``.
@@ -43,7 +44,11 @@ def assert_permutation_equivariant(
     __tracebackhide__ = True
 
     if tolerance is None:
-        atol = PERMUTATION_FLOAT_TOLERANCE[torch.get_default_dtype()]
+        atol = PERMUTATION_FLOAT_TOLERANCE[
+            func.model_dtype
+            if isinstance(func, GraphModel)
+            else torch.get_default_dtype()
+        ]
     else:
         atol = tolerance
 
@@ -93,38 +98,42 @@ def assert_permutation_equivariant(
         out_perm.keys()
     ), "Permutation changed the set of fields returned by model"
 
-    problems = []
+    messages = []
+    num_problems: int = 0
     for k in out_orig.keys():
         if k in node_permute_fields:
-            if not torch.allclose(out_orig[k][node_perm], out_perm[k], atol=atol):
-                err = (out_orig[k][node_perm] - out_perm[k]).abs().max()
-                problems.append(
-                    f"node permutation equivariance violated for field {k}; maximum componentwise error: {err:e}"
-                )
+            err = (out_orig[k][node_perm] - out_perm[k]).abs().max()
+            fail = not torch.allclose(out_orig[k][node_perm], out_perm[k], atol=atol)
+            if fail:
+                num_problems += 1
+            messages.append(
+                f"   node permutation equivariance of field {k:20}       -> max error={err:.3e}{'  FAIL' if fail else ''}"
+            )
         elif k in edge_permute_fields:
-            if not torch.allclose(out_orig[k][edge_perm], out_perm[k], atol=atol):
-                err = (out_orig[k][edge_perm] - out_perm[k]).abs().max()
-                problems.append(
-                    f"edge permutation equivariance violated for field {k}; maximum componentwise error: {err:e}"
-                )
+            err = (out_orig[k][edge_perm] - out_perm[k]).abs().max()
+            fail = not torch.allclose(out_orig[k][edge_perm], out_perm[k], atol=atol)
+            if fail:
+                num_problems += 1
+            messages.append(
+                f"   edge permutation equivariance of field {k:20}       -> max error={err:.3e}{'  FAIL' if fail else ''}"
+            )
         elif k == AtomicDataDict.EDGE_INDEX_KEY:
             pass
         else:
             # Assume invariant
             if out_orig[k].dtype == torch.bool:
-                if not torch.all(out_orig[k] == out_perm[k]):
-                    problems.append(
-                        f"edge/node permutation invariance violated for field {k} ({k} was assumed to be invariant, should it have been marked as equivariant?)"
-                    )
+                err = (out_orig[k] != out_perm[k]).max()
             else:
-                if not torch.allclose(out_orig[k], out_perm[k], atol=atol):
-                    err = (out_orig[k] - out_perm[k]).abs().max()
-                    problems.append(
-                        f"edge/node permutation invariance violated for field {k}; maximum componentwise error: {err:e}. (`{k}` was assumed to be invariant, should it have been marked as equivariant?)"
-                    )
-    msg = "\n".join(problems)
-    if len(problems) == 0:
-        return
+                err = (out_orig[k] - out_perm[k]).abs().max()
+            fail = not torch.allclose(out_orig[k], out_perm[k], atol=atol)
+            if fail:
+                num_problems += 1
+            messages.append(
+                f"   edge & node permutation invariance for field {k:20} -> max error={err:.3e}{'  FAIL' if fail else ''}"
+            )
+    msg = "\n".join(messages)
+    if num_problems == 0:
+        return msg
     else:
         if raise_error:
             raise AssertionError(msg)
@@ -138,7 +147,7 @@ def assert_AtomicData_equivariant(
         AtomicData, AtomicDataDict.Type, List[Union[AtomicData, AtomicDataDict.Type]]
     ],
     permutation_tolerance: Optional[float] = None,
-    o3_tolerance: Optional[float] = None,
+    e3_tolerance: Optional[float] = None,
     **kwargs,
 ) -> str:
     r"""Test the rotation, translation, parity, and permutation equivariance of ``func``.
@@ -169,7 +178,7 @@ def assert_AtomicData_equivariant(
 
     # == Test permutation of graph nodes ==
     # since permutation is discrete and should not be data dependent, run only on one frame.
-    permutation_problems = assert_permutation_equivariant(
+    permutation_message = assert_permutation_equivariant(
         func, data_in[0], tolerance=permutation_tolerance, raise_error=False
     )
 
@@ -178,6 +187,12 @@ def assert_AtomicData_equivariant(
     irreps_in.update(func.irreps_in)
     irreps_in = {k: v for k, v in irreps_in.items() if k in data_in[0]}
     irreps_out = func.irreps_out.copy()
+    # Remove batch-related keys from the irreps_out, if we aren't using batched inputs
+    irreps_out = {
+        k: v
+        for k, v in irreps_out.items()
+        if not (k in ("batch", "ptr") and "batch" not in data_in)
+    }
     # for certain things, we don't care what the given irreps are...
     # make sure that we test correctly for equivariance:
     for irps in (irreps_in, irreps_out):
@@ -189,9 +204,9 @@ def assert_AtomicData_equivariant(
         if AtomicDataDict.CELL_KEY in irps:
             prev_cell_irps = irps[AtomicDataDict.CELL_KEY]
             assert prev_cell_irps is None or o3.Irreps(prev_cell_irps) == o3.Irreps(
-                "3x1o"
+                "1o"
             )
-            # must be this to actually rotate it
+            # must be this to actually rotate it when flattened
             irps[AtomicDataDict.CELL_KEY] = "3x1o"
 
     stress_keys = (AtomicDataDict.STRESS_KEY, AtomicDataDict.VIRIAL_KEY)
@@ -227,7 +242,9 @@ def assert_AtomicData_equivariant(
         # we need it to be decomposed into irreps for equivar testing
         for k in stress_keys:
             if k in output:
-                output[k] = stress_cart_tensor.from_cartesian(output[k], rtp=stress_rtp)
+                output[k] = stress_cart_tensor.from_cartesian(
+                    output[k], rtp=stress_rtp.to(output[k].dtype)
+                )
         return [output[k] for k in irreps_out]
 
     # prepare input data
@@ -253,55 +270,29 @@ def assert_AtomicData_equivariant(
     # take max across errors
     errs = {k: torch.max(torch.vstack([e[k] for e in errs]), dim=0)[0] for k in errs[0]}
 
-    if o3_tolerance is None:
-        o3_tolerance = FLOAT_TOLERANCE[torch.get_default_dtype()]
-    anerr = next(iter(errs.values()))
-    if isinstance(anerr, float) or anerr.ndim == 0:
-        # old e3nn doesn't report which key
-        problems = {k: v for k, v in errs.items() if v > o3_tolerance}
+    current_dtype = (
+        func.model_dtype if isinstance(func, GraphModel) else torch.get_default_dtype()
+    )
+    if e3_tolerance is None:
+        e3_tolerance = FLOAT_TOLERANCE[current_dtype]
+    all_errs = []
+    for case, err in errs.items():
+        for key, this_err in zip(irreps_out.keys(), err):
+            all_errs.append(case + (key, this_err))
+    is_problem = [e[-1] > e3_tolerance for e in all_errs]
 
-        def _describe(errors):
-            return (
-                permutation_problems + "\n" if permutation_problems is not None else ""
-            ) + "\n".join(
-                "(parity_k={:d}, did_translate={}) -> max error={:.3e}".format(
-                    int(k[0]),
-                    bool(k[1]),
-                    float(v),
-                )
-                for k, v in errors.items()
-            )
+    message = (permutation_message + "\n") + "\n".join(
+        f"   (parity_k={int(k[0]):1d}, did_translate={str(bool(k[1])):5}, field={str(k[2]):20})     -> max error={float(k[3]):.3e}{'  FAIL' if prob else ''}"
+        for k, prob in zip(all_errs, is_problem)
+        if irreps_out[str(k[2])] is not None
+    )
 
-        if len(problems) > 0 or permutation_problems is not None:
-            raise AssertionError(
-                "Equivariance test failed for cases:" + _describe(problems)
-            )
+    if any(is_problem) or " FAIL" in permutation_message:
+        raise AssertionError(
+            f"Equivariance test of {type(func).__name__} failed:\n   default dtype: {torch.get_default_dtype()} (assumed) model dtype: {current_dtype}  E(3) tolerance: {e3_tolerance}\n{message}"
+        )
 
-        return _describe(errs)
-    else:
-        # it's newer and tells us which is which
-        all_errs = []
-        for case, err in errs.items():
-            for key, this_err in zip(irreps_out.keys(), err):
-                all_errs.append(case + (key, this_err))
-        problems = [e for e in all_errs if e[-1] > o3_tolerance]
-
-        def _describe(errors):
-            return (
-                permutation_problems + "\n" if permutation_problems is not None else ""
-            ) + "\n".join(
-                "   (parity_k={:1d}, did_translate={:5}, field={:20}) -> max error={:.3e}".format(
-                    int(k[0]), str(bool(k[1])), str(k[2]), float(k[3])
-                )
-                for k in errors
-            )
-
-        if len(problems) > 0 or permutation_problems is not None:
-            raise AssertionError(
-                "Equivariance test failed for cases:\n" + _describe(problems)
-            )
-
-        return _describe(all_errs)
+    return message
 
 
 _DEBUG_HOOKS = None
@@ -349,15 +340,13 @@ def set_irreps_debug(enabled: bool = False) -> None:
             )
         for k, ir in mod.irreps_in.items():
             if k not in inp:
-                raise KeyError(
-                    f"Field {k} with irreps {ir} expected to be input to {mname}; not present"
-                )
+                pass
             elif isinstance(inp[k], torch.Tensor) and isinstance(ir, o3.Irreps):
-                if inp[k].ndim == 1:
+                if inp[k].ndim == 1 and inp[k].numel() > 0:
                     raise ValueError(
                         f"Field {k} in input to module {mname} has only one dimension (assumed to be batch-like); it must have a second irreps dimension even if irreps.dim == 1 (i.e. a single per atom scalar must have shape [N_at, 1], not [N_at])"
                     )
-                elif inp[k].shape[-1] != ir.dim:
+                elif inp[k].shape[-1] != ir.dim and inp[k].numel() > 0:
                     raise ValueError(
                         f"Field {k} in input to module {mname} has last dimension {inp[k].shape[-1]} but its irreps {ir} indicate last dimension {ir.dim}"
                     )
@@ -376,15 +365,13 @@ def set_irreps_debug(enabled: bool = False) -> None:
             )
         for k, ir in mod.irreps_out.items():
             if k not in out:
-                raise KeyError(
-                    f"Field {k} with irreps {ir} expected to be in output from {mname}; not present"
-                )
+                pass
             elif isinstance(out[k], torch.Tensor) and isinstance(ir, o3.Irreps):
-                if out[k].ndim == 1:
+                if out[k].ndim == 1 and out[k].numel() > 0:
                     raise ValueError(
                         f"Field {k} in output from module {mname} has only one dimension (assumed to be batch-like); it must have a second irreps dimension even if irreps.dim == 1 (i.e. a single per atom scalar must have shape [N_at, 1], not [N_at])"
                     )
-                elif out[k].shape[-1] != ir.dim:
+                elif out[k].shape[-1] != ir.dim and out[k].numel() > 0:
                     raise ValueError(
                         f"Field {k} in output from {mname} has last dimension {out[k].shape[-1]} but its irreps {ir} indicate last dimension {ir.dim}"
                     )

@@ -16,7 +16,7 @@ jobs:
     strategy:
       matrix:
         python-version: [3.9]
-        torch-version: [1.10.1, 1.11.0]
+        torch-version: [1.11.0, 1.13.1]
 
     steps:
     - uses: actions/checkout@v2
@@ -32,6 +32,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install setuptools wheel
         pip install torch==${TORCH} -f https://download.pytorch.org/whl/cpu/torch_stable.html
+        pip install h5py
         pip install  --upgrade-strategy only-if-needed .
     - name: Install pytest
       run: |

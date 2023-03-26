@@ -19,6 +19,7 @@ from nequip.model import model_from_config
 from nequip.utils import Config
 from nequip.data import dataset_from_config, AtomicDataset
 from nequip.utils import load_file
+from nequip.utils.config import _GLOBAL_ALL_ASKED_FOR_KEYS
 from nequip.utils.test import assert_AtomicData_equivariant
 from nequip.utils.versions import check_code_version
 from nequip.utils._global_options import _set_global_options, _init_distributed
@@ -26,25 +27,27 @@ from nequip.scripts._logger import set_up_script_logger
 
 default_config = dict(
     root="./",
-    run_name="NequIP",
+    tensorboard=False,
     wandb=False,
-    wandb_project="NequIP",
     model_builders=[
         "SimpleIrrepsConfig",
         "EnergyModel",
         "PerSpeciesRescale",
-        "ForceOutput",
+        "StressForceOutput",
         "RescaleEnergyEtc",
     ],
     dataset_statistics_stride=1,
-    default_dtype="float32",
-    allow_tf32=False,  # TODO: until we understand equivar issues
+    default_dtype="float64",
+    model_dtype="float32",
+    allow_tf32=False,
     verbose="INFO",
     model_debug_mode=False,
     equivariance_test=False,
     grad_anomaly_mode=False,
+    gpu_oom_offload=False,
     append=False,
     distributed=False,
+    warn_unused=False,
     _jit_bailout_depth=2,  # avoid 20 iters of pain, see https://github.com/pytorch/pytorch/issues/52286
     # Quote from eelison in PyTorch slack:
     # https://pytorch.slack.com/archives/CDZD1FANA/p1644259272007529?thread_ts=1644064449.039479&cid=CDZD1FANA
@@ -55,7 +58,13 @@ default_config = dict(
     # We default to DYNAMIC alone because the number of edges is always dynamic,
     # even if the number of atoms is fixed:
     _jit_fusion_strategy=[("DYNAMIC", 3)],
+    # Due to what appear to be ongoing bugs with nvFuser, we default to NNC (fuser1) for now:
+    # TODO: still default to NNC on CPU regardless even if change this for GPU
+    # TODO: default for ROCm?
+    _jit_fuser="fuser1",
 )
+# All default_config keys are valid / requested
+_GLOBAL_ALL_ASKED_FOR_KEYS.update(default_config.keys())
 
 
 def main(args=None, running_as_script: bool = True):
@@ -79,7 +88,22 @@ def main(args=None, running_as_script: bool = True):
 
     # Train
     trainer.save()
-    trainer.train()
+    if config.get("gpu_oom_offload", False):
+        if not torch.cuda.is_available():
+            raise RuntimeError(
+                "CUDA is not available; --gpu-oom-offload doesn't make sense."
+            )
+        warnings.warn(
+            "! GPU OOM Offloading is ON:\n"
+            "This is meant for training models that would be impossible otherwise due to OOM.\n"
+            "Note that this comes at a speed cost and SHOULD NOT be used if your training fits in GPU memory without it.\n"
+            "Please also consider whether a smaller model is a more appropriate solution!\n"
+            "Also, a warning from PyTorch: 'If you overuse pinned memory, it can cause serious problems when running low on RAM!'"
+        )
+        with torch.autograd.graph.save_on_cpu(pin_memory=True):
+            trainer.train()
+    else:
+        trainer.train()
 
     return
 
@@ -116,10 +140,20 @@ def parse_command_line(args=None):
         nargs="?",
     )
     parser.add_argument(
+        "--gpu-oom-offload",
+        help="Use `torch.autograd.graph.save_on_cpu` to offload intermediate tensors to CPU (host) memory in order to train models that would be impossible otherwise due to OOM. Note that this comes as at a speed cost and SHOULD NOT be used if your training fits in GPU memory without it. Please also consider whether a smaller model is a more appropriate solution.",
+        action="store_true",
+    )
+    parser.add_argument(
         "--log",
         help="log file to store all the screen logging",
         type=Path,
         default=None,
+    )
+    parser.add_argument(
+        "--warn-unused",
+        help="Warn instead of error when the config contains unused keys",
+        action="store_true",
     )
     args = parser.parse_args(args=args)
 
@@ -129,6 +163,8 @@ def parse_command_line(args=None):
         "equivariance_test",
         "grad_anomaly_mode",
         "distributed",
+        "warn_unused",
+        "gpu_oom_offload",
     ):
         config[flag] = getattr(args, flag) or config[flag]
 
@@ -175,24 +211,29 @@ def fresh_start(config):
     # we use add_to_config cause it's a fresh start and need to record it
     check_code_version(config, add_to_config=True)
     _set_global_options(config)
+    if config["default_dtype"] != "float64":
+        warnings.warn(
+            f"default_dtype={config['default_dtype']} but we strongly recommend float64"
+        )
     _init_distributed(config.distributed)
 
     # = Make the trainer =
-    # making the trainer initializes torch.distributed
     if config.wandb:
+
         import wandb  # noqa: F401
-        from nequip.train.trainer_wandb import TrainerWandB
+        from nequip.train.trainer_wandb import TrainerWandB as Trainer
 
         # download parameters from wandb in case of sweeping
         from nequip.utils.wandb import init_n_update
 
         config = init_n_update(config)
 
-        trainer = TrainerWandB(model=None, **dict(config))
+    elif config.tensorboard:
+        from nequip.train.trainer_tensorboard import TrainerTensorBoard as Trainer
     else:
         from nequip.train.trainer import Trainer
 
-        trainer = Trainer(model=None, **dict(config))
+    trainer = Trainer(model=None, **Config.as_dict(config))
 
     # what is this
     # to update wandb data?
@@ -211,9 +252,6 @@ def fresh_start(config):
         config=config, initialize=True, dataset=trainer.dataset_train
     )
     logging.info("Successfully built the network...")
-
-    # by doing this here we check also any keys custom builders may have added
-    _check_old_keys(config)
 
     # Equivar test
     if config.equivariance_test > 0:
@@ -241,6 +279,19 @@ def fresh_start(config):
 
     # Store any updated config information in the trainer
     trainer.update_kwargs(config)
+
+    # Only run the unused check as a callback after the trainer has
+    # initialized everything (metrics, early stopping, etc.)
+    def _unused_check():
+        unused = config._unused_keys()
+        if len(unused) > 0:
+            message = f"The following keys in the config file were not used, did you make a typo?: {', '.join(unused)}. (If this sounds wrong, please file an issue: the detection of unused keys is in beta. You can turn this error into a warning with `--warn-unused`.)"
+            if config.warn_unused:
+                warnings.warn(message)
+            else:
+                raise KeyError(message)
+
+    trainer._post_init_callback = _unused_check
 
     return trainer
 
@@ -300,17 +351,6 @@ def restart(config):
     trainer.set_dataset(dataset, validation_dataset)
 
     return trainer
-
-
-def _check_old_keys(config) -> None:
-    """check ``config`` for old/depricated keys and emit corresponding errors/warnings"""
-    # compile_model
-    k = "compile_model"
-    if k in config:
-        if config[k]:
-            raise ValueError("the `compile_model` option has been removed")
-        else:
-            warnings.warn("the `compile_model` option has been removed")
 
 
 if __name__ == "__main__":

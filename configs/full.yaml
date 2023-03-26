@@ -161,6 +161,9 @@ wandb: true                                                                     
 wandb_project: toluene-example                                                     # project name used in wandb
 wandb_watch: false
 
+# # using tensorboard for logging
+# tensorboard: true
+
 # see https://docs.wandb.ai/ref/python/watch
 # wandb_watch_kwargs:
 #   log: all
@@ -168,7 +171,7 @@ wandb_watch: false
 #   log_graph: true
 
 verbose: info                                                                      # the same as python logging, e.g. warning, info, debug, error. case insensitive
-log_batch_freq: 1                                                                  # batch frequency, how often to print training errors withinin the same epoch
+log_batch_freq: 100                                                                # batch frequency, how often to print training errors withinin the same epoch
 log_epoch_freq: 1                                                                  # epoch frequency, how often to print 
 save_checkpoint_freq: -1                                                           # frequency to save the intermediate checkpoint. no saving of intermediate checkpoints when the value is not positive.
 save_ema_checkpoint_freq: -1                                                       # frequency to save the intermediate ema checkpoint. no saving of intermediate checkpoints when the value is not positive.
@@ -311,6 +314,7 @@ per_species_rescale_scales: dataset_forces_rms
 # initial atomic energy scale for each species. Optional.
 # the value can be a constant float value, an array for each species, or a string
 # string option include: 
+# *  "dataset_forces_absmax", which computes the dataset maxmimum force component magnitude
 # *  "dataset_per_atom_total_energy_std", which computes the per atom energy std
 # *  "dataset_per_species_total_energy_std", which uses the GP model uncertainty
 # *  "dataset_per_species_forces_rms", which compute the force rms for each species
@@ -329,7 +333,10 @@ per_species_rescale_scales: dataset_forces_rms
 # Warning: if this value is not None, the model is no longer size extensive
 global_rescale_shift: null
 
-# global energy scale. When "dataset_force_rms", the RMS of force components in the dataset. When "dataset_total_energy_std", the stdev of energies in the dataset. When null, disables the global scale. When a number, used directly.
+# global energy scale. When "dataset_force_rms", the RMS of force components in the dataset.
+# When "dataset_forces_absmax", the maximum force component magnitude in the dataset.
+# When "dataset_total_energy_std", the stdev of energies in the dataset.
+# When null, disables the global scale. When a number, used directly.
 # If not provided, defaults to either dataset_force_rms or dataset_total_energy_std, depending on whether forces are being trained.
 global_rescale_scale: dataset_forces_rms
 

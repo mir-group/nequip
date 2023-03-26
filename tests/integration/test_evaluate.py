@@ -1,9 +1,5 @@
 import pytest
-import tempfile
-import pathlib
-import yaml
 import subprocess
-import os
 import textwrap
 import shutil
 
@@ -14,72 +10,22 @@ import torch
 
 from nequip.data import AtomicDataDict
 
-from test_train import ConstFactorModel, IdentityModel, _check_and_print  # noqa
-
-
-@pytest.fixture(
-    scope="module",
-    params=[
-        ("minimal.yaml", AtomicDataDict.FORCE_KEY),
-    ],
-)
-def conffile(request):
-    return request.param
-
-
-@pytest.fixture(scope="module", params=[ConstFactorModel, IdentityModel])
-def training_session(request, BENCHMARK_ROOT, conffile):
-    conffile, _ = conffile
-    builder = request.param
-    dtype = str(torch.get_default_dtype())[len("torch.") :]
-
-    # if torch.cuda.is_available():
-    #     # TODO: is this true?
-    #     pytest.skip("CUDA and subprocesses have issues")
-
-    path_to_this_file = pathlib.Path(__file__)
-    config_path = path_to_this_file.parents[2] / f"configs/{conffile}"
-    true_config = yaml.load(config_path.read_text(), Loader=yaml.Loader)
-    with tempfile.TemporaryDirectory() as tmpdir:
-        # == Run training ==
-        # Save time
-        run_name = "test_train_" + dtype
-        true_config["run_name"] = run_name
-        true_config["root"] = "./"
-        true_config["dataset_file_name"] = str(
-            BENCHMARK_ROOT / "aspirin_ccsd-train.npz"
-        )
-        true_config["default_dtype"] = dtype
-        true_config["max_epochs"] = 2
-        true_config["model_builders"] = [builder]
-        # We need truth labels as inputs for these fake testing models
-        true_config["_override_allow_truth_label_inputs"] = True
-
-        # to be a true identity, we can't have rescaling
-        true_config["global_rescale_shift"] = None
-        true_config["global_rescale_scale"] = None
-
-        config_path = tmpdir + "/conf.yaml"
-        with open(config_path, "w+") as fp:
-            yaml.dump(true_config, fp)
-        # == Train model ==
-        env = dict(os.environ)
-        # make this script available so model builders can be loaded
-        env["PYTHONPATH"] = ":".join(
-            [str(path_to_this_file.parent)] + env.get("PYTHONPATH", "").split(":")
-        )
-        retcode = subprocess.run(["nequip-train", "conf.yaml"], cwd=tmpdir, env=env)
-        _check_and_print(retcode)
-
-        yield builder, true_config, tmpdir, env
+from conftest import IdentityModel, ConstFactorModel, _check_and_print
 
 
 @pytest.mark.parametrize("do_test_idcs", [True, False])
 @pytest.mark.parametrize("do_metrics", [True, False])
 @pytest.mark.parametrize("do_output_fields", [True, False])
-def test_metrics(training_session, do_test_idcs, do_metrics, do_output_fields):
-
-    builder, true_config, tmpdir, env = training_session
+def test_metrics(
+    fake_model_training_session, conffile, do_test_idcs, do_metrics, do_output_fields
+):
+    energy_only: bool = conffile[0] == "minimal_eng.yaml"
+    if energy_only:
+        # By default, don't run the energy only tests... they are redundant and add a _lot_ of expense
+        pytest.skip()
+    builder, true_config, tmpdir, env = fake_model_training_session
+    if builder not in (IdentityModel, ConstFactorModel):
+        pytest.skip()
     # == Run test error ==
     outdir = f"{true_config['root']}/{true_config['run_name']}/"
 
@@ -119,9 +65,16 @@ def test_metrics(training_session, do_test_idcs, do_metrics, do_output_fields):
 
     # Test idcs
     if do_test_idcs:
-        # The Aspirin dataset is 1000 frames long
-        # Pick some arbitrary number of frames
-        test_idcs_arr = torch.randperm(1000)[:257]
+        if conffile[0] == "minimal.yaml":
+            # The Aspirin dataset is 1000 frames long
+            # Pick some arbitrary number of frames
+            test_idcs_arr = torch.randperm(1000)[:257]
+        elif conffile[0] == "minimal_toy_emt.yaml":
+            # The toy EMT dataset is 50 frames long
+            # Pick some arbitrary number of frames
+            test_idcs_arr = torch.randperm(50)[:7]
+        else:
+            raise KeyError
         test_idcs = "some-test-idcs.pth"
         torch.save(test_idcs_arr, f"{tmpdir}/{test_idcs}")
     else:
@@ -134,39 +87,64 @@ def test_metrics(training_session, do_test_idcs, do_metrics, do_output_fields):
         metrics_yaml = "my-metrics.yaml"
         with open(f"{tmpdir}/{metrics_yaml}", "w") as f:
             # Write out a fancier metrics file
-            f.write(
-                textwrap.dedent(
-                    """
-                    metrics_components:
-                      - - forces
-                        - rmse
-                        - report_per_component: True
-                      - - forces
-                        - mae
-                        - PerSpecies: True
-                      - - total_energy
-                        - mae
-                      - - total_energy
-                        - mae
-                        - PerAtom: True
-                    """
+            if energy_only:
+                f.write(
+                    textwrap.dedent(
+                        """
+                        metrics_components:
+                          - - total_energy
+                            - mae
+                          - - total_energy
+                            - mae
+                            - PerAtom: True
+                        """
+                    )
                 )
-            )
-        expect_metrics = {
-            "f_rmse_0",
-            "f_rmse_1",
-            "f_rmse_2",
-            "H_f_mae",
-            "C_f_mae",
-            "O_f_mae",
-            "psavg_f_mae",
-            "e_mae",
-            "e/N_mae",
-        }
+                expect_metrics = {
+                    "e_mae",
+                    "e/N_mae",
+                }
+            else:
+                # Write out a fancier metrics file
+                f.write(
+                    textwrap.dedent(
+                        """
+                        metrics_components:
+                          - - forces
+                            - rmse
+                            - report_per_component: True
+                          - - forces
+                            - mae
+                            - PerSpecies: True
+                          - - total_energy
+                            - mae
+                          - - total_energy
+                            - mae
+                            - PerAtom: True
+                        """
+                    )
+                )
+                expect_metrics = {
+                    "f_rmse_0",
+                    "f_rmse_1",
+                    "f_rmse_2",
+                    "psavg_f_mae",
+                    "e_mae",
+                    "e/N_mae",
+                }.union(
+                    {
+                        # For the PerSpecies
+                        sym + "_f_mae"
+                        for sym in true_config["chemical_symbols"]
+                    }
+                )
     else:
         metrics_yaml = None
         # Regardless of builder, with minimal.yaml, we should have RMSE and MAE
-        expect_metrics = {"f_mae", "f_rmse"}
+        if energy_only:
+            expect_metrics = {"e_mae", "e_rmse"}
+        else:
+            expect_metrics = {"f_mae", "f_rmse"}
     default_params["metrics-config"] = metrics_yaml
 
     if do_output_fields:
@@ -187,8 +165,16 @@ def test_metrics(training_session, do_test_idcs, do_metrics, do_output_fields):
 
     # check metrics
     if builder == IdentityModel:
+        true_identity: bool = true_config["default_dtype"] == true_config["model_dtype"]
         for metric, err in metrics.items():
-            assert np.allclose(err, 0.0), f"Metric `{metric}` wasn't zero!"
+            # see test_train.py for discussion
+            assert np.allclose(
+                err,
+                0.0,
+                atol=1e-8
+                if true_identity
+                else (1e-2 if metric.startswith("e") else 1e-4),
+            ), f"Metric `{metric}` wasn't zero!"
     elif builder == ConstFactorModel:
         # TODO: check comperable to naive numpy compute
         pass

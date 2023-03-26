@@ -19,6 +19,7 @@ from nequip.data import (
 from nequip.data.transforms import TypeMapper
 from nequip.model import model_from_config
 from nequip.nn import GraphModuleMixin
+from nequip.utils import Config
 from nequip.utils.test import assert_AtomicData_equivariant
 
 
@@ -55,12 +56,14 @@ class BaseModelTests:
                 "types_names": ["H", "C", "O"],
             }
         )
-        model = model_from_config(config, initialize=initialize, deploy=deploy)
+        model = model_from_config(
+            Config.from_dict(config), initialize=initialize, deploy=deploy
+        )
         model = model.to(device)
         return model
 
     @pytest.fixture(scope="class")
-    def model(self, config, device):
+    def model(self, config, device, float_tolerance):
         config, out_fields = config
         model = self.make_model(config, device=device)
         return model, out_fields
@@ -76,12 +79,22 @@ class BaseModelTests:
         instance = instance.to(device=device)
         model_script = script(instance)
 
+        atol = {
+            # tight, but not that tight, since GPU nondet has to pass
+            # plus model insides are still float32 with global dtype float64 in the tests
+            torch.float32: 5e-5,
+            torch.float64: 5e-7,
+        }[torch.get_default_dtype()]
+
+        out_instance = instance(data.copy())
+        out_script = model_script(data.copy())
+
         for out_field in out_fields:
             assert torch.allclose(
-                instance(data)[out_field],
-                model_script(data)[out_field],
-                atol=1e-6,
-            )
+                out_instance[out_field],
+                out_script[out_field],
+                atol=atol,
+            ), f"JIT didn't repro non-JIT on field {out_field} with max error {(out_instance[out_field] - out_script[out_field]).abs().max().item()}"
 
         # - Try saving, loading in another process, and running -
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -94,18 +107,15 @@ class BaseModelTests:
             load_model = torch.jit.load(tmpdir + "/model.pt")
             load_dat = torch.load(tmpdir + "/dat.pt")
 
-            atol = {
-                # tight, but not that tight, since GPU nondet has to pass
-                torch.float32: 1e-6,
-                torch.float64: 1e-10,
-            }[torch.get_default_dtype()]
+            out_script = model_script(data.copy())
+            out_load = load_model(load_dat.copy())
 
             for out_field in out_fields:
                 assert torch.allclose(
-                    model_script(data)[out_field],
-                    load_model(load_dat)[out_field],
+                    out_script[out_field],
+                    out_load[out_field],
                     atol=atol,
-                )
+                ), f"JIT didn't repro save-and-loaded JIT on field {out_field} with max error {(out_script[out_field] - out_load[out_field]).abs().max().item()}"
 
     def test_forward(self, model, atomic_batch, device):
         instance, out_fields = model
@@ -114,6 +124,53 @@ class BaseModelTests:
         output = instance(AtomicData.to_AtomicDataDict(data))
         for out_field in out_fields:
             assert out_field in output
+
+    def test_wrapped_unwrapped(self, model, device, Cu_bulk, float_tolerance):
+        atoms, data_orig = Cu_bulk
+        instance, out_fields = model
+        data = AtomicData.from_ase(atoms, r_max=3.5)
+        data[AtomicDataDict.ATOM_TYPE_KEY] = data_orig[AtomicDataDict.ATOM_TYPE_KEY]
+        data.to(device)
+        out_ref = instance(AtomicData.to_AtomicDataDict(data))
+        # now put things in other periodic images
+        rng = torch.Generator(device=device).manual_seed(12345)
+        # try a few different shifts
+        for _ in range(3):
+            cell_shifts = torch.randint(
+                -5,
+                5,
+                (len(atoms), 3),
+                device=device,
+                dtype=data[AtomicDataDict.POSITIONS_KEY].dtype,
+                generator=rng,
+            )
+            shifts = torch.einsum(
+                "zi,ix->zx", cell_shifts, data[AtomicDataDict.CELL_KEY]
+            )
+            atoms2 = atoms.copy()
+            atoms2.positions += shifts.detach().cpu().numpy()
+            # must recompute the neighborlist for this, since the edge_cell_shifts changed
+            data2 = AtomicData.from_ase(atoms2, r_max=3.5)
+            data2[AtomicDataDict.ATOM_TYPE_KEY] = data[AtomicDataDict.ATOM_TYPE_KEY]
+            data2.to(device)
+            assert torch.equal(
+                data[AtomicDataDict.EDGE_INDEX_KEY],
+                data2[AtomicDataDict.EDGE_INDEX_KEY],
+            )
+            tmp = (
+                data[AtomicDataDict.EDGE_CELL_SHIFT_KEY]
+                + cell_shifts[data[AtomicDataDict.EDGE_INDEX_KEY][0]]
+                - cell_shifts[data[AtomicDataDict.EDGE_INDEX_KEY][1]]
+            )
+            assert torch.equal(
+                tmp,
+                data2[AtomicDataDict.EDGE_CELL_SHIFT_KEY],
+            )
+            out_unwrapped = instance(AtomicData.to_AtomicDataDict(data2))
+            for out_field in out_fields:
+                assert torch.allclose(
+                    out_ref[out_field], out_unwrapped[out_field], atol=float_tolerance
+                )
 
     def test_batch(self, model, atomic_batch, device, float_tolerance):
         """Confirm that the results for individual examples are the same regardless of whether they are batched."""
@@ -175,6 +232,18 @@ class BaseModelTests:
 
     def test_embedding_cutoff(self, model, config, device):
         instance, out_fields = model
+
+        # make all weights nonzero in order to have the most robust test
+        # default init weights can sometimes be zero (e.g. biases) but we want
+        # to ensure smoothness for nonzero values
+        # assumes any trainable parameter will be trained and thus that
+        # nonzero values are valid
+        with torch.no_grad():
+            all_params = list(instance.parameters())
+            old_state = [p.detach().clone() for p in all_params]
+            for p in all_params:
+                p.uniform_(-1.0, 1.0)
+
         config, out_fields = config
         r_max = config["r_max"]
 
@@ -188,8 +257,10 @@ class BaseModelTests:
         edge_embed = instance(AtomicData.to_AtomicDataDict(data))
         if AtomicDataDict.EDGE_FEATURES_KEY in edge_embed:
             key = AtomicDataDict.EDGE_FEATURES_KEY
-        else:
+        elif AtomicDataDict.EDGE_EMBEDDING_KEY in edge_embed:
             key = AtomicDataDict.EDGE_EMBEDDING_KEY
+        else:
+            pytest.skip()
         edge_embed = edge_embed[key]
         data.pos[2, 1] = r_max  # put it past the cutoff
         edge_embed2 = instance(AtomicData.to_AtomicDataDict(data))[key]
@@ -199,7 +270,9 @@ class BaseModelTests:
             # For example, an Allegro edge feature is many body so will be affected
             assert torch.allclose(edge_embed[:2], edge_embed2[:2])
         assert edge_embed[2:].abs().sum() > 1e-6  # some nonzero terms
-        assert torch.allclose(edge_embed2[2:], torch.zeros(1, device=device))
+        assert torch.allclose(
+            edge_embed2[2:], torch.zeros(1, device=device, dtype=edge_embed2.dtype)
+        )
 
         # test gradients
         in_dict = AtomicData.to_AtomicDataDict(data)
@@ -214,7 +287,9 @@ class BaseModelTests:
                 inputs=in_dict[AtomicDataDict.POSITIONS_KEY],
                 retain_graph=True,
             )[0]
-            assert torch.allclose(grads, torch.zeros(1, device=device))
+            assert torch.allclose(
+                grads, torch.zeros(1, device=device, dtype=grads.dtype)
+            )
 
             if AtomicDataDict.PER_ATOM_ENERGY_KEY in out:
                 # are the first two atom's energies unaffected by atom at the cutoff?
@@ -226,6 +301,11 @@ class BaseModelTests:
                 # only care about gradient wrt moved atom
                 assert grads.shape == (3, 3)
                 assert torch.allclose(grads[2], torch.zeros(1, device=device))
+
+        # restore previous model state
+        with torch.no_grad():
+            for p, v in zip(all_params, old_state):
+                p.copy_(v)
 
 
 class BaseEnergyModelTests(BaseModelTests):
@@ -261,6 +341,16 @@ class BaseEnergyModelTests(BaseModelTests):
             out_both[AtomicDataDict.TOTAL_ENERGY_KEY],
             atol=atol,
         )
+        if AtomicDataDict.FORCE_KEY in out1:
+            # check forces if it's a force model
+            assert torch.allclose(
+                torch.cat(
+                    (out1[AtomicDataDict.FORCE_KEY], out2[AtomicDataDict.FORCE_KEY]),
+                    dim=0,
+                ),
+                out_both[AtomicDataDict.FORCE_KEY],
+                atol=atol,
+            )
 
         atoms_both2 = atoms1.copy()
         atoms3 = atoms2.copy()
@@ -359,7 +449,10 @@ class BaseEnergyModelTests(BaseModelTests):
                 assert torch.allclose(
                     output[k],
                     output_partial[k],
-                    atol=1e-8 if k == AtomicDataDict.TOTAL_ENERGY_KEY else 1e-6,
+                    atol=1e-8
+                    if k == AtomicDataDict.TOTAL_ENERGY_KEY
+                    and torch.get_default_dtype() == torch.float64
+                    else 1e-5,
                 )
             else:
                 assert torch.equal(output[k], output_partial[k])
@@ -381,4 +474,40 @@ class BaseEnergyModelTests(BaseModelTests):
             adjacency = data[AtomicDataDict.BATCH_KEY].view(-1, 1) == data[
                 AtomicDataDict.BATCH_KEY
             ].view(1, -1)
-        assert torch.equal(adjacency, torch.any(partial_forces != 0, dim=-1))
+        # for non-adjacent atoms, all partial forces must be zero
+        assert torch.all(partial_forces[~adjacency] == 0)
+
+    def test_force_smoothness(self, model, config, device):
+        instance, out_fields = model
+        if AtomicDataDict.FORCE_KEY not in out_fields:
+            pytest.skip()
+        # see test_embedding_cutoff
+        with torch.no_grad():
+            all_params = list(instance.parameters())
+            old_state = [p.detach().clone() for p in all_params]
+            for p in all_params:
+                p.uniform_(-3.0, 3.0)
+        config, out_fields = config
+        r_max = config["r_max"]
+
+        # make a synthetic three atom example
+        data = AtomicData(
+            atom_types=np.random.choice([0, 1, 2], size=3),
+            pos=np.array([[0.0, 0.0, 0.0], [0.0, 1.0, 0.0], [r_max, 0.0, 0.0]]),
+            edge_index=np.array([[0, 1, 0, 2], [1, 0, 2, 0]]),
+        )
+        data = data.to(device)
+        out = instance(AtomicData.to_AtomicDataDict(data))
+        forces = out[AtomicDataDict.FORCE_KEY]
+        assert (
+            forces[:2].abs().sum() > 1e-4
+        )  # some nonzero terms on the two connected atoms
+        assert torch.allclose(
+            forces[2],
+            torch.zeros(1, device=device, dtype=forces.dtype),
+        )  # the atom at the cutoff should be zero
+
+        # restore previous model state
+        with torch.no_grad():
+            for p, v in zip(all_params, old_state):
+                p.copy_(v)

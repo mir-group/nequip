@@ -6,7 +6,7 @@ import tempfile
 import os
 
 from ase.atoms import Atoms
-from ase.build import molecule
+from ase.build import molecule, bulk
 from ase.calculators.singlepoint import SinglePointCalculator
 from ase.io import write
 
@@ -18,6 +18,25 @@ from nequip.data.transforms import TypeMapper
 from nequip.utils.torch_geometric import Batch
 from nequip.utils._global_options import _set_global_options
 from nequip.utils.misc import dtype_from_name
+
+# Sometimes we run parallel using pytest-xdist, and want to be able to use
+# as many GPUs as are available
+# https://pytest-xdist.readthedocs.io/en/latest/how-to.html#identifying-the-worker-process-during-a-test
+_is_pytest_xdist: bool = os.environ.get("PYTEST_XDIST_WORKER", "master") != "master"
+if _is_pytest_xdist and torch.cuda.is_available():
+    _xdist_worker_rank: int = int(os.environ["PYTEST_XDIST_WORKER"].lstrip("gw"))
+    _cuda_vis_devs = os.environ.get(
+        "CUDA_VISIBLE_DEVICES",
+        ",".join(str(e) for e in range(torch.cuda.device_count())),
+    ).split(",")
+    _cuda_vis_devs = [int(e) for e in _cuda_vis_devs]
+    # set this for tests that run in this process
+    _local_gpu_rank = _xdist_worker_rank % torch.cuda.device_count()
+    torch.cuda.set_device(_local_gpu_rank)
+    # set this for launched child processes
+    os.environ["CUDA_VISIBLE_DEVICES"] = str(_cuda_vis_devs[_local_gpu_rank])
+    del _xdist_worker_rank, _cuda_vis_devs, _local_gpu_rank
+
 
 if "NEQUIP_NUM_TASKS" not in os.environ:
     # Test parallelization, but don't waste time spawning tons of workers if lots of cores available
@@ -97,6 +116,16 @@ def CH3CHO_no_typemap(float_tolerance) -> Tuple[Atoms, AtomicData]:
 
 
 @pytest.fixture(scope="session")
+def Cu_bulk(float_tolerance) -> Tuple[Atoms, AtomicData]:
+    atoms = bulk("Cu") * (2, 2, 1)
+    atoms.rattle()
+    data = AtomicData.from_ase(atoms, r_max=3.5)
+    tm = TypeMapper(chemical_symbol_to_type={"Cu": 0})
+    data = tm(data)
+    return atoms, data
+
+
+@pytest.fixture(scope="session")
 def molecules() -> List[Atoms]:
     atoms_list = []
     for i in range(8):
@@ -121,7 +150,7 @@ def nequip_dataset(molecules, temp_data, float_tolerance):
         a = ASEDataset(
             file_name=fp.name,
             root=temp_data,
-            extra_fixed_fields={"r_max": 3.0},
+            AtomicData_options={"r_max": 3.0},
             ase_args=dict(format="extxyz"),
             type_mapper=TypeMapper(chemical_symbol_to_type={"H": 0, "C": 1, "O": 2}),
         )
@@ -136,17 +165,17 @@ def atomic_batch(nequip_dataset):
 @pytest.fixture(scope="function")
 def per_species_set():
     dtype = torch.get_default_dtype()
-    torch.manual_seed(0)
+    rng = torch.Generator().manual_seed(127)
     mean_min = 1
     mean_max = 100
     std = 20
     n_sample = 1000
     n_species = 9
-    ref_mean = torch.rand((n_species)) * (mean_max - mean_min) + mean_min
+    ref_mean = torch.rand((n_species), generator=rng) * (mean_max - mean_min) + mean_min
     t_mean = torch.ones((n_sample, 1)) * ref_mean.reshape([1, -1])
-    ref_std = torch.rand((n_species)) * std
+    ref_std = torch.rand((n_species), generator=rng) * std
     t_std = torch.ones((n_sample, 1)) * ref_std.reshape([1, -1])
-    E = torch.normal(t_mean, t_std)
+    E = torch.normal(t_mean, t_std, generator=rng)
     return ref_mean.to(dtype), ref_std.to(dtype), E.to(dtype), n_sample, n_species
 
 
