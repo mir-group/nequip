@@ -44,8 +44,11 @@ class HDF5Dataset(AtomicDataset):
         file_name: Optional[str] = None,
         AtomicData_options: Dict[str, Any] = {},
         type_mapper: Optional[TypeMapper] = None,
+        force_use_cached: bool = False,
     ):
-        super().__init__(root=root, type_mapper=type_mapper)
+        super().__init__(
+            root=root, type_mapper=type_mapper, force_use_cached=force_use_cached
+        )
         self.key_mapping = key_mapping
         self.key_list = list(key_mapping.keys())
         self.value_list = list(key_mapping.values())

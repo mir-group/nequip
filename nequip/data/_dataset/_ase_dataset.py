@@ -131,6 +131,7 @@ class ASEDataset(AtomicInMemoryDataset):
         type_mapper: TypeMapper = None,
         key_mapping: Optional[dict] = None,
         include_keys: Optional[List[str]] = None,
+        force_use_cached: bool = False,
     ):
         self.ase_args = {}
         self.ase_args.update(getattr(type(self), "ASE_ARGS", dict()))
@@ -148,6 +149,7 @@ class ASEDataset(AtomicInMemoryDataset):
             AtomicData_options=AtomicData_options,
             include_frames=include_frames,
             type_mapper=type_mapper,
+            force_use_cached=force_use_cached,
         )
 
     @classmethod
