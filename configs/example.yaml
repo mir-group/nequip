@@ -124,8 +124,11 @@ metrics_components:
 
 # optimizer, may be any optimizer defined in torch.optim
 # the name `optimizer_name`is case sensitive
-optimizer_name: Adam                                                               # default optimizer is Adam 
-optimizer_amsgrad: false
+# IMPORTANT: for NequIP (not for Allegro), we find that in most cases AMSGrad strongly improves
+# out-of-distribution generalization over Adam. We highly recommed trying both AMSGrad (by setting
+# optimizer_amsgrad: true) and Adam (by setting optimizer_amsgrad: false)
+optimizer_name: Adam                                                             
+optimizer_amsgrad: true
 
 # lr scheduler, currently only supports the two options listed in full.yaml, i.e. on-pleteau and cosine annealing with warm restarts, if you need more please file an issue
 # here: on-plateau, reduce lr by factory of lr_scheduler_factor if metrics_key hasn't improved for lr_scheduler_patience epoch
