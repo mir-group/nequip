@@ -4,6 +4,7 @@ import pathlib
 import yaml
 import subprocess
 import os
+import warnings
 
 import numpy as np
 import torch
@@ -24,9 +25,15 @@ def test_metrics(nequip_dataset, BENCHMARK_ROOT, conffile, builder):
 
     device = "cpu"
     num_worker = 4
-    if torch.cuda.is_available() and torch.cuda.device_count() > 1:
-        device = "cuda"
-        num_worker = torch.cuda.device_count()
+    # run on CPU if only one GPU is available so that we still test distributed with multiple workers
+    if torch.cuda.is_available():
+        if torch.cuda.device_count() > 1:
+            device = "cuda"
+            num_worker = torch.cuda.device_count()
+        else:
+            warnings.warn(
+                "Although CUDA is available, testing distributed on CPU since there's only one GPU"
+            )
 
     path_to_this_file = pathlib.Path(__file__)
     config_path = path_to_this_file.parents[2] / f"configs/{conffile}"
