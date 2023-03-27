@@ -463,7 +463,6 @@ class ParaStressOutput(GraphModuleMixin, torch.nn.Module):
         edge_virial = torch.einsum(
             "zi,zj->zij", vector_force, data[AtomicDataDict.EDGE_VECTORS_KEY]
         )
-        edge_virial = (edge_virial + edge_virial.transpose(-1, -2)) / 2  # symmetric
         atom_virial = scatter(
             edge_virial,
             data[AtomicDataDict.EDGE_INDEX_KEY][0],
@@ -471,7 +470,17 @@ class ParaStressOutput(GraphModuleMixin, torch.nn.Module):
             reduce="sum",
             dim_size=len(pos),
         )
+        # edge_virial is distributed into two nodes equally. Not sure and need more tests
+        atom_virial = (atom_virial + scatter(
+            edge_virial,
+            data[AtomicDataDict.EDGE_INDEX_KEY][1],
+            dim=0,
+            reduce="sum",
+            dim_size=len(pos),
+        ))/2
+    
         virial = scatter(atom_virial, batch, dim=0, reduce="sum")
+        virial = (virial + virial.transpose(-1, -2)) / 2 # symmetric
 
         if virial is None:
             # condition needed to unwrap optional for torchscript
