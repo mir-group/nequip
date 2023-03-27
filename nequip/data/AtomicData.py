@@ -7,6 +7,7 @@ import warnings
 from copy import deepcopy
 from typing import Union, Tuple, Dict, Optional, List, Set, Sequence
 from collections.abc import Mapping
+import os
 
 import numpy as np
 import ase.neighborlist
@@ -693,6 +694,11 @@ class AtomicData(Data):
         return type(self)(**new_dict)
 
 
+_ERROR_ON_NO_EDGES: bool = os.environ.get("NEQUIP_ERROR_ON_NO_EDGES", "true").lower()
+assert _ERROR_ON_NO_EDGES in ("true", "false")
+_ERROR_ON_NO_EDGES = _ERROR_ON_NO_EDGES == "true"
+
+
 def neighbor_list_and_relative_vec(
     pos,
     r_max,
@@ -785,7 +791,7 @@ def neighbor_list_and_relative_vec(
         bad_edge = first_idex == second_idex
         bad_edge &= np.all(shifts == 0, axis=1)
         keep_edge = ~bad_edge
-        if not np.any(keep_edge):
+        if _ERROR_ON_NO_EDGES and (not np.any(keep_edge)):
             raise ValueError(
                 f"Every single atom has no neighbors within the cutoff r_max={r_max} (after eliminating self edges, no edges remain in this system)"
             )
