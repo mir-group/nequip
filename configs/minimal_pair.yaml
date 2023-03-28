@@ -37,7 +37,7 @@ num_features: 16
 # lj_delta_trainable: false
 # lj_epsilon_trainable: true
 pair_style: ZBL
-units: real  # Ang and kcal/mol
+units: real  # Ang and kcal/mol, LAMMPS unit names;  allowed values "metal" and "real"
 
 # data set
 # the keys used need to be stated at least once in key_mapping, npz_fixed_field_keys or npz_keys
