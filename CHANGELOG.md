@@ -17,6 +17,8 @@ Most recent change on the bottom.
 - Pair potential terms
 - `nequip-evaluate --output-fields-from-original-dataset`
 - Error (or warn) on unused options in YAML that likely indicate typos
+- `dataset_*_absmax` statistics option
+- `HDF5Dataset` (#227)
 
 ### Changed
 - Always require explicit `seed`
@@ -26,9 +28,12 @@ Most recent change on the bottom.
 - Will not reproduce previous versions' data shuffling order (for all practical purposes this does not matter, the `shuffle` option is unchanged)
 - [Breaking] `default_dtype` defaults to `float64` (`model_dtype` default `float32`)
 - `nequip-benchmark` now only uses `--n-data` frames to build the model
+- [Breaking] By default models now use `StressForceOutput`, not `ForceOutput`
 
 ### Fixed
 - Work with `wandb>=0.13.8`
+- Better error for standard deviation with too few data
+- `load_model_state` GPU -> CPU
 
 ### Removed
 - [Breaking] `fixed_fields` machinery (`npz_fixed_field_keys` is still supported, but through a more straightforward implementation)

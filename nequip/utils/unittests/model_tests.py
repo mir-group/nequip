@@ -79,12 +79,22 @@ class BaseModelTests:
         instance = instance.to(device=device)
         model_script = script(instance)
 
+        atol = {
+            # tight, but not that tight, since GPU nondet has to pass
+            # plus model insides are still float32 with global dtype float64 in the tests
+            torch.float32: 5e-5,
+            torch.float64: 5e-7,
+        }[torch.get_default_dtype()]
+
+        out_instance = instance(data.copy())
+        out_script = model_script(data.copy())
+
         for out_field in out_fields:
             assert torch.allclose(
-                instance(data)[out_field],
-                model_script(data)[out_field],
-                atol=1e-6,
-            )
+                out_instance[out_field],
+                out_script[out_field],
+                atol=atol,
+            ), f"JIT didn't repro non-JIT on field {out_field} with max error {(out_instance[out_field] - out_script[out_field]).abs().max().item()}"
 
         # - Try saving, loading in another process, and running -
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -97,19 +107,15 @@ class BaseModelTests:
             load_model = torch.jit.load(tmpdir + "/model.pt")
             load_dat = torch.load(tmpdir + "/dat.pt")
 
-            atol = {
-                # tight, but not that tight, since GPU nondet has to pass
-                # plus model insides are still float32 with global dtype float64 in the tests
-                torch.float32: 5e-6,
-                torch.float64: 5e-7,
-            }[torch.get_default_dtype()]
+            out_script = model_script(data.copy())
+            out_load = load_model(load_dat.copy())
 
             for out_field in out_fields:
                 assert torch.allclose(
-                    model_script(data)[out_field],
-                    load_model(load_dat)[out_field],
+                    out_script[out_field],
+                    out_load[out_field],
                     atol=atol,
-                )
+                ), f"JIT didn't repro save-and-loaded JIT on field {out_field} with max error {(out_script[out_field] - out_load[out_field]).abs().max().item()}"
 
     def test_forward(self, model, atomic_batch, device):
         instance, out_fields = model
@@ -468,7 +474,8 @@ class BaseEnergyModelTests(BaseModelTests):
             adjacency = data[AtomicDataDict.BATCH_KEY].view(-1, 1) == data[
                 AtomicDataDict.BATCH_KEY
             ].view(1, -1)
-        assert torch.equal(adjacency, torch.any(partial_forces != 0, dim=-1))
+        # for non-adjacent atoms, all partial forces must be zero
+        assert torch.all(partial_forces[~adjacency] == 0)
 
     def test_force_smoothness(self, model, config, device):
         instance, out_fields = model

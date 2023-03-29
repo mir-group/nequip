@@ -13,7 +13,8 @@ from nequip.data import (
 )
 
 
-PERMUTATION_FLOAT_TOLERANCE = {torch.float32: 1e-5, torch.float64: 1e-10}
+# This has to be somewhat large because of float32 sum reductions over many edges/atoms
+PERMUTATION_FLOAT_TOLERANCE = {torch.float32: 1e-4, torch.float64: 1e-10}
 
 
 # https://discuss.pytorch.org/t/how-to-quickly-inverse-a-permutation-by-using-pytorch/116205/4

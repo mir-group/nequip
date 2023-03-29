@@ -9,7 +9,13 @@ from .AtomicData import (
     _GRAPH_FIELDS,
     _LONG_FIELDS,
 )
-from .dataset import AtomicDataset, AtomicInMemoryDataset, NpzDataset, ASEDataset
+from ._dataset import (
+    AtomicDataset,
+    AtomicInMemoryDataset,
+    NpzDataset,
+    ASEDataset,
+    HDF5Dataset,
+)
 from .dataloader import DataLoader, Collater, PartialSampler
 from ._build import dataset_from_config
 from ._test_data import EMTTestDataset
@@ -24,6 +30,7 @@ __all__ = [
     AtomicInMemoryDataset,
     NpzDataset,
     ASEDataset,
+    HDF5Dataset,
     DataLoader,
     Collater,
     PartialSampler,

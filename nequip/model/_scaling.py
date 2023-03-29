@@ -281,7 +281,7 @@ def _compute_stats(
     stat_strs = []
     ids = []
     tuple_ids = []
-    tuple_id_map = {"mean": 0, "std": 1, "rms": 0}
+    tuple_id_map = {"mean": 0, "std": 1, "rms": 0, "absmax": 0}
     input_kwargs = {}
     for name in str_names:
 
@@ -302,9 +302,9 @@ def _compute_stats(
         if stat in ["mean", "std"]:
             stat_mode = prefix + "mean_std"
             stat_str = field + prefix + "mean_std"
-        elif stat in ["rms"]:
-            stat_mode = prefix + "rms"
-            stat_str = field + prefix + "rms"
+        elif stat in ["rms", "absmax"]:
+            stat_mode = prefix + stat
+            stat_str = field + prefix + stat
         else:
             raise ValueError(f"Cannot handle {stat} type quantity")
 

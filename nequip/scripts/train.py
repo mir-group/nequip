@@ -30,7 +30,7 @@ default_config = dict(
         "SimpleIrrepsConfig",
         "EnergyModel",
         "PerSpeciesRescale",
-        "ForceOutput",
+        "StressForceOutput",
         "RescaleEnergyEtc",
     ],
     dataset_statistics_stride=1,
@@ -54,6 +54,10 @@ default_config = dict(
     # We default to DYNAMIC alone because the number of edges is always dynamic,
     # even if the number of atoms is fixed:
     _jit_fusion_strategy=[("DYNAMIC", 3)],
+    # Due to what appear to be ongoing bugs with nvFuser, we default to NNC (fuser1) for now:
+    # TODO: still default to NNC on CPU regardless even if change this for GPU
+    # TODO: default for ROCm?
+    _jit_fuser="fuser1",
 )
 # All default_config keys are valid / requested
 _GLOBAL_ALL_ASKED_FOR_KEYS.update(default_config.keys())
