@@ -409,10 +409,16 @@ class ParaStressOutput(GraphModuleMixin, torch.nn.Module):
         self.register_buffer("_empty", torch.Tensor())
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
-        data = AtomicDataDict.with_batch(data)
-
-        batch = data[AtomicDataDict.BATCH_KEY]
-        num_batch: int = int(batch.max().cpu().item()) + 1
+        assert AtomicDataDict.EDGE_VECTORS_KEY not in data
+        
+        if AtomicDataDict.BATCH_KEY in data:
+            batch = data[AtomicDataDict.BATCH_KEY]
+            num_batch: int = len(data[AtomicDataDict.BATCH_PTR_KEY]) - 1
+        else:
+            # Special case for efficiency
+            batch = self._empty
+            num_batch: int = 1
+        
         pos = data[AtomicDataDict.POSITIONS_KEY]
 
         has_cell: bool = AtomicDataDict.CELL_KEY in data
@@ -477,10 +483,6 @@ class ParaStressOutput(GraphModuleMixin, torch.nn.Module):
         virial = scatter(atom_virial, batch, dim=0, reduce="sum")
         virial = (virial + virial.transpose(-1, -2)) / 2 # symmetric
 
-        if virial is None:
-            # condition needed to unwrap optional for torchscript
-            assert False, "failed to compute virial autograd"
-
         # we only compute the stress (1/V * virial) if we have a cell whose volume we can compute
         if has_cell:
             # ^ can only scale by cell volume if we have one...:
@@ -492,7 +494,8 @@ class ParaStressOutput(GraphModuleMixin, torch.nn.Module):
                 cell[:, 0, :],
                 torch.cross(cell[:, 1, :], cell[:, 2, :], dim=1),
             ).unsqueeze(-1)
-            stress = virial / volume.view(-1, 1, 1)
+            stress = virial / volume.view(num_batch, 1, 1)
+            data[AtomicDataDict.CELL_KEY] = orig_cell
         else:
             stress = self._empty  # torchscript
         data[AtomicDataDict.STRESS_KEY] = stress
