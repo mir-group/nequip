@@ -397,9 +397,9 @@ class ParaStressOutput(GraphModuleMixin, torch.nn.Module):
             irreps_out=self.func.irreps_out.copy(),
         )
         self.irreps_out[AtomicDataDict.FORCE_KEY] = "1o"
-        self.irreps_out[AtomicDataDict.STRESS_KEY] = "3x1o"
-        self.irreps_out[AtomicDataDict.VIRIAL_KEY] = "3x1o"
-        self.irreps_out[AtomicDataDict.ATOM_VIRIAL_KEY] = "3x1o"
+        self.irreps_out[AtomicDataDict.STRESS_KEY] = "1o"
+        self.irreps_out[AtomicDataDict.VIRIAL_KEY] = "1o"
+        self.irreps_out[AtomicDataDict.ATOM_VIRIAL_KEY] = "1o"
 
         # for torchscript compat
         self.register_buffer("_empty", torch.Tensor())
