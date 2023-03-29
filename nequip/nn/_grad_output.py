@@ -411,8 +411,9 @@ class ParaStressOutput(GraphModuleMixin, torch.nn.Module):
             batch = data[AtomicDataDict.BATCH_KEY]
             num_batch: int = len(data[AtomicDataDict.BATCH_PTR_KEY]) - 1
         else:
+            data = AtomicDataDict.with_batch(data)
             # Special case for efficiency
-            batch = self._empty
+            batch = data[AtomicDataDict.BATCH_KEY]
             num_batch: int = 1
         
         pos = data[AtomicDataDict.POSITIONS_KEY]
