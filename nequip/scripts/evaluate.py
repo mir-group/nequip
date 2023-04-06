@@ -31,7 +31,7 @@ register_fields(graph_fields=[ORIGINAL_DATASET_INDEX_KEY])
 
 
 def _load_deployed_or_traindir(
-    path: Path, device
+    path: Path, device, freeze: bool = True
 ) -> Tuple[torch.nn.Module, bool, float, List[str]]:
     loaded_deployed_model: bool = False
     model_r_max = None
@@ -41,6 +41,7 @@ def _load_deployed_or_traindir(
             path,
             device=device,
             set_global_options=True,  # don't warn that setting
+            freeze=freeze,
         )
         # the global settings for a deployed model are set by
         # set_global_options in the call to load_deployed_model
