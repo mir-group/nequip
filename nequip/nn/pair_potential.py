@@ -9,7 +9,6 @@ import ase.data
 
 from nequip.data import AtomicDataDict
 from nequip.nn import GraphModuleMixin, RescaleOutput
-from nequip.nn.cutoffs import PolynomialCutoff
 
 
 @torch.jit.script
