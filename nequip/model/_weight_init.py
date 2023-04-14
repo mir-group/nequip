@@ -27,7 +27,7 @@ def initialize_from_state(
         return graph_model  # do nothing
     return load_model_state(
         config=config,
-        model=graph_model,
+        graph_model=graph_model,
         initialize=initialize,
         _prefix="initial_model_state",
     )
