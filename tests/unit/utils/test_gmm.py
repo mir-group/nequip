@@ -2,7 +2,9 @@ import torch
 import numpy as np
 from nequip.utils import gmm
 from sklearn import mixture
+from e3nn.util.test import assert_auto_jitable
 
+# TODO: use pytest fixtures
 rng = np.random.RandomState(678912345)
 fit_data = rng.rand(10, 3)
 gmm_sklearn = mixture.GaussianMixture(
@@ -14,6 +16,9 @@ gmm_torch = torch.jit.script(gmm_torch)
 
 
 class TestGMM:
+    def test_compile(self):
+        assert_auto_jitable(gmm_torch)
+
     def test_fit_forward_simple(self):
         gmm_sklearn.fit(fit_data)
         gmm_torch.fit(torch.from_numpy(fit_data))
@@ -43,10 +48,3 @@ class TestGMM:
             torch.from_numpy(sklearn_nll),
             torch_nll,
         )
-
-    def test_forward(self):
-
-        assert True
-
-
-# TODO:  test consistancy of GaussianMixture NLLs with pure sklearn solution

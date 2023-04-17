@@ -69,7 +69,7 @@ def _estimate_log_gaussian_prob(
 
     # Since we are using the precision of the Cholesky decomposition,
     # `-0.5 * log_det` becomes `+ log_det`
-    return -0.5 * (n_features * math.log(math.pi) + log_prob) + log_det
+    return -0.5 * (n_features * math.log(2 * math.pi) + log_prob) + log_det
 
 
 class GaussianMixture(torch.nn.Module):
@@ -120,7 +120,10 @@ class GaussianMixture(torch.nn.Module):
 
     @torch.jit.unused
     def fit(
-        self, rng: Optional[torch.Generator], X: torch.Tensor, max_components: int = 50
+        self,
+        X: torch.Tensor,
+        max_components: int = 50,
+        rng: Optional[torch.Generator] = None,
     ) -> None:
         """Fit the GMM to the samples `X` using sklearn."""
         # TODO: if n_components is None, use the BIC; else just use provided n_components
