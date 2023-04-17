@@ -84,7 +84,8 @@ def _set_global_options(config, warn_on_override: bool = False) -> None:
         if version.parse(torch.__version__) >= version.parse("1.12")
         else "fuser1"
     )
-    fuser = config.get("_jit_fuser", default_fuser)
+    if torch.cuda.is_available():
+        fuser = config.get("_jit_fuser", default_fuser)
     # context manager just restores old fuser afterwards
     torch.jit.fuser(fuser).__enter__()
     if warn_on_override and fuser != default_fuser:
