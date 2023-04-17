@@ -3,13 +3,14 @@ import numpy as np
 from nequip.utils import gmm
 from sklearn import mixture
 
-fit_data = np.random.rand(10, 3)
+rng = np.random.RandomState(678912345)
+fit_data = rng.rand(10, 3)
 gmm_sklearn = mixture.GaussianMixture(
-    n_components=3, covariance_type="full", random_state=123
+    n_components=3, covariance_type="full", random_state=rng.rand(1)
 )
 
-gmm_torch = gmm.GaussianMixture(n_components=3, seed=123, n_features=3)
-# gmm_torch = torch.jit.script(gmm_torch)
+gmm_torch = gmm.GaussianMixture(n_components=3, n_features=3)
+gmm_torch = torch.jit.script(gmm_torch)
 
 
 class TestGMM:
@@ -17,28 +18,23 @@ class TestGMM:
         gmm_sklearn.fit(fit_data)
         gmm_torch.fit(torch.from_numpy(fit_data))
 
-        assert torch.allclose(
-            torch.from_numpy(gmm_sklearn.means_), gmm_torch.state_dict()["means"]
-        )
+        assert torch.allclose(torch.from_numpy(gmm_sklearn.means_), gmm_torch.means)
 
         assert torch.allclose(
-            torch.from_numpy(gmm_sklearn.covariances_),
-            gmm_torch.state_dict()["covariances"],
+            torch.from_numpy(gmm_sklearn.covariances_), gmm_torch.covariances
         )
 
-        assert torch.allclose(
-            torch.from_numpy(gmm_sklearn.weights_), gmm_torch.state_dict()["weights"]
-        )
+        assert torch.allclose(torch.from_numpy(gmm_sklearn.weights_), gmm_torch.weights)
 
         assert torch.allclose(
             torch.from_numpy(gmm_sklearn.precisions_cholesky_),
-            gmm_torch.state_dict()["precisions_cholesky"],
+            gmm_torch.precisions_cholesky,
         )
 
-        test_data = np.random.rand(20, 3)
+        test_data = rng.rand(20, 3)
 
         sklearn_nll = gmm_sklearn.score_samples(test_data)
-        torch_nll = gmm_torch.forward(torch.from_numpy(test_data))
+        torch_nll = gmm_torch(torch.from_numpy(test_data))
 
         print(f"sklearn_nll shape: {sklearn_nll.shape}")
         print(f"torch_nll shape: {torch_nll.size()}")
