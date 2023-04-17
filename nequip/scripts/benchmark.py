@@ -63,7 +63,7 @@ def main(args=None):
         "--n-data",
         help="Number of frames to use.",
         type=int,
-        default=1,
+        default=2,
     )
     parser.add_argument(
         "--timestep",

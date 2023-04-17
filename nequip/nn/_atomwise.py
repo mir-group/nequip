@@ -184,6 +184,8 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
                 self.shifts = torch.nn.Parameter(shifts)
             else:
                 self.register_buffer("shifts", shifts)
+        else:
+            self.register_buffer("shifts", torch.Tensor())
 
         self.has_scales = scales is not None
         if scales is not None:
@@ -199,6 +201,8 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
                 self.scales = torch.nn.Parameter(scales)
             else:
                 self.register_buffer("scales", scales)
+        else:
+            self.register_buffer("scales", torch.Tensor())
 
         self.arguments_in_dataset_units = arguments_in_dataset_units
 

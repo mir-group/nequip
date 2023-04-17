@@ -241,6 +241,10 @@ class ZBL(GraphModuleMixin, torch.nn.Module):
                 ase.data.atomic_numbers[type_to_chemical_symbol[type_i]]
                 for type_i in range(num_types)
             ]
+            if min(atomic_numbers) < 1:
+                raise ValueError(
+                    f"Your chemical symbols don't seem valid (minimum atomic number is {min(atomic_numbers)} < 1); did you try to use fake chemical symbols for arbitrary atom types?  If so, instead provide atom_types directly in your dataset and specify `type_names` and `type_to_chemical_symbol` in your config. `type_to_chemical_symbol` then tells ZBL what atomic numbers to use for the various atom types in your system."
+                )
         else:
             raise RuntimeError(
                 "Either chemical_symbol_to_type or type_to_chemical_symbol is required."
