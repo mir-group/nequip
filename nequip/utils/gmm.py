@@ -4,6 +4,7 @@ import math
 import torch
 import numpy as np
 from sklearn import mixture
+from e3nn.util.jit import compile_mode
 
 
 @torch.jit.script
@@ -33,7 +34,8 @@ def _estimate_log_gaussian_prob(
     """Estimate the log Gaussian probability."""
 
     assert covariance_type in ("full",)
-    n_features = X.size(dim=1)
+    n_samples, n_features = X.size(dim=0), X.size(dim=1)
+    n_components = means.size(dim=0)
 
     # det(precision_chol) = -0.5 * det(precision)
     log_det = _compute_log_det_cholesky(precisions_chol, covariance_type, n_features)
@@ -47,12 +49,12 @@ def _estimate_log_gaussian_prob(
     # ALBY'S CODE
     # X [n_sample, n_feature]
     # prec_chol is [n_component, n_feature, n_feature]
-    X_centered = X.unsqueeze(-2) - means.unsqueeze(
-        0
-    )  # [n_sample, 1, n_feature] - [1, n_component, n_feature] = [n_sample, n_component, n_feature]
+    X_centered = X.unsqueeze(-2) - means.unsqueeze(0)
+    print(f"X_centered size: {X_centered.size()}")
+    # [n_sample, 1, n_feature] - [1, n_component, n_feature] = [n_sample, n_component, n_feature]
     # [n_sample, n_component, n_feature] * [n_component, n_feature, n_feature]
     log_prob = (
-        torch.einsum("zci,ij->zcj", X_centered, precisions_chol).square().sum(dim=-1)
+        torch.einsum("zci,cij->zcj", X_centered, precisions_chol).square().sum(dim=-1)
     )
 
     # X = X.unsqueeze(0)
@@ -72,6 +74,7 @@ def _estimate_log_gaussian_prob(
     return -0.5 * (n_features * math.log(2 * math.pi) + log_prob) + log_det
 
 
+@compile_mode("script")
 class GaussianMixture(torch.nn.Module):
     """Calculate NLL of samples under a Gaussian Mixture Model (GMM).
 
@@ -134,6 +137,7 @@ class GaussianMixture(torch.nn.Module):
         n_components = self.n_components
         g = rng if rng else torch.Generator()
         random_state = torch.randint(2**16, (1,), generator=g).item()
+        print(f"torch seed: {random_state}")
         if not n_components:
             components = range(1, max_components)
             gmms = [
