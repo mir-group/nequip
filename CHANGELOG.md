@@ -19,6 +19,7 @@ Most recent change on the bottom.
 - Error (or warn) on unused options in YAML that likely indicate typos
 - `dataset_*_absmax` statistics option
 - `HDF5Dataset` (#227)
+- `include_file_as_baseline_config` for simple modifications of existing configs
 
 ### Changed
 - Always require explicit `seed`

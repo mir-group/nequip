@@ -272,7 +272,17 @@ class Config(object):
 
     @staticmethod
     def from_file(filename: str, format: Optional[str] = None, defaults: dict = {}):
-        """Load arguments from file"""
+        """Load arguments from file
+
+        Has support for including another config file as a baseline with:
+        ```
+        # example of using another config as a baseline and overriding only selected options
+        # this option will read in configs/minimal.yaml and take ALL keys from that file
+        include_file_as_baseline_config: configs/minimal.yaml
+        # keys specified in this file WILL OVERRIDE keys from the `include_file_as_baseline_config` file
+        l_max: 1  # overrides l_max: 2 in minimal.yaml
+        ```
+        """
 
         supported_formats = {"yaml": ("yml", "yaml"), "json": "json"}
         dictionary = load_file(
@@ -280,6 +290,23 @@ class Config(object):
             filename=filename,
             enforced_format=format,
         )
+        k: str = "include_file_as_baseline_config"
+        if k in dictionary:
+            # allow one level of subloading
+            baseline_fname = dictionary.pop(k)
+            dictionary_baseline = load_file(
+                supported_formats=supported_formats,
+                filename=baseline_fname,
+                enforced_format=format,
+            )
+            if k in dictionary_baseline:
+                raise NotImplementedError(
+                    f"Multiple levels of `{k}` are not allowed, but {baseline_fname} contained `{k}`"
+                )
+            # override baseline options with the main config
+            dictionary_baseline.update(dictionary)
+            dictionary = dictionary_baseline
+            del dictionary_baseline, baseline_fname
         return Config.from_dict(dictionary, defaults)
 
     @staticmethod
