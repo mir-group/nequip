@@ -5,15 +5,14 @@ from sklearn import mixture
 from e3nn.util.test import assert_auto_jitable
 
 # TODO: use pytest fixtures
-g = torch.Generator().manual_seed(678912345)
-sklearn_seed = torch.randint(2**16, (1,), generator=g).item()
-fit_data_rng = np.random.RandomState(678912345)
+seed = 678912345
+fit_data_rng = torch.Generator().manual_seed(seed)
 
 # Uniformly random data on [-1, 1)
 # fit_data_rng.multivariate_normal(np.zeros(8), np.identity(8))
-fit_data = 2 * (fit_data_rng.rand(100, 8) - 0.5)
+fit_data = 2 * (torch.randn(100, 8, generator=fit_data_rng) - 0.5)
 gmm_sklearn = mixture.GaussianMixture(
-    n_components=2, covariance_type="full", random_state=50993
+    n_components=2, covariance_type="full", random_state=seed
 )
 
 gmm_torch = gmm.GaussianMixture(n_components=2, n_features=8)
@@ -24,9 +23,8 @@ class TestGMM:
         assert_auto_jitable(gmm_torch)
 
     def test_fit_forward_simple(self):
-        print(f"sklearn seed: {sklearn_seed}")
-        gmm_sklearn.fit(fit_data)
-        gmm_torch.fit(torch.from_numpy(fit_data), rng=g)
+        gmm_sklearn.fit(fit_data.numpy())
+        gmm_torch.fit(fit_data, rng=seed)
 
         print(f"sklearn means: {torch.from_numpy(gmm_sklearn.means_)}")
         print(f"torch means: {gmm_torch.means}")
