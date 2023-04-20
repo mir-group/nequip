@@ -103,14 +103,15 @@ class GaussianMixture(torch.nn.Module):
         self.register_buffer("covariances", torch.Tensor())
         self.register_buffer("precisions_cholesky", torch.Tensor())
 
+    @torch.jit.export
+    def is_fit(self) -> bool:
+        return self.weights.numel() != 0
+
     def forward(self, X: torch.Tensor) -> torch.Tensor:
         """Compute the NLL of samples ``X`` under the GMM."""
 
         # Check if model has been fitted
-        assert self.weights.numel() != 0
-        assert self.means.numel() != 0
-        assert self.covariances.numel() != 0
-        assert self.precisions_cholesky.numel() != 0
+        assert self.is_fit()
 
         # TODO: testing
         estimated_log_probs = _estimate_log_gaussian_prob(

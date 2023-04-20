@@ -18,7 +18,6 @@ class GaussianMixtureModelUncertainty(GraphModuleMixin, torch.nn.Module):
 
     feature_field: str
     out_field: str
-    n_components: int
 
     def __init__(
         self,
@@ -31,7 +30,6 @@ class GaussianMixtureModelUncertainty(GraphModuleMixin, torch.nn.Module):
         super().__init__()
         self.feature_field = feature_field
         self.out_field = out_field
-        self.n_components = gmm_n_components
         self._init_irreps(
             irreps_in=irreps_in,
             required_irreps_in=[feature_field],
@@ -55,6 +53,7 @@ class GaussianMixtureModelUncertainty(GraphModuleMixin, torch.nn.Module):
         self.gmm.fit(X)
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
-        nll_scores = self.gmm(data[self.feature_field])
-        data[self.out_field] = nll_scores
+        if self.gmm.is_fit():
+            nll_scores = self.gmm(data[self.feature_field])
+            data[self.out_field] = nll_scores
         return data
