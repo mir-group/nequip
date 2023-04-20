@@ -8,12 +8,15 @@ from e3nn.util.test import assert_auto_jitable
 g = torch.Generator().manual_seed(678912345)
 sklearn_seed = torch.randint(2**16, (1,), generator=g).item()
 fit_data_rng = np.random.RandomState(678912345)
-fit_data = fit_data_rng.rand(10, 4)
+
+# Uniformly random data on [-1, 1)
+# fit_data_rng.multivariate_normal(np.zeros(8), np.identity(8))
+fit_data = 2 * (fit_data_rng.rand(100, 8) - 0.5)
 gmm_sklearn = mixture.GaussianMixture(
-    n_components=3, covariance_type="full", random_state=50993
+    n_components=2, covariance_type="full", random_state=50993
 )
 
-gmm_torch = gmm.GaussianMixture(n_components=3, n_features=4)
+gmm_torch = gmm.GaussianMixture(n_components=2, n_features=8)
 
 
 class TestGMM:
@@ -25,6 +28,8 @@ class TestGMM:
         gmm_sklearn.fit(fit_data)
         gmm_torch.fit(torch.from_numpy(fit_data), rng=g)
 
+        print(f"sklearn means: {torch.from_numpy(gmm_sklearn.means_)}")
+        print(f"torch means: {gmm_torch.means}")
         assert torch.allclose(torch.from_numpy(gmm_sklearn.means_), gmm_torch.means)
 
         assert torch.allclose(
@@ -39,7 +44,7 @@ class TestGMM:
         )
 
         test_data_rng = np.random.RandomState(123456789)
-        test_data = test_data_rng.rand(20, 4)
+        test_data = 2 * (test_data_rng.rand(100, 8) - 0.5)
 
         sklearn_nll = gmm_sklearn.score_samples(test_data)
         torch_nll = gmm_torch(torch.from_numpy(test_data))
