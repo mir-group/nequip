@@ -8,8 +8,7 @@ from e3nn.util.test import assert_auto_jitable
 seed = 678912345
 fit_data_rng = torch.Generator().manual_seed(seed)
 
-# Uniformly random data on [-1, 1)
-# fit_data_rng.multivariate_normal(np.zeros(8), np.identity(8))
+# normally distributed data
 fit_data = 2 * (torch.randn(100, 8, generator=fit_data_rng) - 0.5)
 gmm_sklearn = mixture.GaussianMixture(
     n_components=2, covariance_type="full", random_state=seed
