@@ -17,8 +17,6 @@ model_builders:
  - ForceOutput                # wrap the energy model in a module that uses autodifferention to compute the forces
  - RescaleEnergyEtc  
 
-gmm_n_components: 2
-
 # network
 num_basis: 8
 r_max: 4.0
