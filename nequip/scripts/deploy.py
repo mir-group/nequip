@@ -225,6 +225,7 @@ def main(args=None):
             logging.debug(f"Model had config:\n{config}")
 
     elif args.command == "build":
+        state_dict = None
         if args.model and args.train_dir:
             raise ValueError("--model and --train-dir cannot both be specified.")
         if args.train_dir is not None:
