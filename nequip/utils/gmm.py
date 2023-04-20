@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Union
 
 import math
 import torch
@@ -126,7 +126,7 @@ class GaussianMixture(torch.nn.Module):
         self,
         X: torch.Tensor,
         max_components: int = 50,
-        rng: Optional[torch.Generator] = None,
+        rng: Optional[Union[torch.Generator, int]] = None,
     ) -> None:
         """Fit the GMM to the samples `X` using sklearn."""
         # TODO: if n_components is None, use the BIC; else just use provided n_components
@@ -134,11 +134,16 @@ class GaussianMixture(torch.nn.Module):
         # TODO: fit with sklearn and set this objects buffers from sklearn values
         # Set number of n_components if given, otherwise use the BIC
 
-        n_components = self.n_components
-        g = rng if rng else torch.Generator()
-        random_state = torch.randint(2**16, (1,), generator=g).item()
-        print(f"torch seed: {random_state}")
-        if not n_components:
+        # if RNG is an int, just use it as a seed;
+        # if RNG is None, use the current torch random state;
+        # if RNG is a torch.Generator, use that to generate an int seed for sklearn
+        # this way, this is by default seeded by torch without setting the numpy or sklearn seeds
+        random_state = (
+            rng
+            if isinstance(rng, int)
+            else torch.randint(2**16, (1,), generator=rng).item()
+        )
+        if not self.n_components:
             components = range(1, max_components)
             gmms = [
                 mixture.GaussianMixture(
@@ -147,11 +152,11 @@ class GaussianMixture(torch.nn.Module):
                 for n in components
             ]
             bics = [model.fit(X).bic(X) for model in gmms]
-            n_components = np.argmin(bics)
+            self.n_components = np.argmin(bics)
 
         # Fit GMM
         gmm = mixture.GaussianMixture(
-            n_components=n_components,
+            n_components=self.n_components,
             covariance_type=self.covariance_type,
             random_state=random_state,
         )
