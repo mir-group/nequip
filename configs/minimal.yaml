@@ -14,8 +14,8 @@ model_builders:
  - SimpleIrrepsConfig         # update the config with all the irreps for the network if using the simplified `l_max` / `num_features` / `parity` syntax
  - EnergyModel                # build a full NequIP model
  - PerSpeciesRescale          # add per-atom / per-species scaling and shifting to the NequIP model before the total energy sum
- - ForceOutput                # wrap the energy model in a module that uses autodifferention to compute the forces
- - RescaleEnergyEtc  
+ - StressForceOutput                # wrap the energy model in a module that uses autodifferention to compute the forces
+ - RescaleEnergyEtc
 
 # network
 num_basis: 8
