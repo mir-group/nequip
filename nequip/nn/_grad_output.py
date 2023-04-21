@@ -1,5 +1,4 @@
 from typing import List, Union, Optional
-import warnings
 
 import torch
 
@@ -192,10 +191,6 @@ class StressOutput(GraphModuleMixin, torch.nn.Module):
         do_forces: bool = True,
     ):
         super().__init__()
-
-        warnings.warn(
-            "!! Stresses in NequIP are in BETA and UNDER DEVELOPMENT: _please_ carefully check the sanity of your results and report any (potential) issues on the GitHub"
-        )
 
         if not do_forces:
             raise NotImplementedError

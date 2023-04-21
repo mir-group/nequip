@@ -1,4 +1,5 @@
 from nequip.nn import SequentialGraphNetwork, AtomwiseReduce
+from nequip.nn.embedding import AddRadialCutoffToData
 from nequip.data import AtomicDataDict
 from nequip.nn.pair_potential import LennardJones, ZBL
 
@@ -22,6 +23,7 @@ def PairPotential(config) -> SequentialGraphNetwork:
     return SequentialGraphNetwork.from_parameters(
         shared_params=config,
         layers={
+            "cutoff": AddRadialCutoffToData,
             "pair_potential": {"LJ": LennardJones, "ZBL": ZBL}[config.pair_style],
             "total_energy_sum": (
                 AtomwiseReduce,

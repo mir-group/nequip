@@ -217,6 +217,7 @@ class SequentialGraphNetwork(GraphModuleMixin, torch.nn.Sequential):
             OrderedDict(zip(layers.keys(), built_modules)),
         )
 
+    @torch.jit.unused
     def append(self, name: str, module: GraphModuleMixin) -> None:
         r"""Append a module to the SequentialGraphNetwork.
 
@@ -229,6 +230,7 @@ class SequentialGraphNetwork(GraphModuleMixin, torch.nn.Sequential):
         self.irreps_out = dict(module.irreps_out)
         return
 
+    @torch.jit.unused
     def append_from_parameters(
         self,
         shared_params: Mapping,
@@ -257,6 +259,7 @@ class SequentialGraphNetwork(GraphModuleMixin, torch.nn.Sequential):
         self.append(name, instance)
         return instance
 
+    @torch.jit.unused
     def insert(
         self,
         name: str,
@@ -314,6 +317,7 @@ class SequentialGraphNetwork(GraphModuleMixin, torch.nn.Sequential):
 
         return
 
+    @torch.jit.unused
     def insert_from_parameters(
         self,
         shared_params: Mapping,

@@ -114,5 +114,6 @@ class GraphModel(GraphModuleMixin, torch.nn.Module):
 
     # == Helpers ==
 
+    @torch.jit.unused
     def get_device(self) -> torch.device:
         return _get_device(self)
