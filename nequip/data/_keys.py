@@ -45,6 +45,8 @@ EDGE_ATTRS_KEY: Final[str] = "edge_attrs"
 # [n_edge, dim] invariant embedding of the edges
 EDGE_EMBEDDING_KEY: Final[str] = "edge_embedding"
 EDGE_FEATURES_KEY: Final[str] = "edge_features"
+# [n_edge, 1] invariant of the radial cutoff envelope for each edge, allows reuse of cutoff envelopes
+EDGE_CUTOFF_KEY: Final[str] = "edge_cutoff"
 
 NODE_FEATURES_KEY: Final[str] = "node_features"
 NODE_ATTRS_KEY: Final[str] = "node_attrs"

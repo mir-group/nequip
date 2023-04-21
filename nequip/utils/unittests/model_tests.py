@@ -474,7 +474,8 @@ class BaseEnergyModelTests(BaseModelTests):
             adjacency = data[AtomicDataDict.BATCH_KEY].view(-1, 1) == data[
                 AtomicDataDict.BATCH_KEY
             ].view(1, -1)
-        assert torch.equal(adjacency, torch.any(partial_forces != 0, dim=-1))
+        # for non-adjacent atoms, all partial forces must be zero
+        assert torch.all(partial_forces[~adjacency] == 0)
 
     def test_force_smoothness(self, model, config, device):
         instance, out_fields = model

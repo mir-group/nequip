@@ -76,14 +76,39 @@ class RadialBasisEdgeEncoding(GraphModuleMixin, torch.nn.Module):
         self.out_field = out_field
         self._init_irreps(
             irreps_in=irreps_in,
-            irreps_out={self.out_field: o3.Irreps([(self.basis.num_basis, (0, 1))])},
+            irreps_out={
+                self.out_field: o3.Irreps([(self.basis.num_basis, (0, 1))]),
+                AtomicDataDict.EDGE_CUTOFF_KEY: "0e",
+            },
         )
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
         data = AtomicDataDict.with_edge_vectors(data, with_lengths=True)
         edge_length = data[AtomicDataDict.EDGE_LENGTH_KEY]
-        edge_length_embedded = (
-            self.basis(edge_length) * self.cutoff(edge_length)[:, None]
-        )
+        cutoff = self.cutoff(edge_length).unsqueeze(-1)
+        edge_length_embedded = self.basis(edge_length) * cutoff
         data[self.out_field] = edge_length_embedded
+        data[AtomicDataDict.EDGE_CUTOFF_KEY] = cutoff
+        return data
+
+
+@compile_mode("script")
+class AddRadialCutoffToData(GraphModuleMixin, torch.nn.Module):
+    def __init__(
+        self,
+        cutoff=PolynomialCutoff,
+        cutoff_kwargs={},
+        irreps_in=None,
+    ):
+        super().__init__()
+        self.cutoff = cutoff(**cutoff_kwargs)
+        self._init_irreps(
+            irreps_in=irreps_in, irreps_out={AtomicDataDict.EDGE_CUTOFF_KEY: "0e"}
+        )
+
+    def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
+        data = AtomicDataDict.with_edge_vectors(data, with_lengths=True)
+        edge_length = data[AtomicDataDict.EDGE_LENGTH_KEY]
+        cutoff = self.cutoff(edge_length).unsqueeze(-1)
+        data[AtomicDataDict.EDGE_CUTOFF_KEY] = cutoff
         return data

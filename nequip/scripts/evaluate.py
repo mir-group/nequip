@@ -31,7 +31,7 @@ register_fields(graph_fields=[ORIGINAL_DATASET_INDEX_KEY])
 
 
 def _load_deployed_or_traindir(
-    path: Path, device
+    path: Path, device, freeze: bool = True
 ) -> Tuple[torch.nn.Module, bool, float, List[str]]:
     loaded_deployed_model: bool = False
     model_r_max = None
@@ -41,6 +41,7 @@ def _load_deployed_or_traindir(
             path,
             device=device,
             set_global_options=True,  # don't warn that setting
+            freeze=freeze,
         )
         # the global settings for a deployed model are set by
         # set_global_options in the call to load_deployed_model
@@ -69,7 +70,7 @@ def _load_deployed_or_traindir(
         model_r_max = model_config["r_max"]
         type_names = model_config["type_names"]
     model.eval()
-    return model, load_deployed_model, model_r_max, type_names
+    return model, loaded_deployed_model, model_r_max, type_names
 
 
 def main(args=None, running_as_script: bool = True):
@@ -86,7 +87,7 @@ def main(args=None, running_as_script: bool = True):
 
             Prints only the final result in `name = num` format to stdout; all other information is `logging.debug`ed to stderr.
 
-            WARNING: Please note that results of CUDA models are rarely exactly reproducible, and that even CPU models can be nondeterministic.
+            Please note that results of CUDA models are rarely exactly reproducible, and that even CPU models can be nondeterministic. This is very rarely important in practice, but can be unintuitive.
             """
         )
     )
@@ -250,7 +251,7 @@ def main(args=None, running_as_script: bool = True):
     logger.info(f"Using device: {device}")
     if device.type == "cuda":
         logger.info(
-            "WARNING: please note that models running on CUDA are usually nondeterministc and that this manifests in the final test errors; for a _more_ deterministic result, please use `--device cpu`",
+            "Please note that _all_ machine learning models running on CUDA hardware are generally somewhat nondeterministic and that this can manifest in small, generally unimportant variation in the final test errors.",
         )
 
     if args.use_deterministic_algorithms:

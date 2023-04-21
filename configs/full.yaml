@@ -282,8 +282,9 @@ optimizer_weight_decay: 0
 # setting to inf or null disables it
 max_gradient_norm: null
 
-# lr scheduler, currently only supports the two options listed below, if you need more please file an issue
+# lr scheduler
 # first: on-plateau, reduce lr by factory of lr_scheduler_factor if metrics_key hasn't improved for lr_scheduler_patience epoch
+# you can also set other options of the underlying PyTorch scheduler, for example lr_scheduler_threshold
 lr_scheduler_name: ReduceLROnPlateau
 lr_scheduler_patience: 100
 lr_scheduler_factor: 0.5
