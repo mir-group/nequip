@@ -34,7 +34,7 @@ def _estimate_log_gaussian_prob(
     """Estimate the log Gaussian probability."""
 
     assert covariance_type in ("full",)
-    n_features = X.size(dim=0), X.size(dim=1)
+    n_features = X.size(dim=1)
 
     # det(precision_chol) = -0.5 * det(precision)
     log_det = _compute_log_det_cholesky(precisions_chol, covariance_type, n_features)
