@@ -34,41 +34,19 @@ def _estimate_log_gaussian_prob(
     """Estimate the log Gaussian probability."""
 
     assert covariance_type in ("full",)
-    n_samples, n_features = X.size(dim=0), X.size(dim=1)
-    n_components = means.size(dim=0)
-
-    # det(precision_chol) = -0.5 * det(precision)
+    n_features = X.size(dim=1)
     log_det = _compute_log_det_cholesky(precisions_chol, covariance_type, n_features)
 
-    # TODO: understand this
-    # log_prob = torch.empty((n_samples, n_components))
-    # for k, (mu, prec_chol) in enumerate(zip(means, precisions_chol)):
-    #     y = torch.mm(X, prec_chol) - torch.mm(mu.unsqueeze(0), prec_chol)
-    #     log_prob[:, k] = torch.sum(torch.square(y), dim=1)
-
-    # ALBY'S CODE
-    # X [n_sample, n_feature]
-    # prec_chol is [n_component, n_feature, n_feature]
-    X_centered = X.unsqueeze(-2) - means.unsqueeze(0)
-    print(f"X_centered size: {X_centered.size()}")
+    # dim(X) = [n_sample, n_feature]
+    # dim(precisions_chol) = [n_component, n_feature, n_feature]
     # [n_sample, 1, n_feature] - [1, n_component, n_feature] = [n_sample, n_component, n_feature]
-    # [n_sample, n_component, n_feature] * [n_component, n_feature, n_feature]
+    # dim(X_centered) = [n_sample, n_component, n_feature]
+    X_centered = X.unsqueeze(-2) - means.unsqueeze(0)
     log_prob = (
         torch.einsum("zci,cij->zcj", X_centered, precisions_chol).square().sum(dim=-1)
     )
 
-    # X = X.unsqueeze(0)
-    # means = means.unsqueeze(2)
-    # print(f"X shape: {X.size()}")
-    # print(f"means shape: {means.size()}")
-    # log_prob = torch.sum(
-    #     torch.square(
-    #         torch.matmul(X, precisions_chol.transpose(1, 2))
-    #         - torch.matmul(means, precisions_chol.transpose(1, 2))
-    #     ),
-    #     dim=1,
-    # )
-
+    # TODO: change comment from sklearn
     # Since we are using the precision of the Cholesky decomposition,
     # `-0.5 * log_det` becomes `+ log_det`
     return -0.5 * (n_features * math.log(2 * math.pi) + log_prob) + log_det
