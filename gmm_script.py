@@ -20,7 +20,7 @@ retcode = subprocess.run(
     stderr=subprocess.PIPE,
 )
 retcode.check_returncode()
-# print("Training complete")
+print("Training complete")
 
 # Deploy trained NequIP model
 retcode = subprocess.run(
@@ -37,7 +37,7 @@ retcode = subprocess.run(
     stderr=subprocess.PIPE,
 )
 retcode.check_returncode()
-# print("Deployment complete")
+print("Deployment complete")
 
 # Evaluate deployed NequIP model on original data set
 retcode = subprocess.run(
