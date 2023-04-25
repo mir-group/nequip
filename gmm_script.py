@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 from ase.io import read
 from sklearn.metrics import mean_squared_error
 
-### GMM uncertainties example script using NequIP model trained on minimal.yaml
+# GMM uncertainties example script using NequIP model trained on minimal.yaml #
 
 # Train NequIP model on minimal.yaml
 # Make sure to remove results/aspirin/minimal before running this
