@@ -8,12 +8,9 @@ from e3nn.util.jit import compile_mode
 
 
 @torch.jit.script
-def _compute_log_det_cholesky(
-    matrix_chol: torch.Tensor, covariance_type: str, n_features: int
-):
+def _compute_log_det_cholesky(matrix_chol: torch.Tensor, n_features: int):
     """Compute the log-det of the cholesky decomposition of matrices."""
 
-    assert covariance_type in ("full",)
     n_components = matrix_chol.size(dim=0)
 
     # https://github.com/scikit-learn/scikit-learn/blob/d9cfe3f6b1c58dd253dc87cb676ce5171ff1f8a1/sklearn/mixture/_gaussian_mixture.py#L379
@@ -26,18 +23,14 @@ def _compute_log_det_cholesky(
 
 @torch.jit.script
 def _estimate_log_gaussian_prob(
-    X: torch.Tensor,
-    means: torch.Tensor,
-    precisions_chol: torch.Tensor,
-    covariance_type: str,
+    X: torch.Tensor, means: torch.Tensor, precisions_chol: torch.Tensor
 ):
     """Estimate the log Gaussian probability."""
 
-    assert covariance_type in ("full",)
     n_features = X.size(dim=1)
 
-    # det(precision_chol) = -0.5 * det(precision)
-    log_det = _compute_log_det_cholesky(precisions_chol, covariance_type, n_features)
+    # https://github.com/scikit-learn/scikit-learn/blob/d9cfe3f6b1c58dd253dc87cb676ce5171ff1f8a1/sklearn/mixture/_gaussian_mixture.py#L423
+    log_det = _compute_log_det_cholesky(precisions_chol, n_features)
 
     # dim(X) = [n_sample, n_feature]
     # dim(precisions_chol) = [n_component, n_feature, n_feature]
@@ -48,9 +41,7 @@ def _estimate_log_gaussian_prob(
         torch.einsum("zci,cij->zcj", X_centered, precisions_chol).square().sum(dim=-1)
     )
 
-    # TODO: change comment from sklearn
-    # Since we are using the precision of the Cholesky decomposition,
-    # `-0.5 * log_det` becomes `+ log_det`
+    # https://github.com/scikit-learn/scikit-learn/blob/d9cfe3f6b1c58dd253dc87cb676ce5171ff1f8a1/sklearn/mixture/_gaussian_mixture.py#L454
     return -0.5 * (n_features * math.log(2 * math.pi) + log_prob) + log_det
 
 
@@ -68,12 +59,14 @@ class GaussianMixture(torch.nn.Module):
 
     def __init__(
         self,
-        n_components: Optional[int],
-        n_features: int,
+        n_components: Optional[int] = 0,
+        n_features: Optional[int] = 0,
         covariance_type: str = "full",
     ):
         super(GaussianMixture, self).__init__()
-        assert covariance_type in ("full",)
+        assert covariance_type in (
+            "full",
+        ), f"covariance type was {covariance_type}, should be full"
         self.covariance_type = covariance_type
         self.n_components = n_components
         self.n_features = n_features
@@ -91,16 +84,13 @@ class GaussianMixture(torch.nn.Module):
         """Compute the NLL of samples ``X`` under the GMM."""
 
         # Check if model has been fitted
-        assert self.is_fit()
+        assert self.is_fit(), "model has not been fitted"
 
-        # TODO: testing
         estimated_log_probs = _estimate_log_gaussian_prob(
-            X, self.means, self.precisions_cholesky, self.covariance_type
+            X, self.means, self.precisions_cholesky
         )
-
         estimated_weights = torch.log(self.weights)
-
-        return torch.logsumexp(estimated_log_probs + estimated_weights, dim=1)
+        return -torch.logsumexp(estimated_log_probs + estimated_weights, dim=1)
 
     @torch.jit.unused
     def fit(
@@ -110,10 +100,6 @@ class GaussianMixture(torch.nn.Module):
         rng: Optional[Union[torch.Generator, int]] = None,
     ) -> None:
         """Fit the GMM to the samples `X` using sklearn."""
-        # TODO: if n_components is None, use the BIC; else just use provided n_components
-        #       in the BIC case, make sure to set it to an int of the final n_components
-        # TODO: fit with sklearn and set this objects buffers from sklearn values
-        # Set number of n_components if given, otherwise use the BIC
 
         # if RNG is an int, just use it as a seed;
         # if RNG is None, use the current torch random state;
@@ -124,8 +110,17 @@ class GaussianMixture(torch.nn.Module):
             if isinstance(rng, int)
             else torch.randint(2**16, (1,), generator=rng).item()
         )
+
+        # If number of features is not provided (i.e, 0), set it to the dimension
+        # of the samples in X
+        if not self.n_features:
+            self.n_features = X.size(dim=1)
+
+        # If self.n_components is not provided (i.e, 0), set number of Gaussian
+        # components using BIC. The number of components should not exceed the
+        # number of samples in X and is capped at a heuristic of max_components
         if not self.n_components:
-            components = range(1, max_components)
+            components = range(1, min(max_components, X.size(dim=0)))
             gmms = [
                 mixture.GaussianMixture(
                     n_components=n, covariance_type="full", random_state=random_state
