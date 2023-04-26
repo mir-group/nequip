@@ -59,8 +59,8 @@ class GaussianMixture(torch.nn.Module):
 
     def __init__(
         self,
+        n_features: int,
         n_components: Optional[int] = 0,
-        n_features: Optional[int] = 0,
         covariance_type: str = "full",
     ):
         super(GaussianMixture, self).__init__()
@@ -110,11 +110,6 @@ class GaussianMixture(torch.nn.Module):
             if isinstance(rng, int)
             else torch.randint(2**16, (1,), generator=rng).item()
         )
-
-        # If number of features is not provided (i.e, 0), set it to the dimension
-        # of the samples in X
-        if not self.n_features:
-            self.n_features = X.size(dim=1)
 
         # If self.n_components is not provided (i.e, 0), set number of Gaussian
         # components using BIC. The number of components should not exceed the

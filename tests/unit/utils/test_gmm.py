@@ -44,50 +44,69 @@ class TestGMM:
             n_components=8, covariance_type="full", random_state=seed
         )
 
-    # Torch GMM for test
+    # Torch GMM for small data set tests
     @pytest.fixture
-    def gmm_torch(self):
-        return gmm.GaussianMixture(n_components=8)
+    def gmm_torch_small(self, fit_data_small):
+        return gmm.GaussianMixture(
+            n_features=fit_data_small.size(dim=1), n_components=8
+        )
+
+    # Torch GMM for large data set tests
+    @pytest.fixture
+    def gmm_torch_large(self, fit_data_large):
+        return gmm.GaussianMixture(
+            n_features=fit_data_large.size(dim=1), n_components=8
+        )
 
     # Test compilation
-    def test_compile(self, gmm_torch):
-        assert_auto_jitable(gmm_torch)
+    def test_compile(self, gmm_torch_small):
+        assert_auto_jitable(gmm_torch_small)
 
     # Test agreement between sklearn and torch using small dataset
     def test_fit_forward_small(
-        self, seed, gmm_sklearn, gmm_torch, fit_data_small, test_data_small
+        self, seed, gmm_sklearn, gmm_torch_small, fit_data_small, test_data_small
     ):
         gmm_sklearn.fit(fit_data_small.numpy())
-        gmm_torch.fit(fit_data_small, rng=seed)
+        gmm_torch_small.fit(fit_data_small, rng=seed)
 
-        assert torch.allclose(torch.from_numpy(gmm_sklearn.means_), gmm_torch.means)
         assert torch.allclose(
-            torch.from_numpy(gmm_sklearn.covariances_), gmm_torch.covariances
+            torch.from_numpy(gmm_sklearn.means_), gmm_torch_small.means
         )
-        assert torch.allclose(torch.from_numpy(gmm_sklearn.weights_), gmm_torch.weights)
+        assert torch.allclose(
+            torch.from_numpy(gmm_sklearn.covariances_), gmm_torch_small.covariances
+        )
+        assert torch.allclose(
+            torch.from_numpy(gmm_sklearn.weights_), gmm_torch_small.weights
+        )
         assert torch.allclose(
             torch.from_numpy(gmm_sklearn.precisions_cholesky_),
-            gmm_torch.precisions_cholesky,
+            gmm_torch_small.precisions_cholesky,
         )
 
         sklearn_nll = gmm_sklearn.score_samples(test_data_small.numpy())
-        torch_nll = gmm_torch(test_data_small)
+        torch_nll = gmm_torch_small(test_data_small)
 
         assert torch.allclose(-torch.from_numpy(sklearn_nll), torch_nll)
 
     # Test agreement between sklearn and torch using large dataset
-    def test_fit_forward_large(self, seed, gmm_sklearn, gmm_torch, fit_data_large):
+    def test_fit_forward_large(
+        self, seed, gmm_sklearn, gmm_torch_large, fit_data_large
+    ):
         gmm_sklearn.fit(fit_data_large.numpy())
-        gmm_torch.fit(fit_data_large, rng=seed)
+        gmm_torch_large.fit(fit_data_large, rng=seed)
 
-        assert torch.allclose(torch.from_numpy(gmm_sklearn.means_), gmm_torch.means)
         assert torch.allclose(
-            torch.from_numpy(gmm_sklearn.covariances_), gmm_torch.covariances
+            torch.from_numpy(gmm_sklearn.means_), gmm_torch_large.means
         )
-        assert torch.allclose(torch.from_numpy(gmm_sklearn.weights_), gmm_torch.weights)
+        assert torch.allclose(
+            torch.from_numpy(gmm_sklearn.covariances_), gmm_torch_large.covariances
+        )
+        assert torch.allclose(
+            torch.from_numpy(gmm_sklearn.weights_), gmm_torch_large.weights
+        )
         assert torch.allclose(
             torch.from_numpy(gmm_sklearn.precisions_cholesky_),
-            gmm_torch.precisions_cholesky,
+            gmm_torch_large.precisions_cholesky,
         )
 
         test_data_large = 20 * (
@@ -98,7 +117,7 @@ class TestGMM:
         )
 
         sklearn_nll = gmm_sklearn.score_samples(test_data_large.numpy())
-        torch_nll = gmm_torch(test_data_large)
+        torch_nll = gmm_torch_large(test_data_large)
 
         assert torch.allclose(-torch.from_numpy(sklearn_nll), torch_nll)
 
@@ -116,7 +135,7 @@ class TestGMM:
         gmm_sklearn = mixture.GaussianMixture(
             n_components=np.argmin(bics), covariance_type="full", random_state=seed
         )
-        gmm_torch = gmm.GaussianMixture()
+        gmm_torch = gmm.GaussianMixture(n_features=fit_data_small.size(dim=1))
 
         gmm_sklearn.fit(fit_data_small.numpy())
         gmm_torch.fit(fit_data_small, rng=seed)
@@ -139,11 +158,11 @@ class TestGMM:
     # Test assertion error for covariance type other than "full"
     def test_full_cov(self):
         with pytest.raises(AssertionError) as excinfo:
-            _ = gmm.GaussianMixture(covariance_type="tied")
+            _ = gmm.GaussianMixture(n_features=2, covariance_type="tied")
         assert "covariance type was tied, should be full" in str(excinfo.value)
 
     # Test assertion error for evaluating unfitted GMM
-    def test_unfitted_gmm(self, gmm_torch, test_data_small):
+    def test_unfitted_gmm(self, gmm_torch_small, test_data_small):
         with pytest.raises(AssertionError) as excinfo:
-            _ = gmm_torch(test_data_small)
+            _ = gmm_torch_small(test_data_small)
         assert "model has not been fitted" in str(excinfo.value)
