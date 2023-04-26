@@ -1,6 +1,7 @@
-import pathlib
-import subprocess
+"""Example script to plot GMM uncertainties vs. atomic force errors from the results of `nequip-evaluate`"""
+
 import math
+import argparse
 
 import numpy as np
 import matplotlib as mpl
@@ -9,64 +10,42 @@ import matplotlib.pyplot as plt
 from ase.io import read
 from sklearn.metrics import mean_squared_error
 
-# GMM uncertainties example script using NequIP model trained on minimal.yaml #
+# To obtain GMM uncertainties for each atom in a system, a NequIP model must be trained
+# (e.g., using `nequip-train configs/minimal.yaml`) and then deployed. To fit a GMM
+# during deployment, run
+#
+#   `nequip-deploy build --using-dataset --model deployment.yaml deployed_model.pth`
+#
+# where deployment.yaml is a config file that adds and fits a GMM to the deployed model
+# (for an example, see configs/minimal_gmm.yaml). Lastly, to obtain negative log
+# likelihoods (NLLs) on some test data, the NequIP model must be evaluated on a data set using
+# `nequip-evaluate` with `--output-fields node_features_nll` and
+# `--output-fields-from-original-dataset forces`. For example, running
+#
+#   `nequip-evaluate --train-dir path/to/training/session --model deployed_model.pth --output out.xyz --output-fields node_features_nll --output-fields-from-original-dataset forces`
+#
+# will evaluate deployed_model.pth AND the fitted GMM on the data set at
+# path/to/training/session and will write the NLLs and the true atomic forces (along
+# with the typical outputs of `nequip-evaluate`) to out.xyz. This script can then use
+# out.xyz to create a plot of NLL vs. atomic force RMSE.
 
-# Train NequIP model on minimal.yaml
-# Make sure to remove results/aspirin/minimal before running this
-retcode = subprocess.run(
-    ["nequip-train", "configs/minimal.yaml"],
-    cwd=pathlib.Path(__file__).parents[0],
-    stdout=subprocess.PIPE,
-    stderr=subprocess.PIPE,
+# Parse arguments
+parser = argparse.ArgumentParser(
+    description="Make a plot of GMM NLL uncertainty vs. atomic force RMSE from the results of `nequip-evaluate`."
 )
-retcode.check_returncode()
-print("Training complete")
-
-# Deploy trained NequIP model
-retcode = subprocess.run(
-    [
-        "nequip-deploy",
-        "build",
-        "--using-dataset",
-        "--model",
-        "configs/minimal_gmm.yaml",
-        "out.pth",
-    ],
-    cwd=pathlib.Path(__file__).parents[0],
-    stdout=subprocess.PIPE,
-    stderr=subprocess.PIPE,
+parser.add_argument(
+    "xyzoutput",
+    help=".xyz file from running `nequip-evaluate ... --output out.xyz --output-fields node_features_nll --output-fields-from-original-dataset forces",
 )
-retcode.check_returncode()
-print("Deployment complete")
-
-# Evaluate deployed NequIP model on original data set
-retcode = subprocess.run(
-    [
-        "nequip-evaluate",
-        "--train-dir",
-        "results/aspirin/minimal",
-        "--model",
-        "out.pth",
-        "--output",
-        "minimal_gmm.xyz",
-        "--output-fields",
-        "node_features_nll",
-        "--output-fields-from-original-dataset",
-        "forces",
-    ],
-    cwd=pathlib.Path(__file__).parents[0],
-    stdout=subprocess.PIPE,
-    stderr=subprocess.PIPE,
-)
-retcode.check_returncode()
-print("Evaluation complete")
+parser.add_argument("--output", help="File to write plot to", default=None)
+args = parser.parse_args()
 
 pred_forces = []
 true_forces = []
 nlls = []
 
 # Read in results of NequIP model evaluation
-atoms_list = read("minimal_gmm.xyz", index=":", format="extxyz")
+atoms_list = read(args.xyzoutput, index=":", format="extxyz")
 
 # Number of data points (aspirin molecules) in original data set
 num_data_pts = len(atoms_list)
@@ -79,13 +58,9 @@ for atoms in atoms_list:
     pred_forces.append(atoms.get_forces())
     true_forces.append(atoms.get_array("original_dataset_forces"))
     nlls.append(atoms.get_array("node_features_nll"))
-pred_forces = np.array(pred_forces)
-true_forces = np.array(true_forces)
-nlls = np.array(nlls)
-
-# print(f"pred_forces.shape: {pred_forces.shape}")
-# print(f"true_forces.shape: {true_forces.shape}")
-# print(f"nlls.shape: {nlls.shape}")
+pred_forces = np.asarray(pred_forces)
+true_forces = np.asarray(true_forces)
+nlls = np.asarray(nlls)
 
 # Compute per-atom RMSE of force predictions
 force_rmses = np.zeros((num_data_pts, num_atoms_per_pt))
@@ -108,8 +83,12 @@ plt.hist2d(
     norm=mpl.colors.LogNorm(),
     cmin=1,
 )
-plt.title("NLL vs. Atomic Force RMSE (Aspirin)")
+plt.title("NLL vs. Atomic Force RMSE")
 plt.xlabel(r"RMSE, $\epsilon$ $(\mathrm{meV/\AA})$")
 plt.ylabel(r"Negative Log Likelihood, NLL")
 plt.grid(linestyle="--")
-plt.savefig("minimal_gmm.png", bbox_inches="tight")
+plt.tight_layout()
+if args.output is None:
+    plt.show()
+else:
+    plt.savefig(args.output)
