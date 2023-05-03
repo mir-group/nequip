@@ -70,7 +70,7 @@ def _load_deployed_or_traindir(
         model_r_max = model_config["r_max"]
         type_names = model_config["type_names"]
     model.eval()
-    return model, load_deployed_model, model_r_max, type_names
+    return model, loaded_deployed_model, model_r_max, type_names
 
 
 def main(args=None, running_as_script: bool = True):
