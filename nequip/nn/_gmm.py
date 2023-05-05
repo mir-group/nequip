@@ -4,7 +4,13 @@ import torch
 
 from e3nn import o3
 
-from nequip.data import AtomicDataDict
+from nequip.data import (
+    AtomicDataDict,
+    _NODE_FIELDS,
+    _EDGE_FIELDS,
+    _GRAPH_FIELDS,
+    register_fields,
+)
 from ._graph_mixin import GraphModuleMixin
 from nequip.utils.gmm import GaussianMixture
 
@@ -46,6 +52,12 @@ class GaussianMixtureModelUncertainty(GraphModuleMixin, torch.nn.Module):
             n_components=gmm_n_components,
             n_features=feature_irreps.num_irreps,
             covariance_type=gmm_covariance_type,
+        )
+        # Add NLL as an output field
+        register_fields(
+            node_fields=[out_field + "_nll"] if feature_field in _NODE_FIELDS else [],
+            edge_fields=[out_field + "_nll"] if feature_field in _EDGE_FIELDS else [],
+            graph_fields=[out_field + "_nll"] if feature_field in _GRAPH_FIELDS else [],
         )
 
     @torch.jit.unused
