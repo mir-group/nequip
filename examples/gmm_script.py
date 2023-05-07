@@ -22,10 +22,14 @@ from ase.io import read
 #
 #   `nequip-evaluate --train-dir path/to/training/session --model deployed_model.pth --output out.xyz --output-fields node_features_nll --output-fields-from-original-dataset forces`
 #
-# will evaluate deployed_model.pth AND the fitted GMM on the data set at
+# will evaluate deployed_model.pth AND the fitted GMM on the data set in the config at
 # path/to/training/session and will write the NLLs and the true atomic forces (along
-# with the typical outputs of `nequip-evaluate`) to out.xyz. This script can then use
-# out.xyz to create a plot of NLL vs. atomic force RMSE.
+# with the typical outputs of `nequip-evaluate`) to out.xyz. IMPORTANT: The data set
+# config must have contain the lines
+#   `node_fields:
+#      - node_features_nll`
+# in order for nequip-evaluate to recognize `node_features_nll` as a legitimate argument.
+# This script can then use out.xyz to create a plot of NLL vs. atomic force RMSE.
 
 # Parse arguments
 parser = argparse.ArgumentParser(
