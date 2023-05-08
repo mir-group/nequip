@@ -4,7 +4,7 @@ import logging
 import torch.nn
 from torch_runstats.scatter import scatter, scatter_mean
 
-from nequip.data import AtomicDataDict
+from nequip.data import AtomicDataDict, _GRAPH_FIELDS
 from nequip.utils import instantiate_from_cls_name
 
 
@@ -72,6 +72,10 @@ class PerAtomLoss(SimpleLoss):
         key: str,
         mean: bool = True,
     ):
+        if key not in _GRAPH_FIELDS:
+            raise RuntimeError(
+                f"Doesn't make sense to do a `PerAtom` loss on field `{key}`, which isn't registered as a graph (global) field. If it is a graph-level field, register it with `graph_fields: [\"{key}\"]`; otherwise you don't need to specify `PerAtom` for loss on per-node fields."
+            )
         ref_dict = ref
         ref = ref[key]
         # make sure prediction is promoted to dtype of reference
