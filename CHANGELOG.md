@@ -41,6 +41,7 @@ Most recent change on the bottom.
 
 ## [0.5.6] - 2022-12-19
 ### Added
+- `ParaStressForceOutput` Support for atom virial and virial parallism in Lammps.
 - sklearn dependency removed
 - `nequip-benchmark` and `nequip-train` report number of weights and number of trainable weights
 - `nequip-benchmark --no-compile` and `--verbose` and `--memory-summary`
