@@ -92,7 +92,7 @@ def GaussianMixtureModelUncertainty(
     graph_model.train(mode=prev_training)
     graph_model.to(device=prev_device)
     # fit GMM
-    gmm.fit(features)
+    gmm.fit(features, seed=config["seed"])
     del features
 
     return graph_model

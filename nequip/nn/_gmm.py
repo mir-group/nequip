@@ -51,8 +51,8 @@ class GaussianMixtureModelUncertainty(GraphModuleMixin, torch.nn.Module):
         )
 
     @torch.jit.unused
-    def fit(self, X) -> None:
-        self.gmm.fit(X)
+    def fit(self, X, seed=None) -> None:
+        self.gmm.fit(X, rng=seed)
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
         if self.gmm.is_fit():
