@@ -1,6 +1,10 @@
 # Example config for DEPLOYING a TRAINED model with an additional Gaussian Mixture Model (GMM) for uncertainty quantification
-# See https://arxiv.org/abs/2211.09866
+# See https://doi.org/10.1063/5.0136574
 # This config assumes you have run `configs/minimal.yaml` to train a model; the paths must be updated appropriately for real use
+# You can use this config to build a model as
+#
+#    nequip-deploy build --using-dataset --model configs/minimal_gmm.yaml deployed-with-gmm.pth
+#
 
 # This special key loads ALL KEYS from the specified YAML file
 # We use it here to load all the hyperparameters, etc. of the model we're trying to deploy from its training dir

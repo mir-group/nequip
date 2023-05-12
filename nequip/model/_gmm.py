@@ -62,9 +62,7 @@ def GaussianMixtureModelUncertainty(
     # evaluate
     features = []
     collater = Collater.for_dataset(dataset=dataset)
-    batch_size: int = config.get(
-        "validation_batch_size", config.batch_size
-    )  # TODO: better default?
+    batch_size: int = config.get("validation_batch_size", config.batch_size)
     stride: int = config.get("dataset_statistics_stride", 1)
     # TODO: guard TQDM on interactive?
     for batch_start_i in tqdm(

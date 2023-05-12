@@ -1,4 +1,34 @@
-"""Example script to plot GMM uncertainties vs. atomic force errors from the results of `nequip-evaluate`"""
+"""Example script to plot GMM uncertainties vs. atomic force errors from the results of `nequip-evaluate`
+
+To obtain GMM uncertainties for each atom in a system, a NequIP model must be trained
+(e.g., using `nequip-train configs/minimal.yaml`) and then deployed. To fit a GMM
+during deployment, run
+
+    nequip-deploy build --using-dataset --model deployment.yaml deployed_model.pth
+
+where deployment.yaml is a config file that adds and fits a GMM to the deployed model
+(for an example, see configs/minimal_gmm.yaml). Lastly, to obtain negative log
+likelihoods (NLLs) on some test data, the NequIP model must be evaluated on a data set using
+`nequip-evaluate` with `--output-fields node_features_nll` and
+`--output-fields-from-original-dataset forces`. For example, running
+
+    nequip-evaluate --dataset-config path/to/dataset-config.yaml --model deployed_model.pth --output out.xyz --output-fields node_features_nll --output-fields-from-original-dataset forces
+
+will evaluate deployed_model.pth (which includes the fitted GMM) on the data set in the config at
+path/to/dataset-config.yaml and will write the NLLs and the true atomic forces (along
+with the typical outputs of `nequip-evaluate`) to out.xyz.
+
+IMPORTANT: The data set config must contain the lines
+
+  node_fields:
+   - node_features_nll
+
+in order for nequip-evaluate to recognize `node_features_nll` as a legitimate output.
+
+This script can then use out.xyz to create a plot of NLL vs. atomic force RMSE:
+
+    python gmm_script.py out.xyz --output plot.png
+"""
 
 import argparse
 
@@ -7,29 +37,6 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 
 from ase.io import read
-
-# To obtain GMM uncertainties for each atom in a system, a NequIP model must be trained
-# (e.g., using `nequip-train configs/minimal.yaml`) and then deployed. To fit a GMM
-# during deployment, run
-#
-#   `nequip-deploy build --using-dataset --model deployment.yaml deployed_model.pth`
-#
-# where deployment.yaml is a config file that adds and fits a GMM to the deployed model
-# (for an example, see configs/minimal_gmm.yaml). Lastly, to obtain negative log
-# likelihoods (NLLs) on some test data, the NequIP model must be evaluated on a data set using
-# `nequip-evaluate` with `--output-fields node_features_nll` and
-# `--output-fields-from-original-dataset forces`. For example, running
-#
-#   `nequip-evaluate --train-dir path/to/training/session --model deployed_model.pth --output out.xyz --output-fields node_features_nll --output-fields-from-original-dataset forces`
-#
-# will evaluate deployed_model.pth AND the fitted GMM on the data set in the config at
-# path/to/training/session and will write the NLLs and the true atomic forces (along
-# with the typical outputs of `nequip-evaluate`) to out.xyz. IMPORTANT: The data set
-# config must have contain the lines
-#   `node_fields:
-#      - node_features_nll`
-# in order for nequip-evaluate to recognize `node_features_nll` as a legitimate argument.
-# This script can then use out.xyz to create a plot of NLL vs. atomic force RMSE.
 
 # Parse arguments
 parser = argparse.ArgumentParser(
@@ -69,8 +76,8 @@ plt.hist2d(
     cmin=1,
 )
 plt.title("NLL vs. Atomic Force RMSE")
-plt.xlabel(r"RMSE, $\epsilon$ $(\mathrm{meV/\AA})$")
-plt.ylabel(r"Negative Log Likelihood, NLL")
+plt.xlabel("Per-atom Force RMSE [force units]")
+plt.ylabel("Per-atom Negative Log Likelihood (NLL) [unitless]")
 plt.grid(linestyle="--")
 plt.tight_layout()
 if args.output is None:

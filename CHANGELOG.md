@@ -20,6 +20,7 @@ Most recent change on the bottom.
 - `dataset_*_absmax` statistics option
 - `HDF5Dataset` (#227)
 - `include_file_as_baseline_config` for simple modifications of existing configs
+- Support for Gaussian Mixture Model uncertainty quantification (https://doi.org/10.1063/5.0136574)
 
 ### Changed
 - Always require explicit `seed`
