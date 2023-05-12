@@ -111,26 +111,26 @@ class GaussianMixture(torch.nn.Module):
             else torch.randint(2**16, (1,), generator=rng).item()
         )
 
+        gmm_kwargs = dict(
+            covariance_type=self.covariance_type,
+            random_state=random_state,
+        )
+
         # If self.n_components is not provided (i.e, 0), set number of Gaussian
         # components using BIC. The number of components should not exceed the
         # number of samples in X and is capped at a heuristic of max_components
         if not self.n_components:
-            components = range(1, min(max_components, X.size(dim=0)))
+            components = list(range(1, min(max_components, X.size(dim=0))))
             gmms = [
-                mixture.GaussianMixture(
-                    n_components=n, covariance_type="full", random_state=random_state
-                )
+                mixture.GaussianMixture(n_components=n, **gmm_kwargs)
                 for n in components
             ]
             bics = [model.fit(X).bic(X) for model in gmms]
-            self.n_components = np.argmin(bics)
+            self.n_components = components[np.argmin(bics)]
+            del gmms, bics, components
 
         # Fit GMM
-        gmm = mixture.GaussianMixture(
-            n_components=self.n_components,
-            covariance_type=self.covariance_type,
-            random_state=random_state,
-        )
+        gmm = mixture.GaussianMixture(n_components=self.n_components, **gmm_kwargs)
         gmm.fit(X)
 
         # Save info from GMM into the register buffers

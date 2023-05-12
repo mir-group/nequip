@@ -73,7 +73,7 @@ class TestGMM:
 
     # Test agreement between sklearn and torch using BIC
     def test_fit_forward_bic(self, seed, feature_data):
-        components = range(1, min(50, feature_data["fit_data"].size(dim=0)))
+        components = list(range(1, min(50, feature_data["fit_data"].size(dim=0))))
         gmms = [
             mixture.GaussianMixture(
                 n_components=n, covariance_type="full", random_state=seed
@@ -86,7 +86,9 @@ class TestGMM:
         ]
 
         gmm_sklearn = mixture.GaussianMixture(
-            n_components=np.argmin(bics), covariance_type="full", random_state=seed
+            n_components=components[np.argmin(bics)],
+            covariance_type="full",
+            random_state=seed,
         )
         gmm_torch = gmm.GaussianMixture(n_features=feature_data["fit_data"].size(dim=1))
 
