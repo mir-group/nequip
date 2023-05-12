@@ -9,7 +9,11 @@ run_name: example-run-toluene
 seed: 123                                                                         # model seed
 dataset_seed: 456                                                                 # data set seed
 append: true                                                                      # set true if a restarted run should append to the previous log file
-default_dtype: float32                                                            # type of float to use, e.g. float32 and float64
+
+# see https://arxiv.org/abs/2304.10061 for discussion of numerical precision
+default_dtype: float64
+model_dtype: float32
+allow_tf32: true    # consider setting to false if you plan to mix training/inference over any devices that are not NVIDIA Ampere or later
 
 # network
 r_max: 4.0                                                                        # cutoff radius in length units, here Angstrom, this is an important hyperparamter to scan

@@ -29,7 +29,7 @@ Most recent change on the bottom.
 - Don't log as often by default
 - [Breaking] Default nonlinearities are `silu` (`e`) and `tanh` (`o`)
 - Will not reproduce previous versions' data shuffling order (for all practical purposes this does not matter, the `shuffle` option is unchanged)
-- [Breaking] `default_dtype` defaults to `float64` (`model_dtype` default `float32`)
+- [Breaking] `default_dtype` defaults to `float64` (`model_dtype` default `float32`, `allow_tf32: true` by default--- see https://arxiv.org/abs/2304.10061)
 - `nequip-benchmark` now only uses `--n-data` frames to build the model
 - [Breaking] By default models now use `StressForceOutput`, not `ForceOutput`
 
