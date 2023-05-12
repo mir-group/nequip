@@ -204,7 +204,7 @@ class Config(object):
         keys = self.update(prefix_dict, allow_val_change=allow_val_change)
         keys = {k: f"{prefix}_{k}" for k in keys}
 
-        for suffix in ["params", "kwargs"]:
+        for suffix in ["kwargs"]:
             if f"{prefix}_{suffix}" in dictionary:
                 key3 = self.update(
                     dictionary[f"{prefix}_{suffix}"],

@@ -245,7 +245,7 @@ def fresh_start(config):
     def _unused_check():
         unused = config._unused_keys()
         if len(unused) > 0:
-            message = f"The following keys in the config file were not used, did you make a typo?: {', '.join(unused)}. (If this sounds wrong, please file an issue: the detection of unused keys is in beta. You can turn this error into a warning with `--warn-unused`.)"
+            message = f"The following keys in the config file were not used, did you make a typo?: {', '.join(unused)}. (If this sounds wrong, please file an issue. You can turn this error into a warning with `--warn-unused`, but please make sure that the key really is correctly spelled and used!.)"
             if config.warn_unused:
                 warnings.warn(message)
             else:
