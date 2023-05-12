@@ -22,7 +22,7 @@ import torch
 from e3nn.util.jit import script
 
 from nequip.model import model_from_config
-from nequip.train import Trainer
+from nequip.data import dataset_from_config
 from nequip.utils import Config
 from nequip.utils.versions import check_code_version, get_config_code_versions
 from nequip.scripts.train import default_config
@@ -205,6 +205,13 @@ def main(args=None):
         type=pathlib.Path,
     )
     build_parser.add_argument(
+        "--using-dataset",
+        help="Allow model builders to use a dataset during deployment. By default uses the training dataset, but can point to a YAML file for another dataset.",
+        type=pathlib.Path,
+        const=True,
+        nargs="?",
+    )
+    build_parser.add_argument(
         "out_file",
         help="Output file for deployed model.",
         type=pathlib.Path,
@@ -236,11 +243,15 @@ def main(args=None):
             logging.debug(f"Model had config:\n{config}")
 
     elif args.command == "build":
+        state_dict = None
         if args.model and args.train_dir:
             raise ValueError("--model and --train-dir cannot both be specified.")
         if args.train_dir is not None:
             logging.info("Loading best_model from training session...")
             config = Config.from_file(str(args.train_dir / "config.yaml"))
+            state_dict = torch.load(
+                str(args.train_dir / "best_model.pth"), map_location="cpu"
+            )
         elif args.model is not None:
             logging.info("Building model from config...")
             config = Config.from_file(str(args.model), defaults=default_config)
@@ -251,16 +262,24 @@ def main(args=None):
         check_code_version(config)
 
         # -- load model --
+        # figure out first if a dataset is involved
+        dataset = None
+        if args.using_dataset:
+            dataset_config = config
+            if args.using_dataset is not True:
+                dataset_config = Config.from_file(str(args.using_dataset))
+            dataset = dataset_from_config(dataset_config)
+            if args.using_dataset is True:
+                # we're using the one from training config
+                # downselect to training set
+                dataset = dataset.index_select(config.train_idcs)
+        # build the actual model]
+        # reset the global metadata dict so that model builders can fill it:
         global _current_metadata
         _current_metadata = {}
-        if args.train_dir is not None:
-            model, _ = Trainer.load_model_from_training_session(
-                args.train_dir, model_name="best_model.pth", device="cpu"
-            )
-        elif args.model is not None:
-            model = model_from_config(config, deploy=True)
-        else:
-            raise AssertionError
+        model = model_from_config(config, dataset=dataset, deploy=True)
+        if state_dict is not None:
+            model.load_state_dict(state_dict, strict=True)
 
         # -- compile --
         model = _compile_for_deploy(model)

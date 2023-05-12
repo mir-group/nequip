@@ -19,6 +19,7 @@ from nequip.utils import load_file
 from nequip.utils.config import _GLOBAL_ALL_ASKED_FOR_KEYS
 from nequip.utils.test import assert_AtomicData_equivariant
 from nequip.utils.versions import check_code_version
+from nequip.utils.misc import get_default_device_name
 from nequip.utils._global_options import _set_global_options
 from nequip.scripts._logger import set_up_script_logger
 
@@ -34,6 +35,7 @@ default_config = dict(
         "RescaleEnergyEtc",
     ],
     dataset_statistics_stride=1,
+    device=get_default_device_name(),
     default_dtype="float64",
     model_dtype="float32",
     allow_tf32=False,

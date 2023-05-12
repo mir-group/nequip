@@ -49,6 +49,7 @@ from nequip.utils import (
 from nequip.utils.versions import check_code_version
 from nequip.model import model_from_config
 from nequip.utils.config import _GLOBAL_ALL_ASKED_FOR_KEYS
+from nequip.utils.misc import get_default_device_name
 
 from .loss import Loss, LossStat
 from .metrics import Metrics
@@ -225,7 +226,7 @@ class Trainer:
         self,
         model,
         model_builders: Optional[list] = [],
-        device: str = "cuda" if torch.cuda.is_available() else "cpu",
+        device: str = get_default_device_name(),
         seed: Optional[int] = None,
         dataset_seed: Optional[int] = None,
         loss_coeffs: Union[dict, str] = AtomicDataDict.TOTAL_ENERGY_KEY,
