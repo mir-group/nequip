@@ -3,7 +3,6 @@ from typing import Optional, Union
 import math
 import torch
 import numpy as np
-from sklearn import mixture
 from e3nn.util.jit import compile_mode
 
 
@@ -100,6 +99,7 @@ class GaussianMixture(torch.nn.Module):
         rng: Optional[Union[torch.Generator, int]] = None,
     ) -> None:
         """Fit the GMM to the samples `X` using sklearn."""
+        from sklearn import mixture
 
         # if RNG is an int, just use it as a seed;
         # if RNG is None, use the current torch random state;
