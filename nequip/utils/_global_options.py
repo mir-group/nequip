@@ -50,7 +50,16 @@ def _set_global_options(config, warn_on_override: bool = False) -> None:
             torch.backends.cuda.matmul.allow_tf32 = config["allow_tf32"]
             torch.backends.cudnn.allow_tf32 = config["allow_tf32"]
 
-    if version.parse(torch.__version__) >= version.parse("1.11"):
+    # Temporary warning due to unresolved upstream issue
+    torch_version = version.parse(torch.__version__)
+    if torch_version < version.parse("1.11"):
+        warnings.warn("We currently recommend the use of PyTorch 1.11")
+    elif torch_version > version.parse("1.11"):
+        warnings.warn(
+            "!! Upstream issues in PyTorch versions >1.11 have been seen to cause unusual performance degredations on some CUDA systems that become worse over time; see https://github.com/mir-group/nequip/discussions/311. At present we *strongly* recommend the use of PyTorch 1.11 if using CUDA devices; while using other versions if you observe this problem, an unexpected lack of this problem, or other strange behavior, please post in the linked GitHub issue."
+        )
+
+    if torch_version >= version.parse("1.11"):
         # PyTorch >= 1.11
         k = "_jit_fusion_strategy"
         if k in config:
