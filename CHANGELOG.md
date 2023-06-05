@@ -32,6 +32,7 @@ Most recent change on the bottom.
 - [Breaking] `default_dtype` defaults to `float64` (`model_dtype` default `float32`, `allow_tf32: true` by default--- see https://arxiv.org/abs/2304.10061)
 - `nequip-benchmark` now only uses `--n-data` frames to build the model
 - [Breaking] By default models now use `StressForceOutput`, not `ForceOutput`
+- Added `edge_energy` to `ALL_ENERGY_KEYS` subjecting it to global rescale
 
 ### Fixed
 - Work with `wandb>=0.13.8`

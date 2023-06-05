@@ -47,6 +47,8 @@ EDGE_EMBEDDING_KEY: Final[str] = "edge_embedding"
 EDGE_FEATURES_KEY: Final[str] = "edge_features"
 # [n_edge, 1] invariant of the radial cutoff envelope for each edge, allows reuse of cutoff envelopes
 EDGE_CUTOFF_KEY: Final[str] = "edge_cutoff"
+# edge energy as in Allegro
+EDGE_ENERGY_KEY: Final[str] = "edge_energy"
 
 NODE_FEATURES_KEY: Final[str] = "node_features"
 NODE_ATTRS_KEY: Final[str] = "node_attrs"
@@ -59,6 +61,7 @@ STRESS_KEY: Final[str] = "stress"
 VIRIAL_KEY: Final[str] = "virial"
 
 ALL_ENERGY_KEYS: Final[List[str]] = [
+    EDGE_ENERGY_KEY,
     PER_ATOM_ENERGY_KEY,
     TOTAL_ENERGY_KEY,
     FORCE_KEY,
