@@ -24,7 +24,7 @@ from e3nn.util.jit import script
 from nequip.model import model_from_config
 from nequip.data import dataset_from_config
 from nequip.utils import Config
-from nequip.utils.versions import check_code_version, get_config_code_versions
+from nequip.utils.versions import check_code_version, get_current_code_versions
 from nequip.scripts.train import default_config
 from nequip.utils.misc import dtype_to_name
 from nequip.utils._global_options import _set_global_options
@@ -287,7 +287,7 @@ def main(args=None):
 
         # Deploy
         metadata: dict = {}
-        code_versions, code_commits = get_config_code_versions(config)
+        code_versions, code_commits = get_current_code_versions(config)
         for code, version in code_versions.items():
             metadata[code + "_version"] = version
         if len(code_commits) > 0:
