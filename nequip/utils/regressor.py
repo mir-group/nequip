@@ -1,18 +1,25 @@
 import logging
-import torch
-
-from torch import matmul
 from typing import Optional, Sequence
+
+import torch
 from opt_einsum import contract
+from torch import matmul
 
 
 def solver(X, y, alpha: Optional[float] = 0.001, stride: Optional[int] = 1, **kwargs):
+
     # results are in the same "units" as y, so same dtype too:
     dtype_out = y.dtype
     # always solve in float64 for numerical stability
     dtype = torch.float64
     X = X[::stride].to(dtype)
     y = y[::stride].to(dtype)
+
+    # find out columns of X that are always zeros
+    X_sum = torch.sum(X, axis=0)
+
+    # remove that column from X and remember where to put it back
+    X = ((X.T)[X_sum != 0]).T
 
     X, y = down_sampling_by_composition(X, y)
 
@@ -41,11 +48,18 @@ def solver(X, y, alpha: Optional[float] = 0.001, stride: Optional[int] = 1, **kw
     sigma2 = torch.var(matmul(X, mean) - dy)
     cov = torch.sqrt(sigma2 * contract("ij,kj,kl,li->i", Ainv, X, X, Ainv))
 
-    mean = mean + y_mean.reshape([-1])
+    # put the X_sum zero columns back in
+    new_mean = torch.zeros_like(X_sum)
+    new_mean[X_sum != 0] = mean.reshape([-1])
+    new_mean = new_mean + y_mean.reshape([-1])
+
+    new_cov = torch.zeros_like(X_sum)
+    new_cov[X_sum != 0] = cov.reshape([-1])
+    new_cov[X_sum == 0] = torch.std(y / torch.sum(X, axis=1))
 
     logging.debug(f"Ridge Regression, residue {sigma2}")
 
-    return mean.to(dtype_out), cov.to(dtype_out)
+    return new_mean.to(dtype_out), new_cov.to(dtype_out)
 
 
 def down_sampling_by_composition(
