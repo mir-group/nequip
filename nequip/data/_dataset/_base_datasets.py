@@ -323,6 +323,7 @@ class AtomicInMemoryDataset(AtomicDataset):
         stride: int = 1,
         unbiased: bool = True,
         kwargs: Optional[Dict[str, dict]] = {},
+        type_names: Optional[list[str]] = None,
     ) -> List[tuple]:
         """Compute the statistics of ``fields`` in the dataset.
 
@@ -486,6 +487,7 @@ class AtomicInMemoryDataset(AtomicDataset):
                     atom_types=atom_types,
                     unbiased=unbiased,
                     algorithm_kwargs=algorithm_kwargs,
+                    type_names=type_names,
                 )
                 out.append(results)
 
@@ -555,6 +557,7 @@ class AtomicInMemoryDataset(AtomicDataset):
         atom_types: torch.Tensor,
         batch: torch.Tensor,
         unbiased: bool = True,
+        type_names: Optional[list[str]] = None,
         algorithm_kwargs: Optional[dict] = {},
     ):
         """Compute "per-species" statistics.
@@ -563,7 +566,10 @@ class AtomicInMemoryDataset(AtomicDataset):
 
         For a per-node quantity, computes the expected statistic but for each type instead of over all nodes.
         """
-        N = bincount(atom_types.squeeze(-1), batch)
+        if type_names is not None:
+            N = bincount(atom_types.squeeze(-1), batch, minlength=len(type_names))
+        else:
+            N = bincount(atom_types.squeeze(-1), batch)
         assert N.ndim == 2  # [batch, n_type]
         N = N[(N > 0).any(dim=1)]  # deal with non-contiguous batch indexes
         assert arr.ndim >= 2

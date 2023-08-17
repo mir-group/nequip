@@ -201,6 +201,7 @@ def PerSpeciesRescale(
                 str_names=str_names,
                 dataset=dataset,
                 stride=config.dataset_statistics_stride,
+                type_names=config.type_names,
                 kwargs=config.get(module_prefix + "_kwargs", {}),
             )
 
@@ -261,7 +262,7 @@ def PerSpeciesRescale(
 
 
 def _compute_stats(
-    str_names: List[str], dataset, stride: int, kwargs: Optional[dict] = {}
+        str_names: List[str], dataset, stride: int, type_names: Optional[List[str]]=None, kwargs: Optional[dict] = {},
 ):
     """return the values of statistics over dataset
     quantity name should be dataset_key_stat, where key can be any key
@@ -325,5 +326,6 @@ def _compute_stats(
         modes=stat_modes,
         stride=stride,
         kwargs=input_kwargs,
+        type_names=type_names,
     )
     return [values[idx][tuple_ids[i]] for i, idx in enumerate(ids)]
