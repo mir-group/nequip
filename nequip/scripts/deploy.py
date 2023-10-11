@@ -211,6 +211,12 @@ def main(args=None):
         default=None,
     )
     build_parser.add_argument(
+        "--override",
+        help="Override top-level configuration keys from the `--train-dir`/`--model`'s config YAML file.  This should be a valid YAML string. Unless you know why you need to, do not use this option.",
+        type=str,
+        default=None,
+    )
+    build_parser.add_argument(
         "--using-dataset",
         help="Allow model builders to use a dataset during deployment. By default uses the training dataset, but can point to a YAML file for another dataset.",
         type=pathlib.Path,
@@ -264,6 +270,20 @@ def main(args=None):
             config = Config.from_file(str(args.model), defaults=default_config)
         else:
             raise ValueError("one of --train-dir or --model must be given")
+
+        # Set override options before _set_global_options so that things like allow_tf32 are correctly handled
+        if args.override is not None:
+            override_options = yaml.load(args.override, Loader=yaml.Loader)
+            assert isinstance(
+                override_options, dict
+            ), "--override's YAML string must define a dictionary of top-level options"
+            overridden_keys = set(config.keys()).intersection(override_options.keys())
+            set_keys = set(override_options.keys()) - set(overridden_keys)
+            logging.info(
+                f"--override:  overrode keys {list(overridden_keys)} and set new keys {list(set_keys)}"
+            )
+            config.update(override_options)
+            del override_options, overridden_keys, set_keys
 
         _set_global_options(config)
         check_code_version(config)

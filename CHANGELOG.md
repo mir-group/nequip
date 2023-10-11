@@ -22,7 +22,7 @@ Most recent change on the bottom.
 - `include_file_as_baseline_config` for simple modifications of existing configs
 - `nequip-deploy --using-dataset` to support data-dependent deployment steps
 - Support for Gaussian Mixture Model uncertainty quantification (https://doi.org/10.1063/5.0136574)
-- `nequip-deploy build --checkpoint` to deploy specific checkpoints easily
+- `nequip-deploy build --checkpoint` and `--override` to avoid many largely duplicated YAML files
 
 ### Changed
 - Always require explicit `seed`
