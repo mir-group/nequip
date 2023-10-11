@@ -205,6 +205,12 @@ def main(args=None):
         type=pathlib.Path,
     )
     build_parser.add_argument(
+        "--checkpoint",
+        help="Which model checkpoint from --train-dir to deploy. Defaults to `best_model.pth`. If --train-dir is provided, this is a relative path;  if --model is provided instead, this is an absolute path.",
+        type=str,
+        default=None,
+    )
+    build_parser.add_argument(
         "--using-dataset",
         help="Allow model builders to use a dataset during deployment. By default uses the training dataset, but can point to a YAML file for another dataset.",
         type=pathlib.Path,
@@ -246,12 +252,13 @@ def main(args=None):
         state_dict = None
         if args.model and args.train_dir:
             raise ValueError("--model and --train-dir cannot both be specified.")
+        checkpoint_file = args.checkpoint
         if args.train_dir is not None:
-            logging.info("Loading best_model from training session...")
+            if checkpoint_file is None:
+                checkpoint_file = "best_model.pth"
+            logging.info(f"Loading {checkpoint_file} from training session...")
+            checkpoint_file = str(args.train_dir / "best_model.pth")
             config = Config.from_file(str(args.train_dir / "config.yaml"))
-            state_dict = torch.load(
-                str(args.train_dir / "best_model.pth"), map_location="cpu"
-            )
         elif args.model is not None:
             logging.info("Building model from config...")
             config = Config.from_file(str(args.model), defaults=default_config)
@@ -278,7 +285,10 @@ def main(args=None):
         global _current_metadata
         _current_metadata = {}
         model = model_from_config(config, dataset=dataset, deploy=True)
-        if state_dict is not None:
+        if checkpoint_file is not None:
+            state_dict = torch.load(
+                str(args.train_dir / "best_model.pth"), map_location="cpu"
+            )
             model.load_state_dict(state_dict, strict=True)
 
         # -- compile --
