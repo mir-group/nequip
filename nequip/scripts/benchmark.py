@@ -7,6 +7,7 @@ import logging
 import sys
 import pdb
 import traceback
+import pickle
 
 import torch
 from torch.utils.benchmark import Timer, Measurement
@@ -271,6 +272,14 @@ def main(args=None):
         )
         del errstr
     else:
+        if args.memory_summary and torch.cuda.is_available():
+            torch.cuda.memory._record_memory_history(
+                True,
+                # keep 100,000 alloc/free events from before the snapshot
+                trace_alloc_max_entries=100000,
+                # record stack information for the trace events
+                trace_alloc_record_context=True,
+            )
         print("Warmup...")
         warmup_time = time.time()
         for _ in range(warmup):
@@ -279,6 +288,7 @@ def main(args=None):
         print(f"    {warmup} calls of warmup took {warmup_time:.4f}s")
 
         print("Benchmarking...")
+
         # just time
         t = Timer(
             stmt="model(next(datas).copy())['total_energy'].item()",
@@ -289,6 +299,10 @@ def main(args=None):
         if args.memory_summary and torch.cuda.is_available():
             print("Memory usage summary:")
             print(torch.cuda.memory_summary())
+            snapshot = torch.cuda.memory._snapshot()
+
+            with open("snapshot.pickle", "wb") as f:
+                pickle.dump(snapshot, f)
 
         print(" -- Results --")
         print(
