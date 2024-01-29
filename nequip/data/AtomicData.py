@@ -157,6 +157,10 @@ def _process_dict(kwargs, ignore_fields=[]):
             # ^ this tensor is a scalar; we need to give it
             # a data dimension to play nice with irreps
             kwargs[k] = v
+        else:
+            warnings.warn(
+                f"Value for field {k} was of unsupported type {type(k)} (value was {v})"
+            )
 
     if AtomicDataDict.BATCH_KEY in kwargs:
         num_frames = kwargs[AtomicDataDict.BATCH_KEY].max() + 1
@@ -229,7 +233,6 @@ class AtomicData(Data):
     def __init__(
         self, irreps: Dict[str, e3nn.o3.Irreps] = {}, _validate: bool = True, **kwargs
     ):
-
         # empty init needed by get_example
         if len(kwargs) == 0 and len(irreps) == 0:
             super().__init__()
@@ -420,7 +423,6 @@ class AtomicData(Data):
         )
 
         if atoms.calc is not None:
-
             if isinstance(
                 atoms.calc, (SinglePointCalculator, SinglePointDFTCalculator)
             ):
