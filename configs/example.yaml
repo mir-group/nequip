@@ -99,6 +99,9 @@ early_stopping_patiences:                                                       
 early_stopping_lower_bounds:                                                       # stop early if a metric value is lower than the bound
   LR: 1.0e-5
 
+early_stopping_upper_bounds:                                                       # stop early if the training appears to have exploded
+  validation_loss: 1.0e4
+
 # loss function
 loss_coeffs:                                                                        
   forces: 1                                                                        # if using PerAtomMSELoss, a default weight of 1:1 on each should work well
