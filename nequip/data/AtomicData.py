@@ -157,9 +157,12 @@ def _process_dict(kwargs, ignore_fields=[]):
             # ^ this tensor is a scalar; we need to give it
             # a data dimension to play nice with irreps
             kwargs[k] = v
+        elif isinstance(v, torch.Tensor):
+            # This is a tensor, so we just don't do anything except avoid the warning in the `else`
+            pass
         else:
             warnings.warn(
-                f"Value for field {k} was of unsupported type {type(k)} (value was {v})"
+                f"Value for field {k} was of unsupported type {type(v)} (value was {v})"
             )
 
     if AtomicDataDict.BATCH_KEY in kwargs:
