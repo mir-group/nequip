@@ -46,6 +46,7 @@ Most recent change on the bottom.
 - [Breaking] `fixed_fields` machinery (`npz_fixed_field_keys` is still supported, but through a more straightforward implementation)
 - Default run name/WandB project name of `NequIP`, they must now always be provided explicitly
 - [Breaking] Removed `_params` as an allowable subconfiguration suffix (i.e. instead of `optimizer_params` now only `optimizer_kwargs` is valid, not both)
+- [Breaking] Removed `per_species_rescale_arguments_in_dataset_units`
 
 ## [0.5.6] - 2022-12-19
 ### Added

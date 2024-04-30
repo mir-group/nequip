@@ -307,29 +307,32 @@ per_species_rescale_scales_trainable: false
 # whether the scales are trainable. Defaults to False. Optional
 per_species_rescale_shifts_trainable: false
 # whether the shifts are trainable. Defaults to False. Optional
+
 per_species_rescale_shifts: dataset_per_atom_total_energy_mean
 # initial atomic energy shift for each species. default to the mean of per atom energy. Optional
 # the value can be a constant float value, an array for each species, or a string
+# if numbers are explicitly provided, they must be in the same energy units as the training data
 # string option include: 
 # *  "dataset_per_atom_total_energy_mean", which computes the per atom average
 # *  "dataset_per_species_total_energy_mean", which automatically compute the per atom energy mean using a GP model
-per_species_rescale_scales: dataset_forces_rms
+
+per_species_rescale_scales: null
 # initial atomic energy scale for each species. Optional.
 # the value can be a constant float value, an array for each species, or a string
+# if numbers are explicitly provided, they must be in the same energy units as the training data
 # string option include: 
 # *  "dataset_forces_absmax", which computes the dataset maxmimum force component magnitude
 # *  "dataset_per_atom_total_energy_std", which computes the per atom energy std
 # *  "dataset_per_species_total_energy_std", which uses the GP model uncertainty
 # *  "dataset_per_species_forces_rms", which compute the force rms for each species
-# If not provided, defaults to dataset_per_species_force_rms or dataset_per_atom_total_energy_std, depending on whether forces are being trained.
+# If not provided, defaults to null.
+
 # per_species_rescale_kwargs: 
 #   total_energy: 
 #     alpha: 0.001
 #     max_iteration: 20
 #     stride: 100
-# keywords for ridge regression decomposition of per specie energy. Optional. Defaults to 0.001. The value should be in the range of 1e-3 to 1e-2
-# per_species_rescale_arguments_in_dataset_units: True
-# if explicit numbers are given for the shifts/scales, this parameter must specify whether the given numbers are unitless shifts/scales or are in the units of the dataset. If ``True``, any global rescalings will correctly be applied to the per-species values.
+# keywords for ridge regression decomposition of per species energy. Optional. Defaults to 0.001. The value should be in the range of 1e-3 to 1e-2
 
 # global energy shift and scale
 # When "dataset_total_energy_mean", the mean energy of the dataset. When None, disables the global shift. When a number, used directly.
