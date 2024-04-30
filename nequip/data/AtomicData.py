@@ -5,7 +5,7 @@ Authors: Albert Musaelian
 
 import warnings
 from copy import deepcopy
-from typing import Union, Tuple, Dict, Optional, List, Set, Sequence
+from typing import Union, Tuple, Dict, Optional, List, Set, Sequence, Final
 from collections.abc import Mapping
 import os
 
@@ -705,6 +705,13 @@ _ERROR_ON_NO_EDGES: bool = os.environ.get("NEQUIP_ERROR_ON_NO_EDGES", "true").lo
 assert _ERROR_ON_NO_EDGES in ("true", "false")
 _ERROR_ON_NO_EDGES = _ERROR_ON_NO_EDGES == "true"
 
+_NEQUIP_MATSCIPY_NL: Final[bool] = os.environ.get("NEQUIP_MATSCIPY_NL", "false").lower()
+assert _NEQUIP_MATSCIPY_NL in ("true", "false")
+_NEQUIP_MATSCIPY_NL = _NEQUIP_MATSCIPY_NL == "true"
+
+if _NEQUIP_MATSCIPY_NL:
+    import matscipy.neighbours
+
 
 def neighbor_list_and_relative_vec(
     pos,
@@ -783,15 +790,25 @@ def neighbor_list_and_relative_vec(
     # ASE dependent part
     temp_cell = ase.geometry.complete_cell(temp_cell)
 
-    first_idex, second_idex, shifts = ase.neighborlist.primitive_neighbor_list(
-        "ijS",
-        pbc,
-        temp_cell,
-        temp_pos,
-        cutoff=float(r_max),
-        self_interaction=strict_self_interaction,  # we want edges from atom to itself in different periodic images!
-        use_scaled_positions=False,
-    )
+    if _NEQUIP_MATSCIPY_NL:
+        assert strict_self_interaction and not self_interaction
+        first_idex, second_idex, shifts = matscipy.neighbours.neighbour_list(
+            "ijS",
+            pbc=pbc,
+            cell=temp_cell,
+            positions=temp_pos,
+            cutoff=float(r_max),
+        )
+    else:
+        first_idex, second_idex, shifts = ase.neighborlist.primitive_neighbor_list(
+            "ijS",
+            pbc,
+            temp_cell,
+            temp_pos,
+            cutoff=float(r_max),
+            self_interaction=strict_self_interaction,  # we want edges from atom to itself in different periodic images!
+            use_scaled_positions=False,
+        )
 
     # Eliminate true self-edges that don't cross periodic boundaries
     if not self_interaction:

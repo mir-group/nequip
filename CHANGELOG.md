@@ -23,6 +23,7 @@ Most recent change on the bottom.
 - `nequip-deploy --using-dataset` to support data-dependent deployment steps
 - Support for Gaussian Mixture Model uncertainty quantification (https://doi.org/10.1063/5.0136574)
 - `nequip-deploy build --checkpoint` and `--override` to avoid many largely duplicated YAML files
+- matscipy neighborlist support enabled with `NEQUIP_MATSCIPY_NL` environment variable
 
 ### Changed
 - Always require explicit `seed`
