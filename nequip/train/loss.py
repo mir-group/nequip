@@ -39,10 +39,7 @@ class Loss:
     def __init__(
         self,
         coeffs: Union[dict, str, List[str]],
-        coeff_schedule: str = "constant",
     ):
-
-        self.coeff_schedule = coeff_schedule
         self.coeffs = {}
         self.funcs = {}
         self.keys = []
