@@ -212,9 +212,9 @@ early_stopping_upper_bounds:                                                    
 
 # loss function
 loss_coeffs:                                                                       # different weights to use in a weighted loss functions
-  forces: 1                                                                        # if using PerAtomMSELoss, a default weight of 1:1 on each should work well
+  forces: 1.0                                                                      # if using PerAtomMSELoss, a default weight of 1:1 on each should work well
   total_energy:                                                                    
-    - 1
+    - 1.0
     - PerAtomMSELoss
 # note that the ratio between force and energy loss matters for the training process. One may consider using 1:1 with the PerAtomMSELoss. If the energy loss still significantly dominate the loss function at the initial epochs, tune the energy loss weight lower helps the training a lot.
 
@@ -248,6 +248,15 @@ loss_coeffs:                                                                    
 #   - 3.0
 #   - L1Loss
 #   forces: 1.0
+
+# You can schedule changes in the loss coefficients using a callback:
+# In the "schedule" key each entry is a two-element list of:
+#  - the 1-based epoch index at which to start the new loss coefficients
+#  - the new loss coefficients as a dict
+#
+# start_of_epoch_callbacks:
+#  - !!python/object:nequip.train.callbacks.loss_schedule.SimpleLossSchedule {"schedule": [[2, {"forces": 0.0, "total_energy": 1.0}]]}
+#
 
 # output metrics
 metrics_components:
@@ -371,6 +380,3 @@ global_rescale_scale_trainable: false
 # per_species_rescale_shifts: null
 # per_species_rescale_scales: null
 
-# Options for e3nn's set_optimization_defaults. A dict:
-# e3nn_optimization_defaults:
-#   explicit_backward: True

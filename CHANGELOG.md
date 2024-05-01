@@ -22,6 +22,8 @@ Most recent change on the bottom.
 - `include_file_as_baseline_config` for simple modifications of existing configs
 - `nequip-deploy --using-dataset` to support data-dependent deployment steps
 - Support for Gaussian Mixture Model uncertainty quantification (https://doi.org/10.1063/5.0136574)
+- `start_of_epoch_callbacks`
+- `nequip.train.callbacks.loss_schedule.SimpleLossSchedule` for changing the loss coefficients at specified epochs
 - `nequip-deploy build --checkpoint` and `--override` to avoid many largely duplicated YAML files
 - matscipy neighborlist support enabled with `NEQUIP_MATSCIPY_NL` environment variable
 

@@ -258,6 +258,7 @@ class Trainer:
         val_idcs: Optional[list] = None,
         train_val_split: str = "random",
         init_callbacks: list = [],
+        start_of_epoch_callbacks: list = [],
         end_of_epoch_callbacks: list = [],
         end_of_batch_callbacks: list = [],
         end_of_train_callbacks: list = [],
@@ -348,6 +349,9 @@ class Trainer:
 
         # load all callbacks
         self._init_callbacks = [load_callable(callback) for callback in init_callbacks]
+        self._start_of_epoch_callbacks = [
+            load_callable(callback) for callback in start_of_epoch_callbacks
+        ]
         self._end_of_epoch_callbacks = [
             load_callable(callback) for callback in end_of_epoch_callbacks
         ]
@@ -887,6 +891,8 @@ class Trainer:
         self.metrics.to(self.torch_device)
 
     def epoch_step(self):
+        for callback in self._start_of_epoch_callbacks:
+            callback(self)
 
         dataloaders = {TRAIN: self.dl_train, VALIDATION: self.dl_val}
         categories = [TRAIN, VALIDATION] if self.iepoch >= 0 else [VALIDATION]
