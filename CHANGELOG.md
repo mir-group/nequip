@@ -37,6 +37,7 @@ Most recent change on the bottom.
 - `nequip-benchmark` now only uses `--n-data` frames to build the model
 - [Breaking] By default models now use `StressForceOutput`, not `ForceOutput`
 - Added `edge_energy` to `ALL_ENERGY_KEYS` subjecting it to global rescale
+- Allow calculation of atomic and well-separated dimer energies
 
 ### Fixed
 - Work with `wandb>=0.13.8`
