@@ -20,6 +20,7 @@ class GradientOutput(GraphModuleMixin, torch.nn.Module):
         out_field: the field in which to return the computed gradients. Defaults to ``f"d({of})/d({wrt})"`` for each field in ``wrt``.
         sign: either 1 or -1; the returned gradient is multiplied by this.
     """
+
     sign: float
     _negate: bool
     skip: bool
@@ -103,18 +104,19 @@ class GradientOutput(GraphModuleMixin, torch.nn.Module):
             for out, grad in zip(self.out_field, grads):
                 if grad is None:
                     # From the docs: "If an output doesn’t require_grad, then the gradient can be None"
-                    raise RuntimeError("Something is wrong, gradient couldn't be computed")
-                
+                    raise RuntimeError(
+                        "Something is wrong, gradient couldn't be computed"
+                    )
+
                 if self._negate:
                     grad = torch.neg(grad)
                 data[out] = grad
         else:
-            for out,tens in zip(self.out_field,wrt_tensors):
-                data[out] = torch.zeros( tens.shape, dtype=tens.dtype,
-                                         device=tens.device )
+            for out, tens in zip(self.out_field, wrt_tensors):
+                data[out] = torch.zeros(
+                    tens.shape, dtype=tens.dtype, device=tens.device
+                )
 
-
-                
         # unset requires_grad_
         for req_grad, k in zip(old_requires_grad, self.wrt):
             data[k].requires_grad_(req_grad)
@@ -131,6 +133,7 @@ class PartialForceOutput(GraphModuleMixin, torch.nn.Module):
         vectorize: the vectorize option to ``torch.autograd.functional.jacobian``,
             false by default since it doesn't work well.
     """
+
     vectorize: bool
 
     def __init__(
@@ -195,6 +198,7 @@ class StressOutput(GraphModuleMixin, torch.nn.Module):
         func: the energy model to wrap
         do_forces: whether to compute forces as well
     """
+
     do_forces: bool
 
     def __init__(
