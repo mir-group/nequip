@@ -218,6 +218,8 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
             return data
 
         species_idx = data[AtomicDataDict.ATOM_TYPE_KEY].squeeze(-1)
+        if len(species_idx.shape) == 0:
+            species_idx = data[AtomicDataDict.ATOM_TYPE_KEY]
         in_field = data[self.field]
         assert len(in_field) == len(
             species_idx

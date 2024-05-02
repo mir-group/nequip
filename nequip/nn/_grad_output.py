@@ -76,33 +76,45 @@ class GradientOutput(GraphModuleMixin, torch.nn.Module):
         # set req grad
         wrt_tensors = []
         old_requires_grad: List[bool] = []
+        needs_grad = False
         for k in self.wrt:
             old_requires_grad.append(data[k].requires_grad)
-            data[k].requires_grad_(True)
+            if data[k].shape[0] > 1:
+                data[k].requires_grad_(True)
+                needs_grad = True
+            else:
+                data[k].requires_grad_(False)
             wrt_tensors.append(data[k])
         # run func
         data = self.func(data)
-        # Get grads
-        grads = torch.autograd.grad(
-            # TODO:
-            # This makes sense for scalar batch-level or batch-wise outputs, specifically because d(sum(batches))/d wrt = sum(d batch / d wrt) = d my_batch / d wrt
-            # for a well-behaved example level like energy where d other_batch / d wrt is always zero. (In other words, the energy of example 1 in the batch is completely unaffect by changes in the position of atoms in another example.)
-            # This should work for any gradient of energy, but could act suspiciously and unexpectedly for arbitrary gradient outputs, if they ever come up
-            [data[self.of].sum()],
-            wrt_tensors,
-            create_graph=self.training,  # needed to allow gradients of this output during training
-        )
-        # return
-        # grad is optional[tensor]?
-        for out, grad in zip(self.out_field, grads):
-            if grad is None:
-                # From the docs: "If an output doesn’t require_grad, then the gradient can be None"
-                raise RuntimeError("Something is wrong, gradient couldn't be computed")
+        if needs_grad:
+            # Get grads
+            grads = torch.autograd.grad(
+                # TODO:
+                # This makes sense for scalar batch-level or batch-wise outputs, specifically because d(sum(batches))/d wrt = sum(d batch / d wrt) = d my_batch / d wrt
+                # for a well-behaved example level like energy where d other_batch / d wrt is always zero. (In other words, the energy of example 1 in the batch is completely unaffect by changes in the position of atoms in another example.)
+                # This should work for any gradient of energy, but could act suspiciously and unexpectedly for arbitrary gradient outputs, if they ever come up
+                [data[self.of].sum()],
+                wrt_tensors,
+                create_graph=self.training,  # needed to allow gradients of this output during training
+            )
+            # return
+            # grad is optional[tensor]?
+            for out, grad in zip(self.out_field, grads):
+                if grad is None:
+                    # From the docs: "If an output doesn’t require_grad, then the gradient can be None"
+                    raise RuntimeError("Something is wrong, gradient couldn't be computed")
+                
+                if self._negate:
+                    grad = torch.neg(grad)
+                data[out] = grad
+        else:
+            for out,tens in zip(self.out_field,wrt_tensors):
+                data[out] = torch.zeros( tens.shape, dtype=tens.dtype,
+                                         device=tens.device )
 
-            if self._negate:
-                grad = torch.neg(grad)
-            data[out] = grad
 
+                
         # unset requires_grad_
         for req_grad, k in zip(old_requires_grad, self.wrt):
             data[k].requires_grad_(req_grad)
