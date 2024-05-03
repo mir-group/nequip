@@ -124,6 +124,8 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
         num_types: the number of types in the model.
         shifts: the initial shifts to use, one per atom type.
         scales: the initial scales to use, one per atom type.
+        shifts_mask: a non-optimizable mask applied to shifts to allow some types to not contribute
+            to the energy; usually used from qm/mm delta-mlp models.
         arguments_in_dataset_units: if ``True``, says that the provided shifts/scales are in dataset
             units (in which case they will be rescaled appropriately by any global rescaling later
             applied to the model); if ``False``, the provided shifts/scales will be used without modification.
@@ -140,6 +142,7 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
     shifts_trainable: bool
     has_scales: bool
     has_shifts: bool
+    has_shifts_mask: bool
     default_dtype: torch.dtype
     _use_fma: bool
 
@@ -150,6 +153,7 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
         type_names: List[str],
         shifts: Optional[List[float]],
         scales: Optional[List[float]],
+        shifts_mask: Optional[List[float]],
         arguments_in_dataset_units: bool,
         out_field: Optional[str] = None,
         scales_trainable: bool = False,
@@ -158,6 +162,7 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
         irreps_in={},
     ):
         super().__init__()
+
         self.num_types = num_types
         self.type_names = type_names
         self.field = field
@@ -173,6 +178,7 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
         )
 
         self.has_shifts = shifts is not None
+        self.has_shifts_mask = shifts_mask is not None
         if shifts is not None:
             shifts = torch.as_tensor(shifts, dtype=self.default_dtype)
             if len(shifts.reshape([-1])) == 1:
@@ -182,12 +188,35 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
                 )
             assert shifts.shape == (num_types,), f"Invalid shape of shifts {shifts}"
             self.shifts_trainable = shifts_trainable
+
+            if shifts_mask is not None:
+                if isinstance(shifts_mask, list):
+                    my_shifts_mask = torch.as_tensor([float(x) for x in shifts_mask])
+                    if len(my_shifts_mask.reshape([-1])) == 1:
+                        shifts_mask = torch.ones(num_types)
+                    else:
+                        shifts_mask = my_shifts_mask
+                else:
+                    shifts_mask = torch.ones(num_types) * shifts_mask
+                assert shifts_mask.shape == (
+                    num_types,
+                ), f"Invalid shape of shifts_mask {shifts_mask}"
+
             if shifts_trainable:
                 self.shifts = torch.nn.Parameter(shifts)
+                if shifts_mask is not None:
+                    self.shifts_mask = torch.nn.Parameter(
+                        shifts_mask, requires_grad=False
+                    )
+            elif self.has_shifts_mask:
+                self.register_buffer("shifts", shifts * shifts_mask)
             else:
                 self.register_buffer("shifts", shifts)
         else:
             self.register_buffer("shifts", torch.Tensor())
+
+        if not self.has_shifts_mask:
+            self.register_buffer("shifts_mask", torch.Tensor())
 
         self.has_scales = scales is not None
         if scales is not None:
@@ -218,6 +247,7 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
             return data
 
         species_idx = data[AtomicDataDict.ATOM_TYPE_KEY].squeeze(-1)
+
         in_field = data[self.field]
         assert len(in_field) == len(
             species_idx
@@ -228,11 +258,20 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
             # addcmul computes
             # input + tensor1 * tensor2 elementwise
             # it will promote to widest dtype, which comes from shifts/scales
-            in_field = torch.addcmul(
-                torch.index_select(self.shifts, 0, species_idx).view(-1, 1),
-                torch.index_select(self.scales, 0, species_idx).view(-1, 1),
-                in_field,
-            )
+
+            if self.has_shifts_mask:
+                in_field = torch.addcmul(
+                    torch.index_select(self.shifts, 0, species_idx).view(-1, 1)
+                    * torch.index_select(self.shifts_mask, 0, species_idx).view(-1, 1),
+                    torch.index_select(self.scales, 0, species_idx).view(-1, 1),
+                    in_field,
+                )
+            else:
+                in_field = torch.addcmul(
+                    torch.index_select(self.shifts, 0, species_idx).view(-1, 1),
+                    torch.index_select(self.scales, 0, species_idx).view(-1, 1),
+                    in_field,
+                )
         else:
             # fallback path for torch<1.13 OR mix of enabled shifts and scales
             # multiplication / addition promotes dtypes already, so no cast is needed
@@ -244,10 +283,20 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
                     * in_field
                 )
             if self.has_shifts:
-                in_field = (
-                    torch.index_select(self.shifts, 0, species_idx).view(-1, 1)
-                    + in_field
-                )
+                if self.has_shifts_mask:
+                    in_field = (
+                        torch.index_select(self.shifts, 0, species_idx).view(-1, 1)
+                        * torch.index_select(self.shifts_mask, 0, species_idx).view(
+                            -1, 1
+                        )
+                        + in_field
+                    )
+                else:
+                    in_field = (
+                        torch.index_select(self.shifts, 0, species_idx).view(-1, 1)
+                        + in_field
+                    )
+
         data[self.out_field] = in_field
         return data
 
@@ -268,13 +317,18 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
                 f"PerSpeciesScaleShift's arguments were in dataset units; rescaling:\n  "
                 f"Original scales: {TypeMapper.format(self.scales, self.type_names) if self.has_scales else 'n/a'} "
                 f"shifts: {TypeMapper.format(self.shifts, self.type_names) if self.has_shifts else 'n/a'}"
+                f"shifts_mask: {TypeMapper.format(self.shifts_mask, self.type_names) if self.has_shifts_mask else 'n/a'}"
             )
             with torch.no_grad():
                 if self.has_scales:
                     self.scales.div_(rescale_module.scale_by)
                 if self.has_shifts:
-                    self.shifts.div_(rescale_module.scale_by)
-            logging.debug(
-                f"  New scales: {TypeMapper.format(self.scales, self.type_names) if self.has_scales else 'n/a'} "
-                f"shifts: {TypeMapper.format(self.shifts, self.type_names) if self.has_shifts else 'n/a'}"
-            )
+                    if self.has_shifts_mask:
+                        (self.shifts_mask * self.shifts).div_(rescale_module.scale_by)
+                    else:
+                        self.shifts.div_(rescale_module.scale_by)
+                logging.debug(
+                    f"  New scales: {TypeMapper.format(self.scales, self.type_names) if self.has_scales else 'n/a'} "
+                    f"shifts: {TypeMapper.format(self.shifts, self.type_names) if self.has_shifts else 'n/a'}"
+                    f"shifts_mask: {TypeMapper.format(self.shifts_mask, self.type_names) if self.has_shifts_mask else 'n/a'}"
+                )

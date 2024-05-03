@@ -179,6 +179,7 @@ def _PerSpeciesRescale(
     """
     scales = config.get(module_prefix + "_scales", scales_default)
     shifts = config.get(module_prefix + "_shifts", shifts_default)
+    shifts_mask = config.get(module_prefix + "_shifts_mask", None)
 
     # = Determine what statistics need to be compute =
     assert config.get(
@@ -243,6 +244,7 @@ def _PerSpeciesRescale(
         # so this is fine regardless of whether its trainable.
         scales = 1.0 if scales is not None else None
         shifts = 0.0 if shifts is not None else None
+        shifts_mask = 1.0 if shifts_mask is not None else None
         # values from the previously initialized model
         # will be brought in from the state dict later,
         # so these values (and rescaling them) doesn't matter
@@ -253,6 +255,7 @@ def _PerSpeciesRescale(
         out_field=out_field,
         shifts=shifts,
         scales=scales,
+        shifts_mask=shifts_mask,
         arguments_in_dataset_units=True,
     )
     model.insert_from_parameters(

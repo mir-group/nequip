@@ -26,6 +26,7 @@ Most recent change on the bottom.
 - `nequip.train.callbacks.loss_schedule.SimpleLossSchedule` for changing the loss coefficients at specified epochs
 - `nequip-deploy build --checkpoint` and `--override` to avoid many largely duplicated YAML files
 - matscipy neighborlist support enabled with `NEQUIP_MATSCIPY_NL` environment variable
+- `per_species_rescale_shifts_mask=List[bool]` which acts like a elementwise mask that turns on/off contributions from the shift parameters
 
 ### Changed
 - Always require explicit `seed`
