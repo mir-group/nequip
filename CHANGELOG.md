@@ -6,7 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Most recent change on the bottom.
 
-## Unreleased - 0.6.0
+## Unreleased
+
+## [0.6.0] - 2024-5-10
 ### Added
 - add Tensorboard as logger option
 - [Breaking] Refactor overall model logic into `GraphModel` top-level module
