@@ -54,10 +54,13 @@ class TestLoop:
             print(batch)
 
 
+NPZ_DATASET_FIXTURE_N_FRAMES: int = 8
+
+
 @pytest.fixture(scope="module")
 def npz_dataset():
     natoms = 3
-    nframes = 8
+    nframes = NPZ_DATASET_FIXTURE_N_FRAMES
     npz = dict(
         positions=np.random.random((nframes, natoms, 3)),
         force=np.random.random((nframes, natoms, 3)),
@@ -69,7 +72,7 @@ def npz_dataset():
         a = NpzDataset(
             file_name=folder + "/npzdata.npz",
             root=folder,
-            extra_fixed_fields={"r_max": 3},
+            AtomicData_options={"r_max": 3},
         )
         yield a
 

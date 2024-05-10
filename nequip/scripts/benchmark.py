@@ -7,6 +7,7 @@ import logging
 import sys
 import pdb
 import traceback
+import pickle
 
 import torch
 from torch.utils.benchmark import Timer, Measurement
@@ -57,19 +58,13 @@ def main(args=None):
         "-n",
         help="Number of trials.",
         type=int,
-        default=30,
+        default=None,
     )
     parser.add_argument(
         "--n-data",
         help="Number of frames to use.",
         type=int,
-        default=1,
-    )
-    parser.add_argument(
-        "--timestep",
-        help="MD timestep for ns/day esimation, in fs. Defauts to 1fs.",
-        type=float,
-        default=1,
+        default=2,
     )
     parser.add_argument(
         "--no-compile",
@@ -116,20 +111,22 @@ def main(args=None):
     dataset = dataset_from_config(config)
     dataset_time = time.time() - dataset_time
     print(f"    loading dataset took {dataset_time:.4f}s")
+    print(
+        f"    loaded dataset of size {len(dataset)} and sampled --n-data={args.n_data} frames"
+    )
     dataset_rng = torch.Generator()
     dataset_rng.manual_seed(config.get("dataset_seed", config.get("seed", 12345)))
+    dataset = dataset.index_select(
+        torch.randperm(len(dataset), generator=dataset_rng)[: args.n_data]
+    )
     datas_list = [
-        AtomicData.to_AtomicDataDict(dataset[i].to(device))
-        for i in torch.randperm(len(dataset), generator=dataset_rng)[: args.n_data]
+        AtomicData.to_AtomicDataDict(dataset[i].to(device)) for i in range(args.n_data)
     ]
     n_atom: int = len(datas_list[0]["pos"])
     if not all(len(d["pos"]) == n_atom for d in datas_list):
         raise NotImplementedError(
             "nequip-benchmark does not currently handle benchmarking on data frames with variable number of atoms"
         )
-    print(
-        f"    loaded dataset of size {len(dataset)} and sampled --n-data={args.n_data} frames"
-    )
     # print some dataset information
     print("    benchmark frames statistics:")
     print(f"         number of atoms: {n_atom}")
@@ -157,6 +154,8 @@ def main(args=None):
     if args.n == 0:
         print("Got -n 0, so quitting without running benchmark.")
         return
+    elif args.n is None:
+        args.n = 5 if args.profile else 30
 
     # Load model:
     if args.model is None:
@@ -239,8 +238,11 @@ def main(args=None):
             on_trace_ready=trace_handler,
         ) as p:
             for _ in range(1 + warmup + args.n):
-                model(next(datas).copy())
+                out = model(next(datas).copy())
+                out[AtomicDataDict.TOTAL_ENERGY_KEY].item()
                 p.step()
+
+        print(p.key_averages().table(sort_by="cuda_time_total", row_limit=100))
     elif args.pdb:
         print("Running model under debugger...")
         try:
@@ -270,6 +272,14 @@ def main(args=None):
         )
         del errstr
     else:
+        if args.memory_summary and torch.cuda.is_available():
+            torch.cuda.memory._record_memory_history(
+                True,
+                # keep 100,000 alloc/free events from before the snapshot
+                trace_alloc_max_entries=100000,
+                # record stack information for the trace events
+                trace_alloc_record_context=True,
+            )
         print("Warmup...")
         warmup_time = time.time()
         for _ in range(warmup):
@@ -278,22 +288,34 @@ def main(args=None):
         print(f"    {warmup} calls of warmup took {warmup_time:.4f}s")
 
         print("Benchmarking...")
+
         # just time
         t = Timer(
-            stmt="model(next(datas).copy())", globals={"model": model, "datas": datas}
+            stmt="model(next(datas).copy())['total_energy'].item()",
+            globals={"model": model, "datas": datas},
         )
         perloop: Measurement = t.timeit(args.n)
 
         if args.memory_summary and torch.cuda.is_available():
             print("Memory usage summary:")
             print(torch.cuda.memory_summary())
+            snapshot = torch.cuda.memory._snapshot()
+
+            with open("snapshot.pickle", "wb") as f:
+                pickle.dump(snapshot, f)
 
         print(" -- Results --")
         print(
             f"PLEASE NOTE: these are speeds for the MODEL, evaluated on --n-data={args.n_data} configurations kept in memory."
         )
         print(
-            "    \\_ MD itself, memory copies, and other overhead will affect real-world performance."
+            "A variety of factors affect the performance in real molecular dynamics calculations:"
+        )
+        print(
+            "!!! Molecular dynamics speeds should be measured in LAMMPS; speeds from nequip-benchmark should only be used as an estimate of RELATIVE speed among different hyperparameters."
+        )
+        print(
+            "Please further note that relative speed ordering of hyperparameters is NOT NECESSARILY CONSISTENT across different classes of GPUs (i.e. A100 vs V100 vs consumer) or GPUs vs CPUs."
         )
         print()
         trim_time = trim_sigfig(perloop.times[0], perloop.significant_figures)
@@ -302,19 +324,6 @@ def main(args=None):
             trim_time / time_scale
         )
         print(f"The average call took {time_str}{time_unit}")
-        print(
-            "Assuming linear scaling — which is ALMOST NEVER true in practice, especially on GPU —"
-        )
-        per_atom_time = trim_time / n_atom
-        time_unit_per, time_scale_per = select_unit(per_atom_time)
-        print(
-            f"    \\_ this comes out to {per_atom_time/time_scale_per:g} {time_unit_per}/atom/call"
-        )
-        ns_day = (86400.0 / trim_time) * args.timestep * 1e-6
-        #     day in s^   s/step^         ^ fs / step      ^ ns / fs
-        print(
-            f"For this system, at a {args.timestep:.2f}fs timestep, this comes out to {ns_day:.2f} ns/day"
-        )
 
 
 if __name__ == "__main__":

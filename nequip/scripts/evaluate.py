@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Tuple, List
 import sys
 import argparse
 import logging
@@ -11,17 +11,66 @@ import ase.io
 
 import torch
 
-from nequip.data import AtomicData, Collater, dataset_from_config, register_fields
-from nequip.scripts.deploy import load_deployed_model, R_MAX_KEY
+from nequip.data import (
+    AtomicData,
+    Collater,
+    dataset_from_config,
+    register_fields,
+    _register_field_prefix,
+)
+from nequip.scripts.deploy import load_deployed_model, R_MAX_KEY, TYPE_NAMES_KEY
 from nequip.scripts._logger import set_up_script_logger
 from nequip.scripts.train import default_config, check_code_version
 from nequip.utils._global_options import _set_global_options
 from nequip.train import Trainer, Loss, Metrics
 from nequip.utils import load_file, instantiate, Config
 
-
-ORIGINAL_DATASET_INDEX_KEY: str = "original_dataset_index"
+ORIGINAL_DATASET_PREFIX: str = "original_dataset_"
+ORIGINAL_DATASET_INDEX_KEY: str = ORIGINAL_DATASET_PREFIX + "index"
 register_fields(graph_fields=[ORIGINAL_DATASET_INDEX_KEY])
+
+
+def _load_deployed_or_traindir(
+    path: Path, device, freeze: bool = True
+) -> Tuple[torch.nn.Module, bool, float, List[str]]:
+    loaded_deployed_model: bool = False
+    model_r_max = None
+    type_names = None
+    try:
+        model, metadata = load_deployed_model(
+            path,
+            device=device,
+            set_global_options=True,  # don't warn that setting
+            freeze=freeze,
+        )
+        # the global settings for a deployed model are set by
+        # set_global_options in the call to load_deployed_model
+        # above
+        model_r_max = float(metadata[R_MAX_KEY])
+        type_names = metadata[TYPE_NAMES_KEY].split(" ")
+        loaded_deployed_model = True
+    except ValueError:  # its not a deployed model
+        loaded_deployed_model = False
+    # we don't do this in the `except:` block to avoid "during handing of this exception another exception"
+    # chains if there is an issue loading the training session model. This makes the error messages more
+    # comprehensible:
+    if not loaded_deployed_model:
+        # Use the model config, regardless of dataset config
+        global_config = path.parent / "config.yaml"
+        global_config = Config.from_file(str(global_config), defaults=default_config)
+        _set_global_options(global_config)
+        check_code_version(global_config)
+        del global_config
+
+        # load a training session model
+        model, model_config = Trainer.load_model_from_training_session(
+            traindir=path.parent, model_name=path.name
+        )
+        model = model.to(device)
+        model_r_max = model_config["r_max"]
+        type_names = model_config["type_names"]
+    model.eval()
+    return model, loaded_deployed_model, model_r_max, type_names
 
 
 def main(args=None, running_as_script: bool = True):
@@ -38,7 +87,7 @@ def main(args=None, running_as_script: bool = True):
 
             Prints only the final result in `name = num` format to stdout; all other information is `logging.debug`ed to stderr.
 
-            WARNING: Please note that results of CUDA models are rarely exactly reproducible, and that even CPU models can be nondeterministic.
+            Please note that results of CUDA models are rarely exactly reproducible, and that even CPU models can be nondeterministic. This is very rarely important in practice, but can be unintuitive.
             """
         )
     )
@@ -68,7 +117,7 @@ def main(args=None, running_as_script: bool = True):
     )
     parser.add_argument(
         "--test-indexes",
-        help="Path to a file containing the indexes in the dataset that make up the test set. If omitted, all data frames *not* used as training or validation data in the training session `train_dir` will be used.",
+        help="Path to a file containing the indexes in the dataset that make up the test set. If omitted, all data frames *not* used as training or validation data in the training session `train_dir` will be used. PyTorch, YAML, and JSON formats containing a list of integers are supported.",
         type=Path,
         default=None,
     )
@@ -109,6 +158,12 @@ def main(args=None, running_as_script: bool = True):
     parser.add_argument(
         "--output-fields",
         help="Extra fields (names comma separated with no spaces) to write to the `--output`.",
+        type=str,
+        default="",
+    )
+    parser.add_argument(
+        "--output-fields-from-original-dataset",
+        help="Extra fields from the ORIGINAL REFERENCE DATASET (names comma separated with no spaces) to write to the `--output` with the added prefix `original_dataset_*`",
         type=str,
         default="",
     )
@@ -164,9 +219,20 @@ def main(args=None, running_as_script: bool = True):
     if args.output is not None:
         if args.output.suffix != ".xyz":
             raise ValueError("Only .xyz format for `--output` is supported.")
-        args.output_fields = [e for e in args.output_fields.split(",") if e != ""] + [
-            ORIGINAL_DATASET_INDEX_KEY
+        args.output_fields_from_original_dataset = [
+            e for e in args.output_fields_from_original_dataset.split(",") if e != ""
         ]
+        args.output_fields = [e for e in args.output_fields.split(",") if e != ""]
+        ase_all_fields = (
+            args.output_fields
+            + [
+                ORIGINAL_DATASET_PREFIX + e
+                for e in args.output_fields_from_original_dataset
+            ]
+            + [ORIGINAL_DATASET_INDEX_KEY]
+        )
+        if len(args.output_fields_from_original_dataset) > 0:
+            _register_field_prefix(ORIGINAL_DATASET_PREFIX)
         output_type = "xyz"
     else:
         assert args.output_fields == ""
@@ -185,7 +251,7 @@ def main(args=None, running_as_script: bool = True):
     logger.info(f"Using device: {device}")
     if device.type == "cuda":
         logger.info(
-            "WARNING: please note that models running on CUDA are usually nondeterministc and that this manifests in the final test errors; for a _more_ deterministic result, please use `--device cpu`",
+            "Please note that _all_ machine learning models running on CUDA hardware are generally somewhat nondeterministic and that this can manifest in small, generally unimportant variation in the final test errors.",
         )
 
     if args.use_deterministic_algorithms:
@@ -196,41 +262,10 @@ def main(args=None, running_as_script: bool = True):
 
     # Load model:
     logger.info("Loading model... ")
-    loaded_deployed_model: bool = False
-    model_r_max = None
-    try:
-        model, metadata = load_deployed_model(
-            args.model,
-            device=device,
-            set_global_options=True,  # don't warn that setting
-        )
-        logger.info("loaded deployed model.")
-        # the global settings for a deployed model are set by
-        # set_global_options in the call to load_deployed_model
-        # above
-        model_r_max = float(metadata[R_MAX_KEY])
-        loaded_deployed_model = True
-    except ValueError:  # its not a deployed model
-        loaded_deployed_model = False
-    # we don't do this in the `except:` block to avoid "during handing of this exception another exception"
-    # chains if there is an issue loading the training session model. This makes the error messages more
-    # comprehensible:
-    if not loaded_deployed_model:
-        # Use the model config, regardless of dataset config
-        global_config = args.model.parent / "config.yaml"
-        global_config = Config.from_file(str(global_config), defaults=default_config)
-        _set_global_options(global_config)
-        check_code_version(global_config)
-        del global_config
-
-        # load a training session model
-        model, model_config = Trainer.load_model_from_training_session(
-            traindir=args.model.parent, model_name=args.model.name
-        )
-        model = model.to(device)
-        logger.info("loaded model from training session")
-        model_r_max = model_config["r_max"]
-    model.eval()
+    model, loaded_deployed_model, model_r_max, _ = _load_deployed_or_traindir(
+        args.model, device=device
+    )
+    logger.info(f"    loaded{' deployed' if loaded_deployed_model else ''} model")
 
     # Load a config file
     logger.info(
@@ -374,22 +409,27 @@ def main(args=None, running_as_script: bool = True):
             with torch.no_grad():
                 # Write output
                 if output_type == "xyz":
+                    output_out = out.copy()
                     # add test frame to the output:
-                    out[ORIGINAL_DATASET_INDEX_KEY] = torch.LongTensor(
+                    output_out[ORIGINAL_DATASET_INDEX_KEY] = torch.LongTensor(
                         this_batch_test_indexes
                     )
+                    for field in args.output_fields_from_original_dataset:
+                        # batch is from the original dataset
+                        output_out[ORIGINAL_DATASET_PREFIX + field] = batch[field]
                     # append to the file
                     ase.io.write(
                         output,
-                        AtomicData.from_AtomicDataDict(out)
+                        AtomicData.from_AtomicDataDict(output_out)
                         .to(device="cpu")
                         .to_ase(
                             type_mapper=dataset.type_mapper,
-                            extra_fields=args.output_fields,
+                            extra_fields=ase_all_fields,
                         ),
                         format="extxyz",
                         append=True,
                     )
+                    del output_out
 
                 # Accumulate metrics
                 if do_metrics:

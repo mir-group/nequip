@@ -9,7 +9,11 @@ run_name: example-run-toluene
 seed: 123                                                                         # model seed
 dataset_seed: 456                                                                 # data set seed
 append: true                                                                      # set true if a restarted run should append to the previous log file
-default_dtype: float32                                                            # type of float to use, e.g. float32 and float64
+
+# see https://arxiv.org/abs/2304.10061 for discussion of numerical precision
+default_dtype: float64
+model_dtype: float32
+allow_tf32: true    # consider setting to false if you plan to mix training/inference over any devices that are not NVIDIA Ampere or later
 
 # network
 r_max: 4.0                                                                        # cutoff radius in length units, here Angstrom, this is an important hyperparamter to scan
@@ -68,7 +72,7 @@ wandb: true                                                                     
 wandb_project: toluene-example                                                     # project name used in wandb
 
 verbose: info                                                                      # the same as python logging, e.g. warning, info, debug, error; case insensitive
-log_batch_freq: 10                                                                 # batch frequency, how often to print training errors withinin the same epoch
+log_batch_freq: 100                                                                # batch frequency, how often to print training errors withinin the same epoch
 log_epoch_freq: 1                                                                  # epoch frequency, how often to print 
 save_checkpoint_freq: -1                                                           # frequency to save the intermediate checkpoint. no saving of intermediate checkpoints when the value is not positive.
 save_ema_checkpoint_freq: -1                                                       # frequency to save the intermediate ema checkpoint. no saving of intermediate checkpoints when the value is not positive.
@@ -94,6 +98,9 @@ early_stopping_patiences:                                                       
 
 early_stopping_lower_bounds:                                                       # stop early if a metric value is lower than the bound
   LR: 1.0e-5
+
+early_stopping_upper_bounds:                                                       # stop early if the training appears to have exploded
+  validation_loss: 1.0e+4
 
 # loss function
 loss_coeffs:                                                                        
@@ -141,17 +148,12 @@ lr_scheduler_factor: 0.5
 # the default is to scale the atomic energy and forces by scaling them by the force standard deviation and to shift the energy by the mean atomic energy
 # in certain cases, it can be useful to have a trainable shift/scale and to also have species-dependent shifts/scales for each atom
 
-# whether the shifts and scales are trainable. Defaults to False. Optional
-per_species_rescale_shifts_trainable: false
-per_species_rescale_scales_trainable: false
-
 # initial atomic energy shift for each species. default to the mean of per atom energy. Optional
 # the value can be a constant float value, an array for each species, or a string that defines a statistics over the training dataset
+# if numbers are explicitly provided, they must be in the same energy units as the training data
 per_species_rescale_shifts: dataset_per_atom_total_energy_mean
 
 # initial atomic energy scale for each species. Optional.
 # the value can be a constant float value, an array for each species, or a string
-per_species_rescale_scales: dataset_forces_rms
-
-# if explicit numbers are given for the shifts/scales, this parameter must specify whether the given numbers are unitless shifts/scales or are in the units of the dataset. If ``True``, any global rescalings will correctly be applied to the per-species values.
-# per_species_rescale_arguments_in_dataset_units: True
+# if numbers are explicitly provided, they must be in the same energy units as the training data
+per_species_rescale_scales: null

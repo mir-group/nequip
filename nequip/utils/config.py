@@ -34,6 +34,8 @@ Examples:
     If a parameter is updated, the updated value will be formatted back to the same type.
 
 """
+from typing import Set, Dict, Any, List
+
 import inspect
 
 from copy import deepcopy
@@ -42,7 +44,12 @@ from typing import Optional
 from nequip.utils.savenload import save_file, load_file
 
 
+_GLOBAL_ALL_ASKED_FOR_KEYS: Set[str] = set()
+
+
 class Config(object):
+    _items: Dict[str, Any]
+
     def __init__(
         self,
         config: Optional[dict] = None,
@@ -76,10 +83,20 @@ class Config(object):
     def _as_dict(self):
         return self._items
 
-    def as_dict(self):
-        return dict(self)
+    @staticmethod
+    def as_dict(obj):
+        # don't use `dict(self)`, since that
+        # calls __getitem__
+        if isinstance(obj, dict):
+            return obj.copy()
+        elif isinstance(obj, Config):
+            return obj._items.copy()
+        else:
+            raise TypeError
 
     def __getitem__(self, key):
+        # any requested key is a valid key
+        _GLOBAL_ALL_ASKED_FOR_KEYS.add(key)
         return self._items[key]
 
     def get_type(self, key):
@@ -115,7 +132,6 @@ class Config(object):
         return self._allow_list
 
     def __setitem__(self, key, val):
-
         # typehint
         if key.endswith("_type") and key.startswith("_"):
 
@@ -157,6 +173,7 @@ class Config(object):
         return key in self._items
 
     def pop(self, *args):
+        _GLOBAL_ALL_ASKED_FOR_KEYS.add(args[0])
         return self._items.pop(*args)
 
     def update_w_prefix(
@@ -187,7 +204,7 @@ class Config(object):
         keys = self.update(prefix_dict, allow_val_change=allow_val_change)
         keys = {k: f"{prefix}_{k}" for k in keys}
 
-        for suffix in ["params", "kwargs"]:
+        for suffix in ["kwargs"]:
             if f"{prefix}_{suffix}" in dictionary:
                 key3 = self.update(
                     dictionary[f"{prefix}_{suffix}"],
@@ -227,6 +244,7 @@ class Config(object):
         return set(keys) - set([None])
 
     def get(self, *args):
+        _GLOBAL_ALL_ASKED_FOR_KEYS.add(args[0])
         return self._items.get(*args)
 
     def persist(self):
@@ -254,7 +272,17 @@ class Config(object):
 
     @staticmethod
     def from_file(filename: str, format: Optional[str] = None, defaults: dict = {}):
-        """Load arguments from file"""
+        """Load arguments from file
+
+        Has support for including another config file as a baseline with:
+        ```
+        # example of using another config as a baseline and overriding only selected options
+        # this option will read in configs/minimal.yaml and take ALL keys from that file
+        include_file_as_baseline_config: configs/minimal.yaml
+        # keys specified in this file WILL OVERRIDE keys from the `include_file_as_baseline_config` file
+        l_max: 1  # overrides l_max: 2 in minimal.yaml
+        ```
+        """
 
         supported_formats = {"yaml": ("yml", "yaml"), "json": "json"}
         dictionary = load_file(
@@ -262,6 +290,23 @@ class Config(object):
             filename=filename,
             enforced_format=format,
         )
+        k: str = "include_file_as_baseline_config"
+        if k in dictionary:
+            # allow one level of subloading
+            baseline_fname = dictionary.pop(k)
+            dictionary_baseline = load_file(
+                supported_formats=supported_formats,
+                filename=baseline_fname,
+                enforced_format=format,
+            )
+            if k in dictionary_baseline:
+                raise NotImplementedError(
+                    f"Multiple levels of `{k}` are not allowed, but {baseline_fname} contained `{k}`"
+                )
+            # override baseline options with the main config
+            dictionary_baseline.update(dictionary)
+            dictionary = dictionary_baseline
+            del dictionary_baseline, baseline_fname
         return Config.from_dict(dictionary, defaults)
 
     @staticmethod
@@ -338,3 +383,10 @@ class Config(object):
             return Config(config=default_params, allow_list=param_keys)
 
     load = from_file
+
+    def _get_nomark(self, key: str) -> Any:
+        return self._items.get(key)
+
+    def _unused_keys(self) -> List[str]:
+        unused = [k for k in self.keys() if k not in _GLOBAL_ALL_ASKED_FOR_KEYS]
+        return unused

@@ -13,6 +13,7 @@ class TypeMapper:
 
     num_types: int
     chemical_symbol_to_type: Optional[Dict[str, int]]
+    type_to_chemical_symbol: Optional[Dict[int, str]]
     type_names: List[str]
     _min_Z: int
 
@@ -20,6 +21,7 @@ class TypeMapper:
         self,
         type_names: Optional[List[str]] = None,
         chemical_symbol_to_type: Optional[Dict[str, int]] = None,
+        type_to_chemical_symbol: Optional[Dict[int, str]] = None,
         chemical_symbols: Optional[List[str]] = None,
     ):
         if chemical_symbols is not None:
@@ -36,6 +38,14 @@ class TypeMapper:
             ]
             chemical_symbol_to_type = {k: i for i, k in enumerate(chemical_symbols)}
             del chemical_symbols
+
+        if type_to_chemical_symbol is not None:
+            type_to_chemical_symbol = {
+                int(k): v for k, v in type_to_chemical_symbol.items()
+            }
+            assert all(
+                v in ase.data.chemical_symbols for v in type_to_chemical_symbol.values()
+            )
 
         # Build from chem->type mapping, if provided
         self.chemical_symbol_to_type = chemical_symbol_to_type
@@ -75,6 +85,14 @@ class TypeMapper:
             for sym, type_idx in self.chemical_symbol_to_type.items():
                 self._index_to_Z[type_idx] = ase.data.atomic_numbers[sym]
             self._valid_set = set(valid_atomic_numbers)
+            true_type_to_chemical_symbol = {
+                type_id: sym for sym, type_id in self.chemical_symbol_to_type.items()
+            }
+            if type_to_chemical_symbol is not None:
+                assert type_to_chemical_symbol == true_type_to_chemical_symbol
+            else:
+                type_to_chemical_symbol = true_type_to_chemical_symbol
+
         # check
         if type_names is None:
             raise ValueError(
@@ -88,6 +106,9 @@ class TypeMapper:
         self.num_types = len(type_names)
         # Check type_names
         self.type_names = type_names
+        self.type_to_chemical_symbol = type_to_chemical_symbol
+        if self.type_to_chemical_symbol is not None:
+            assert set(type_to_chemical_symbol.keys()) == set(range(self.num_types))
 
     def __call__(
         self, data: Union[AtomicDataDict.Type, AtomicData], types_required: bool = True

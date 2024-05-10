@@ -23,14 +23,14 @@ def RescaleEnergyEtc(
         dataset=dataset,
         initialize=initialize,
         module_prefix="global_rescale",
-        default_scale=f"dataset_{AtomicDataDict.FORCE_KEY}_rms"
-        if AtomicDataDict.FORCE_KEY in model.irreps_out
-        else f"dataset_{AtomicDataDict.TOTAL_ENERGY_KEY}_std",
+        default_scale=(
+            f"dataset_{AtomicDataDict.FORCE_KEY}_rms"
+            if AtomicDataDict.FORCE_KEY in model.irreps_out
+            else f"dataset_{AtomicDataDict.TOTAL_ENERGY_KEY}_std"
+        ),
         default_shift=None,
         default_scale_keys=AtomicDataDict.ALL_ENERGY_KEYS,
         default_shift_keys=[AtomicDataDict.TOTAL_ENERGY_KEY],
-        default_related_scale_keys=[AtomicDataDict.PER_ATOM_ENERGY_KEY],
-        default_related_shift_keys=[],
     )
 
 
@@ -43,8 +43,6 @@ def GlobalRescale(
     default_shift: Union[str, float, list],
     default_scale_keys: list,
     default_shift_keys: list,
-    default_related_scale_keys: list,
-    default_related_shift_keys: list,
     dataset: Optional[AtomicDataset] = None,
 ):
     """Add global rescaling for energy(-based quantities).
@@ -113,8 +111,6 @@ def GlobalRescale(
     error_string = "keys need to be a list"
     assert isinstance(default_scale_keys, list), error_string
     assert isinstance(default_shift_keys, list), error_string
-    assert isinstance(default_related_scale_keys, list), error_string
-    assert isinstance(default_related_shift_keys, list), error_string
 
     # == Build the model ==
     return RescaleOutput(
@@ -123,10 +119,9 @@ def GlobalRescale(
         scale_by=global_scale,
         shift_keys=[k for k in default_shift_keys if k in model.irreps_out],
         shift_by=global_shift,
-        related_scale_keys=default_related_scale_keys,
-        related_shift_keys=default_related_shift_keys,
         shift_trainable=config.get(f"{module_prefix}_shift_trainable", False),
         scale_trainable=config.get(f"{module_prefix}_scale_trainable", False),
+        default_dtype=config.get("default_dtype", None),
     )
 
 
@@ -136,26 +131,8 @@ def PerSpeciesRescale(
     initialize: bool,
     dataset: Optional[AtomicDataset] = None,
 ):
-    """Add global rescaling for energy(-based quantities).
-
-    If ``initialize`` is false, doesn't compute statistics.
-    """
+    """Add per-atom rescaling (and shifting) for per-atom energies."""
     module_prefix = "per_species_rescale"
-
-    # = Determine energy rescale type =
-    scales = config.get(
-        module_prefix + "_scales",
-        f"dataset_{AtomicDataDict.FORCE_KEY}_rms"
-        # if `train_on_keys` isn't provided, assume conservatively
-        # that we aren't "training" on anything (i.e. take the
-        # most general defaults)
-        if AtomicDataDict.FORCE_KEY in config.get("train_on_keys", [])
-        else f"dataset_per_atom_{AtomicDataDict.TOTAL_ENERGY_KEY}_std",
-    )
-    shifts = config.get(
-        module_prefix + "_shifts",
-        f"dataset_per_atom_{AtomicDataDict.TOTAL_ENERGY_KEY}_mean",
-    )
 
     # Check for common double shift mistake with defaults
     if "RescaleEnergyEtc" in config.get("model_builders", []):
@@ -163,15 +140,51 @@ def PerSpeciesRescale(
         # THIS CHECK IS ONLY GOOD ENOUGH FOR EMITTING WARNINGS
         has_global_shift = config.get("global_rescale_shift", None) is not None
         if has_global_shift:
-            if shifts is not None:
+            if config.get(module_prefix + "_shifts", True) is not None:
                 # using default of per_atom shift
                 raise RuntimeError(
                     "A global_rescale_shift was provided, but the default per-atom energy shift was not disabled."
                 )
         del has_global_shift
 
-    # = Determine what statistics need to be compute =\
-    arguments_in_dataset_units = None
+    return _PerSpeciesRescale(
+        scales_default=None,
+        shifts_default=f"dataset_per_atom_{AtomicDataDict.TOTAL_ENERGY_KEY}_mean",
+        field=AtomicDataDict.PER_ATOM_ENERGY_KEY,
+        out_field=AtomicDataDict.PER_ATOM_ENERGY_KEY,
+        module_prefix=module_prefix,
+        insert_before="total_energy_sum",
+        model=model,
+        config=config,
+        initialize=initialize,
+        dataset=dataset,
+    )
+
+
+def _PerSpeciesRescale(
+    scales_default,
+    shifts_default,
+    field: str,
+    out_field: str,
+    module_prefix: str,
+    insert_before: str,
+    model: GraphModuleMixin,
+    config,
+    initialize: bool,
+    dataset: Optional[AtomicDataset] = None,
+):
+    """Add per-atom rescaling (and shifting) for a field
+
+    If ``initialize`` is false, doesn't compute statistics.
+    """
+    scales = config.get(module_prefix + "_scales", scales_default)
+    shifts = config.get(module_prefix + "_shifts", shifts_default)
+
+    # = Determine what statistics need to be compute =
+    assert config.get(
+        module_prefix + "_arguments_in_dataset_units", True
+    ), f"The PerSpeciesRescale builder is only compatible with {module_prefix + '_arguments_in_dataset_units'} set to True"
+
     if initialize:
         str_names = []
         for value in [scales, shifts]:
@@ -188,20 +201,6 @@ def PerSpeciesRescale(
             else:
                 raise ValueError(f"Invalid value `{value}` of type {type(value)}")
 
-        if len(str_names) == 2:
-            # Both computed from dataset
-            arguments_in_dataset_units = True
-        elif len(str_names) == 1:
-            if None in [scales, shifts]:
-                # if the one that isnt str is null, it's just disabled
-                # that has no units
-                # so it's ok to have just one and to be in dataset units
-                arguments_in_dataset_units = True
-            else:
-                assert config[
-                    module_prefix + "_arguments_in_dataset_units"
-                ], "Requested to set either the shifts or scales of the per_species_rescale using dataset values, but chose to provide the other in non-dataset units. Please give the explictly specified shifts/scales in dataset units and set per_species_rescale_arguments_in_dataset_units"
-
         # = Compute shifts and scales =
         if len(str_names) > 0:
             computed_stats = _compute_stats(
@@ -213,21 +212,24 @@ def PerSpeciesRescale(
 
         if isinstance(scales, str):
             s = scales
-            scales = computed_stats[str_names.index(scales)].squeeze(-1)  # energy is 1D
+            # energy or other property is 1D:
+            scales = computed_stats[str_names.index(scales)].squeeze(-1)
             logging.info(f"Replace string {s} to {scales}")
         elif isinstance(scales, (list, float)):
             scales = torch.as_tensor(scales)
 
         if isinstance(shifts, str):
             s = shifts
-            shifts = computed_stats[str_names.index(shifts)].squeeze(-1)  # energy is 1D
+            # energy or other property is 1D:
+            shifts = computed_stats[str_names.index(shifts)].squeeze(-1)
             logging.info(f"Replace string {s} to {shifts}")
         elif isinstance(shifts, (list, float)):
             shifts = torch.as_tensor(shifts)
 
+        # TODO kind of weird error to check for here
         if scales is not None and torch.min(scales) < RESCALE_THRESHOLD:
             raise ValueError(
-                f"Per species energy scaling was very low: {scales}. Maybe try setting {module_prefix}_scales = 1."
+                f"Per species scaling was very low: {scales}. Maybe try setting {module_prefix}_scales = 1."
             )
 
         logging.info(
@@ -241,22 +243,20 @@ def PerSpeciesRescale(
         # so this is fine regardless of whether its trainable.
         scales = 1.0 if scales is not None else None
         shifts = 0.0 if shifts is not None else None
-        # values correctly scaled according to where the come from
-        # will be brought from the state dict later,
-        # so what you set this to doesnt matter:
-        arguments_in_dataset_units = False
+        # values from the previously initialized model
+        # will be brought in from the state dict later,
+        # so these values (and rescaling them) doesn't matter
 
     # insert in per species shift
     params = dict(
-        field=AtomicDataDict.PER_ATOM_ENERGY_KEY,
-        out_field=AtomicDataDict.PER_ATOM_ENERGY_KEY,
+        field=field,
+        out_field=out_field,
         shifts=shifts,
         scales=scales,
+        arguments_in_dataset_units=True,
     )
-
-    params["arguments_in_dataset_units"] = arguments_in_dataset_units
     model.insert_from_parameters(
-        before="total_energy_sum",
+        before=insert_before,
         name=module_prefix,
         shared_params=config,
         builder=PerSpeciesScaleShift,
@@ -288,7 +288,7 @@ def _compute_stats(
     stat_strs = []
     ids = []
     tuple_ids = []
-    tuple_id_map = {"mean": 0, "std": 1, "rms": 0}
+    tuple_id_map = {"mean": 0, "std": 1, "rms": 0, "absmax": 0}
     input_kwargs = {}
     for name in str_names:
 
@@ -309,9 +309,9 @@ def _compute_stats(
         if stat in ["mean", "std"]:
             stat_mode = prefix + "mean_std"
             stat_str = field + prefix + "mean_std"
-        elif stat in ["rms"]:
-            stat_mode = prefix + "rms"
-            stat_str = field + prefix + "rms"
+        elif stat in ["rms", "absmax"]:
+            stat_mode = prefix + stat
+            stat_str = field + prefix + stat
         else:
             raise ValueError(f"Cannot handle {stat} type quantity")
 

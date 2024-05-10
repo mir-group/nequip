@@ -1,8 +1,0 @@
-Training
-========
-
-Basic
------
-
-Advanced
---------

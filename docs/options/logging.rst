@@ -1,8 +1,0 @@
-Logging
-=======
-
-Basic
------
-
-Advanced
---------

@@ -1,4 +1,6 @@
 import warnings
+from packaging import version
+import os
 
 import torch
 
@@ -9,6 +11,7 @@ from nequip.data import register_fields
 from .misc import dtype_from_name
 from .auto_init import instantiate
 from .test import set_irreps_debug
+from .config import Config
 
 
 # for multiprocessing, we need to keep track of our latest global options so
@@ -35,7 +38,7 @@ def _set_global_options(config, warn_on_override: bool = False) -> None:
     """
     # update these options into the latest global config.
     global _latest_global_config
-    _latest_global_config.update(dict(config))
+    _latest_global_config.update(Config.as_dict(config))
     # Set TF32 support
     # See https://pytorch.org/docs/stable/notes/cuda.html#tensorfloat-32-tf32-on-ampere-devices
     if torch.cuda.is_available() and "allow_tf32" in config:
@@ -48,7 +51,16 @@ def _set_global_options(config, warn_on_override: bool = False) -> None:
             torch.backends.cuda.matmul.allow_tf32 = config["allow_tf32"]
             torch.backends.cudnn.allow_tf32 = config["allow_tf32"]
 
-    if int(torch.__version__.split(".")[1]) >= 11:
+    # Temporary warning due to unresolved upstream issue
+    torch_version = version.parse(torch.__version__)
+    if torch_version < version.parse("1.11"):
+        warnings.warn("We currently recommend the use of PyTorch 1.11")
+    elif torch_version > version.parse("1.11"):
+        warnings.warn(
+            "!! Upstream issues in PyTorch versions >1.11 have been seen to cause unusual performance degredations on some CUDA systems that become worse over time; see https://github.com/mir-group/nequip/discussions/311. At present we *strongly* recommend the use of PyTorch 1.11 if using CUDA devices; while using other versions if you observe this problem, an unexpected lack of this problem, or other strange behavior, please post in the linked GitHub issue."
+        )
+
+    if torch_version >= version.parse("1.11"):
         # PyTorch >= 1.11
         k = "_jit_fusion_strategy"
         if k in config:
@@ -70,11 +82,41 @@ def _set_global_options(config, warn_on_override: bool = False) -> None:
                     f"Setting the GLOBAL value for jit bailout depth to `{new_depth}` which is different than the previous value of `{old_depth}`"
                 )
 
+    # Deal with fusers
+    # The default PyTorch fuser changed to nvFuser in 1.12
+    # fuser1 is NNC, fuser2 is nvFuser
+    # See https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/OVERVIEW.md#fusers
+    # And https://github.com/pytorch/pytorch/blob/e0a0f37a11164f59b42bc80a6f95b54f722d47ce/torch/jit/_fuser.py#L46
+    # Also https://github.com/pytorch/pytorch/blob/main/torch/csrc/jit/codegen/cuda/README.md
+    # Also https://github.com/pytorch/pytorch/blob/66fb83293e6a6f527d3fde632e3547fda20becea/torch/csrc/jit/OVERVIEW.md?plain=1#L1201
+    # https://github.com/search?q=repo%3Apytorch%2Fpytorch%20PYTORCH_JIT_USE_NNC_NOT_NVFUSER&type=code
+    # We follow the approach they have explicitly built for disabling nvFuser in favor of NNC:
+    # https://github.com/pytorch/pytorch/blob/66fb83293e6a6f527d3fde632e3547fda20becea/torch/csrc/jit/codegen/cuda/README.md?plain=1#L214
+    #
+    #     There are three ways to disable nvfuser. Listed below with descending priorities:
+    #      - Force using NNC instead of nvfuser for GPU fusion with env variable `export PYTORCH_JIT_USE_NNC_NOT_NVFUSER=1`.
+    #      - Disabling nvfuser with torch API `torch._C._jit_set_nvfuser_enabled(False)`.
+    #      - Disable nvfuser with env variable `export PYTORCH_JIT_ENABLE_NVFUSER=0`.
+    #
+    k = "PYTORCH_JIT_USE_NNC_NOT_NVFUSER"
+    if k in os.environ:
+        warnings.warn(
+            "Do NOT manually set PYTORCH_JIT_USE_NNC_NOT_NVFUSER=0 unless you know exactly what you're doing!"
+        )
+    else:
+        os.environ[k] = "1"
+
     # TODO: warn_on_override for the rest here?
     if config.get("model_debug_mode", False):
         set_irreps_debug(enabled=True)
     if "default_dtype" in config:
-        torch.set_default_dtype(dtype_from_name(config["default_dtype"]))
+        old_dtype = torch.get_default_dtype()
+        new_dtype = dtype_from_name(config["default_dtype"])
+        if warn_on_override and old_dtype != new_dtype:
+            warnings.warn(
+                f"Setting the GLOBAL value for torch.set_default_dtype to `{new_dtype}` which is different than the previous value of `{old_dtype}`"
+            )
+        torch.set_default_dtype(new_dtype)
     if config.get("grad_anomaly_mode", False):
         torch.autograd.set_detect_anomaly(True)
 

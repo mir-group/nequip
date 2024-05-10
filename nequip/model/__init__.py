@@ -6,6 +6,8 @@ from ._weight_init import (
     initialize_from_state,
     load_model_state,
 )
+from ._gmm import GaussianMixtureModelUncertainty
+from ._pair_potential import PairPotential, PairPotentialTerm
 
 from ._build import model_from_config
 
@@ -22,6 +24,9 @@ __all__ = [
     uniform_initialize_FCs,
     initialize_from_state,
     load_model_state,
+    GaussianMixtureModelUncertainty,
     model_from_config,
+    PairPotential,
+    PairPotentialTerm,
     builder_utils,
 ]

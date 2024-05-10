@@ -19,11 +19,14 @@ parity: true
 num_features: 16
 
 # data set
-dataset: ase                                                                       # type of data set, can be npz or ase
+dataset: ase                                                # type of data set, can be npz or ase
 dataset_url: https://qmml.org/Datasets/w-14.zip             # url to download the npz. optional
-dataset_file_name: ./benchmark_data/w-14.xyz                        # path to data set file
+dataset_file_name: ./benchmark_data/w-14.xyz                # path to data set file
 dataset_key_mapping:
   force: forces
+# !! WARNING !!:  NequIP expects virial / stress labels to be in "consistent units", i.e.
+#                 using the same base units as all other data. For stress, in particular,
+#                 this means the correct units for nequip are energy / length^3.
 dataset_include_keys:
   - virial
 # A mapping of chemical species to type indexes is necessary if the dataset is provided with atomic numbers instead of type indexes.
@@ -37,7 +40,7 @@ dataset_include_frames: !!python/object/apply:builtins.range
 
 global_rescale_scale: dataset_total_energy_std
 per_species_rescale_shifts: dataset_per_atom_total_energy_mean
-per_species_rescale_scales: dataset_per_atom_total_energy_std
+per_species_rescale_scales: null
 
 # logging
 wandb: false

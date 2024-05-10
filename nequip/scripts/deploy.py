@@ -1,15 +1,17 @@
 import sys
 
 if sys.version_info[1] >= 8:
-    from typing import Final
+    from typing import Final, Optional
 else:
-    from typing_extensions import Final
+    from typing_extensions import Final, Optional
 from typing import Tuple, Dict, Union
 import argparse
 import pathlib
 import logging
 import yaml
 import itertools
+import packaging.version
+import warnings
 
 # This is a weird hack to avoid Intel MKL issues on the cluster when this is called as a subprocess of a process that has itself initialized PyTorch.
 # Since numpy gets imported later anyway for dataset stuff, this shouldn't affect performance.
@@ -17,15 +19,14 @@ import numpy as np  # noqa: F401
 
 import torch
 
-import ase.data
-
 from e3nn.util.jit import script
 
 from nequip.model import model_from_config
-from nequip.train import Trainer
+from nequip.data import dataset_from_config
 from nequip.utils import Config
-from nequip.utils.versions import check_code_version, get_config_code_versions
+from nequip.utils.versions import check_code_version, get_current_code_versions
 from nequip.scripts.train import default_config
+from nequip.utils.misc import dtype_to_name
 from nequip.utils._global_options import _set_global_options
 
 CONFIG_KEY: Final[str] = "config"
@@ -39,6 +40,8 @@ TYPE_NAMES_KEY: Final[str] = "type_names"
 JIT_BAILOUT_KEY: Final[str] = "_jit_bailout_depth"
 JIT_FUSION_STRATEGY: Final[str] = "_jit_fusion_strategy"
 TF32_KEY: Final[str] = "allow_tf32"
+DEFAULT_DTYPE_KEY: Final[str] = "default_dtype"
+MODEL_DTYPE_KEY: Final[str] = "model_dtype"
 
 _ALL_METADATA_KEYS = [
     CONFIG_KEY,
@@ -51,7 +54,27 @@ _ALL_METADATA_KEYS = [
     JIT_BAILOUT_KEY,
     JIT_FUSION_STRATEGY,
     TF32_KEY,
+    DEFAULT_DTYPE_KEY,
+    MODEL_DTYPE_KEY,
 ]
+
+
+def _register_metadata_key(key: str) -> None:
+    _ALL_METADATA_KEYS.append(key)
+
+
+_current_metadata: Optional[dict] = None
+
+
+def _set_deploy_metadata(key: str, value) -> None:
+    # TODO: not thread safe but who cares?
+    global _current_metadata
+    if _current_metadata is None:
+        pass  # not deploying right now
+    elif key in _current_metadata:
+        raise RuntimeError(f"{key} already set in the deployment metadata")
+    else:
+        _current_metadata[key] = value
 
 
 def _compile_for_deploy(model):
@@ -100,11 +123,28 @@ def load_deployed_model(
         model = torch.jit.freeze(model)
     # Everything we store right now is ASCII, so decode for printing
     metadata = {k: v.decode("ascii") for k, v in metadata.items()}
+    # Update metadata for backward compatibility
+    if metadata[DEFAULT_DTYPE_KEY] == "":
+        # Default and model go together
+        assert metadata[MODEL_DTYPE_KEY] == ""
+        # If there isn't a dtype, it should be older than 0.6.0:
+        assert packaging.version.parse(
+            metadata[NEQUIP_VERSION_KEY]
+        ) < packaging.version.parse("0.6.0")
+        # i.e. no value due to L85 above
+        # The old pre-0.6.0 defaults:
+        metadata[DEFAULT_DTYPE_KEY] = "float32"
+        metadata[MODEL_DTYPE_KEY] = "float32"
+        warnings.warn(
+            "Models deployed before v0.6.0 don't contain information about their default_dtype or model_dtype; assuming the old default of float32 for both, but this might not be right if you had explicitly set default_dtype=float64."
+        )
+
     # Set up global settings:
     assert set_global_options in (True, False, "warn")
     if set_global_options:
         global_config_dict = {}
         global_config_dict["allow_tf32"] = bool(int(metadata[TF32_KEY]))
+        global_config_dict["default_dtype"] = str(metadata[DEFAULT_DTYPE_KEY])
         # JIT strategy
         strategy = metadata.get(JIT_FUSION_STRATEGY, "")
         if strategy != "":
@@ -165,6 +205,25 @@ def main(args=None):
         type=pathlib.Path,
     )
     build_parser.add_argument(
+        "--checkpoint",
+        help="Which model checkpoint from --train-dir to deploy. Defaults to `best_model.pth`. If --train-dir is provided, this is a relative path;  if --model is provided instead, this is an absolute path.",
+        type=str,
+        default=None,
+    )
+    build_parser.add_argument(
+        "--override",
+        help="Override top-level configuration keys from the `--train-dir`/`--model`'s config YAML file.  This should be a valid YAML string. Unless you know why you need to, do not use this option.",
+        type=str,
+        default=None,
+    )
+    build_parser.add_argument(
+        "--using-dataset",
+        help="Allow model builders to use a dataset during deployment. By default uses the training dataset, but can point to a YAML file for another dataset.",
+        type=pathlib.Path,
+        const=True,
+        nargs="?",
+    )
+    build_parser.add_argument(
         "out_file",
         help="Output file for deployed model.",
         type=pathlib.Path,
@@ -196,10 +255,15 @@ def main(args=None):
             logging.debug(f"Model had config:\n{config}")
 
     elif args.command == "build":
+        state_dict = None
         if args.model and args.train_dir:
             raise ValueError("--model and --train-dir cannot both be specified.")
+        checkpoint_file = args.checkpoint
         if args.train_dir is not None:
-            logging.info("Loading best_model from training session...")
+            if checkpoint_file is None:
+                checkpoint_file = "best_model.pth"
+            logging.info(f"Loading {checkpoint_file} from training session...")
+            checkpoint_file = str(args.train_dir / "best_model.pth")
             config = Config.from_file(str(args.train_dir / "config.yaml"))
         elif args.model is not None:
             logging.info("Building model from config...")
@@ -207,18 +271,45 @@ def main(args=None):
         else:
             raise ValueError("one of --train-dir or --model must be given")
 
+        # Set override options before _set_global_options so that things like allow_tf32 are correctly handled
+        if args.override is not None:
+            override_options = yaml.load(args.override, Loader=yaml.Loader)
+            assert isinstance(
+                override_options, dict
+            ), "--override's YAML string must define a dictionary of top-level options"
+            overridden_keys = set(config.keys()).intersection(override_options.keys())
+            set_keys = set(override_options.keys()) - set(overridden_keys)
+            logging.info(
+                f"--override:  overrode keys {list(overridden_keys)} and set new keys {list(set_keys)}"
+            )
+            config.update(override_options)
+            del override_options, overridden_keys, set_keys
+
         _set_global_options(config)
         check_code_version(config)
 
         # -- load model --
-        if args.train_dir is not None:
-            model, _ = Trainer.load_model_from_training_session(
-                args.train_dir, model_name="best_model.pth", device="cpu"
+        # figure out first if a dataset is involved
+        dataset = None
+        if args.using_dataset:
+            dataset_config = config
+            if args.using_dataset is not True:
+                dataset_config = Config.from_file(str(args.using_dataset))
+            dataset = dataset_from_config(dataset_config)
+            if args.using_dataset is True:
+                # we're using the one from training config
+                # downselect to training set
+                dataset = dataset.index_select(config.train_idcs)
+        # build the actual model]
+        # reset the global metadata dict so that model builders can fill it:
+        global _current_metadata
+        _current_metadata = {}
+        model = model_from_config(config, dataset=dataset, deploy=True)
+        if checkpoint_file is not None:
+            state_dict = torch.load(
+                str(args.train_dir / "best_model.pth"), map_location="cpu"
             )
-        elif args.model is not None:
-            model = model_from_config(config, deploy=True)
-        else:
-            raise AssertionError
+            model.load_state_dict(state_dict, strict=True)
 
         # -- compile --
         model = _compile_for_deploy(model)
@@ -226,7 +317,7 @@ def main(args=None):
 
         # Deploy
         metadata: dict = {}
-        code_versions, code_commits = get_config_code_versions(config)
+        code_versions, code_commits = get_current_code_versions(config)
         for code, version in code_versions.items():
             metadata[code + "_version"] = version
         if len(code_commits) > 0:
@@ -235,29 +326,33 @@ def main(args=None):
             )
 
         metadata[R_MAX_KEY] = str(float(config["r_max"]))
-        if "allowed_species" in config:
-            # This is from before the atomic number updates
-            n_species = len(config["allowed_species"])
-            type_names = {
-                type: ase.data.chemical_symbols[atomic_num]
-                for type, atomic_num in enumerate(config["allowed_species"])
-            }
-        else:
-            # The new atomic number setup
-            n_species = str(config["num_types"])
-            type_names = config["type_names"]
+        n_species = str(config["num_types"])
+        type_names = config["type_names"]
         metadata[N_SPECIES_KEY] = str(n_species)
         metadata[TYPE_NAMES_KEY] = " ".join(type_names)
 
         metadata[JIT_BAILOUT_KEY] = str(config[JIT_BAILOUT_KEY])
-        if int(torch.__version__.split(".")[1]) >= 11 and JIT_FUSION_STRATEGY in config:
+        if (
+            packaging.version.parse(torch.__version__)
+            >= packaging.version.parse("1.11")
+            and JIT_FUSION_STRATEGY in config
+        ):
             metadata[JIT_FUSION_STRATEGY] = ";".join(
                 "%s,%i" % e for e in config[JIT_FUSION_STRATEGY]
             )
         metadata[TF32_KEY] = str(int(config["allow_tf32"]))
-        metadata[CONFIG_KEY] = yaml.dump(dict(config))
+        metadata[DEFAULT_DTYPE_KEY] = dtype_to_name(config["default_dtype"])
+        metadata[MODEL_DTYPE_KEY] = dtype_to_name(config["model_dtype"])
+        metadata[CONFIG_KEY] = yaml.dump(Config.as_dict(config))
+
+        for k, v in _current_metadata.items():
+            if k in metadata:
+                raise RuntimeError(f"Custom deploy key {k} was already set")
+            metadata[k] = v
+        _current_metadata = None
 
         metadata = {k: v.encode("ascii") for k, v in metadata.items()}
+
         torch.jit.save(model, args.out_file, _extra_files=metadata)
     else:
         raise ValueError
