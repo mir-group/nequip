@@ -18,7 +18,7 @@ allow_tf32: true    # consider setting to false if you plan to mix training/infe
 # network
 r_max: 4.0                                                                        # cutoff radius in length units, here Angstrom, this is an important hyperparamter to scan
 num_layers: 4                                                                     # number of interaction blocks, we find 3-5 to work best
-l_max: 1                                                                          # the maximum irrep order (rotation order) for the network's features, l=1 is a good default, l=2 is more accurate but slower
+l_max: 2                                                                          # the maximum irrep order (rotation order) for the network's features, l=2 is accurate but slower, l=1 if you want to be faster but less accurte
 parity: true                                                                      # whether to include features with odd mirror parity; often turning parity off gives equally good results but faster networks, so do consider this
 num_features: 32                                                                  # the multiplicity of the features, 32 is a good default for accurate network, if you want to be more accurate, go larger, if you want to be faster, go lower
 nonlinearity_type: gate                                                           # may be 'gate' or 'norm', 'gate' is recommended
@@ -131,8 +131,11 @@ metrics_components:
 
 # optimizer, may be any optimizer defined in torch.optim
 # the name `optimizer_name`is case sensitive
-optimizer_name: Adam                                                               # default optimizer is Adam 
-optimizer_amsgrad: false
+# IMPORTANT: for NequIP (not for Allegro), we find that in most cases AMSGrad strongly improves
+# out-of-distribution generalization over Adam. We highly recommed trying both AMSGrad (by setting
+# optimizer_amsgrad: true) and Adam (by setting optimizer_amsgrad: false)
+optimizer_name: Adam                                                             
+optimizer_amsgrad: true
 
 # lr scheduler, currently only supports the two options listed in full.yaml, i.e. on-pleteau and cosine annealing with warm restarts, if you need more please file an issue
 # here: on-plateau, reduce lr by factory of lr_scheduler_factor if metrics_key hasn't improved for lr_scheduler_patience epoch
