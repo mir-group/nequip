@@ -7,6 +7,7 @@ enable wandb resume
 make an interface with ray
 
 """
+
 import sys
 import inspect
 import logging
@@ -53,6 +54,7 @@ from nequip.utils.versions import check_code_version
 from nequip.utils.sampler import DistributedValidationSampler
 from nequip.model import model_from_config
 from nequip.utils.config import _GLOBAL_ALL_ASKED_FOR_KEYS
+from nequip.utils.misc import get_default_device_name
 
 from .loss import Loss, LossStat
 from .metrics import Metrics
@@ -229,7 +231,7 @@ class Trainer:
         self,
         model,
         model_builders: Optional[list] = [],
-        device: str = "cuda" if torch.cuda.is_available() else "cpu",
+        device: str = get_default_device_name(),
         distributed: bool = False,
         seed: Optional[int] = None,
         dataset_seed: Optional[int] = None,
@@ -262,6 +264,7 @@ class Trainer:
         val_idcs: Optional[list] = None,
         train_val_split: str = "random",
         init_callbacks: list = [],
+        start_of_epoch_callbacks: list = [],
         end_of_epoch_callbacks: list = [],
         end_of_batch_callbacks: list = [],
         end_of_train_callbacks: list = [],
@@ -342,6 +345,15 @@ class Trainer:
             self.trainer_save_path = output.generate_file("trainer.pth")
             self.config_path = self.output.generate_file("config.yaml")
 
+        if seed is None:
+            raise ValueError("seed is required")
+
+        torch.manual_seed(seed)
+        np.random.seed(seed)
+
+        self.dataset_rng = torch.Generator()
+        self.dataset_rng.manual_seed(dataset_seed if dataset_seed is not None else seed)
+
         self.logger.info(f"Torch device: {self.device}")
 
         if seed is None:
@@ -380,6 +392,9 @@ class Trainer:
 
         # load all callbacks
         self._init_callbacks = [load_callable(callback) for callback in init_callbacks]
+        self._start_of_epoch_callbacks = [
+            load_callable(callback) for callback in start_of_epoch_callbacks
+        ]
         self._end_of_epoch_callbacks = [
             load_callable(callback) for callback in end_of_epoch_callbacks
         ]
@@ -796,7 +811,6 @@ class Trainer:
             )
 
     def train(self):
-
         """Training"""
         if getattr(self, "dl_train", None) is None:
             raise RuntimeError("You must call `set_dataset()` before calling `train()`")
@@ -942,6 +956,8 @@ class Trainer:
         self.metrics.to(self.torch_device)
 
     def epoch_step(self):
+        for callback in self._start_of_epoch_callbacks:
+            callback(self)
 
         dataloaders = {TRAIN: self.dl_train, VALIDATION: self.dl_val}
         categories = [TRAIN, VALIDATION] if self.iepoch >= 0 else [VALIDATION]
@@ -1304,7 +1320,7 @@ class Trainer:
         if self.distributed:
             assert self.n_train_per_epoch is None, "not implemented together yet"
             # For consistancy between distributed and normal training,
-            # we use DistributedSampler no matter what.
+            # we should use DistributedSampler no matter what.
             # TODO!: what do do with drop_tail??
             self.dl_train_sampler = torch.utils.data.distributed.DistributedSampler(
                 dataset=self.dataset_train,

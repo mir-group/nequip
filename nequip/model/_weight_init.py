@@ -1,4 +1,5 @@
 import math
+import logging
 
 import torch
 
@@ -27,7 +28,7 @@ def initialize_from_state(
         return graph_model  # do nothing
     return load_model_state(
         config=config,
-        model=graph_model,
+        graph_model=graph_model,
         initialize=initialize,
         _prefix="initial_model_state",
     )
@@ -57,7 +58,11 @@ def load_model_state(
     state = torch.load(
         config[_prefix], map_location=None if torch.cuda.is_available() else "cpu"
     )
-    graph_model.load_state_dict(state, strict=config.get(_prefix + "_strict", True))
+    strict: bool = config.get(_prefix + "_strict", True)
+    graph_model.load_state_dict(state, strict=strict)
+    logging.info(
+        f"Loaded model state {'' if strict else ' with strict=False'} (parameters/weights/persistent buffers) from state {_prefix}={config[_prefix]}"
+    )
     return graph_model
 
 

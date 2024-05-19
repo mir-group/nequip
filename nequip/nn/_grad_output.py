@@ -20,6 +20,7 @@ class GradientOutput(GraphModuleMixin, torch.nn.Module):
         out_field: the field in which to return the computed gradients. Defaults to ``f"d({of})/d({wrt})"`` for each field in ``wrt``.
         sign: either 1 or -1; the returned gradient is multiplied by this.
     """
+
     sign: float
     _negate: bool
     skip: bool
@@ -119,6 +120,7 @@ class PartialForceOutput(GraphModuleMixin, torch.nn.Module):
         vectorize: the vectorize option to ``torch.autograd.functional.jacobian``,
             false by default since it doesn't work well.
     """
+
     vectorize: bool
 
     def __init__(
@@ -183,6 +185,7 @@ class StressOutput(GraphModuleMixin, torch.nn.Module):
         func: the energy model to wrap
         do_forces: whether to compute forces as well
     """
+
     do_forces: bool
 
     def __init__(
@@ -330,12 +333,13 @@ class StressOutput(GraphModuleMixin, torch.nn.Module):
             # ^ can only scale by cell volume if we have one...:
             # Rescale stress tensor
             # See https://github.com/atomistic-machine-learning/schnetpack/blob/master/src/schnetpack/atomistic/output_modules.py#L180
+            # See also https://en.wikipedia.org/wiki/Triple_product
+            # See also https://gitlab.com/ase/ase/-/blob/master/ase/cell.py,
+            #          which uses np.abs(np.linalg.det(cell))
             # First dim is batch, second is vec, third is xyz
-            volume = torch.einsum(
-                "zi,zi->z",
-                cell[:, 0, :],
-                torch.cross(cell[:, 1, :], cell[:, 2, :], dim=1),
-            ).unsqueeze(-1)
+            # Note the .abs(), since volume should always be positive
+            # det is equal to a dot (b cross c)
+            volume = torch.linalg.det(cell).abs().unsqueeze(-1)
             stress = virial / volume.view(num_batch, 1, 1)
             data[AtomicDataDict.CELL_KEY] = orig_cell
         else:

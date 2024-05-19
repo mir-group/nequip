@@ -22,9 +22,9 @@ import torch
 from e3nn.util.jit import script
 
 from nequip.model import model_from_config
-from nequip.train import Trainer
+from nequip.data import dataset_from_config
 from nequip.utils import Config
-from nequip.utils.versions import check_code_version, get_config_code_versions
+from nequip.utils.versions import check_code_version, get_current_code_versions
 from nequip.scripts.train import default_config
 from nequip.utils.misc import dtype_to_name
 from nequip.utils._global_options import _set_global_options
@@ -205,6 +205,25 @@ def main(args=None):
         type=pathlib.Path,
     )
     build_parser.add_argument(
+        "--checkpoint",
+        help="Which model checkpoint from --train-dir to deploy. Defaults to `best_model.pth`. If --train-dir is provided, this is a relative path;  if --model is provided instead, this is an absolute path.",
+        type=str,
+        default=None,
+    )
+    build_parser.add_argument(
+        "--override",
+        help="Override top-level configuration keys from the `--train-dir`/`--model`'s config YAML file.  This should be a valid YAML string. Unless you know why you need to, do not use this option.",
+        type=str,
+        default=None,
+    )
+    build_parser.add_argument(
+        "--using-dataset",
+        help="Allow model builders to use a dataset during deployment. By default uses the training dataset, but can point to a YAML file for another dataset.",
+        type=pathlib.Path,
+        const=True,
+        nargs="?",
+    )
+    build_parser.add_argument(
         "out_file",
         help="Output file for deployed model.",
         type=pathlib.Path,
@@ -236,10 +255,15 @@ def main(args=None):
             logging.debug(f"Model had config:\n{config}")
 
     elif args.command == "build":
+        state_dict = None
         if args.model and args.train_dir:
             raise ValueError("--model and --train-dir cannot both be specified.")
+        checkpoint_file = args.checkpoint
         if args.train_dir is not None:
-            logging.info("Loading best_model from training session...")
+            if checkpoint_file is None:
+                checkpoint_file = "best_model.pth"
+            logging.info(f"Loading {checkpoint_file} from training session...")
+            checkpoint_file = str(args.train_dir / "best_model.pth")
             config = Config.from_file(str(args.train_dir / "config.yaml"))
         elif args.model is not None:
             logging.info("Building model from config...")
@@ -247,20 +271,45 @@ def main(args=None):
         else:
             raise ValueError("one of --train-dir or --model must be given")
 
+        # Set override options before _set_global_options so that things like allow_tf32 are correctly handled
+        if args.override is not None:
+            override_options = yaml.load(args.override, Loader=yaml.Loader)
+            assert isinstance(
+                override_options, dict
+            ), "--override's YAML string must define a dictionary of top-level options"
+            overridden_keys = set(config.keys()).intersection(override_options.keys())
+            set_keys = set(override_options.keys()) - set(overridden_keys)
+            logging.info(
+                f"--override:  overrode keys {list(overridden_keys)} and set new keys {list(set_keys)}"
+            )
+            config.update(override_options)
+            del override_options, overridden_keys, set_keys
+
         _set_global_options(config)
         check_code_version(config)
 
         # -- load model --
+        # figure out first if a dataset is involved
+        dataset = None
+        if args.using_dataset:
+            dataset_config = config
+            if args.using_dataset is not True:
+                dataset_config = Config.from_file(str(args.using_dataset))
+            dataset = dataset_from_config(dataset_config)
+            if args.using_dataset is True:
+                # we're using the one from training config
+                # downselect to training set
+                dataset = dataset.index_select(config.train_idcs)
+        # build the actual model
+        # reset the global metadata dict so that model builders can fill it:
         global _current_metadata
         _current_metadata = {}
-        if args.train_dir is not None:
-            model, _ = Trainer.load_model_from_training_session(
-                args.train_dir, model_name="best_model.pth", device="cpu"
+        model = model_from_config(config, dataset=dataset, deploy=True)
+        if checkpoint_file is not None:
+            state_dict = torch.load(
+                str(args.train_dir / "best_model.pth"), map_location="cpu"
             )
-        elif args.model is not None:
-            model = model_from_config(config, deploy=True)
-        else:
-            raise AssertionError
+            model.load_state_dict(state_dict, strict=True)
 
         # -- compile --
         model = _compile_for_deploy(model)
@@ -268,7 +317,7 @@ def main(args=None):
 
         # Deploy
         metadata: dict = {}
-        code_versions, code_commits = get_config_code_versions(config)
+        code_versions, code_commits = get_current_code_versions(config)
         for code, version in code_versions.items():
             metadata[code + "_version"] = version
         if len(code_commits) > 0:

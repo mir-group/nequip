@@ -227,11 +227,12 @@ class AtomicInMemoryDataset(AtomicDataset):
             # Check bad key combinations, but don't require that this be a graph yet.
             AtomicDataDict.validate_keys(all_keys, graph_required=False)
 
-            # check dimesionality
+            # check dimensionality
             num_examples = set([len(a) for a in fields.values()])
             if not len(num_examples) == 1:
+                shape_dict = {f: v.shape for f, v in fields.items()}
                 raise ValueError(
-                    f"This dataset is invalid: expected all fields to have same length (same number of examples), but they had shapes { {f: v.shape for f, v in fields.items() } }"
+                    f"This dataset is invalid: expected all fields to have same length (same number of examples), but they had shapes {shape_dict}"
                 )
             num_examples = next(iter(num_examples))
 

@@ -5,8 +5,9 @@ Authors: Albert Musaelian
 
 import warnings
 from copy import deepcopy
-from typing import Union, Tuple, Dict, Optional, List, Set, Sequence
+from typing import Union, Tuple, Dict, Optional, List, Set, Sequence, Final
 from collections.abc import Mapping
+import os
 
 import numpy as np
 import ase.neighborlist
@@ -49,6 +50,8 @@ _DEFAULT_EDGE_FIELDS: Set[str] = {
     AtomicDataDict.EDGE_ATTRS_KEY,
     AtomicDataDict.EDGE_EMBEDDING_KEY,
     AtomicDataDict.EDGE_FEATURES_KEY,
+    AtomicDataDict.EDGE_CUTOFF_KEY,
+    AtomicDataDict.EDGE_ENERGY_KEY,
 }
 _DEFAULT_GRAPH_FIELDS: Set[str] = {
     AtomicDataDict.TOTAL_ENERGY_KEY,
@@ -154,6 +157,13 @@ def _process_dict(kwargs, ignore_fields=[]):
             # ^ this tensor is a scalar; we need to give it
             # a data dimension to play nice with irreps
             kwargs[k] = v
+        elif isinstance(v, torch.Tensor):
+            # This is a tensor, so we just don't do anything except avoid the warning in the `else`
+            pass
+        else:
+            warnings.warn(
+                f"Value for field {k} was of unsupported type {type(v)} (value was {v})"
+            )
 
     if AtomicDataDict.BATCH_KEY in kwargs:
         num_frames = kwargs[AtomicDataDict.BATCH_KEY].max() + 1
@@ -226,7 +236,6 @@ class AtomicData(Data):
     def __init__(
         self, irreps: Dict[str, e3nn.o3.Irreps] = {}, _validate: bool = True, **kwargs
     ):
-
         # empty init needed by get_example
         if len(kwargs) == 0 and len(irreps) == 0:
             super().__init__()
@@ -417,7 +426,6 @@ class AtomicData(Data):
         )
 
         if atoms.calc is not None:
-
             if isinstance(
                 atoms.calc, (SinglePointCalculator, SinglePointDFTCalculator)
             ):
@@ -693,6 +701,18 @@ class AtomicData(Data):
         return type(self)(**new_dict)
 
 
+_ERROR_ON_NO_EDGES: bool = os.environ.get("NEQUIP_ERROR_ON_NO_EDGES", "true").lower()
+assert _ERROR_ON_NO_EDGES in ("true", "false")
+_ERROR_ON_NO_EDGES = _ERROR_ON_NO_EDGES == "true"
+
+_NEQUIP_MATSCIPY_NL: Final[bool] = os.environ.get("NEQUIP_MATSCIPY_NL", "false").lower()
+assert _NEQUIP_MATSCIPY_NL in ("true", "false")
+_NEQUIP_MATSCIPY_NL = _NEQUIP_MATSCIPY_NL == "true"
+
+if _NEQUIP_MATSCIPY_NL:
+    import matscipy.neighbours
+
+
 def neighbor_list_and_relative_vec(
     pos,
     r_max,
@@ -770,22 +790,32 @@ def neighbor_list_and_relative_vec(
     # ASE dependent part
     temp_cell = ase.geometry.complete_cell(temp_cell)
 
-    first_idex, second_idex, shifts = ase.neighborlist.primitive_neighbor_list(
-        "ijS",
-        pbc,
-        temp_cell,
-        temp_pos,
-        cutoff=float(r_max),
-        self_interaction=strict_self_interaction,  # we want edges from atom to itself in different periodic images!
-        use_scaled_positions=False,
-    )
+    if _NEQUIP_MATSCIPY_NL:
+        assert strict_self_interaction and not self_interaction
+        first_idex, second_idex, shifts = matscipy.neighbours.neighbour_list(
+            "ijS",
+            pbc=pbc,
+            cell=temp_cell,
+            positions=temp_pos,
+            cutoff=float(r_max),
+        )
+    else:
+        first_idex, second_idex, shifts = ase.neighborlist.primitive_neighbor_list(
+            "ijS",
+            pbc,
+            temp_cell,
+            temp_pos,
+            cutoff=float(r_max),
+            self_interaction=strict_self_interaction,  # we want edges from atom to itself in different periodic images!
+            use_scaled_positions=False,
+        )
 
     # Eliminate true self-edges that don't cross periodic boundaries
     if not self_interaction:
         bad_edge = first_idex == second_idex
         bad_edge &= np.all(shifts == 0, axis=1)
         keep_edge = ~bad_edge
-        if not np.any(keep_edge):
+        if _ERROR_ON_NO_EDGES and (not np.any(keep_edge)):
             raise ValueError(
                 f"Every single atom has no neighbors within the cutoff r_max={r_max} (after eliminating self edges, no edges remain in this system)"
             )

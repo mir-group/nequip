@@ -1,4 +1,5 @@
 """ Train a network."""
+
 from typing import List, Dict
 import logging
 import argparse
@@ -22,6 +23,7 @@ from nequip.utils import load_file
 from nequip.utils.config import _GLOBAL_ALL_ASKED_FOR_KEYS
 from nequip.utils.test import assert_AtomicData_equivariant
 from nequip.utils.versions import check_code_version
+from nequip.utils.misc import get_default_device_name
 from nequip.utils._global_options import _set_global_options, _init_distributed
 from nequip.scripts._logger import set_up_script_logger
 
@@ -37,9 +39,10 @@ default_config = dict(
         "RescaleEnergyEtc",
     ],
     dataset_statistics_stride=1,
+    device=get_default_device_name(),
     default_dtype="float64",
     model_dtype="float32",
-    allow_tf32=False,
+    allow_tf32=True,
     verbose="INFO",
     model_debug_mode=False,
     equivariance_test=False,
@@ -285,7 +288,7 @@ def fresh_start(config):
     def _unused_check():
         unused = config._unused_keys()
         if len(unused) > 0:
-            message = f"The following keys in the config file were not used, did you make a typo?: {', '.join(unused)}. (If this sounds wrong, please file an issue: the detection of unused keys is in beta. You can turn this error into a warning with `--warn-unused`.)"
+            message = f"The following keys in the config file were not used, did you make a typo?: {', '.join(unused)}. (If this sounds wrong, please file an issue. You can turn this error into a warning with `--warn-unused`, but please make sure that the key really is correctly spelled and used!.)"
             if config.warn_unused:
                 warnings.warn(message)
             else:

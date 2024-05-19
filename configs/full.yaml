@@ -13,9 +13,11 @@ run_name: example-run-toluene
 seed: 123                                                                         # model seed
 dataset_seed: 456                                                                 # data set seed
 append: true                                                                      # set true if a restarted run should append to the previous log file
-default_dtype: float32                                                            # type of float to use, e.g. float32 and float64
-allow_tf32: false                                                                 # whether to use TensorFloat32 if it is available
-# device:  cuda                                                                   # which device to use. Default: automatically detected cuda or "cpu"
+
+# see https://arxiv.org/abs/2304.10061 for discussion of numerical precision
+default_dtype: float64
+model_dtype: float32
+allow_tf32: true    # consider setting to false if you plan to mix training/inference over any devices that are not NVIDIA Ampere or later
 
 # == network ==
 
@@ -210,9 +212,9 @@ early_stopping_upper_bounds:                                                    
 
 # loss function
 loss_coeffs:                                                                       # different weights to use in a weighted loss functions
-  forces: 1                                                                        # if using PerAtomMSELoss, a default weight of 1:1 on each should work well
+  forces: 1.0                                                                      # if using PerAtomMSELoss, a default weight of 1:1 on each should work well
   total_energy:                                                                    
-    - 1
+    - 1.0
     - PerAtomMSELoss
 # note that the ratio between force and energy loss matters for the training process. One may consider using 1:1 with the PerAtomMSELoss. If the energy loss still significantly dominate the loss function at the initial epochs, tune the energy loss weight lower helps the training a lot.
 
@@ -247,6 +249,15 @@ loss_coeffs:                                                                    
 #   - L1Loss
 #   forces: 1.0
 
+# You can schedule changes in the loss coefficients using a callback:
+# In the "schedule" key each entry is a two-element list of:
+#  - the 1-based epoch index at which to start the new loss coefficients
+#  - the new loss coefficients as a dict
+#
+# start_of_epoch_callbacks:
+#  - !!python/object:nequip.train.callbacks.loss_schedule.SimpleLossSchedule {"schedule": [[2, {"forces": 0.0, "total_energy": 1.0}]]}
+#
+
 # output metrics
 metrics_components:
   - - forces                               # key 
@@ -269,8 +280,11 @@ metrics_components:
 
 # optimizer, may be any optimizer defined in torch.optim
 # the name `optimizer_name`is case sensitive
-optimizer_name: Adam                                                               # default optimizer is Adam 
-optimizer_amsgrad: false
+# IMPORTANT: for NequIP (not for Allegro), we find that in most cases AMSGrad strongly improves
+# out-of-distribution generalization over Adam. We highly recommed trying both AMSGrad (by setting
+# optimizer_amsgrad: true) and Adam (by setting optimizer_amsgrad: false)
+optimizer_name: Adam                                                          
+optimizer_amsgrad: true
 optimizer_betas: !!python/tuple
   - 0.9
   - 0.999
@@ -282,8 +296,9 @@ optimizer_weight_decay: 0
 # setting to inf or null disables it
 max_gradient_norm: null
 
-# lr scheduler, currently only supports the two options listed below, if you need more please file an issue
+# lr scheduler
 # first: on-plateau, reduce lr by factory of lr_scheduler_factor if metrics_key hasn't improved for lr_scheduler_patience epoch
+# you can also set other options of the underlying PyTorch scheduler, for example lr_scheduler_threshold
 lr_scheduler_name: ReduceLROnPlateau
 lr_scheduler_patience: 100
 lr_scheduler_factor: 0.5
@@ -304,29 +319,32 @@ per_species_rescale_scales_trainable: false
 # whether the scales are trainable. Defaults to False. Optional
 per_species_rescale_shifts_trainable: false
 # whether the shifts are trainable. Defaults to False. Optional
+
 per_species_rescale_shifts: dataset_per_atom_total_energy_mean
 # initial atomic energy shift for each species. default to the mean of per atom energy. Optional
 # the value can be a constant float value, an array for each species, or a string
+# if numbers are explicitly provided, they must be in the same energy units as the training data
 # string option include: 
 # *  "dataset_per_atom_total_energy_mean", which computes the per atom average
 # *  "dataset_per_species_total_energy_mean", which automatically compute the per atom energy mean using a GP model
-per_species_rescale_scales: dataset_forces_rms
+
+per_species_rescale_scales: null
 # initial atomic energy scale for each species. Optional.
 # the value can be a constant float value, an array for each species, or a string
+# if numbers are explicitly provided, they must be in the same energy units as the training data
 # string option include: 
 # *  "dataset_forces_absmax", which computes the dataset maxmimum force component magnitude
 # *  "dataset_per_atom_total_energy_std", which computes the per atom energy std
 # *  "dataset_per_species_total_energy_std", which uses the GP model uncertainty
 # *  "dataset_per_species_forces_rms", which compute the force rms for each species
-# If not provided, defaults to dataset_per_species_force_rms or dataset_per_atom_total_energy_std, depending on whether forces are being trained.
+# If not provided, defaults to null.
+
 # per_species_rescale_kwargs: 
 #   total_energy: 
 #     alpha: 0.001
 #     max_iteration: 20
 #     stride: 100
-# keywords for ridge regression decomposition of per specie energy. Optional. Defaults to 0.001. The value should be in the range of 1e-3 to 1e-2
-# per_species_rescale_arguments_in_dataset_units: True
-# if explicit numbers are given for the shifts/scales, this parameter must specify whether the given numbers are unitless shifts/scales or are in the units of the dataset. If ``True``, any global rescalings will correctly be applied to the per-species values.
+# keywords for ridge regression decomposition of per species energy. Optional. Defaults to 0.001. The value should be in the range of 1e-3 to 1e-2
 
 # global energy shift and scale
 # When "dataset_total_energy_mean", the mean energy of the dataset. When None, disables the global shift. When a number, used directly.
@@ -365,6 +383,3 @@ global_rescale_scale_trainable: false
 # per_species_rescale_shifts: null
 # per_species_rescale_scales: null
 
-# Options for e3nn's set_optimization_defaults. A dict:
-# e3nn_optimization_defaults:
-#   explicit_backward: True

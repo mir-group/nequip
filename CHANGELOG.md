@@ -6,7 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Most recent change on the bottom.
 
-## Unreleased - 0.6.0
+## Unreleased
+
+## [0.6.0] - 2024-5-10
 ### Added
 - add Tensorboard as logger option
 - [Breaking] Refactor overall model logic into `GraphModel` top-level module
@@ -19,6 +21,13 @@ Most recent change on the bottom.
 - Error (or warn) on unused options in YAML that likely indicate typos
 - `dataset_*_absmax` statistics option
 - `HDF5Dataset` (#227)
+- `include_file_as_baseline_config` for simple modifications of existing configs
+- `nequip-deploy --using-dataset` to support data-dependent deployment steps
+- Support for Gaussian Mixture Model uncertainty quantification (https://doi.org/10.1063/5.0136574)
+- `start_of_epoch_callbacks`
+- `nequip.train.callbacks.loss_schedule.SimpleLossSchedule` for changing the loss coefficients at specified epochs
+- `nequip-deploy build --checkpoint` and `--override` to avoid many largely duplicated YAML files
+- matscipy neighborlist support enabled with `NEQUIP_MATSCIPY_NL` environment variable
 
 ### Changed
 - Always require explicit `seed`
@@ -26,18 +35,22 @@ Most recent change on the bottom.
 - Don't log as often by default
 - [Breaking] Default nonlinearities are `silu` (`e`) and `tanh` (`o`)
 - Will not reproduce previous versions' data shuffling order (for all practical purposes this does not matter, the `shuffle` option is unchanged)
-- [Breaking] `default_dtype` defaults to `float64` (`model_dtype` default `float32`)
+- [Breaking] `default_dtype` defaults to `float64` (`model_dtype` default `float32`, `allow_tf32: true` by default--- see https://arxiv.org/abs/2304.10061)
 - `nequip-benchmark` now only uses `--n-data` frames to build the model
 - [Breaking] By default models now use `StressForceOutput`, not `ForceOutput`
+- Added `edge_energy` to `ALL_ENERGY_KEYS` subjecting it to global rescale
 
 ### Fixed
 - Work with `wandb>=0.13.8`
 - Better error for standard deviation with too few data
 - `load_model_state` GPU -> CPU
+- No negative volumes in rare cases 
 
 ### Removed
 - [Breaking] `fixed_fields` machinery (`npz_fixed_field_keys` is still supported, but through a more straightforward implementation)
 - Default run name/WandB project name of `NequIP`, they must now always be provided explicitly
+- [Breaking] Removed `_params` as an allowable subconfiguration suffix (i.e. instead of `optimizer_params` now only `optimizer_kwargs` is valid, not both)
+- [Breaking] Removed `per_species_rescale_arguments_in_dataset_units`
 
 ## [0.5.6] - 2022-12-19
 ### Added

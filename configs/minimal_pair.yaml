@@ -37,7 +37,7 @@ num_features: 16
 # lj_delta_trainable: false
 # lj_epsilon_trainable: true
 pair_style: ZBL
-units: real  # Ang and kcal/mol
+units: real  # Ang and kcal/mol, LAMMPS unit names;  allowed values "metal" and "real"
 
 # data set
 # the keys used need to be stated at least once in key_mapping, npz_fixed_field_keys or npz_keys
@@ -65,13 +65,11 @@ wandb: false
 # verbose: debug
 
 # training
-n_train: 150                                                                       # number of training data
-n_val: 50                                                                          # number of validation data
-learning_rate: 0.005                                                               # learning rate, we found values between 0.01 and 0.005 to work best - this is often one of the most important hyperparameters to tune
-batch_size: 5                                                                      # batch size, we found it important to keep this small for most applications including forces (1-5); for energy-only training, higher batch sizes work better
-validation_batch_size: 10                                                          # batch size for evaluating the model during validation. This does not affect the training results, but using the highest value possible (<=n_val) without running out of memory will speed up your training.
-max_epochs: 100000                   
-append: true
+n_train: 5
+n_val: 5
+batch_size: 1
+validation_batch_size: 5
+max_epochs: 10
 
 # loss function
 loss_coeffs:                                                                        

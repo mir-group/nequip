@@ -9,7 +9,6 @@ import ase.data
 
 from nequip.data import AtomicDataDict
 from nequip.nn import GraphModuleMixin, RescaleOutput
-from nequip.nn.cutoffs import PolynomialCutoff
 
 
 @torch.jit.script
@@ -43,8 +42,6 @@ class LennardJones(GraphModuleMixin, torch.nn.Module):
         lj_exponent: Optional[float] = None,
         lj_per_type: bool = True,
         lj_style: str = "lj",
-        cutoff=PolynomialCutoff,
-        cutoff_kwargs={},
         irreps_in=None,
     ) -> None:
         super().__init__()
@@ -86,12 +83,6 @@ class LennardJones(GraphModuleMixin, torch.nn.Module):
             lj_exponent = 6.0
         self.exponent = lj_exponent
 
-        self._has_cutoff = cutoff is not None
-        if self._has_cutoff:
-            self.cutoff = cutoff(**cutoff_kwargs)
-        else:
-            self.cutoff = torch.nn.Identity()
-
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
         data = AtomicDataDict.with_edge_vectors(data, with_lengths=True)
         edge_center = data[AtomicDataDict.EDGE_INDEX_KEY][0]
@@ -127,9 +118,8 @@ class LennardJones(GraphModuleMixin, torch.nn.Module):
                 # TODO: this is probably broken with NaNs at delta
                 lj_eng = lj_eng * (edge_len < (2 ** (1.0 / self.exponent) + delta))
 
-        if self._has_cutoff:
-            # apply the cutoff for smoothness
-            lj_eng = lj_eng * self.cutoff(edge_len)
+        # apply the cutoff for smoothness
+        lj_eng = lj_eng * data[AtomicDataDict.EDGE_CUTOFF_KEY]
 
         # sum edge LJ energies onto atoms
         atomic_eng = scatter(
@@ -163,14 +153,71 @@ class LennardJones(GraphModuleMixin, torch.nn.Module):
             self.epsilon.copy_(self.epsilon / rescale_module.scale_by.item())
 
 
+@compile_mode("script")
+class SimpleLennardJones(GraphModuleMixin, torch.nn.Module):
+    """Simple Lennard-Jones."""
+
+    lj_sigma: float
+    lj_epsilon: float
+    lj_use_cutoff: bool
+
+    def __init__(
+        self,
+        lj_sigma: float,
+        lj_epsilon: float,
+        lj_use_cutoff: bool = False,
+        irreps_in=None,
+    ) -> None:
+        super().__init__()
+        self._init_irreps(
+            irreps_in=irreps_in, irreps_out={AtomicDataDict.PER_ATOM_ENERGY_KEY: "0e"}
+        )
+        self.lj_sigma, self.lj_epsilon, self.lj_use_cutoff = (
+            lj_sigma,
+            lj_epsilon,
+            lj_use_cutoff,
+        )
+
+    def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
+        data = AtomicDataDict.with_edge_vectors(data, with_lengths=True)
+        edge_center = data[AtomicDataDict.EDGE_INDEX_KEY][0]
+        edge_len = data[AtomicDataDict.EDGE_LENGTH_KEY].unsqueeze(-1)
+
+        lj_eng = (self.lj_sigma / edge_len) ** 6.0
+        lj_eng = lj_eng.square() - lj_eng
+        lj_eng = 2 * self.lj_epsilon * lj_eng
+
+        if self.lj_use_cutoff:
+            # apply the cutoff for smoothness
+            lj_eng = lj_eng * data[AtomicDataDict.EDGE_CUTOFF_KEY]
+
+        # sum edge LJ energies onto atoms
+        atomic_eng = scatter(
+            lj_eng,
+            edge_center,
+            dim=0,
+            dim_size=len(data[AtomicDataDict.POSITIONS_KEY]),
+        )
+        if AtomicDataDict.PER_ATOM_ENERGY_KEY in data:
+            atomic_eng = atomic_eng + data[AtomicDataDict.PER_ATOM_ENERGY_KEY]
+        data[AtomicDataDict.PER_ATOM_ENERGY_KEY] = atomic_eng
+        return data
+
+    def update_for_rescale(self, rescale_module: RescaleOutput):
+        if AtomicDataDict.PER_ATOM_ENERGY_KEY not in rescale_module.scale_keys:
+            return
+        if not rescale_module.has_scale:
+            return
+        # Our energy will be scaled by scale_by later, so we have to divide here to cancel out:
+        self.lj_epsilon /= rescale_module.scale_by.item()
+
+
 @torch.jit.script
 def _zbl(
     Z: torch.Tensor,
     r: torch.Tensor,
     atom_types: torch.Tensor,
     edge_index: torch.Tensor,
-    r_max: float,
-    p: float,
     qqr2exesquare: float,
 ) -> torch.Tensor:
     # from LAMMPS pair_zbl_const.h
@@ -199,15 +246,7 @@ def _zbl(
         + c4 * (d4 * x).exp()
     )
     eng = qqr2exesquare * ((Zi * Zj) / r) * psi
-
-    # compute cutoff envelope
-    r = r / r_max
-    cutoff = 1.0 - (((p + 1.0) * (p + 2.0) / 2.0) * torch.pow(r, p))
-    cutoff = cutoff + (p * (p + 2.0) * torch.pow(r, p + 1.0))
-    cutoff = cutoff - ((p * (p + 1.0) / 2) * torch.pow(r, p + 2.0))
-    cutoff = cutoff * (r < 1.0)
-
-    return cutoff * eng
+    return eng
 
 
 @compile_mode("script")
@@ -219,16 +258,12 @@ class ZBL(GraphModuleMixin, torch.nn.Module):
     """
 
     num_types: int
-    r_max: float
-    PolynomialCutoff_p: float
 
     def __init__(
         self,
         num_types: int,
-        r_max: float,
         units: str,
         type_to_chemical_symbol: Optional[Dict[int, str]] = None,
-        PolynomialCutoff_p: float = 6.0,
         irreps_in=None,
     ):
         super().__init__()
@@ -278,8 +313,6 @@ class ZBL(GraphModuleMixin, torch.nn.Module):
             )
             * 0.5,  # Put half the energy on each of ij, ji
         )
-        self.r_max = float(r_max)
-        self.PolynomialCutoff_p = float(PolynomialCutoff_p)
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
         data = AtomicDataDict.with_edge_vectors(data, with_lengths=True)
@@ -290,10 +323,10 @@ class ZBL(GraphModuleMixin, torch.nn.Module):
             r=data[AtomicDataDict.EDGE_LENGTH_KEY],
             atom_types=data[AtomicDataDict.ATOM_TYPE_KEY],
             edge_index=data[AtomicDataDict.EDGE_INDEX_KEY],
-            r_max=self.r_max,
-            p=self.PolynomialCutoff_p,
             qqr2exesquare=self._qqr2exesquare,
         ).unsqueeze(-1)
+        # apply cutoff
+        zbl_edge_eng = zbl_edge_eng * data[AtomicDataDict.EDGE_CUTOFF_KEY]
         atomic_eng = scatter(
             zbl_edge_eng,
             edge_center,

@@ -40,7 +40,7 @@ dataset_include_frames: !!python/object/apply:builtins.range
 
 global_rescale_scale: dataset_total_energy_std
 per_species_rescale_shifts: dataset_per_atom_total_energy_mean
-per_species_rescale_scales: dataset_per_atom_total_energy_std
+per_species_rescale_scales: null
 
 # logging
 wandb: false

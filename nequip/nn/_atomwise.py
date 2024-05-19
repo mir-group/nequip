@@ -83,9 +83,11 @@ class AtomwiseReduce(GraphModuleMixin, torch.nn.Module):
         self.out_field = f"{reduce}_{field}" if out_field is None else out_field
         self._init_irreps(
             irreps_in=irreps_in,
-            irreps_out={self.out_field: irreps_in[self.field]}
-            if self.field in irreps_in
-            else {},
+            irreps_out=(
+                {self.out_field: irreps_in[self.field]}
+                if self.field in irreps_in
+                else {}
+            ),
         )
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
@@ -204,6 +206,7 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
         else:
             self.register_buffer("scales", torch.Tensor())
 
+        assert isinstance(arguments_in_dataset_units, bool)
         self.arguments_in_dataset_units = arguments_in_dataset_units
 
         # we can use FMA for performance but its type promotion is broken until 1.13

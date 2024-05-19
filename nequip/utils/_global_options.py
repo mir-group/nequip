@@ -1,7 +1,7 @@
 import warnings
+from packaging import version
 import os
 import sys
-from packaging import version
 
 import torch
 import torch.distributed as dist
@@ -53,7 +53,16 @@ def _set_global_options(config, warn_on_override: bool = False) -> None:
             torch.backends.cuda.matmul.allow_tf32 = config["allow_tf32"]
             torch.backends.cudnn.allow_tf32 = config["allow_tf32"]
 
-    if version.parse(torch.__version__) >= version.parse("1.11"):
+    # Temporary warning due to unresolved upstream issue
+    torch_version = version.parse(torch.__version__)
+    if torch_version < version.parse("1.11"):
+        warnings.warn("We currently recommend the use of PyTorch 1.11")
+    elif torch_version > version.parse("1.11"):
+        warnings.warn(
+            "!! Upstream issues in PyTorch versions >1.11 have been seen to cause unusual performance degredations on some CUDA systems that become worse over time; see https://github.com/mir-group/nequip/discussions/311. At present we *strongly* recommend the use of PyTorch 1.11 if using CUDA devices; while using other versions if you observe this problem, an unexpected lack of this problem, or other strange behavior, please post in the linked GitHub issue."
+        )
+
+    if torch_version >= version.parse("1.11"):
         # PyTorch >= 1.11
         k = "_jit_fusion_strategy"
         if k in config:
@@ -80,21 +89,24 @@ def _set_global_options(config, warn_on_override: bool = False) -> None:
     # fuser1 is NNC, fuser2 is nvFuser
     # See https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/OVERVIEW.md#fusers
     # And https://github.com/pytorch/pytorch/blob/e0a0f37a11164f59b42bc80a6f95b54f722d47ce/torch/jit/_fuser.py#L46
-    default_fuser = (
-        "fuser2"  # TODO: does this make sense for ROCm?
-        if torch.cuda.is_available()
-        else "fuser1"  # default to NNC on CPU for now no matter what
-        if version.parse(torch.__version__) >= version.parse("1.12")
-        else "fuser1"
-    )
-    fuser = config.get("_jit_fuser", default_fuser)
-    # context manager just restores old fuser afterwards
-    torch.jit.fuser(fuser).__enter__()
-    if warn_on_override and fuser != default_fuser:
-        # ^ meh assumption, but better than hardcoding getting the old state
+    # Also https://github.com/pytorch/pytorch/blob/main/torch/csrc/jit/codegen/cuda/README.md
+    # Also https://github.com/pytorch/pytorch/blob/66fb83293e6a6f527d3fde632e3547fda20becea/torch/csrc/jit/OVERVIEW.md?plain=1#L1201
+    # https://github.com/search?q=repo%3Apytorch%2Fpytorch%20PYTORCH_JIT_USE_NNC_NOT_NVFUSER&type=code
+    # We follow the approach they have explicitly built for disabling nvFuser in favor of NNC:
+    # https://github.com/pytorch/pytorch/blob/66fb83293e6a6f527d3fde632e3547fda20becea/torch/csrc/jit/codegen/cuda/README.md?plain=1#L214
+    #
+    #     There are three ways to disable nvfuser. Listed below with descending priorities:
+    #      - Force using NNC instead of nvfuser for GPU fusion with env variable `export PYTORCH_JIT_USE_NNC_NOT_NVFUSER=1`.
+    #      - Disabling nvfuser with torch API `torch._C._jit_set_nvfuser_enabled(False)`.
+    #      - Disable nvfuser with env variable `export PYTORCH_JIT_ENABLE_NVFUSER=0`.
+    #
+    k = "PYTORCH_JIT_USE_NNC_NOT_NVFUSER"
+    if k in os.environ:
         warnings.warn(
-            f"Setting the GLOBAL value for JIT fuser to `{fuser}`, which is different than the default for your current PyTorch version ({torch.__version__}) of `{default_fuser}`"
+            "Do NOT manually set PYTORCH_JIT_USE_NNC_NOT_NVFUSER=0 unless you know exactly what you're doing!"
         )
+    else:
+        os.environ[k] = "1"
 
     # TODO: warn_on_override for the rest here?
     if config.get("model_debug_mode", False):

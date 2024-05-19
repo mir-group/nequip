@@ -15,7 +15,13 @@ import ase.io
 import torch
 import torch.distributed as dist
 
-from nequip.data import AtomicData, Collater, register_fields, _register_field_prefix
+from nequip.data import (
+    AtomicData,
+    Collater,
+    dataset_from_config,
+    register_fields,
+    _register_field_prefix,
+)
 from nequip.scripts.deploy import load_deployed_model, R_MAX_KEY, TYPE_NAMES_KEY
 from nequip.scripts._logger import set_up_script_logger
 from nequip.scripts.train import default_config, check_code_version, _load_datasets
@@ -29,7 +35,7 @@ register_fields(graph_fields=[ORIGINAL_DATASET_INDEX_KEY])
 
 
 def _load_deployed_or_traindir(
-    path: Path, device
+    path: Path, device, freeze: bool = True
 ) -> Tuple[torch.nn.Module, bool, float, List[str]]:
     loaded_deployed_model: bool = False
     model_r_max = None
@@ -39,6 +45,7 @@ def _load_deployed_or_traindir(
             path,
             device=device,
             set_global_options=True,  # don't warn that setting
+            freeze=freeze,
         )
         # the global settings for a deployed model are set by
         # set_global_options in the call to load_deployed_model
@@ -67,7 +74,7 @@ def _load_deployed_or_traindir(
         model_r_max = model_config["r_max"]
         type_names = model_config["type_names"]
     model.eval()
-    return model, load_deployed_model, model_r_max, type_names
+    return model, loaded_deployed_model, model_r_max, type_names
 
 
 def main(args=None, running_as_script: bool = True):
@@ -407,9 +414,11 @@ def main(args=None, running_as_script: bool = True):
             if do_metrics:
                 display_bar = context_stack.enter_context(
                     tqdm(
-                        bar_format=""
-                        if prog.disable  # prog.ncols doesn't exist if disabled
-                        else ("{desc:." + str(prog.ncols) + "}"),
+                        bar_format=(
+                            ""
+                            if prog.disable  # prog.ncols doesn't exist if disabled
+                            else ("{desc:." + str(prog.ncols) + "}")
+                        ),
                         disable=None,
                     )
                 )

@@ -51,10 +51,12 @@ def _ase_dataset_reader(
         datas.append(
             (
                 global_index,
-                AtomicData.from_ase(atoms=atoms, **atomicdata_kwargs)
-                if global_index in include_frames
-                # in-memory dataset will ignore this later, but needed for indexing to work out
-                else None,
+                (
+                    AtomicData.from_ase(atoms=atoms, **atomicdata_kwargs)
+                    if global_index in include_frames
+                    # in-memory dataset will ignore this later, but needed for indexing to work out
+                    else None
+                ),
             )
         )
     # Save to a tempfile---
