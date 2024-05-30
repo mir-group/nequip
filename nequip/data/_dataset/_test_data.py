@@ -7,8 +7,9 @@ import ase
 import ase.build
 from ase.calculators.emt import EMT
 
-from nequip.data import AtomicInMemoryDataset, AtomicData
-from .transforms import TypeMapper
+from .. import AtomicData
+from ..transforms import TypeMapper
+from ._base_datasets import AtomicInMemoryDataset
 
 
 class EMTTestDataset(AtomicInMemoryDataset):
@@ -33,6 +34,7 @@ class EMTTestDataset(AtomicInMemoryDataset):
         AtomicData_options: Dict[str, Any] = {},
         include_frames: Optional[List[int]] = None,
         type_mapper: TypeMapper = None,
+        force_use_cached: bool = False,
     ):
         # Set properties for hashing
         assert element in ("Cu", "Pd", "Au", "Pt", "Al", "Ni", "Ag")
@@ -49,6 +51,7 @@ class EMTTestDataset(AtomicInMemoryDataset):
             AtomicData_options=AtomicData_options,
             include_frames=include_frames,
             type_mapper=type_mapper,
+            force_use_cached=force_use_cached,
         )
 
     @property

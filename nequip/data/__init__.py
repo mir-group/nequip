@@ -15,10 +15,10 @@ from ._dataset import (
     NpzDataset,
     ASEDataset,
     HDF5Dataset,
+    EMTTestDataset,
 )
 from .dataloader import DataLoader, Collater, PartialSampler
 from ._build import dataset_from_config
-from ._test_data import EMTTestDataset
 
 __all__ = [
     AtomicData,

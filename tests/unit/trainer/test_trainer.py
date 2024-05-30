@@ -1,6 +1,7 @@
 """
 Trainer tests
 """
+
 import pytest
 
 import numpy as np
@@ -149,7 +150,7 @@ class TestData:
         trainer.train_val_split = mode
         trainer.set_dataset(nequip_dataset)
         for epoch_i in range(3):
-            trainer.dl_train_sampler.step_epoch(epoch_i)
+            trainer.dl_train_sampler.set_epoch(epoch_i)
             n_samples: int = 0
             for i, batch in enumerate(trainer.dl_train):
                 n_samples += batch[AtomicDataDict.BATCH_PTR_KEY].shape[0] - 1

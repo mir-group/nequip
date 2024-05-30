@@ -964,14 +964,12 @@ class Trainer:
         dataloaders = [
             dataloaders[c] for c in categories
         ]  # get the right dataloaders for the catagories we actually run
-        if TRAIN in categories:
-            # We have to step the sampler so it knows what epoch it is
-            self.dl_train_sampler.step_epoch(self.iepoch)
 
         self.metrics_dict = {}
         self.loss_dict = {}
 
         for sampler in [dl.sampler for dl in dataloaders]:
+            # We have to step the sampler so it knows what epoch it is
             sampler.set_epoch(self.iepoch)
 
         for category, dataset in zip(categories, dataloaders):
@@ -1317,39 +1315,39 @@ class Trainer:
             generator=self.dataset_rng,
         )
 
-        if self.distributed:
-            assert self.n_train_per_epoch is None, "not implemented together yet"
-            # For consistancy between distributed and normal training,
-            # we should use DistributedSampler no matter what.
-            # TODO!: what do do with drop_tail??
-            self.dl_train_sampler = torch.utils.data.distributed.DistributedSampler(
-                dataset=self.dataset_train,
-                num_replicas=dist.get_world_size() if self.distributed else 1,
-                rank=dist.get_rank() if self.distributed else 0,
-                shuffle=self.shuffle,
-                seed=self.dataset_seed,
-            )
-            # we can't, however, use DistributedSampler for validation---
-            # it will repeat some frames in order to make n_val divisible by num_replicas
-            # instead, we follow https://discuss.pytorch.org/t/how-to-validate-in-distributeddataparallel-correctly/94267/11
-            # and use a custom Sampler:
-            val_sampler = DistributedValidationSampler(
-                dataset=self.dataset_val,
-                num_replicas=dist.get_world_size() if self.distributed else 1,
-                rank=dist.get_rank() if self.distributed else 0,
-            )
-        else:
-            if self.n_train_per_epoch is not None:
-                assert self.n_train_per_epoch % self.batch_size == 0
-            self.dl_train_sampler = PartialSampler(
-                data_source=self.dataset_train,
-                # training should shuffle (if enabled)
-                shuffle=self.shuffle,
-                # if n_train_per_epoch is None (default), it's set to len(self.dataset_train) == n_train
-                # i.e. use all `n_train` frames each epoch
-                num_samples_per_epoch=self.n_train_per_epoch,
-                generator=self.dataset_rng,
-            )
+        rank = dist.get_rank() if self.distributed else 0
+        world_size = dist.get_world_size() if self.distributed else 1
+        if self.n_train_per_epoch is not None:
+            # Note that batch_size must be world_size * local_batch_size, which means
+            # this already tests that n_train_per_epoch is divisible by both world_size
+            # and local_batch_size.  The effective local n_train_per_epoch will be
+            # n_train_per_epoch // world_size, which is then a multiple of local_batch_size.
+            assert (
+                self.n_train_per_epoch % self.batch_size == 0
+            ), "n_train_per_epoch must be divisible by batch_size"
+        # note that PartialSampler also handles the multi-node distributed case
+        self.dl_train_sampler = PartialSampler(
+            data_source=self.dataset_train,
+            # training should shuffle (if enabled)
+            shuffle=self.shuffle,
+            # if n_train_per_epoch is None (default), it's set to len(self.dataset_train) == n_train
+            # i.e. use all `n_train` frames each epoch
+            num_samples_per_epoch=self.n_train_per_epoch,
+            generator=self.dataset_rng,
+            rank=rank,
+            world_size=world_size,
+        )
+
+        # we can't, however, use PartialSampler for validation---
+        # it requires divisiblity of the number of samples per epoch by the world size,
+        # which may not be true for the validation set.
+        # instead, we follow https://discuss.pytorch.org/t/how-to-validate-in-distributeddataparallel-correctly/94267/11
+        # and use a custom Sampler:
+        val_sampler = DistributedValidationSampler(
+            dataset=self.dataset_val,
+            num_replicas=world_size,
+            rank=rank,
+        )
 
         self.dl_train = DataLoader(
             dataset=self.dataset_train,
@@ -1361,7 +1359,7 @@ class Trainer:
         # we still pass the generator just to be safe
         self.dl_val = DataLoader(
             dataset=self.dataset_val,
-            sampler=val_sampler if self.distributed else None,
+            sampler=val_sampler,
             batch_size=self._local_validation_batch_size,
             drop_last=False,  # don't allow drop_last so we always get exactly the full validation set
             **dl_kwargs,

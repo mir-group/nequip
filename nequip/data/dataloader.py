@@ -71,7 +71,7 @@ class PartialSampler(Sampler[int]):
     To ensure deterministic reproducibility and restartability, dataset permutations are generated
     from a combination of the overall seed and the epoch number. As a result, the caller must
     tell this sampler the epoch number before each time `__iter__` is called by calling
-    `my_partial_sampler.step_epoch(epoch_number_about_to_run)` each time.
+    `my_partial_sampler.set_epoch(epoch_number_about_to_run)` each time.
 
     This sampler decouples epochs from the dataset size and cycles through the dataset over as
     many (partial) epochs as it may take. As a result, the _dataset_ epoch can change partway
@@ -84,9 +84,12 @@ class PartialSampler(Sampler[int]):
             If `None`, defaults to `len(data_source)`.
         generator (Generator): Generator used in sampling.
     """
+
     data_source: Dataset
     num_samples_per_epoch: int
     shuffle: bool
+    world_size: int
+    rank: int
     _epoch: int
     _prev_epoch: int
 
@@ -96,6 +99,8 @@ class PartialSampler(Sampler[int]):
         shuffle: bool = True,
         num_samples_per_epoch: Optional[int] = None,
         generator=None,
+        rank: int = 0,
+        world_size: int = 1,
     ) -> None:
         self.data_source = data_source
         self.shuffle = shuffle
@@ -107,13 +112,26 @@ class PartialSampler(Sampler[int]):
         self.generator = generator
         self._epoch = None
         self._prev_epoch = None
+        self.rank = rank
+        self.world_size = world_size
+        assert self.world_size > 0
+        assert 0 <= self.rank < self.world_size
+        assert (
+            self.num_samples_per_epoch % self.world_size == 0
+        ), "num_samples_per_epoch must be divisible by world_size (number of ranks)"
 
     @property
     def num_samples_total(self) -> int:
         # dataset size might change at runtime
         return len(self.data_source)
 
-    def step_epoch(self, epoch: int) -> None:
+    def set_epoch(self, epoch: int) -> None:
+        r"""Set the current epoch.
+
+        Must be set before each epoch's `__iter__` is called.
+
+        Like PyTorch's own `DistributedSampler`.
+        """
         self._epoch = epoch
 
     def __iter__(self) -> Iterator[int]:
@@ -156,9 +174,17 @@ class PartialSampler(Sampler[int]):
         # because we cycle into indexes from the next dataset epoch,
         # we should _always_ be able to get num_samples_per_epoch
         assert len(this_segment_indexes) == self.num_samples_per_epoch
+
+        # but in multi-GPU case, we need now to subselect this rank's samples
+        this_segment_indexes = this_segment_indexes[self.rank :: self.world_size]
+        assert (
+            len(this_segment_indexes) == self.num_samples_per_epoch // self.world_size
+        )
+
         yield from this_segment_indexes
 
         self._prev_epoch = self._epoch
 
     def __len__(self) -> int:
-        return self.num_samples_per_epoch
+        # Each rank only gets to process its share of the total num_samples_per_epoch
+        return self.num_samples_per_epoch // self.world_size

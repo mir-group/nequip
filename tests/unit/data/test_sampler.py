@@ -29,7 +29,7 @@ def test_partials_add_up(sampler: PartialSampler):
     """Confirm that full data epochs are (random permutations of) the list of all dataset indexes"""
     seq = []
     for epoch_i in range(2 * sampler.num_samples_total + 1):
-        sampler.step_epoch(epoch_i)
+        sampler.set_epoch(epoch_i)
         seq.extend(iter(sampler))
 
     seq = [int(e) for e in seq]
@@ -68,17 +68,45 @@ def test_partials_add_up(sampler: PartialSampler):
         )
 
 
+def test_distributed():
+    world_size = 1
+    num_samples_per_epoch = world_size * 17
+    n_extra = 23
+    total_num_samples = num_samples_per_epoch + n_extra
+    dataset = range(total_num_samples)  # can mock this object for this test
+    samplers = [
+        PartialSampler(
+            data_source=dataset,
+            shuffle=True,
+            num_samples_per_epoch=num_samples_per_epoch,
+            generator=torch.Generator().manual_seed(42),
+            rank=rank,
+            world_size=world_size,
+        )
+        for rank in range(world_size)
+    ]
+    for s in samplers:
+        s.set_epoch(0)
+    assert (
+        len(
+            set(range(total_num_samples))
+            - set(itertools.chain(*[(int(e) for e in samp) for samp in samplers]))
+        )
+        == n_extra
+    )
+
+
 def test_epoch_count(sampler: PartialSampler):
     with pytest.raises(AssertionError):
         list(iter(sampler))
-    sampler.step_epoch(0)
+    sampler.set_epoch(0)
     assert sampler._epoch == 0
     assert sampler._prev_epoch is None
     list(iter(sampler))
     assert sampler._prev_epoch == 0
     with pytest.raises(AssertionError):
         list(iter(sampler))
-    sampler.step_epoch(1)
+    sampler.set_epoch(1)
     list(iter(sampler))
     assert sampler._epoch == 1
     assert sampler._prev_epoch == 1  # since that's the prev epoch we've just completed

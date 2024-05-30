@@ -17,11 +17,6 @@ class DistributedValidationSampler(Sampler):
         num_replicas (int, optional): Number of processes participating in
             distributed training.
         rank (int, optional): Rank of the current process within :attr:`num_replicas`.
-    .. warning::
-        In distributed mode, calling the :meth`set_epoch(epoch) <set_epoch>` method at
-        the beginning of each epoch **before** creating the :class:`DataLoader` iterator
-        is necessary to make shuffling work properly across multiple epochs. Otherwise,
-        the same ordering will be always used.
     """
 
     def __init__(self, dataset, num_replicas=None, rank=None):
