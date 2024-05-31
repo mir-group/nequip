@@ -411,6 +411,14 @@ class Trainer:
         self.init()
 
     def init_objects(self):
+        # check this before we wrap in DistributedDataParallel
+        if hasattr(self.model, "irreps_out"):
+            for key in self.train_on_keys:
+                if key not in self.model.irreps_out:
+                    raise RuntimeError(
+                        f"Loss function include fields {key} that are not predicted by the model {self.model.irreps_out}"
+                    )
+
         # initialize optimizer
         learning_rate = self.learning_rate
         if self.distributed:
@@ -488,13 +496,6 @@ class Trainer:
                 decay=self.ema_decay,
                 use_num_updates=self.ema_use_num_updates,
             )
-
-        if hasattr(self.model, "irreps_out"):
-            for key in self.train_on_keys:
-                if key not in self.model.irreps_out:
-                    raise RuntimeError(
-                        f"Loss function include fields {key} that are not predicted by the model {self.model.irreps_out}"
-                    )
 
     @property
     def init_keys(self):
@@ -866,7 +867,7 @@ class Trainer:
 
         # this will normalize the targets
         # in both validation and train we want targets normalized _for the loss_
-        data_for_loss = self.model.unscale(data, force_process=True)
+        data_for_loss = self.graph_model.unscale(data, force_process=True)
 
         # Run model
         # We make a shallow copy of the input dict in case the model modifies it
@@ -908,7 +909,7 @@ class Trainer:
         with torch.no_grad():
             if validation:
                 # loss function always needs to be in normalized unit
-                normalized_units_out = self.model.unscale(out, force_process=True)
+                normalized_units_out = self.graph_model.unscale(out, force_process=True)
                 # data_for_loss is always forced into normalized units
                 loss, loss_contrib = self.loss(
                     pred=normalized_units_out, ref=data_for_loss
@@ -918,7 +919,7 @@ class Trainer:
             else:
                 # If we are in training mode, we need to bring the prediction
                 # into real units for metrics
-                out = self.model.scale(out, force_process=True)
+                out = self.graph_model.scale(out, force_process=True)
 
             # save metrics stats
             self.batch_losses = self.loss_stat(loss, loss_contrib)
@@ -948,6 +949,10 @@ class Trainer:
             return True
 
         return False
+
+    @property
+    def graph_model(self):
+        return self.model.module if self.distributed else self.model
 
     def reset_metrics(self):
         self.loss_stat.reset()
