@@ -11,6 +11,8 @@ import torch
 
 from test_train import LearningFactorModel, _check_and_print
 
+from nequip.data import AtomicDataDict
+
 
 @pytest.mark.parametrize(
     "conffile",
@@ -68,7 +70,10 @@ def test_metrics(nequip_dataset, BENCHMARK_ROOT, conffile, builder):
             # We just don't add rescaling:
             true_config["model_builders"] = [builder]
         # We need truth labels as inputs for these fake testing models
-        true_config["_override_allow_truth_label_inputs"] = True
+        true_config["model_input_fields"] = {
+            AtomicDataDict.FORCE_KEY: "1o",
+            AtomicDataDict.TOTAL_ENERGY_KEY: "0e",
+        }
 
         distributed_config = true_config.copy()
         run_name_distributed = "test_train_distributed_" + dtype
@@ -103,6 +108,7 @@ def test_metrics(nequip_dataset, BENCHMARK_ROOT, conffile, builder):
                 nequip_train_script_path,
                 "conf_distributed.yaml",
                 "--distributed",
+                "--warn-unused",
             ],
             cwd=tmpdir,
             env=env,
@@ -113,7 +119,7 @@ def test_metrics(nequip_dataset, BENCHMARK_ROOT, conffile, builder):
 
         # == Train truth model ==
         retcode = subprocess.run(
-            ["nequip-train", "conf_true.yaml"],
+            ["nequip-train", "conf_true.yaml", "--warn-unused"],
             cwd=tmpdir,
             env=env,
             stdout=subprocess.PIPE,
