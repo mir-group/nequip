@@ -1313,6 +1313,7 @@ class Trainer:
                 self.dataloader_num_workers > 0 and self.max_epochs > 1
             ),
             # PyTorch recommends this for GPU since it makes copies much faster
+            # TODO: this has been suggested to cause issues with DDP?
             pin_memory=(self.torch_device != torch.device("cpu")),
             # avoid getting stuck
             timeout=(10 if self.dataloader_num_workers > 0 else 0),
@@ -1329,7 +1330,7 @@ class Trainer:
             # n_train_per_epoch // world_size, which is then a multiple of local_batch_size.
             assert (
                 self.n_train_per_epoch % self.batch_size == 0
-            ), "n_train_per_epoch must be divisible by batch_size"
+            ), f"n_train_per_epoch={self.n_train_per_epoch} must be divisible by batch_size={self.batch_size}"
         # note that PartialSampler also handles the multi-node distributed case
         self.dl_train_sampler = PartialSampler(
             data_source=self.dataset_train,

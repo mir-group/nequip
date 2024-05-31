@@ -118,7 +118,7 @@ class PartialSampler(Sampler[int]):
         assert 0 <= self.rank < self.world_size
         assert (
             self.num_samples_per_epoch % self.world_size == 0
-        ), "num_samples_per_epoch must be divisible by world_size (number of ranks)"
+        ), f"num_samples_per_epoch={self.num_samples_per_epoch} must be divisible by world_size={self.world_size} (number of ranks)"
 
     @property
     def num_samples_total(self) -> int:
