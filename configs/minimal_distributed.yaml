@@ -1,0 +1,78 @@
+# !! PLEASE NOTE: `minimal.yaml` is meant as a _minimal_ example of a tiny, fast
+#                 training that can be used to verify your nequip install,
+#                 the syntax of your configuration edits, etc.
+#                 These are NOT recommended hyperparameters for real applications!
+#                 Please see `example.yaml` for a reasonable starting point.
+
+# Minimal config for distributed training, based on `minimal.yaml`.
+# Training should be run with a command like:
+#
+#   torchrun --nnodes 1 --nproc_per_node 2 `which nequip-train` configs/minimal_distributed.yaml --distributed
+#
+# Values in this file and the `--nnodes` / `--nproc_per_node` mutually constrain one another:
+# Any training set size may be used
+n_train: 5
+# Any validation set size may be used
+n_val: 5
+# The (validation) batch size must be divisible by the world size (total number of ranks)
+batch_size: 2
+validation_batch_size: 2
+# n_train_per_epoch option sets how many training examples will constitute an "epoch"
+# It must be divisible by the batch size
+# If smaller than n_train, the full training set will be used over multiple epochs
+n_train_per_epoch: 4
+
+
+# general
+root: results/aspirin
+run_name: minimal
+seed: 123
+dataset_seed: 456
+
+model_builders:
+ - SimpleIrrepsConfig         # update the config with all the irreps for the network if using the simplified `l_max` / `num_features` / `parity` syntax
+ - EnergyModel                # build a full NequIP model
+ - PerSpeciesRescale          # add per-atom / per-species scaling and shifting to the NequIP model before the total energy sum
+ - StressForceOutput                # wrap the energy model in a module that uses autodifferention to compute the forces
+ - RescaleEnergyEtc
+
+# network
+num_basis: 8
+r_max: 4.0
+l_max: 2
+parity: true
+num_features: 16
+
+# data set
+# the keys used need to be stated at least once in key_mapping, npz_fixed_field_keys or npz_keys
+# key_mapping is used to map the key in the npz file to the NequIP default values (see data/_key.py)
+# all arrays are expected to have the shape of (nframe, natom, ?) except the fixed fields
+# note that if your data set uses pbc, you need to also pass an array that maps to the nequip "pbc" key
+dataset: npz                                                                       # type of data set, can be npz or ase
+dataset_url: http://quantum-machine.org/gdml/data/npz/aspirin_ccsd.zip             # url to download the npz. optional
+dataset_file_name: ./benchmark_data/aspirin_ccsd-train.npz                         # path to data set file
+key_mapping:
+  z: atomic_numbers                                                                # atomic species, integers
+  E: total_energy                                                                  # total potential eneriges to train to
+  F: forces                                                                        # atomic forces to train to
+  R: pos                                                                           # raw atomic positions
+npz_fixed_field_keys:                                                              # fields that are repeated across different examples
+  - atomic_numbers
+
+chemical_symbols:
+  - H
+  - O
+  - C
+
+# logging
+wandb: false
+# verbose: debug
+
+# training
+max_epochs: 10
+
+# loss function
+loss_coeffs: forces
+
+# optimizer
+optimizer_name: Adam
