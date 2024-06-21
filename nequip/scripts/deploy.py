@@ -71,6 +71,8 @@ def _set_deploy_metadata(key: str, value) -> None:
     global _current_metadata
     if _current_metadata is None:
         pass  # not deploying right now
+    elif key not in _ALL_METADATA_KEYS:
+        raise KeyError(f"{key} is not a registered model deployment metadata key")
     elif key in _current_metadata:
         raise RuntimeError(f"{key} already set in the deployment metadata")
     else:

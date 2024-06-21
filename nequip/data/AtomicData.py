@@ -18,6 +18,7 @@ from ase.stress import voigt_6_to_full_3x3_stress, full_3x3_to_voigt_6_stress
 
 import torch
 import e3nn.o3
+from e3nn.io import CartesianTensor
 
 from . import AtomicDataDict
 from ._util import _TORCH_INTEGER_DTYPES
@@ -26,6 +27,7 @@ from nequip.utils.torch_geometric import Data
 # A type representing ASE-style periodic boundary condtions, which can be partial (the tuple case)
 PBC = Union[bool, Tuple[bool, bool, bool]]
 
+# === Key Registration ===
 
 _DEFAULT_LONG_FIELDS: Set[str] = {
     AtomicDataDict.EDGE_INDEX_KEY,
@@ -61,10 +63,15 @@ _DEFAULT_GRAPH_FIELDS: Set[str] = {
     AtomicDataDict.CELL_KEY,
     AtomicDataDict.BATCH_PTR_KEY,
 }
+_DEFAULT_CARTESIAN_TENSOR_FIELDS: Dict[str, str] = {
+    AtomicDataDict.STRESS_KEY: "ij=ji",
+    AtomicDataDict.VIRIAL_KEY: "ij=ji",
+}
 _NODE_FIELDS: Set[str] = set(_DEFAULT_NODE_FIELDS)
 _EDGE_FIELDS: Set[str] = set(_DEFAULT_EDGE_FIELDS)
 _GRAPH_FIELDS: Set[str] = set(_DEFAULT_GRAPH_FIELDS)
 _LONG_FIELDS: Set[str] = set(_DEFAULT_LONG_FIELDS)
+_CARTESIAN_TENSOR_FIELDS: Dict[str, str] = dict(_DEFAULT_CARTESIAN_TENSOR_FIELDS)
 
 
 def register_fields(
@@ -72,6 +79,7 @@ def register_fields(
     edge_fields: Sequence[str] = [],
     graph_fields: Sequence[str] = [],
     long_fields: Sequence[str] = [],
+    cartesian_tensor_fields: Dict[str, str] = {},
 ) -> None:
     r"""Register fields as being per-atom, per-edge, or per-frame.
 
@@ -83,18 +91,36 @@ def register_fields(
     edge_fields: set = set(edge_fields)
     graph_fields: set = set(graph_fields)
     long_fields: set = set(long_fields)
-    allfields = node_fields.union(edge_fields, graph_fields)
-    assert len(allfields) == len(node_fields) + len(edge_fields) + len(graph_fields)
+
+    # error checking: prevents registering fields as contradictory types
+    # potentially unregistered fields
+    assert len(node_fields.intersection(edge_fields)) == 0
+    assert len(node_fields.intersection(graph_fields)) == 0
+    assert len(edge_fields.intersection(graph_fields)) == 0
+    # already registered fields
+    assert len(_NODE_FIELDS.intersection(edge_fields)) == 0
+    assert len(_NODE_FIELDS.intersection(graph_fields)) == 0
+    assert len(_EDGE_FIELDS.intersection(node_fields)) == 0
+    assert len(_EDGE_FIELDS.intersection(graph_fields)) == 0
+    assert len(_GRAPH_FIELDS.intersection(edge_fields)) == 0
+    assert len(_GRAPH_FIELDS.intersection(node_fields)) == 0
+
+    # check that Cartesian tensor fields to add are rank-2 (higher ranks not supported)
+    for cart_tensor_key in cartesian_tensor_fields:
+        cart_tensor_rank = len(
+            CartesianTensor(cartesian_tensor_fields[cart_tensor_key]).indices
+        )
+        if cart_tensor_rank != 2:
+            raise NotImplementedError(
+                f"Only rank-2 tensor data processing supported, but got {cart_tensor_key} is rank {cart_tensor_rank}. Consider raising a GitHub issue if higher-rank tensor data processing is desired."
+            )
+
+    # update fields
     _NODE_FIELDS.update(node_fields)
     _EDGE_FIELDS.update(edge_fields)
     _GRAPH_FIELDS.update(graph_fields)
     _LONG_FIELDS.update(long_fields)
-    if len(set.union(_NODE_FIELDS, _EDGE_FIELDS, _GRAPH_FIELDS)) < (
-        len(_NODE_FIELDS) + len(_EDGE_FIELDS) + len(_GRAPH_FIELDS)
-    ):
-        raise ValueError(
-            "At least one key was registered as more than one of node, edge, or graph!"
-        )
+    _CARTESIAN_TENSOR_FIELDS.update(cartesian_tensor_fields)
 
 
 def deregister_fields(*fields: Sequence[str]) -> None:
@@ -109,9 +135,16 @@ def deregister_fields(*fields: Sequence[str]) -> None:
         assert f not in _DEFAULT_NODE_FIELDS, "Cannot deregister built-in field"
         assert f not in _DEFAULT_EDGE_FIELDS, "Cannot deregister built-in field"
         assert f not in _DEFAULT_GRAPH_FIELDS, "Cannot deregister built-in field"
+        assert f not in _DEFAULT_LONG_FIELDS, "Cannot deregister built-in field"
+        assert (
+            f not in _DEFAULT_CARTESIAN_TENSOR_FIELDS
+        ), "Cannot deregister built-in field"
+
         _NODE_FIELDS.discard(f)
         _EDGE_FIELDS.discard(f)
         _GRAPH_FIELDS.discard(f)
+        _LONG_FIELDS.discard(f)
+        _CARTESIAN_TENSOR_FIELDS.pop(f, None)
 
 
 def _register_field_prefix(prefix: str) -> None:
@@ -123,6 +156,9 @@ def _register_field_prefix(prefix: str) -> None:
         graph_fields=[prefix + e for e in _GRAPH_FIELDS],
         long_fields=[prefix + e for e in _LONG_FIELDS],
     )
+
+
+#  === AtomicData ===
 
 
 def _process_dict(kwargs, ignore_fields=[]):
@@ -449,17 +485,40 @@ class AtomicData(Data):
         cell = kwargs.pop("cell", atoms.get_cell())
         pbc = kwargs.pop("pbc", atoms.pbc)
 
-        # handle ASE-style 6 element Voigt order stress
-        for key in (AtomicDataDict.STRESS_KEY, AtomicDataDict.VIRIAL_KEY):
-            if key in add_fields:
-                if add_fields[key].shape == (3, 3):
-                    # it's already 3x3, do nothing else
-                    pass
-                elif add_fields[key].shape == (6,):
-                    # it's Voigt order
-                    add_fields[key] = voigt_6_to_full_3x3_stress(add_fields[key])
+        # IMPORTANT: the following reshape logic only applies to rank-2 Cartesian tensor fields
+        for key in add_fields:
+            if key in _CARTESIAN_TENSOR_FIELDS:
+                # enforce (3, 3) shape for graph fields, e.g. stress, virial
+                if key in _GRAPH_FIELDS:
+                    # handle ASE-style 6 element Voigt order stress
+                    if key in (AtomicDataDict.STRESS_KEY, AtomicDataDict.VIRIAL_KEY):
+                        if add_fields[key].shape == (6,):
+                            add_fields[key] = voigt_6_to_full_3x3_stress(
+                                add_fields[key]
+                            )
+                    if add_fields[key].shape == (3, 3):
+                        # it's already 3x3, do nothing else
+                        pass
+                    elif add_fields[key].shape == (9,):
+                        add_fields[key] = add_fields[key].reshape((3, 3))
+                    else:
+                        raise RuntimeError(
+                            f"bad shape for {key} registered as a Cartesian tensor graph field---please note that only rank-2 Cartesian tensors are currently supported"
+                        )
+                # enforce (N_atom, 3, 3) shape for node fields, e.g. Born effective charges
+                elif key in _NODE_FIELDS:
+                    if add_fields[key].shape[1:] == (3, 3):
+                        pass
+                    elif add_fields[key].shape[1:] == (9,):
+                        add_fields[key] = add_fields[key].reshape((-1, 3, 3))
+                    else:
+                        raise RuntimeError(
+                            f"bad shape for {key} registered as a Cartesian tensor node field---please note that only rank-2 Cartesian tensors are currently supported"
+                        )
                 else:
-                    raise RuntimeError(f"bad shape for {key}")
+                    raise RuntimeError(
+                        f"{key} registered as a Cartesian tensor field was not registered as either a graph or node field"
+                    )
 
         return cls.from_points(
             pos=atoms.positions,
