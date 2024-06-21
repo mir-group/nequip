@@ -10,7 +10,6 @@ from collections.abc import Mapping
 import os
 
 import numpy as np
-import ase.neighborlist
 import ase
 from ase.calculators.singlepoint import SinglePointCalculator, SinglePointDFTCalculator
 from ase.calculators.calculator import all_properties as ase_all_properties
@@ -764,12 +763,21 @@ _ERROR_ON_NO_EDGES: bool = os.environ.get("NEQUIP_ERROR_ON_NO_EDGES", "true").lo
 assert _ERROR_ON_NO_EDGES in ("true", "false")
 _ERROR_ON_NO_EDGES = _ERROR_ON_NO_EDGES == "true"
 
-_NEQUIP_MATSCIPY_NL: Final[bool] = os.environ.get("NEQUIP_MATSCIPY_NL", "false").lower()
-assert _NEQUIP_MATSCIPY_NL in ("true", "false")
-_NEQUIP_MATSCIPY_NL = _NEQUIP_MATSCIPY_NL == "true"
+# use "ase" as default
+# TODO: eventually, choose fastest as default
+# NOTE:
+# - vesin and matscipy do not support self-interaction
+# - vesin does not allow for mixed pbcs
+_NEQUIP_NL: Final[str] = os.environ.get("NEQUIP_NL", "ase").lower()
 
-if _NEQUIP_MATSCIPY_NL:
+if _NEQUIP_NL == "vesin":
+    from vesin import NeighborList as vesin_nl
+elif _NEQUIP_NL == "matscipy":
     import matscipy.neighbours
+elif _NEQUIP_NL == "ase":
+    import ase.neighborlist
+else:
+    raise NotImplementedError(f"Unknown neighborlist NEQUIP_NL = {_NEQUIP_NL}")
 
 
 def neighbor_list_and_relative_vec(
@@ -849,7 +857,24 @@ def neighbor_list_and_relative_vec(
     # ASE dependent part
     temp_cell = ase.geometry.complete_cell(temp_cell)
 
-    if _NEQUIP_MATSCIPY_NL:
+    if _NEQUIP_NL == "vesin":
+        assert strict_self_interaction and not self_interaction
+        # use same mixed pbc logic as
+        # https://github.com/Luthaf/vesin/blob/main/python/vesin/src/vesin/_ase.py
+        if pbc[0] and pbc[1] and pbc[2]:
+            periodic = True
+        elif not pbc[0] and not pbc[1] and not pbc[2]:
+            periodic = False
+        else:
+            raise ValueError(
+                "different periodic boundary conditions on different axes are not supported by vesin neighborlist, use ASE or matscipy"
+            )
+
+        first_idex, second_idex, shifts = vesin_nl(
+            cutoff=float(r_max), full_list=True
+        ).compute(points=temp_pos, box=temp_cell, periodic=periodic, quantities="ijS")
+
+    elif _NEQUIP_NL == "matscipy":
         assert strict_self_interaction and not self_interaction
         first_idex, second_idex, shifts = matscipy.neighbours.neighbour_list(
             "ijS",
@@ -858,7 +883,7 @@ def neighbor_list_and_relative_vec(
             positions=temp_pos,
             cutoff=float(r_max),
         )
-    else:
+    elif _NEQUIP_NL == "ase":
         first_idex, second_idex, shifts = ase.neighborlist.primitive_neighbor_list(
             "ijS",
             pbc,

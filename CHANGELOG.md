@@ -10,12 +10,10 @@ Most recent change on the bottom.
 ### Added
 - add support for equivariance testing of arbitrary Cartesian tensor outputs
 - [Breaking] use entry points for `nequip.extension`s (e.g. for field registration)
-
+- alternate neighborlist support enabled with `NEQUIP_NL` environment variable, which can be set to `ase` (default), `matscipy` or `vesin`
 
 ### Changed
-
-
-## Unreleased
+- [Breaking] `NEQUIP_MATSCIPY_NL` environment variable no longer supported
 
 
 ## [0.6.0] - 2024-5-10
