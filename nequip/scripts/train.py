@@ -7,7 +7,7 @@ import warnings
 # Since numpy gets imported later anyway for dataset stuff, this shouldn't affect performance.
 import numpy as np  # noqa: F401
 
-from os.path import isdir
+from os.path import exists
 from pathlib import Path
 
 import torch
@@ -74,7 +74,7 @@ def main(args=None, running_as_script: bool = True):
     if running_as_script:
         set_up_script_logger(config.get("log", None), config.verbose)
 
-    found_restart_file = isdir(f"{config.root}/{config.run_name}")
+    found_restart_file = exists(f"{config.root}/{config.run_name}/trainer.pth")
     if found_restart_file and not config.append:
         raise RuntimeError(
             f"Training instance exists at {config.root}/{config.run_name}; "
