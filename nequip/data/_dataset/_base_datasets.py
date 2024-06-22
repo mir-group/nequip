@@ -423,7 +423,7 @@ class AtomicInMemoryDataset(AtomicDataset):
                 if field not in selectors:
                     # this means field is not selected and so not available
                     raise RuntimeError(
-                        f"Only per-node and per-graph fields can have statistics computed; `{field}` has not been registered as either. If it is per-node or per-graph, please register it as such using `nequip.data.register_fields`"
+                        f"Only per-node and per-graph fields can have statistics computed; `{field}` has not been registered as either. If it is per-node or per-graph, please register it as such"
                     )
                 arr = data_transformed[field]
                 if field in _NODE_FIELDS:

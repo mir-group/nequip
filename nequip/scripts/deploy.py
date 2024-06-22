@@ -71,6 +71,8 @@ def _set_deploy_metadata(key: str, value) -> None:
     global _current_metadata
     if _current_metadata is None:
         pass  # not deploying right now
+    elif key not in _ALL_METADATA_KEYS:
+        raise KeyError(f"{key} is not a registered model deployment metadata key")
     elif key in _current_metadata:
         raise RuntimeError(f"{key} already set in the deployment metadata")
     else:
@@ -108,10 +110,23 @@ def load_deployed_model(
             f"{model_path} does not seem to be a deployed NequIP model file. Did you forget to deploy it using `nequip-deploy`? \n\n(Underlying error: {e})"
         )
     # Confirm nequip made it
-    if metadata[NEQUIP_VERSION_KEY] == "":
-        raise ValueError(
-            f"{model_path} does not seem to be a deployed NequIP model file"
-        )
+    if len(metadata[NEQUIP_VERSION_KEY]) == 0:
+        if len(metadata[JIT_BAILOUT_KEY]) != 0:
+            # In versions <0.6.0, there may have been a bug leading to empty "*_version"
+            # metadata keys.  We can be pretty confident this is a NequIP model from
+            # those versions, though, if it stored "_jit_bailout_depth"
+            # https://github.com/mir-group/nequip/commit/2f43aa84542df733bbe38cb9d6cca176b0e98054
+            # Likely addresses https://github.com/mir-group/nequip/issues/431
+            warnings.warn(
+                f"{model_path} appears to be from a older (0.5.* or earlier) version of `nequip` "
+                "that pre-dates a variety of breaking changes. Please carefully check the "
+                "correctness of your results for unexpected behaviour, and consider re-deploying "
+                "your model using this current `nequip` installation."
+            )
+        else:
+            raise ValueError(
+                f"{model_path} does not seem to be a deployed NequIP model file"
+            )
     # Confirm its TorchScript
     assert isinstance(model, torch.jit.ScriptModule)
     # Make sure we're in eval mode
@@ -127,11 +142,14 @@ def load_deployed_model(
     if metadata[DEFAULT_DTYPE_KEY] == "":
         # Default and model go together
         assert metadata[MODEL_DTYPE_KEY] == ""
-        # If there isn't a dtype, it should be older than 0.6.0:
-        assert packaging.version.parse(
-            metadata[NEQUIP_VERSION_KEY]
-        ) < packaging.version.parse("0.6.0")
-        # i.e. no value due to L85 above
+        # If there isn't a dtype, it should be older than 0.6.0---but
+        # this may not be reflected in the version fields (see above check)
+        # So we only check if it is available:
+        if len(metadata[NEQUIP_VERSION_KEY]) > 0:
+            assert packaging.version.parse(
+                metadata[NEQUIP_VERSION_KEY]
+            ) < packaging.version.parse("0.6.0")
+
         # The old pre-0.6.0 defaults:
         metadata[DEFAULT_DTYPE_KEY] = "float32"
         metadata[MODEL_DTYPE_KEY] = "float32"

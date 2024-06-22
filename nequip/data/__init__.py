@@ -8,6 +8,7 @@ from .AtomicData import (
     _EDGE_FIELDS,
     _GRAPH_FIELDS,
     _LONG_FIELDS,
+    _CARTESIAN_TENSOR_FIELDS,
 )
 from ._dataset import (
     AtomicDataset,
@@ -39,5 +40,6 @@ __all__ = [
     _EDGE_FIELDS,
     _GRAPH_FIELDS,
     _LONG_FIELDS,
+    _CARTESIAN_TENSOR_FIELDS,
     EMTTestDataset,
 ]
