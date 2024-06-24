@@ -7,6 +7,7 @@ enable wandb resume
 make an interface with ray
 
 """
+
 import sys
 import inspect
 import logging
@@ -157,9 +158,9 @@ class Trainer:
         batch_size (int): size of each batch
         validation_batch_size (int): batch size for evaluating the model for validation
         shuffle (bool): parameters for dataloader
-        n_train (int): # of frames for training
+        n_train (int, str): # of frames for training (as int, or as a percentage string)
         n_train_per_epoch (optional int): how many frames from `n_train` to use each epoch; see `PartialSampler`. When `None`, all `n_train` frames will be used each epoch.
-        n_val (int): # of frames for validation
+        n_val (int), str: # of frames for validation (as int, or as a percentage string)
         exclude_keys (list):  fields from dataset to ignore.
         dataloader_num_workers (int): `num_workers` for the `DataLoader`s
         train_idcs (optional, list):  list of frames to use for training
@@ -250,9 +251,9 @@ class Trainer:
         batch_size: int = 5,
         validation_batch_size: int = 5,
         shuffle: bool = True,
-        n_train: Optional[int] = None,
+        n_train: Optional[Union[int, str]] = None,
         n_train_per_epoch: Optional[int] = None,
-        n_val: Optional[int] = None,
+        n_val: Optional[Union[int, str]] = None,
         dataloader_num_workers: int = 0,
         train_idcs: Optional[list] = None,
         val_idcs: Optional[list] = None,
@@ -754,7 +755,6 @@ class Trainer:
             )
 
     def train(self):
-
         """Training"""
         if getattr(self, "dl_train", None) is None:
             raise RuntimeError("You must call `set_dataset()` before calling `train()`")
@@ -1144,12 +1144,55 @@ class Trainer:
         for i in range(len(logger.handlers)):
             logger.handlers.pop()
 
+    def _parse_n_train_n_val(
+        self, train_dataset_size: int, val_dataset_size: int
+    ) -> tuple[int]:
+        # parse n_train and n_val (can be ints or str with percentage):
+        n_train_n_val = []
+        for n_name in ["n_train", "n_val"]:
+            n = getattr(self, n_name)
+            if isinstance(n, str) and "%" in n:
+                dataset_size = (
+                    train_dataset_size if n_name == "n_train" else val_dataset_size
+                )
+                n_train_n_val.append(
+                    (float(n.strip("%")) / 100) * dataset_size
+                )  # convert to float first
+            elif isinstance(n, int):
+                n_train_n_val.append(n)
+            else:
+                raise ValueError(
+                    f"Invalid value/type for {n_name}: {n} -- must be either int or str with %!"
+                )
+
+        floored_n_train_n_val = [int(n) for n in n_train_n_val]
+        # if n_train and n_val were both set as percentages which summed to 100%, make sure that sum of
+        # floored values comes to 100% of dataset size (i.e. that flooring doesn't omit a frame)
+        if (
+            train_dataset_size == val_dataset_size
+            and isinstance(self.n_train, str)
+            and isinstance(self.n_val, str)
+            and np.isclose(
+                float(self.n_train.strip("%")) + float(self.n_val.strip("%")), 100
+            )
+        ):
+            if (
+                sum(floored_n_train_n_val) != train_dataset_size
+            ):  # one frame was cut, add to larger of the
+                # two float values (i.e. round up the percentage which gave a >= x.5 float value)
+                floored_n_train_n_val[
+                    np.argmax(n_train_n_val)
+                ] += train_dataset_size - sum(floored_n_train_n_val)
+
+        return tuple(floored_n_train_n_val)
+
     def set_dataset(
         self,
         dataset: AtomicDataset,
         validation_dataset: Optional[AtomicDataset] = None,
     ) -> None:
-        """Set the dataset(s) used by this trainer.
+        """
+        Set the dataset(s) used by this trainer.
 
         Training and validation datasets will be sampled from
         them in accordance with the trainer's parameters.
@@ -1163,7 +1206,10 @@ class Trainer:
             if validation_dataset is None:
                 # Sample both from `dataset`:
                 total_n = len(dataset)
-                if (self.n_train + self.n_val) > total_n:
+                n_train, n_val = self._parse_n_train_n_val(
+                    train_dataset_size=total_n, val_dataset_size=total_n
+                )
+                if (n_train + n_val) > total_n:
                     raise ValueError(
                         "too little data for training and validation. please reduce n_train and n_val"
                     )
@@ -1177,25 +1223,29 @@ class Trainer:
                         f"splitting mode {self.train_val_split} not implemented"
                     )
 
-                self.train_idcs = idcs[: self.n_train]
-                self.val_idcs = idcs[self.n_train : self.n_train + self.n_val]
+                self.train_idcs = idcs[:n_train]
+                self.val_idcs = idcs[n_train : n_train + n_val]
             else:
-                if self.n_train > len(dataset):
+                n_train, n_val = self._parse_n_train_n_val(
+                    train_dataset_size=len(dataset),
+                    val_dataset_size=len(validation_dataset),
+                )
+                if n_train > len(dataset):
                     raise ValueError("Not enough data in dataset for requested n_train")
-                if self.n_val > len(validation_dataset):
+                if n_val > len(validation_dataset):
                     raise ValueError(
                         "Not enough data in validation dataset for requested n_val"
                     )
                 if self.train_val_split == "random":
                     self.train_idcs = torch.randperm(
                         len(dataset), generator=self.dataset_rng
-                    )[: self.n_train]
+                    )[:n_train]
                     self.val_idcs = torch.randperm(
                         len(validation_dataset), generator=self.dataset_rng
-                    )[: self.n_val]
+                    )[:n_val]
                 elif self.train_val_split == "sequential":
-                    self.train_idcs = torch.arange(self.n_train)
-                    self.val_idcs = torch.arange(self.n_val)
+                    self.train_idcs = torch.arange(n_train)
+                    self.val_idcs = torch.arange(n_val)
                 else:
                     raise NotImplementedError(
                         f"splitting mode {self.train_val_split} not implemented"
