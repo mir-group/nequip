@@ -81,7 +81,7 @@ class TestNequIPModel(BaseEnergyModelTests):
         # $ lmp -in zbl_data.lmps
         # $ python -c "import numpy as np; d = np.loadtxt('zbl.dat', skiprows=1); np.save('zbl.npy', d)"
         refdata = np.load(Path(__file__).parent / "zbl.npy")
-        for (r, Zi, Zj, pe, fxi, fxj) in refdata:
+        for r, Zi, Zj, pe, fxi, fxj in refdata:
             if r >= r_max:
                 continue
             atoms.positions[1, 0] = r

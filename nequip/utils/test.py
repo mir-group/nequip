@@ -45,9 +45,11 @@ def assert_permutation_equivariant(
 
     if tolerance is None:
         atol = PERMUTATION_FLOAT_TOLERANCE[
-            func.model_dtype
-            if isinstance(func, GraphModel)
-            else torch.get_default_dtype()
+            (
+                func.model_dtype
+                if isinstance(func, GraphModel)
+                else torch.get_default_dtype()
+            )
         ]
     else:
         atol = tolerance

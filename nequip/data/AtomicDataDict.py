@@ -5,6 +5,7 @@ of the ``AtomicData`` class which are produced by ``AtomicData.to_AtomicDataDict
 
 Authors: Albert Musaelian
 """
+
 from typing import Dict, Any
 
 import torch

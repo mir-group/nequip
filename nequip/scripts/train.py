@@ -1,4 +1,5 @@
 """ Train a network."""
+
 import logging
 import argparse
 import warnings
@@ -24,7 +25,8 @@ from nequip.utils._global_options import _set_global_options
 from nequip.scripts._logger import set_up_script_logger
 
 warnings.filterwarnings(  # unnecessary e3nn-related JIT warning
-    "ignore", message="The TorchScript type system doesn't support instance-level annotations"
+    "ignore",
+    message="The TorchScript type system doesn't support instance-level annotations",
 )
 default_config = dict(
     root="./",
