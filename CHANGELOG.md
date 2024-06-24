@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Most recent change on the bottom.
 
 ## Unreleased
+- Allow `n_train` and `n_val` to be specified as percentages of datasets.
+- Only attempt training restart if `trainer.pth` file present (prevents unnecessary crashes due to file-not-found errors in some cases)
 
 ## [0.6.0] - 2024-5-10
 ### Added
