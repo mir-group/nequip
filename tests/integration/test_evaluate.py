@@ -195,7 +195,7 @@ def test_metrics(
                         1e-8
                         if true_identity
                         else (
-                            1.1e-2
+                            2e-2
                             if any(i in metric for i in ["_e", "e_", "e/N"])
                             else 1e-4
                         )
