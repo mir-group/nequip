@@ -64,10 +64,17 @@ class Metrics:
         self.params = {}
         self.funcs = {}
         self.kwargs = {}
+        self.stratified_stats = (
+            {}
+        )  # need to be stored separately, as needs all data labels at once
+
         for component in components:
 
             key, reduction, params = Metrics.parse(component)
 
+            params["stratify"] = params.get(
+                "stratify", False
+            )  # can be 'range', 'population' or int/float
             params["PerSpecies"] = params.get("PerSpecies", False)
             params["PerAtom"] = params.get("PerAtom", False)
 
@@ -78,7 +85,14 @@ class Metrics:
             # default is to flatten the array
 
             if key not in self.running_stats:
-                self.running_stats[key] = {}
+                if not params.get("stratify", False):
+                    self.running_stats[key] = {}
+                else:
+                    self.stratified_stats[key] = {
+                        "error": [],
+                        "ref": [],
+                    }  # just need error and ref
+
                 self.funcs[key] = {}
                 self.kwargs[key] = {}
                 self.params[key] = {}
@@ -86,6 +100,7 @@ class Metrics:
             # store for initialization
             kwargs = deepcopy(params)
             kwargs.pop("functional", "L1Loss")
+            kwargs.pop("stratify")
             kwargs.pop("PerSpecies")
             kwargs.pop("PerAtom")
 
@@ -160,20 +175,26 @@ class Metrics:
                 )
 
                 _, params = self.params[key][param_hash]
+                stratify = params["stratify"]
                 per_species = params["PerSpecies"]
                 per_atom = params["PerAtom"]
 
-                # initialize the internal run_stat base on the error shape
-                if param_hash not in self.running_stats[key]:
-                    self.running_stats[key][param_hash] = self.init_runstat(
-                        params=kwargs, error=error
-                    )
+                if not stratify:
+                    # initialize the internal run_stat base on the error shape
+                    if param_hash not in self.running_stats[key]:
+                        self.running_stats[key][param_hash] = self.init_runstat(
+                            params=kwargs, error=error
+                        )
 
-                stat = self.running_stats[key][param_hash]
+                    stat = self.running_stats[key][param_hash]
 
                 params = {}
                 if per_species:
-                    # TO DO, this needs OneHot component. will need to be decoupled
+                    if stratify:
+                        raise NotImplementedError(
+                            "Stratify is not implemented for per_species"
+                        )
+                    # TODO, this needs OneHot component. will need to be decoupled
                     params = {
                         "accumulate_by": pred[AtomicDataDict.ATOM_TYPE_KEY].squeeze(-1)
                     }
@@ -185,9 +206,19 @@ class Metrics:
                     error_N = error
 
                 if stat.dim == () and not per_species:
-                    metrics[(key, param_hash)] = stat.accumulate_batch(
-                        error_N.flatten(), **params
-                    )
+                    error_N = error_N.flatten()
+
+                if (  # just need error and ref value, note that forces are not stratified by xyz
+                    stratify  # norm (just raw x, y, z values used)
+                ):
+                    if param_hash not in stratify:
+                        self.stratified_stats[key][param_hash] = {
+                            "error": error_N,
+                            "ref_val": ref[key],
+                        }
+                    self.stratified_stats[key][param_hash]["error"].cat(error_N)
+                    self.stratified_stats[key][param_hash]["ref"].cat(ref[key])
+
                 else:
                     metrics[(key, param_hash)] = stat.accumulate_batch(
                         error_N, **params
@@ -209,8 +240,51 @@ class Metrics:
 
         metrics = {}
         for key, stats in self.running_stats.items():
-            for reduction, stat in stats.items():
-                metrics[(key, reduction)] = stat.current_result()
+            for param_hash, stat in stats.items():
+                metrics[(key, param_hash)] = stat.current_result()
+
+        for key, stats in self.stratified_stats.items():
+            # self.stratified_stats[key][param_hash]["ref"].cat(ref[key])
+            for param_hash, stratified_stat_dict in stats.items():
+                # compute the stratified error:
+                # func = self.funcs[key][param_hash]
+                reduction, params = self.params[key][param_hash]
+                errors = stratified_stat_dict["error"]
+                ref_vals = stratified_stat_dict["ref_val"]
+                stratified_metric_dict = {}
+
+                if params.get(
+                    "range", False
+                ):  # stratify by range (given as percent string)
+                    # TODO: Need to print range too for this
+                    range = ref_vals.max() - ref_vals.min()
+                    range_separation = (float(params["range"].strip("%")) / 100) * range
+
+                    for i in range(range // range_separation):
+                        mask = (ref_vals >= i * range_separation) & (
+                            ref_vals < (i + 1) * range_separation
+                        )
+                        error = errors[mask]
+                        if len(error) > 0:
+                            if reduction == "rms":
+                                stat = error.square().mean().sqrt()
+                            elif reduction in ["mean", "mae"]:
+                                stat = error.mean()
+                            else:
+                                raise NotImplementedError(
+                                    f"reduction {reduction} not implemented"
+                                )
+
+                            stratified_metric_dict[i] = stat
+
+                        else:
+                            stratified_metric_dict[i] = torch.tensor(float("nan"))
+
+                # elif params.get("population", False):  # stratify by population
+                # ...
+
+                metrics[(key, param_hash)] = stratified_metric_dict
+
         return metrics
 
     def flatten_metrics(self, metrics, type_names=None):
@@ -232,6 +306,7 @@ class Metrics:
 
             stat = self.running_stats[key][param_hash]
             per_species = params["PerSpecies"]
+            stratify = params["stratify"]
 
             if per_species:
                 if stat.output_dim == tuple():
@@ -251,6 +326,12 @@ class Metrics:
                             name = f"{ele}_{item_name}_{idx}"
                             flat_dict[name] = v.item()
                             skip_keys.append(name)
+
+            elif stratify:  # then value is a dict of {stratum_idx: value}
+                for stratum_idx, v in value.items():
+                    name = f"{stratum_idx}_{item_name}"
+                    flat_dict[name] = v.item()
+                    skip_keys.append(name)
 
             else:
                 if stat.output_dim == tuple():
