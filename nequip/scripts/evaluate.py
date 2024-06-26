@@ -459,7 +459,9 @@ def main(args=None, running_as_script: bool = True):
             "\n".join(
                 f"{k:>20s} = {v:< 20f}"
                 for k, v in metrics.flatten_metrics(
-                    metrics.current_result(),
+                    metrics.current_result(
+                        verbose=True
+                    ),  # verbose output about strata on final call
                     type_names=dataset.type_mapper.type_names,
                 )[0].items()
             )

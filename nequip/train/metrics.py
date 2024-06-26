@@ -5,6 +5,7 @@ from typing import Union, Sequence, Tuple
 import yaml
 
 import torch
+import numpy as np
 
 from nequip.data import AtomicDataDict
 from torch_runstats import RunningStats, Reduction
@@ -74,7 +75,7 @@ class Metrics:
 
             params["stratify"] = params.get(
                 "stratify", False
-            )  # can be 'range', 'population' or int/float
+            )  # can be either 'XX%_range', 'XX%_population' or int/float (raw unit for separation)
             params["PerSpecies"] = params.get("PerSpecies", False)
             params["PerAtom"] = params.get("PerAtom", False)
 
@@ -82,20 +83,16 @@ class Metrics:
 
             functional = params.get("functional", "L1Loss")
 
-            # default is to flatten the array
-
-            if key not in self.running_stats:
-                if not params.get("stratify", False):
-                    self.running_stats[key] = {}
-                else:
-                    self.stratified_stats[key] = {
-                        "error": [],
-                        "ref": [],
-                    }  # just need error and ref
-
+            if key not in self.kwargs:
                 self.funcs[key] = {}
                 self.kwargs[key] = {}
                 self.params[key] = {}
+
+            if key not in self.running_stats and not params.get("stratify", False):
+                self.running_stats[key] = {}  # default is to flatten the array
+
+            if key not in self.stratified_stats and params.get("stratify", False):
+                self.stratified_stats[key] = {}
 
             # store for initialization
             kwargs = deepcopy(params)
@@ -211,13 +208,17 @@ class Metrics:
                 if (  # just need error and ref value, note that forces are not stratified by xyz
                     stratify  # norm (just raw x, y, z values used)
                 ):
-                    if param_hash not in stratify:
+                    if param_hash not in self.stratified_stats[key]:
                         self.stratified_stats[key][param_hash] = {
                             "error": error_N,
                             "ref_val": ref[key],
                         }
-                    self.stratified_stats[key][param_hash]["error"].cat(error_N)
-                    self.stratified_stats[key][param_hash]["ref"].cat(ref[key])
+                    self.stratified_stats[key][param_hash]["error"] = torch.cat(
+                        (self.stratified_stats[key][param_hash]["error"], error_N)
+                    )
+                    self.stratified_stats[key][param_hash]["ref_val"] = torch.cat(
+                        (self.stratified_stats[key][param_hash]["ref_val"], ref[key])
+                    )
 
                 else:
                     metrics[(key, param_hash)] = stat.accumulate_batch(
@@ -236,7 +237,15 @@ class Metrics:
             for stat in stats.values():
                 stat.to(device=device)
 
-    def current_result(self):
+    def current_result(self, verbose=False):
+        """
+        Return the current result of the metrics.
+
+        Args:
+            verbose (bool):
+                If True, prints information about stratified metrics (i.e. ranges).
+                Default: False
+        """
 
         metrics = {}
         for key, stats in self.running_stats.items():
@@ -244,44 +253,67 @@ class Metrics:
                 metrics[(key, param_hash)] = stat.current_result()
 
         for key, stats in self.stratified_stats.items():
-            # self.stratified_stats[key][param_hash]["ref"].cat(ref[key])
-            for param_hash, stratified_stat_dict in stats.items():
-                # compute the stratified error:
-                # func = self.funcs[key][param_hash]
+            for (
+                param_hash,
+                stratified_stat_dict,
+            ) in stats.items():  # compute the stratified error:
                 reduction, params = self.params[key][param_hash]
                 errors = stratified_stat_dict["error"]
                 ref_vals = stratified_stat_dict["ref_val"]
                 stratified_metric_dict = {}
 
-                if params.get(
-                    "range", False
+                if isinstance(params.get("stratify"), str) and "range" in params.get(
+                    "stratify"
                 ):  # stratify by range (given as percent string)
-                    # TODO: Need to print range too for this
-                    range = ref_vals.max() - ref_vals.min()
-                    range_separation = (float(params["range"].strip("%")) / 100) * range
-
-                    for i in range(range // range_separation):
-                        mask = (ref_vals >= i * range_separation) & (
-                            ref_vals < (i + 1) * range_separation
+                    min_max_range = (ref_vals.max() - ref_vals.min()).cpu().numpy()
+                    range_separation = (
+                        float(params["stratify"].strip("%_range")) / 100
+                    ) * min_max_range
+                    if verbose:
+                        print(
+                            f"Stratifying {key} errors by {key} range, in increments of "
+                            f"{params['stratify'].strip('_range')} (= {range_separation:.3f}), with"
+                            f" min-max dataset range of {min_max_range:.3f}"
                         )
-                        error = errors[mask]
-                        if len(error) > 0:
+
+                    num_strata = np.ceil(min_max_range / range_separation).astype(int)
+                    format = (  # .1% if 1/num_strata is not an integer, otherwise .0% (no decimal)
+                        ".1%"
+                        if not np.isclose(
+                            (1 / num_strata) * 100, round((1 / num_strata) * 100)
+                        )
+                        else ".0%"
+                    )
+
+                    for i in range(num_strata):
+                        mask = (ref_vals >= (i * range_separation) + ref_vals.min()) & (
+                            ref_vals < ((i + 1) * range_separation) + ref_vals.min()
+                        )
+                        masked_errors = errors[mask]
+                        if len(masked_errors) > 0:
                             if reduction == "rms":
-                                stat = error.square().mean().sqrt()
+                                stat = masked_errors.square().mean().sqrt()
                             elif reduction in ["mean", "mae"]:
-                                stat = error.mean()
+                                stat = masked_errors.mean()
                             else:
                                 raise NotImplementedError(
                                     f"reduction {reduction} not implemented"
                                 )
 
-                            stratified_metric_dict[i] = stat
+                            stratified_metric_dict[
+                                (
+                                    f"{i/num_strata:{format}}"
+                                    f"-{(i+1)/num_strata:{format}}"
+                                )
+                            ] = stat
 
                         else:
-                            stratified_metric_dict[i] = torch.tensor(float("nan"))
+                            stratified_metric_dict[
+                                f"{i/num_strata:{format}}-{(i+1)/num_strata:{format}}"
+                            ] = torch.tensor(float("nan"))
 
                 # elif params.get("population", False):  # stratify by population
-                # ...
+                # ... # TODO
 
                 metrics[(key, param_hash)] = stratified_metric_dict
 
@@ -304,41 +336,45 @@ class Metrics:
             suffix = "/N" if per_atom else ""
             item_name = f"{short_name}{suffix}_{reduction}"
 
-            stat = self.running_stats[key][param_hash]
             per_species = params["PerSpecies"]
             stratify = params["stratify"]
 
-            if per_species:
-                if stat.output_dim == tuple():
-                    if type_names is None:
-                        type_names = [i for i in range(len(value))]
-                    for id_ele, v in enumerate(value):
-                        if type_names is not None:
-                            flat_dict[f"{type_names[id_ele]}_{item_name}"] = v.item()
-                        else:
-                            flat_dict[f"{id_ele}_{item_name}"] = v.item()
-
-                    flat_dict[f"psavg_{item_name}"] = value.mean().item()
-                else:
-                    for id_ele, vec in enumerate(value):
-                        ele = type_names[id_ele]
-                        for idx, v in enumerate(vec):
-                            name = f"{ele}_{item_name}_{idx}"
-                            flat_dict[name] = v.item()
-                            skip_keys.append(name)
-
-            elif stratify:  # then value is a dict of {stratum_idx: value}
+            if stratify:  # then value is a dict of {stratum_idx: value}
                 for stratum_idx, v in value.items():
                     name = f"{stratum_idx}_{item_name}"
                     flat_dict[name] = v.item()
                     skip_keys.append(name)
 
             else:
-                if stat.output_dim == tuple():
-                    # a scalar
-                    flat_dict[item_name] = value.item()
+                stat = self.running_stats[key][param_hash]
+
+                if per_species:
+                    stat = self.running_stats[key][param_hash]
+                    if stat.output_dim == tuple():
+                        if type_names is None:
+                            type_names = [i for i in range(len(value))]
+                        for id_ele, v in enumerate(value):
+                            if type_names is not None:
+                                flat_dict[f"{type_names[id_ele]}_{item_name}"] = (
+                                    v.item()
+                                )
+                            else:
+                                flat_dict[f"{id_ele}_{item_name}"] = v.item()
+
+                        flat_dict[f"psavg_{item_name}"] = value.mean().item()
+                    else:
+                        for id_ele, vec in enumerate(value):
+                            ele = type_names[id_ele]
+                            for idx, v in enumerate(vec):
+                                name = f"{ele}_{item_name}_{idx}"
+                                flat_dict[name] = v.item()
+                                skip_keys.append(name)
+
                 else:
-                    # a vector
-                    for idx, v in enumerate(value.flatten()):
-                        flat_dict[f"{item_name}_{idx}"] = v.item()
+                    if stat.output_dim == tuple():  # a scalar
+                        flat_dict[item_name] = value.item()
+                    else:  # a vector
+                        for idx, v in enumerate(value.flatten()):
+                            flat_dict[f"{item_name}_{idx}"] = v.item()
+
         return flat_dict, skip_keys
