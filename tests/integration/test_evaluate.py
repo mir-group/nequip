@@ -57,7 +57,8 @@ def test_metrics(
         metrics = dict(
             [
                 tuple(e.strip() for e in line.split("=", 1))
-                for line in retcode.stdout.decode().splitlines()
+                for line in retcode.stderr.decode().splitlines()
+                if " = " in line
             ]
         )
         metrics = {k: float(v) for k, v in metrics.items()}
@@ -97,12 +98,17 @@ def test_metrics(
                           - - total_energy
                             - mae
                             - PerAtom: True
+                          - - total_energy
+                            - mae
+                            - stratify: 10%_range
+                              PerAtom: True
                         """
                     )
                 )
                 expect_metrics = {
                     "e_mae",
                     "e/N_mae",
+                    "10%-20%_range_e/N_mae",
                 }
             else:
                 # Write out a fancier metrics file
@@ -121,6 +127,16 @@ def test_metrics(
                           - - total_energy
                             - mae
                             - PerAtom: True
+                          - - total_energy
+                            - mae
+                            - stratify: 10%_range
+                              PerAtom: True
+                          - - forces
+                            - rmse
+                            - stratify: 10%_population
+                          - - total_energy
+                            - mae
+                            - stratify: 0.5
                         """
                     )
                 )
@@ -131,6 +147,9 @@ def test_metrics(
                     "psavg_f_mae",
                     "e_mae",
                     "e/N_mae",
+                    "10%-20%_range_e/N_mae",
+                    "30%-40%_population_f_rmse",
+                    "0.5-1.0_range_e_mae",
                 }.union(
                     {
                         # For the PerSpecies
@@ -161,22 +180,21 @@ def test_metrics(
     orig_atoms = ase.io.read(tmpdir + "/out-orig.xyz", index=":", format="extxyz")
 
     # check that we have the metrics
-    assert set(metrics.keys()) == expect_metrics
+    assert expect_metrics.issubset(set(metrics.keys()))
 
     # check metrics
     if builder == IdentityModel:
         true_identity: bool = true_config["default_dtype"] == true_config["model_dtype"]
         for metric, err in metrics.items():
-            # see test_train.py for discussion
-            assert np.allclose(
-                err,
-                0.0,
-                atol=(
-                    1e-8
-                    if true_identity
-                    else (1e-2 if metric.startswith("e") else 1e-4)
-                ),
-            ), f"Metric `{metric}` wasn't zero!"
+            if not np.isnan(err):
+                # see test_train.py for discussion
+                assert np.allclose(
+                    err,
+                    0.0,
+                    atol=(
+                        1e-8 if true_identity else (1e-2 if "_e" in metric else 1e-4)
+                    ),
+                ), f"Metric `{metric}` wasn't zero!"
     elif builder == ConstFactorModel:
         # TODO: check comperable to naive numpy compute
         pass
@@ -205,13 +223,18 @@ def test_metrics(
             }
         )
         for k, v in metrics.items():
-            assert np.allclose(
-                v,
-                metrics2[k],
-                atol={torch.float32: 1e-6, torch.float64: 1e-8}[
-                    torch.get_default_dtype()
-                ],
-            )
+            if not np.isnan(v):
+                assert np.allclose(
+                    v,
+                    metrics2[k],
+                    atol={
+                        torch.float32: 1e-6
+                        + (1e-1 if "population_f_rmse" in k else 0.0),
+                        torch.float64: 1e-8,
+                    }[torch.get_default_dtype()],
+                )
+            else:
+                assert np.isnan(metrics2[k])  # assert both are nans
 
         # Check the output XYZ
         batch_atoms = ase.io.read(tmpdir + "/out-orig.xyz", index=":", format="extxyz")

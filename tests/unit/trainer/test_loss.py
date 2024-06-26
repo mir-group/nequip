@@ -178,6 +178,7 @@ def data(float_tolerance):
         AtomicDataDict.TOTAL_ENERGY_KEY: torch.rand((2, 1)),
         "k": torch.rand((2, 1)),
         AtomicDataDict.ATOM_TYPE_KEY: torch.as_tensor([1, 1, 1, 1, 1, 0, 0, 0, 0, 0]),
+        AtomicDataDict.STRESS_KEY: torch.rand((2, 1)),
     }
     ref = {
         AtomicDataDict.BATCH_KEY: torch.tensor(
@@ -187,6 +188,7 @@ def data(float_tolerance):
         AtomicDataDict.TOTAL_ENERGY_KEY: torch.rand((2, 1)),
         "k": torch.rand((2, 1)),
         AtomicDataDict.ATOM_TYPE_KEY: torch.as_tensor([1, 1, 1, 1, 1, 0, 0, 0, 0, 0]),
+        AtomicDataDict.STRESS_KEY: torch.rand((2, 1)),
     }
     yield pred, ref
 

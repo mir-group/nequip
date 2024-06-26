@@ -27,6 +27,11 @@ metrics_tests = [
         ),
         (AtomicDataDict.FORCE_KEY, "mae", {"dim": 3}),
     ),
+    (  # test stratify settings
+        (AtomicDataDict.TOTAL_ENERGY_KEY, "mae", {"stratify": "10%_range"}),
+        (AtomicDataDict.FORCE_KEY, "rmse", {"stratify": "10%_population"}),
+        (AtomicDataDict.STRESS_KEY, "mae", {"stratify": 0.001}),
+    ),
 ]
 
 

@@ -202,7 +202,7 @@ class Metrics:
                 else:
                     error_N = error
 
-                if stat.dim == () and not per_species:
+                if not stratify and stat.dim == () and not per_species:
                     error_N = error_N.flatten()
 
                 if (  # just need error and ref value, note that forces are not stratified by xyz
@@ -213,12 +213,16 @@ class Metrics:
                             "error": error_N,
                             "ref_val": ref[key],
                         }
-                    self.stratified_stats[key][param_hash]["error"] = torch.cat(
-                        (self.stratified_stats[key][param_hash]["error"], error_N)
-                    )
-                    self.stratified_stats[key][param_hash]["ref_val"] = torch.cat(
-                        (self.stratified_stats[key][param_hash]["ref_val"], ref[key])
-                    )
+                    else:
+                        self.stratified_stats[key][param_hash]["error"] = torch.cat(
+                            (self.stratified_stats[key][param_hash]["error"], error_N)
+                        )
+                        self.stratified_stats[key][param_hash]["ref_val"] = torch.cat(
+                            (
+                                self.stratified_stats[key][param_hash]["ref_val"],
+                                ref[key],
+                            )
+                        )
 
                 else:
                     metrics[(key, param_hash)] = stat.accumulate_batch(
@@ -258,8 +262,9 @@ class Metrics:
                 stratified_stat_dict,
             ) in stats.items():  # compute the stratified error:
                 reduction, params = self.params[key][param_hash]
-                errors = stratified_stat_dict["error"]
-                ref_vals = stratified_stat_dict["ref_val"]
+                # flatten in case has dim > 1 (force, stress):
+                errors = stratified_stat_dict["error"].flatten()
+                ref_vals = stratified_stat_dict["ref_val"].flatten()
                 stratified_metric_dict = {}
 
                 if (
@@ -276,7 +281,10 @@ class Metrics:
                         range_separation = (
                             float(params["stratify"].strip("%_range")) / 100
                         ) * min_max_range
-                        range_separation_str = f"{params['stratify'].strip('_range')} (= {range_separation:.3f})"
+                        range_separation_str = (
+                            f"{params['stratify'].strip('_range')} (= "
+                            f"~{range_separation:.3f})"
+                        )
                     if verbose:
                         print(
                             f"Stratifying {key} errors by {key} range, in increments of "
