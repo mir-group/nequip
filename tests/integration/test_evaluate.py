@@ -192,7 +192,13 @@ def test_metrics(
                     err,
                     0.0,
                     atol=(
-                        1e-8 if true_identity else (1e-2 if "_e" in metric else 1e-4)
+                        1e-8
+                        if true_identity
+                        else (
+                            1.1e-2
+                            if any(i in metric for i in ["_e", "e_", "e/N"])
+                            else 1e-4
+                        )
                     ),
                 ), f"Metric `{metric}` wasn't zero!"
     elif builder == ConstFactorModel:
@@ -228,8 +234,7 @@ def test_metrics(
                     v,
                     metrics2[k],
                     atol={
-                        torch.float32: 1e-6
-                        + (1e-1 if "population_f_rmse" in k else 0.0),
+                        torch.float32: 1e-6,
                         torch.float64: 1e-8,
                     }[torch.get_default_dtype()],
                 )

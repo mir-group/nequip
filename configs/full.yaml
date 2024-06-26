@@ -283,11 +283,11 @@ metrics_components:
 # we can also output errors stratified by the reference value ranges (in percent or absolute values), or by the error populations in percent:
   - - total_energy
     - mae
-    - stratify: 10%_range                 # stratify by range (in reference energies per atom), in increments of 10%
+    - stratify: 10%_range                 # stratify by range (in reference energies per atom), in increments of 10% (i.e. errors for first 10% lowest reference values, next 10% etc)
       PerAtom: True
   - - forces
     - rmse
-    - stratify: 10%_population          # stratify by population (in forces errors per atom), in increments of 10%
+    - stratify: 10%_population          # stratify by population (in forces errors per atom), in increments of 10%  (i.e. errors for first 10% lowest errors, next 10% etc)
   - - stress
     - mae
     - stratify: 0.001                  # stratify by absolute value (in reference stresses), in increments of 0.001
