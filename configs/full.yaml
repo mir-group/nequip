@@ -274,12 +274,23 @@ metrics_components:
   - - forces                                
     - rmse                                  
     - PerSpecies: True                     
-      report_per_component: False    
+      report_per_component: False
   - - total_energy
     - mae    
   - - total_energy
     - mae
     - PerAtom: True                        # if true, energy is normalized by the number of atoms
+# we can also output errors stratified by the reference value ranges (in percent or absolute values), or by the error populations in percent:
+  - - total_energy
+    - mae
+    - stratify: 10%_range                 # stratify by range (in reference energies per atom), in increments of 10%
+      PerAtom: True
+  - - forces
+    - rmse
+    - stratify: 10%_population          # stratify by population (in forces errors per atom), in increments of 10%
+  - - stress
+    - mae
+    - stratify: 0.001                  # stratify by absolute value (in reference stresses), in increments of 0.001
 
 # optimizer, may be any optimizer defined in torch.optim
 # the name `optimizer_name`is case sensitive

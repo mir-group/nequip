@@ -253,7 +253,7 @@ class Metrics:
                 metrics[(key, param_hash)] = stat.current_result()
 
         for key, stats in self.stratified_stats.items():
-            for (  # TODO: Check each choice for forces, rmse and E/N as well!
+            for (
                 param_hash,
                 stratified_stat_dict,
             ) in stats.items():  # compute the stratified error:
@@ -292,6 +292,12 @@ class Metrics:
                             )
                             else ".0%"
                         )
+                    elif isinstance(
+                        params.get("stratify"), float
+                    ):  # same decimal places as given
+                        format = f".{str(params.get('stratify'))[::-1].find('.')}f"
+                    else:
+                        format = ""
 
                     for i in range(num_strata):
                         if isinstance(params.get("stratify"), str):
@@ -300,14 +306,17 @@ class Metrics:
                                 f"-{(i + 1) / num_strata:{format}}_range"
                             )
                         else:
-                            stratum_key = f"{i * range_separation}-{(i + 1) * range_separation}_range"
+                            stratum_key = (
+                                f"{i * range_separation:{format}}"
+                                f"-{(i + 1) * range_separation:{format}}_range"
+                            )
 
                         mask = (ref_vals >= (i * range_separation) + ref_vals.min()) & (
                             ref_vals < ((i + 1) * range_separation) + ref_vals.min()
                         )
                         masked_errors = errors[mask]
                         if len(masked_errors) > 0:
-                            if reduction == "rms":
+                            if reduction in ["rms", "rmse"]:
                                 stat = masked_errors.square().mean().sqrt()
                             elif reduction in ["mean", "mae"]:
                                 stat = masked_errors.mean()
@@ -359,7 +368,7 @@ class Metrics:
                             )
                         ]
                         if len(stratum_errors) > 0:
-                            if reduction == "rms":
+                            if reduction in ["rms", "rmse"]:
                                 stat = stratum_errors.square().mean().sqrt()
                             elif reduction in ["mean", "mae"]:
                                 stat = stratum_errors.mean()

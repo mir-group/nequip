@@ -9,6 +9,7 @@ Most recent change on the bottom.
 ## Unreleased
 - Allow `n_train` and `n_val` to be specified as percentages of datasets.
 - Only attempt training restart if `trainer.pth` file present (prevents unnecessary crashes due to file-not-found errors in some cases)
+- Stratified metrics now possible; stratified by reference values in percent or raw units, or by error population.
 
 ## [0.6.0] - 2024-5-10
 ### Added
