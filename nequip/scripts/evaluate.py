@@ -457,7 +457,7 @@ def main(args=None, running_as_script: bool = True):
         logger.info("\n--- Final result: ---")
         logger.info(
             "\n".join(
-                f"{k:>20s} = {v:< 20f}"
+                f"{k:>30s} = {v:< 30f}"
                 for k, v in metrics.flatten_metrics(
                     metrics.current_result(
                         verbose=True

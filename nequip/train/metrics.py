@@ -253,7 +253,7 @@ class Metrics:
                 metrics[(key, param_hash)] = stat.current_result()
 
         for key, stats in self.stratified_stats.items():
-            for (
+            for (  # TODO: Check each choice for forces, rmse and E/N as well!
                 param_hash,
                 stratified_stat_dict,
             ) in stats.items():  # compute the stratified error:
@@ -262,30 +262,46 @@ class Metrics:
                 ref_vals = stratified_stat_dict["ref_val"]
                 stratified_metric_dict = {}
 
-                if isinstance(params.get("stratify"), str) and "range" in params.get(
-                    "stratify"
-                ):  # stratify by range (given as percent string)
+                if (
+                    isinstance(params.get("stratify"), str)
+                    and "range" in params.get("stratify")
+                ) or isinstance(
+                    params.get("stratify"), (int, float)
+                ):  # stratify by range,
+                    # either as percent string or raw unit:
                     min_max_range = (ref_vals.max() - ref_vals.min()).cpu().numpy()
-                    range_separation = (
-                        float(params["stratify"].strip("%_range")) / 100
-                    ) * min_max_range
+                    if isinstance(params.get("stratify"), (int, float)):
+                        range_separation = range_separation_str = params["stratify"]
+                    else:
+                        range_separation = (
+                            float(params["stratify"].strip("%_range")) / 100
+                        ) * min_max_range
+                        range_separation_str = f"{params['stratify'].strip('_range')} (= {range_separation:.3f})"
                     if verbose:
                         print(
                             f"Stratifying {key} errors by {key} range, in increments of "
-                            f"{params['stratify'].strip('_range')} (= {range_separation:.3f}), with"
-                            f" min-max dataset range of {min_max_range:.3f}"
+                            f"{range_separation_str}, with min-max dataset range of {min_max_range:.3f}"
                         )
 
                     num_strata = np.ceil(min_max_range / range_separation).astype(int)
-                    format = (  # .1% if 1/num_strata is not an integer, otherwise .0% (no decimal)
-                        ".1%"
-                        if not np.isclose(
-                            (1 / num_strata) * 100, round((1 / num_strata) * 100)
+                    if isinstance(params.get("stratify"), str):
+                        format = (  # .1% if 1/num_strata is not an integer, otherwise .0% (no decimal)
+                            ".1%"
+                            if not np.isclose(
+                                (1 / num_strata) * 100, round((1 / num_strata) * 100)
+                            )
+                            else ".0%"
                         )
-                        else ".0%"
-                    )
 
                     for i in range(num_strata):
+                        if isinstance(params.get("stratify"), str):
+                            stratum_key = (
+                                f"{i / num_strata:{format}}"
+                                f"-{(i + 1) / num_strata:{format}}_range"
+                            )
+                        else:
+                            stratum_key = f"{i * range_separation}-{(i + 1) * range_separation}_range"
+
                         mask = (ref_vals >= (i * range_separation) + ref_vals.min()) & (
                             ref_vals < ((i + 1) * range_separation) + ref_vals.min()
                         )
@@ -300,20 +316,64 @@ class Metrics:
                                     f"reduction {reduction} not implemented"
                                 )
 
-                            stratified_metric_dict[
-                                (
-                                    f"{i/num_strata:{format}}"
-                                    f"-{(i+1)/num_strata:{format}}"
-                                )
-                            ] = stat
+                            stratified_metric_dict[stratum_key] = stat
 
                         else:
-                            stratified_metric_dict[
-                                f"{i/num_strata:{format}}-{(i+1)/num_strata:{format}}"
-                            ] = torch.tensor(float("nan"))
+                            stratified_metric_dict[stratum_key] = torch.tensor(
+                                float("nan")
+                            )
 
-                # elif params.get("population", False):  # stratify by population
-                # ... # TODO
+                elif isinstance(
+                    params.get("stratify"), str
+                ) and "population" in params.get(
+                    "stratify"
+                ):  # stratify by population (given as percent string)
+                    total_population = len(errors)
+                    population_separation = (
+                        float(params["stratify"].strip("%_population")) / 100
+                    ) * total_population
+                    if verbose:
+                        print(
+                            f"Stratifying {key} errors by population, in increments of "
+                            f"{params['stratify'].strip('_population')} (= "
+                            f"~{round(population_separation)} labels)"
+                        )
+
+                    num_strata = np.ceil(
+                        total_population / population_separation
+                    ).astype(int)
+                    format = (  # .1% if 1/num_strata is not an integer, otherwise .0% (no decimal)
+                        ".1%"
+                        if not np.isclose(
+                            (1 / num_strata) * 100, round((1 / num_strata) * 100)
+                        )
+                        else ".0%"
+                    )
+                    sorted_errors = torch.sort(errors, dim=0).values
+
+                    for i in range(num_strata):
+                        stratum_key = f"{i/num_strata:{format}}-{(i+1)/num_strata:{format}}_population"
+                        stratum_errors = sorted_errors[
+                            int(population_separation * i) : int(
+                                population_separation * (i + 1)
+                            )
+                        ]
+                        if len(stratum_errors) > 0:
+                            if reduction == "rms":
+                                stat = stratum_errors.square().mean().sqrt()
+                            elif reduction in ["mean", "mae"]:
+                                stat = stratum_errors.mean()
+                            else:
+                                raise NotImplementedError(
+                                    f"reduction {reduction} not implemented"
+                                )
+
+                            stratified_metric_dict[stratum_key] = stat
+
+                        else:
+                            stratified_metric_dict[stratum_key] = torch.tensor(
+                                float("nan")
+                            )
 
                 metrics[(key, param_hash)] = stratified_metric_dict
 
