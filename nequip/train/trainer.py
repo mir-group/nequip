@@ -1156,7 +1156,7 @@ class Trainer:
             n = getattr(self, n_name)
             if isinstance(n, str) and "%" in n:
                 n_train_n_val.append(
-                    (float(n.strip("%")) / 100) * dataset_size
+                    (float(n.rstrip("%")) / 100) * dataset_size
                 )  # convert to float first
             elif isinstance(n, int):
                 n_train_n_val.append(n)
