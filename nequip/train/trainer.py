@@ -1156,7 +1156,7 @@ class Trainer:
                     train_dataset_size if n_name == "n_train" else val_dataset_size
                 )
                 n_train_n_val.append(
-                    (float(n.strip("%")) / 100) * dataset_size
+                    (float(n.rstrip("%")) / 100) * dataset_size
                 )  # convert to float first
             elif isinstance(n, int):
                 n_train_n_val.append(n)
