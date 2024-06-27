@@ -1149,14 +1149,14 @@ class Trainer:
     ) -> tuple[int]:
         # parse n_train and n_val (can be ints or str with percentage):
         n_train_n_val = []
-        for n_name in ["n_train", "n_val"]:
+        for n_name, dataset_size in (
+            ("n_train", train_dataset_size),
+            ("n_val", val_dataset_size),
+        ):
             n = getattr(self, n_name)
             if isinstance(n, str) and "%" in n:
-                dataset_size = (
-                    train_dataset_size if n_name == "n_train" else val_dataset_size
-                )
                 n_train_n_val.append(
-                    (float(n.strip("%")) / 100) * dataset_size
+                    (float(n.rstrip("%")) / 100) * dataset_size
                 )  # convert to float first
             elif isinstance(n, int):
                 n_train_n_val.append(n)
