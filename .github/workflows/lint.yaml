@@ -18,7 +18,7 @@ jobs:
       - name: Black Check
         uses: psf/black@stable
         with:
-          version: "22.3.0"
+          version: "24.4.2"
 
   flake8:
     runs-on: ubuntu-latest
@@ -29,7 +29,7 @@ jobs:
           python-version: '3.x'
       - name: Install flake8
         run: |
-          pip install flake8==7.0.0
+          pip install flake8==7.1.0
       - name: run flake8
         run: |
           flake8 . --count --show-source --statistics
