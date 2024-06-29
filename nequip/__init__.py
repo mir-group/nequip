@@ -16,9 +16,9 @@ assert (torch_version == packaging.version.parse("1.11")) or (
 ), f"NequIP supports PyTorch 1.11.* or 1.13.* or later, but {torch_version} found"
 
 # warn if using 1.13* or 2.0.*
-if packaging.version.parse("1.13.0") <= torch_version < packaging.version.parse("2.1"):
+if packaging.version.parse("1.13.0") <= torch_version:
     warnings.warn(
-        f"!! PyTorch version {torch_version} found. Upstream issues in PyTorch versions 1.13.* and 2.0.* have been seen to cause unusual performance degredations on some CUDA systems that become worse over time; see https://github.com/mir-group/nequip/discussions/311. The best tested PyTorch version to use with CUDA devices is 1.11; while using other versions if you observe this problem, an unexpected lack of this problem, or other strange behavior, please post in the linked GitHub issue."
+        f"!! PyTorch version {torch_version} found. Upstream issues in PyTorch versions 1.13.* and 2.* have been seen to cause unusual performance degredations on some CUDA systems that become worse over time; see https://github.com/mir-group/nequip/discussions/311. The best tested PyTorch version to use with CUDA devices is 1.11; while using other versions if you observe this problem, an unexpected lack of this problem, or other strange behavior, please post in the linked GitHub issue."
     )
 
 
