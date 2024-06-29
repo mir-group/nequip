@@ -11,10 +11,8 @@ import warnings
 torch_version = packaging.version.parse(torch.__version__)
 
 # only allow 1.11*, 1.13* or higher (no 1.12.*)
-assert (torch_version > packaging.version.parse("1.11.0")) and not (
-    packaging.version.parse("1.12.0")
-    <= torch_version
-    < packaging.version.parse("1.13.0")
+assert (torch_version == packaging.version.parse("1.11")) or (
+    torch_version >= packaging.version.parse("1.13")
 ), f"NequIP supports PyTorch 1.11.* or 1.13.* or later, but {torch_version} found"
 
 # warn if using 1.13* or 2.0.*
