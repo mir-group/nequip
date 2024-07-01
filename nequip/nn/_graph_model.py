@@ -55,6 +55,9 @@ class GraphModel(GraphModuleMixin, torch.nn.Module):
             model_dtype if model_dtype is not None else torch.get_default_dtype()
         )
         self.model_input_fields = list(self.irreps_in.keys())
+        self.register_buffer(
+            "_model_dtype_example", torch.as_tensor(0.0, dtype=model_dtype)
+        )
 
         self._num_rescale_layers = 0
         outer_layer = self.model
@@ -105,9 +108,17 @@ class GraphModel(GraphModuleMixin, torch.nn.Module):
         new_data: AtomicDataDict.Type = {}
         for k, v in data.items():
             if k in self.model_input_fields:
-                if v.is_floating_point():
+                # Allow input position and position-related
+                # fields to be maintained in their original dtype
+                if v.is_floating_point() and k not in (
+                    AtomicDataDict.POSITIONS_KEY,
+                    AtomicDataDict.CELL_KEY,
+                    AtomicDataDict.EDGE_CELL_SHIFT_KEY,
+                ):
                     v = v.to(dtype=self.model_dtype)
                 new_data[k] = v
+        # Store the model dtype indicator tensor in all input data dicts
+        new_data[AtomicDataDict.MODEL_DTYPE_KEY] = self._model_dtype_example
         # run the model
         data = self.model(new_data)
         return data
