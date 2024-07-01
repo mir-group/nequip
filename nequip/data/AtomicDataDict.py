@@ -54,11 +54,14 @@ def with_edge_vectors(data: Type, with_lengths: bool = True) -> Type:
     Returns:
         Tensor [n_edges, 3] edge displacement vectors
     """
+    model_dtype: torch.dtype = data[_keys.MODEL_DTYPE_KEY].dtype
+    # We do calculations on the positions and cells in whatever dtype they
+    # were provided in, and only convert to model_dtype after
     if _keys.EDGE_VECTORS_KEY in data:
         if with_lengths and _keys.EDGE_LENGTH_KEY not in data:
             data[_keys.EDGE_LENGTH_KEY] = torch.linalg.norm(
                 data[_keys.EDGE_VECTORS_KEY], dim=-1
-            )
+            ).to(model_dtype)
         return data
     else:
         # Build it dynamically
@@ -82,7 +85,9 @@ def with_edge_vectors(data: Type, with_lengths: bool = True) -> Type:
                 # Cell has a batch dimension
                 # note the ASE cell vectors as rows convention
                 edge_vec = edge_vec + torch.einsum(
-                    "ni,nij->nj", edge_cell_shift, cell[batch[edge_index[0]]]
+                    "ni,nij->nj",
+                    edge_cell_shift,
+                    cell[batch[edge_index[0]]],
                 )
                 # TODO: is there a more efficient way to do the above without
                 # creating an [n_edge] and [n_edge, 3, 3] tensor?
@@ -96,9 +101,11 @@ def with_edge_vectors(data: Type, with_lengths: bool = True) -> Type:
                     edge_cell_shift,
                     cell.squeeze(0),  # remove batch dimension
                 )
-        data[_keys.EDGE_VECTORS_KEY] = edge_vec
+        data[_keys.EDGE_VECTORS_KEY] = edge_vec.to(model_dtype)
         if with_lengths:
-            data[_keys.EDGE_LENGTH_KEY] = torch.linalg.norm(edge_vec, dim=-1)
+            data[_keys.EDGE_LENGTH_KEY] = torch.linalg.norm(edge_vec, dim=-1).to(
+                model_dtype
+            )
         return data
 
 
