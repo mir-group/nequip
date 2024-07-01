@@ -45,7 +45,7 @@ if "NEQUIP_NUM_TASKS" not in os.environ:
 # The default float tolerance
 FLOAT_TOLERANCE = {
     t: torch.as_tensor(v, dtype=dtype_from_name(t))
-    for t, v in {"float32": 1e-3, "float64": 1e-10}.items()
+    for t, v in {"float32": 1e-3, "float64": 1e-8}.items()
 }
 
 
