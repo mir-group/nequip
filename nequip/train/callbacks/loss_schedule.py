@@ -25,9 +25,10 @@ class SimpleLossSchedule:
 
     def __call__(self, trainer: Trainer):
         assert (
-            self in trainer._start_of_epoch_callbacks
+            self in trainer.callback_manager.callbacks["start_of_epoch"]
         ), "must be start not end of epoch"
         # user-facing 1 based indexing of epochs rather than internal zero based
+
         iepoch: int = trainer.iepoch + 1
         if iepoch < 1:  # initial validation epoch is 0 in user-facing indexing
             return
