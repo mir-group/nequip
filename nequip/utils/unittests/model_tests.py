@@ -228,7 +228,13 @@ class BaseModelTests:
         instance, out_fields = model
         instance = instance.to(device=device)
         atomic_batch = atomic_batch.to(device=device)
-        assert_AtomicData_equivariant(func=instance, data_in=atomic_batch)
+        assert_AtomicData_equivariant(
+            func=instance,
+            data_in=atomic_batch,
+            e3_tolerance={torch.float32: 1e-3, torch.float64: 1e-8}[
+                torch.get_default_dtype()
+            ],
+        )
 
     def test_embedding_cutoff(self, model, config, device):
         instance, out_fields = model
@@ -449,10 +455,12 @@ class BaseEnergyModelTests(BaseModelTests):
                 assert torch.allclose(
                     output[k],
                     output_partial[k],
-                    atol=1e-8
-                    if k == AtomicDataDict.TOTAL_ENERGY_KEY
-                    and torch.get_default_dtype() == torch.float64
-                    else 1e-5,
+                    atol=(
+                        1e-8
+                        if k == AtomicDataDict.TOTAL_ENERGY_KEY
+                        and torch.get_default_dtype() == torch.float64
+                        else 1e-5
+                    ),
                 )
             else:
                 assert torch.equal(output[k], output_partial[k])
