@@ -3,6 +3,9 @@
 import logging
 import argparse
 import warnings
+import shutil
+import difflib
+import yaml
 
 # This is a weird hack to avoid Intel MKL issues on the cluster when this is called as a subprocess of a process that has itself initialized PyTorch.
 # Since numpy gets imported later anyway for dataset stuff, this shouldn't affect performance.
@@ -68,32 +71,61 @@ _GLOBAL_ALL_ASKED_FOR_KEYS.update(default_config.keys())
 
 
 def main(args=None, running_as_script: bool = True):
-    config = parse_command_line(args)
+    config, path_to_config, override_options = parse_command_line(args)
 
     if running_as_script:
         set_up_script_logger(config.get("log", None), config.verbose)
 
-    found_restart_file = exists(f"{config.root}/{config.run_name}/trainer.pth")
+    train_dir = f"{config.root}/{config.run_name}"
+    found_restart_file = exists(f"{train_dir}/trainer.pth")
     if found_restart_file and not config.append:
         raise RuntimeError(
-            f"Training instance exists at {config.root}/{config.run_name}; "
+            f"Training instance exists at {train_dir}; "
             "either set append to True or use a different root or runname"
         )
-    elif not found_restart_file and isdir(f"{config.root}/{config.run_name}"):
+    elif not found_restart_file and isdir(train_dir):
         # output directory exists but no ``trainer.pth`` file, suggesting previous run crash during
         # first training epoch (usually due to memory):
         warnings.warn(
-            f"Previous run folder at {config.root}/{config.run_name} exists, but a saved model "
+            f"Previous run folder at {train_dir} exists, but a saved model "
             f"(trainer.pth file) was not found. This folder will be cleared and a fresh training run will "
             f"be started."
         )
-        rmtree(f"{config.root}/{config.run_name}")
+        rmtree(train_dir)
 
     # for fresh new train
     if not found_restart_file:
+        # update config with override parameters
+        config.update(override_options)
         trainer = fresh_start(config)
+        # copy original config to training directory
+        shutil.copyfile(path_to_config, f"{train_dir}/original_config.yaml")
     else:
-        trainer = restart(config)
+        # perform string matching for original config and restart config
+        # throw error if they are different
+        with open(f"{train_dir}/original_config.yaml") as orig_f, open(
+            path_to_config
+        ) as current_f:
+            diffs = [
+                x
+                for x in difflib.Differ().compare(
+                    orig_f.readlines(), current_f.readlines()
+                )
+                if x[0] in ("+", "-")
+            ]
+        if diffs:
+            # all rows with changes
+            raise RuntimeError(
+                f"Config {path_to_config} used for restart differs from original config for training run in {train_dir}.\n"
+                + "The following differences were found:\n\n"
+                + "".join(diffs)
+                + "\n"
+                + "If you intend to update config parameters, use the --override flag. For example, use\n"
+                + f'`nequip-train {path_to_config} --override "max_epochs: 42"`\n'
+                + 'on the command line to override the config parameter "max_epochs"'
+            )
+        else:
+            trainer = restart(config, override_options)
 
     # Train
     trainer.save()
@@ -157,6 +189,12 @@ def parse_command_line(args=None):
         help="Warn instead of error when the config contains unused keys",
         action="store_true",
     )
+    parser.add_argument(
+        "--override",
+        help="Override top-level configuration keys from the `--train-dir`/`--model`'s config YAML file.  This should be a valid YAML string. Unless you know why you need to, do not use this option.",
+        type=str,
+        default=None,
+    )
     args = parser.parse_args(args=args)
 
     config = Config.from_file(args.config, defaults=default_config)
@@ -169,10 +207,26 @@ def parse_command_line(args=None):
     ):
         config[flag] = getattr(args, flag) or config[flag]
 
-    return config
+    # Set override options before _set_global_options so that things like allow_tf32 are correctly handled
+    if args.override is not None:
+        override_options = yaml.load(args.override, Loader=yaml.Loader)
+        assert isinstance(
+            override_options, dict
+        ), "--override's YAML string must define a dictionary of top-level options"
+        overridden_keys = set(config.keys()).intersection(override_options.keys())
+        set_keys = set(override_options.keys()) - set(overridden_keys)
+        logging.info(
+            f"--override:  overrode keys {list(overridden_keys)} and set new keys {list(set_keys)}"
+        )
+        del overridden_keys, set_keys
+    else:
+        override_options = {}
+
+    return config, args.config, override_options
 
 
 def fresh_start(config):
+
     # we use add_to_config cause it's a fresh start and need to record it
     check_code_version(config, add_to_config=True)
     _set_global_options(config)
@@ -267,7 +321,7 @@ def fresh_start(config):
     return trainer
 
 
-def restart(config):
+def restart(config, override_options):
     # load the dictionary
     restart_file = f"{config.root}/{config.run_name}/trainer.pth"
     dictionary = load_file(
@@ -275,20 +329,6 @@ def restart(config):
         filename=restart_file,
         enforced_format="torch",
     )
-
-    # compare dictionary to config and update stop condition related arguments
-    for k in config.keys():
-        if config[k] != dictionary.get(k, ""):
-            if k == "max_epochs":
-                dictionary[k] = config[k]
-                logging.info(f'Update "{k}" to {dictionary[k]}')
-            elif k.startswith("early_stop"):
-                dictionary[k] = config[k]
-                logging.info(f'Update "{k}" to {dictionary[k]}')
-            elif isinstance(config[k], type(dictionary.get(k, ""))):
-                raise ValueError(
-                    f'Key "{k}" is different in config and the result trainer.pth file. Please double check'
-                )
 
     # note, "trainer.pth"/dictionary also store code versions,
     # which will not be stored in config and thus not checked here
@@ -298,6 +338,10 @@ def restart(config):
     # raise error
 
     config = Config(dictionary, exclude_keys=["state_dict", "progress"])
+
+    # override configs loaded from save
+    dictionary.update(override_options)
+    config.update(override_options)
 
     # dtype, etc.
     _set_global_options(config)
