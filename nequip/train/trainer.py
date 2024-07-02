@@ -1146,7 +1146,7 @@ class Trainer:
 
     def _parse_n_train_n_val(
         self, train_dataset_size: int, val_dataset_size: int
-    ) -> tuple[int]:
+    ) -> Tuple[int, int]:
         # parse n_train and n_val (can be ints or str with percentage):
         n_train_n_val = []
         for n_name, dataset_size in (
