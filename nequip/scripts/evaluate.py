@@ -383,9 +383,11 @@ def main(args=None, running_as_script: bool = True):
         if do_metrics:
             display_bar = context_stack.enter_context(
                 tqdm(
-                    bar_format=""
-                    if prog.disable  # prog.ncols doesn't exist if disabled
-                    else ("{desc:." + str(prog.ncols) + "}"),
+                    bar_format=(
+                        ""
+                        if prog.disable  # prog.ncols doesn't exist if disabled
+                        else ("{desc:." + str(prog.ncols) + "}")
+                    ),
                     disable=None,
                 )
             )

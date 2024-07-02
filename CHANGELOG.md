@@ -6,14 +6,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Most recent change on the bottom.
 
+
 ## Unreleased - 0.6.1
 ### Added
 - add support for equivariance testing of arbitrary Cartesian tensor outputs
 - [Breaking] use entry points for `nequip.extension`s (e.g. for field registration)
 - alternate neighborlist support enabled with `NEQUIP_NL` environment variable, which can be set to `ase` (default), `matscipy` or `vesin`
+- Allow `n_train` and `n_val` to be specified as percentages of datasets.
+- Only attempt training restart if `trainer.pth` file present (prevents unnecessary crashes due to file-not-found errors in some cases)
 
 ### Changed
 - [Breaking] `NEQUIP_MATSCIPY_NL` environment variable no longer supported
+
+### Fixed
+- Fixed `flake8` install location in `pre-commit-config.yaml`
 
 
 ## [0.6.0] - 2024-5-10
