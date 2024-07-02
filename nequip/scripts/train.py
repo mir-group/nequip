@@ -49,7 +49,7 @@ default_config = dict(
     equivariance_test=False,
     grad_anomaly_mode=False,
     gpu_oom_offload=False,
-    append=False,
+    append=True,
     warn_unused=False,
     _jit_bailout_depth=2,  # avoid 20 iters of pain, see https://github.com/pytorch/pytorch/issues/52286
     # Quote from eelison in PyTorch slack:
