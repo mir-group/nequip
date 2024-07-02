@@ -108,7 +108,7 @@ class Trainer:
     - "trainer_save.pth": all the training information. The file used for loading and restart
 
     For restart run, the default set up is to not append to the original folders and files.
-    The Output class will automatically build a folder call root/run_name
+    The Output class will automatically build a folder called ``root/run_name``
     If append mode is on, the log file will be appended and the best model and last model will be overwritten.
 
     More examples can be found in tests/train/test_trainer.py

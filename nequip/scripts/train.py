@@ -8,7 +8,8 @@ import warnings
 # Since numpy gets imported later anyway for dataset stuff, this shouldn't affect performance.
 import numpy as np  # noqa: F401
 
-from os.path import exists
+from os.path import exists, isdir
+from shutil import rmtree
 from pathlib import Path
 
 import torch
@@ -78,6 +79,15 @@ def main(args=None, running_as_script: bool = True):
             f"Training instance exists at {config.root}/{config.run_name}; "
             "either set append to True or use a different root or runname"
         )
+    elif not found_restart_file and isdir(f"{config.root}/{config.run_name}"):
+        # output directory exists but no ``trainer.pth`` file, suggesting previous run crash during
+        # first training epoch (usually due to memory):
+        warnings.warn(
+            f"Previous run folder at {config.root}/{config.run_name} exists, but a saved model "
+            f"(trainer.pth file) was not found. This folder will be cleared and a fresh training run will "
+            f"be started."
+        )
+        rmtree(f"{config.root}/{config.run_name}")
 
     # for fresh new train
     if not found_restart_file:
