@@ -92,9 +92,10 @@ def _set_global_options(config, warn_on_override: bool = False) -> None:
     #
     k = "PYTORCH_JIT_USE_NNC_NOT_NVFUSER"
     if k in os.environ:
-        warnings.warn(
-            "Do NOT manually set PYTORCH_JIT_USE_NNC_NOT_NVFUSER=0 unless you know exactly what you're doing!"
-        )
+        if os.environ[k] != "1":
+            warnings.warn(
+                "Do NOT manually set PYTORCH_JIT_USE_NNC_NOT_NVFUSER=0 unless you know exactly what you're doing!"
+            )
     else:
         os.environ[k] = "1"
 
