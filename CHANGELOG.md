@@ -7,8 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Most recent change on the bottom.
 
 
-## Unreleased
+## Unreleased - 0.7.0
+### Added
+- `--override` now supported as a `nequip-train` flag (similar to its use in `nequip-deploy`)
+- add SoftAdapt (https://arxiv.org/abs/2403.18122) callback option
 
+### Changed
+- [Breaking] training restart behavior altered: file-wise consistency checks performed between original config and config passed to `nequip-train` on restart (instead of checking the config dicts)
+- [Breaking] config format for callbacks changed (see `configs/full.yaml` for an example)
+
+### Fixed
+- fixed `wandb_watch` bug
 
 ## [0.6.2] - 2025-3-22
 
