@@ -1166,6 +1166,10 @@ class Trainer:
                 )
 
         floored_n_train_n_val = [int(n) for n in n_train_n_val]
+        for n, n_name in zip(floored_n_train_n_val, ["n_train", "n_val"]):
+            if n < 1:
+                raise ValueError(f"{n_name} must be at least 1! Got {n}.")
+
         # if n_train and n_val were both set as percentages which summed to 100%, make sure that sum of
         # floored values comes to 100% of dataset size (i.e. that flooring doesn't omit a frame)
         if (
