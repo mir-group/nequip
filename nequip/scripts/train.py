@@ -93,19 +93,19 @@ def main(args=None, running_as_script: bool = True):
         )
         rmtree(train_dir)
 
-    # for fresh new train
-    if not found_restart_file:
-        # update config with override parameters
+    if not found_restart_file:  # fresh start
+        # update config with override parameters for setting up train-dir
         config.update(override_options)
         trainer = fresh_start(config)
         # copy original config to training directory
         shutil.copyfile(path_to_config, f"{train_dir}/original_config.yaml")
-    else:
+    else:  # restart
         # perform string matching for original config and restart config
         # throw error if they are different
-        with open(f"{train_dir}/original_config.yaml") as orig_f, open(
-            path_to_config
-        ) as current_f:
+        with (
+            open(f"{train_dir}/original_config.yaml") as orig_f,
+            open(path_to_config) as current_f,
+        ):
             diffs = [
                 x
                 for x in difflib.Differ().compare(
@@ -114,15 +114,15 @@ def main(args=None, running_as_script: bool = True):
                 if x[0] in ("+", "-")
             ]
         if diffs:
-            # all rows with changes
             raise RuntimeError(
                 f"Config {path_to_config} used for restart differs from original config for training run in {train_dir}.\n"
                 + "The following differences were found:\n\n"
                 + "".join(diffs)
                 + "\n"
-                + "If you intend to update config parameters, use the --override flag. For example, use\n"
+                + "If you intend to override the original config parameters, use the --override flag. For example, use\n"
                 + f'`nequip-train {path_to_config} --override "max_epochs: 42"`\n'
-                + 'on the command line to override the config parameter "max_epochs"'
+                + 'on the command line to override the config parameter "max_epochs"\n'
+                + "BE WARNED that use of the --override flag is not protected by consistency checks performed by NequIP."
             )
         else:
             trainer = restart(config, override_options)
