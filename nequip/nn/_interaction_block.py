@@ -1,4 +1,5 @@
 """ Interaction Block """
+
 from typing import Optional, Dict, Callable
 
 import torch

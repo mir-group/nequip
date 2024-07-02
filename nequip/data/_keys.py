@@ -2,6 +2,7 @@
 
 This is a seperate module to compensate for a TorchScript bug that can only recognize constants when they are accessed as attributes of an imported module.
 """
+
 import sys
 from typing import List
 

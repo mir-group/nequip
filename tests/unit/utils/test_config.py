@@ -1,6 +1,7 @@
 """
 Config tests
 """
+
 import pytest
 
 from os import remove

@@ -84,6 +84,7 @@ class PartialSampler(Sampler[int]):
             If `None`, defaults to `len(data_source)`.
         generator (Generator): Generator used in sampling.
     """
+
     data_source: Dataset
     num_samples_per_epoch: int
     shuffle: bool
