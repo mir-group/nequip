@@ -108,7 +108,7 @@ class Trainer:
     - "trainer_save.pth": all the training information. The file used for loading and restart
 
     For restart run, the default set up is to not append to the original folders and files.
-    The Output class will automatically build a folder call root/run_name
+    The Output class will automatically build a folder called ``root/run_name``
     If append mode is on, the log file will be appended and the best model and last model will be overwritten.
 
     More examples can be found in tests/train/test_trainer.py
@@ -1146,7 +1146,7 @@ class Trainer:
 
     def _parse_n_train_n_val(
         self, train_dataset_size: int, val_dataset_size: int
-    ) -> tuple[int]:
+    ) -> Tuple[int, int]:
         # parse n_train and n_val (can be ints or str with percentage):
         n_train_n_val = []
         for n_name, dataset_size in (
@@ -1166,6 +1166,10 @@ class Trainer:
                 )
 
         floored_n_train_n_val = [int(n) for n in n_train_n_val]
+        for n, n_name in zip(floored_n_train_n_val, ["n_train", "n_val"]):
+            if n < 1:
+                raise ValueError(f"{n_name} must be at least 1! Got {n}.")
+
         # if n_train and n_val were both set as percentages which summed to 100%, make sure that sum of
         # floored values comes to 100% of dataset size (i.e. that flooring doesn't omit a frame)
         if (

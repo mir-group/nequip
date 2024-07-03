@@ -83,7 +83,8 @@ class PerAtomLoss(SimpleLoss):
         # zero the nan entries
         has_nan = self.ignore_nan and torch.isnan(ref.sum())
         N = torch.bincount(ref_dict[AtomicDataDict.BATCH_KEY])
-        N = N.reshape((-1, 1))
+        # as many dimensions of size 1 as there are non-batch dimensions in the data
+        N = N.reshape((-1,) + (1,) * (pred.ndim - 1))
         if has_nan:
             not_nan = (ref == ref).int()
             loss = self.func(pred, torch.nan_to_num(ref, nan=0.0)) * not_nan / N
