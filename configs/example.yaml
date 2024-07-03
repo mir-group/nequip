@@ -18,7 +18,7 @@ allow_tf32: true    # consider setting to false if you plan to mix training/infe
 # network
 r_max: 4.0                                                                        # cutoff radius in length units, here Angstrom, this is an important hyperparamter to scan
 num_layers: 4                                                                     # number of interaction blocks, we find 3-5 to work best
-l_max: 1                                                                          # the maximum irrep order (rotation order) for the network's features, l=1 is a good default, l=2 is more accurate but slower
+l_max: 2                                                                          # the maximum irrep order (rotation order) for the network's features, l=2 is accurate but slower, l=1 if you want to be faster but less accurte
 parity: true                                                                      # whether to include features with odd mirror parity; often turning parity off gives equally good results but faster networks, so do consider this
 num_features: 32                                                                  # the multiplicity of the features, 32 is a good default for accurate network, if you want to be more accurate, go larger, if you want to be faster, go lower
 nonlinearity_type: gate                                                           # may be 'gate' or 'norm', 'gate' is recommended
@@ -100,7 +100,7 @@ early_stopping_lower_bounds:                                                    
   LR: 1.0e-5
 
 early_stopping_upper_bounds:                                                       # stop early if the training appears to have exploded
-  validation_loss: 1.0e4
+  validation_loss: 1.0e+4
 
 # loss function
 loss_coeffs:                                                                        
@@ -131,8 +131,11 @@ metrics_components:
 
 # optimizer, may be any optimizer defined in torch.optim
 # the name `optimizer_name`is case sensitive
-optimizer_name: Adam                                                               # default optimizer is Adam 
-optimizer_amsgrad: false
+# IMPORTANT: for NequIP (not for Allegro), we find that in most cases AMSGrad strongly improves
+# out-of-distribution generalization over Adam. We highly recommed trying both AMSGrad (by setting
+# optimizer_amsgrad: true) and Adam (by setting optimizer_amsgrad: false)
+optimizer_name: Adam                                                             
+optimizer_amsgrad: true
 
 # lr scheduler, currently only supports the two options listed in full.yaml, i.e. on-pleteau and cosine annealing with warm restarts, if you need more please file an issue
 # here: on-plateau, reduce lr by factory of lr_scheduler_factor if metrics_key hasn't improved for lr_scheduler_patience epoch
@@ -145,17 +148,12 @@ lr_scheduler_factor: 0.5
 # the default is to scale the atomic energy and forces by scaling them by the force standard deviation and to shift the energy by the mean atomic energy
 # in certain cases, it can be useful to have a trainable shift/scale and to also have species-dependent shifts/scales for each atom
 
-# whether the shifts and scales are trainable. Defaults to False. Optional
-per_species_rescale_shifts_trainable: false
-per_species_rescale_scales_trainable: false
-
 # initial atomic energy shift for each species. default to the mean of per atom energy. Optional
 # the value can be a constant float value, an array for each species, or a string that defines a statistics over the training dataset
+# if numbers are explicitly provided, they must be in the same energy units as the training data
 per_species_rescale_shifts: dataset_per_atom_total_energy_mean
 
 # initial atomic energy scale for each species. Optional.
 # the value can be a constant float value, an array for each species, or a string
-per_species_rescale_scales: dataset_forces_rms
-
-# if explicit numbers are given for the shifts/scales, this parameter must specify whether the given numbers are unitless shifts/scales or are in the units of the dataset. If ``True``, any global rescalings will correctly be applied to the per-species values.
-# per_species_rescale_arguments_in_dataset_units: True
+# if numbers are explicitly provided, they must be in the same energy units as the training data
+per_species_rescale_scales: null

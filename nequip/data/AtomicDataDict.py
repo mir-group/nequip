@@ -5,6 +5,7 @@ of the ``AtomicData`` class which are produced by ``AtomicData.to_AtomicDataDict
 
 Authors: Albert Musaelian
 """
+
 from typing import Dict, Any
 
 import torch
@@ -67,7 +68,10 @@ def with_edge_vectors(data: Type, with_lengths: bool = True) -> Type:
         # (2) works on a Batch constructed from AtomicData
         pos = data[_keys.POSITIONS_KEY]
         edge_index = data[_keys.EDGE_INDEX_KEY]
-        edge_vec = pos[edge_index[1]] - pos[edge_index[0]]
+        # edge_vec = pos[edge_index[1]] - pos[edge_index[0]]
+        edge_vec = torch.index_select(pos, 0, edge_index[1]) - torch.index_select(
+            pos, 0, edge_index[0]
+        )
         if _keys.CELL_KEY in data:
             # ^ note that to save time we don't check that the edge_cell_shifts are trivial if no cell is provided; we just assume they are either not present or all zero.
             # -1 gives a batch dim no matter what
