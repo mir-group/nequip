@@ -217,7 +217,14 @@ class Trainer:
     """
 
     stop_keys = ["max_epochs", "early_stopping", "early_stopping_kwargs"]
-    object_keys = ["loss", "lr_sched", "optim", "ema", "early_stopping_conds"]
+    object_keys = [
+        "loss",
+        "callback_manager",
+        "lr_sched",
+        "optim",
+        "ema",
+        "early_stopping_conds",
+    ]
     lr_scheduler_module = torch.optim.lr_scheduler
     optim_module = torch.optim
 

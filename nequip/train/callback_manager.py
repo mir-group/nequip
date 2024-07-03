@@ -44,3 +44,9 @@ class CallbackManager:
 
         for callback in self.callbacks.get(callback_type):
             callback(trainer)
+
+    def state_dict(self):
+        return {"callback_manager_obj_callbacks": self.callbacks}
+
+    def load_state_dict(self, state_dict):
+        self.callbacks = state_dict.get("callback_manager_obj_callbacks")
