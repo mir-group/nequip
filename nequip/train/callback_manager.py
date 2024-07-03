@@ -10,12 +10,12 @@ class CallbackManager:
 
     def __init__(
         self,
-        init_callbacks,
-        start_of_epoch_callbacks,
-        end_of_epoch_callbacks,
-        end_of_batch_callbacks,
-        end_of_train_callbacks,
-        final_callbacks,
+        init_callbacks=[],
+        start_of_epoch_callbacks=[],
+        end_of_epoch_callbacks=[],
+        end_of_batch_callbacks=[],
+        end_of_train_callbacks=[],
+        final_callbacks=[],
     ):
 
         # load all callbacks
