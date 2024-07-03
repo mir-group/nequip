@@ -258,12 +258,6 @@ class Trainer:
         train_idcs: Optional[list] = None,
         val_idcs: Optional[list] = None,
         train_val_split: str = "random",
-        init_callbacks: list = [],
-        start_of_epoch_callbacks: list = [],
-        end_of_epoch_callbacks: list = [],
-        end_of_batch_callbacks: list = [],
-        end_of_train_callbacks: list = [],
-        final_callbacks: list = [],
         log_batch_freq: int = 100,
         log_epoch_freq: int = 1,
         save_checkpoint_freq: int = -1,
@@ -343,20 +337,16 @@ class Trainer:
         )
         self.loss_stat = LossStat(self.loss)
 
+        # initialize callback manager
+        self.callback_manager, _ = instantiate(
+            builder=CallbackManager,
+            all_args=self.kwargs,
+        )
+
         # what do we train on?
         self.train_on_keys = self.loss.keys
         if train_on_keys is not None:
             assert set(train_on_keys) == set(self.train_on_keys)
-
-        # load all callbacks
-        self.callback_manager = CallbackManager(
-            init_callbacks=init_callbacks,
-            start_of_epoch_callbacks=start_of_epoch_callbacks,
-            end_of_epoch_callbacks=end_of_epoch_callbacks,
-            end_of_batch_callbacks=end_of_batch_callbacks,
-            end_of_train_callbacks=end_of_train_callbacks,
-            final_callbacks=final_callbacks,
-        )
 
         self.init()
 
