@@ -9,6 +9,7 @@ make an interface with ray
 """
 
 import sys
+import warnings
 import inspect
 import logging
 from copy import deepcopy
@@ -1331,6 +1332,18 @@ class Trainer:
             assert (
                 self.n_train_per_epoch % self.batch_size == 0
             ), f"n_train_per_epoch={self.n_train_per_epoch} must be divisible by batch_size={self.batch_size}"
+        elif world_size > 1:
+            # n_train_per_epoch will be set to n_train, so check divisibility by world_size,
+            # and warn user if adjusting:
+            if self.n_train % world_size != 0:
+                warnings.warn(
+                    f"By default, n_train_per_epoch is set to n_train={self.n_train} when not specified, "
+                    f"but this is not divisible by world_size={world_size} here, which is required for "
+                    f"multi-GPU training. n_train_per_epoch will be set to "
+                    f"{self.n_train - self.n_train % world_size}."
+                )
+                self.n_train_per_epoch = self.n_train - self.n_train % world_size
+
         # note that PartialSampler also handles the multi-node distributed case
         self.dl_train_sampler = PartialSampler(
             data_source=self.dataset_train,
