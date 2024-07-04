@@ -171,9 +171,11 @@ def test_metrics(
             assert np.allclose(
                 err,
                 0.0,
-                atol=1e-8
-                if true_identity
-                else (1e-2 if metric.startswith("e") else 1e-4),
+                atol=(
+                    1e-8
+                    if true_identity
+                    else (1e-2 if metric.startswith("e") else 1e-4)
+                ),
             ), f"Metric `{metric}` wasn't zero!"
     elif builder == ConstFactorModel:
         # TODO: check comperable to naive numpy compute

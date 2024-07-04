@@ -18,7 +18,6 @@ import torch.distributed as dist
 from nequip.data import (
     AtomicData,
     Collater,
-    dataset_from_config,
     register_fields,
     _register_field_prefix,
 )
