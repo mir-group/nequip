@@ -91,7 +91,7 @@ def _set_global_options(config, warn_on_override: bool = False) -> None:
     #      - Disable nvfuser with env variable `export PYTORCH_JIT_ENABLE_NVFUSER=0`.
     #
     k = "PYTORCH_JIT_USE_NNC_NOT_NVFUSER"
-    if k in os.environ:
+    if k in os.environ and int(os.environ["PYTORCH_JIT_USE_NNC_NOT_NVFUSER"]) == 0:
         warnings.warn(
             "Do NOT manually set PYTORCH_JIT_USE_NNC_NOT_NVFUSER=0 unless you know exactly what you're doing!"
         )
