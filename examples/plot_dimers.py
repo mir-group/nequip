@@ -39,11 +39,14 @@ if args.r_max is not None:
 print("Computing dimers...")
 potential = {}
 N_sample = args.n_samples
-N_combs = len(list(itertools.combinations_with_replacement(range(num_types), 2)))
-r = torch.zeros(N_sample * N_combs, 2, 3, device=args.device)
+type_combos = [
+    list(e) for e in itertools.combinations_with_replacement(range(num_types), 2)
+]
+N_combos = len(type_combos)
+r = torch.zeros(N_sample * N_combos, 2, 3, device=args.device)
 rs_one = torch.linspace(args.r_min, model_r_max, N_sample, device=args.device)
-rs = rs_one.repeat([N_combs])
-assert rs.shape == (N_combs * N_sample,)
+rs = rs_one.repeat([N_combos])
+assert rs.shape == (N_combos * N_sample,)
 r[:, 1, 0] += rs  # offset second atom along x axis
 types = torch.as_tensor(type_combos)
 types = types.reshape(N_combos, 1, 2).expand(N_combos, N_sample, 2).reshape(-1)
