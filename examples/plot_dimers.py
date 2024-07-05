@@ -41,7 +41,7 @@ potential = {}
 N_sample = args.n_samples
 N_combs = len(list(itertools.combinations_with_replacement(range(num_types), 2)))
 r = torch.zeros(N_sample * N_combs, 2, 3, device=args.device)
-rs_one = torch.linspace(args.r_min, model_r_max, 500, device=args.device)
+rs_one = torch.linspace(args.r_min, model_r_max, N_sample, device=args.device)
 rs = rs_one.repeat([N_combs])
 assert rs.shape == (N_combs * N_sample,)
 r[:, 1, 0] += rs  # offset second atom along x axis
