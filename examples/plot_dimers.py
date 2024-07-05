@@ -39,19 +39,20 @@ if args.r_max is not None:
 print("Computing dimers...")
 potential = {}
 N_sample = args.n_samples
-N_combs = len(list(itertools.combinations_with_replacement(range(num_types), 2)))
-r = torch.zeros(N_sample * N_combs, 2, 3, device=args.device)
+type_combos = [
+    list(e) for e in itertools.combinations_with_replacement(range(num_types), 2)
+]
+N_combos = len(type_combos)
+r = torch.zeros(N_sample * N_combos, 2, 3, device=args.device)
 rs_one = torch.linspace(args.r_min, model_r_max, N_sample, device=args.device)
-rs = rs_one.repeat([N_combs])
-assert rs.shape == (N_combs * N_sample,)
+rs = rs_one.repeat([N_combos])
+assert rs.shape == (N_combos * N_sample,)
 r[:, 1, 0] += rs  # offset second atom along x axis
-types = torch.as_tensor(
-    [list(e) for e in itertools.combinations_with_replacement(range(num_types), 2)]
-)
-types = types.reshape(N_combs, 1, 2).expand(N_combs, N_sample, 2).reshape(-1)
+types = torch.as_tensor(type_combos)
+types = types.reshape(N_combos, 1, 2).expand(N_combos, N_sample, 2).reshape(-1)
 r = r.reshape(-1, 3)
 assert types.shape == r.shape[:1]
-N_at_total = N_sample * N_combs * 2
+N_at_total = N_sample * N_combos * 2
 assert len(types) == N_at_total
 edge_index = torch.vstack(
     (
@@ -61,14 +62,14 @@ edge_index = torch.vstack(
     )
 )
 data = AtomicData(pos=r, atom_types=types, edge_index=edge_index)
-data.batch = torch.arange(N_sample * N_combs, device=args.device).repeat_interleave(2)
-data.ptr = torch.arange(0, 2 * N_sample * N_combs + 1, 2, device=args.device)
+data.batch = torch.arange(N_sample * N_combos, device=args.device).repeat_interleave(2)
+data.ptr = torch.arange(0, 2 * N_sample * N_combos + 1, 2, device=args.device)
 result = model(AtomicData.to_AtomicDataDict(data.to(device=args.device)))
 
 print("Plotting...")
 energies = (
     result[AtomicDataDict.TOTAL_ENERGY_KEY]
-    .reshape(N_combs, N_sample)
+    .reshape(N_combos, N_sample)
     .cpu()
     .detach()
     .numpy()
@@ -83,9 +84,7 @@ fig, axs = plt.subplots(
     dpi=120,
 )
 
-for i, (type1, type2) in enumerate(
-    itertools.combinations_with_replacement(range(num_types), 2)
-):
+for i, (type1, type2) in enumerate(type_combos):
     ax = axs[i]
     ax.set_ylabel(f"{type_names[type1]}-{type_names[type2]}")
     ax.plot(rs_one, energies[i])
