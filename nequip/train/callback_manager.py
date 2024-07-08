@@ -10,35 +10,32 @@ class CallbackManager:
 
     def __init__(
         self,
-        init_callbacks=[],
-        start_of_epoch_callbacks=[],
-        end_of_epoch_callbacks=[],
-        end_of_batch_callbacks=[],
-        end_of_train_callbacks=[],
-        final_callbacks=[],
+        callbacks={},
     ):
-
+        CALLBACK_TYPES = [
+            "init",
+            "start_of_epoch",
+            "end_of_epoch",
+            "end_of_batch",
+            "end_of_train",
+            "final",
+        ]
         # load all callbacks
-        self.callbacks = {
-            "init": [load_callable(callback) for callback in init_callbacks],
-            "start_of_epoch": [
-                load_callable(callback) for callback in start_of_epoch_callbacks
-            ],
-            "end_of_epoch": [
-                load_callable(callback) for callback in end_of_epoch_callbacks
-            ],
-            "end_of_batch": [
-                load_callable(callback) for callback in end_of_batch_callbacks
-            ],
-            "end_of_train": [
-                load_callable(callback) for callback in end_of_train_callbacks
-            ],
-            "final": [load_callable(callback) for callback in final_callbacks],
-        }
+        self.callbacks = {callback_type: [] for callback_type in CALLBACK_TYPES}
 
-        for callback_type in self.callbacks:
-            for callback in self.callbacks.get(callback_type):
-                assert dataclasses.is_dataclass(callback) or callable(callback)
+        for callback_type in callbacks:
+            if callback_type not in CALLBACK_TYPES:
+                raise ValueError(
+                    f"{callback_type} is not a supported callback type.\nSupported callback types include "
+                    + str(CALLBACK_TYPES)
+                )
+            # make sure callbacks are either dataclasses or functions
+            for callback in callbacks[callback_type]:
+                if not (dataclasses.is_dataclass(callback) or callable(callback)):
+                    raise ValueError(
+                        f"Callbacks must be of type dataclass or callable. Error found on the callback {callback} of type {callback_type}"
+                    )
+                self.callbacks[callback_type].append(load_callable(callback))
 
     def apply(self, trainer, callback_type: str):
 
