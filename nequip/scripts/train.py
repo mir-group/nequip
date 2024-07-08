@@ -32,6 +32,8 @@ default_config = dict(
     root="./",
     tensorboard=False,
     wandb=False,
+    wandb_watch=False,
+    wandb_watch_kwargs={},
     model_builders=[
         "SimpleIrrepsConfig",
         "EnergyModel",
