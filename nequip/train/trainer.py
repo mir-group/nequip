@@ -347,6 +347,7 @@ class Trainer:
         # initialize callback manager
         self.callback_manager, _ = instantiate(
             builder=CallbackManager,
+            prefix="callbacks",
             all_args=self.kwargs,
         )
 
