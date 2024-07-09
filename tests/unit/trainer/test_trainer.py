@@ -1,6 +1,7 @@
 """
 Trainer tests
 """
+
 import pytest
 
 import numpy as np
@@ -45,18 +46,28 @@ minimal_config = dict(
 )
 
 
-@pytest.fixture(scope="function")
-def trainer(float_tolerance):
+def create_trainer(float_tolerance, **kwargs):
     """
-    Generate a class instance with minimal configurations
+    Generate a class instance with minimal configurations,
+    with the option to modify the configurations using
+    kwargs.
     """
     conf = minimal_config.copy()
+    conf.update(kwargs)
     conf["default_dtype"] = str(torch.get_default_dtype())[len("torch.") :]
     model = model_from_config(conf)
     with tempfile.TemporaryDirectory(prefix="output") as path:
         conf["root"] = path
         c = Trainer(model=model, **conf)
         yield c
+
+
+@pytest.fixture(scope="function")
+def trainer(float_tolerance):
+    """
+    Generate a class instance with minimal configurations.
+    """
+    yield from create_trainer(float_tolerance)
 
 
 class TestTrainerSetUp:
@@ -157,6 +168,134 @@ class TestData:
                 assert n_samples == trainer.n_train_per_epoch
             else:
                 assert n_samples == trainer.n_train
+
+    @pytest.mark.parametrize("mode", ["random", "sequential"])
+    @pytest.mark.parametrize(
+        "n_train_percent, n_val_percent", [("75%", "15%"), ("20%", "30%")]
+    )
+    def test_split_w_percent_n_train_n_val(
+        self, nequip_dataset, mode, float_tolerance, n_train_percent, n_val_percent
+    ):
+        """
+        Test case where n_train and n_val are given as percentage of the
+        dataset size, and here they don't sum to 100%.
+        """
+        # nequip_dataset has 8 frames, so setting n_train to 75% and n_val to 15% should give 6 and 1
+        # frames respectively. Note that summed percentages don't have to be 100%
+        trainer_w_percent_n_train_n_val = next(
+            create_trainer(
+                float_tolerance=float_tolerance,
+                n_train=n_train_percent,
+                n_val=n_val_percent,
+            )
+        )
+        trainer_w_percent_n_train_n_val.train_val_split = mode
+        trainer_w_percent_n_train_n_val.set_dataset(nequip_dataset)
+        for epoch_i in range(3):
+            trainer_w_percent_n_train_n_val.dl_train_sampler.step_epoch(epoch_i)
+            n_samples: int = 0
+            n_val_samples: int = 0
+            for i, batch in enumerate(trainer_w_percent_n_train_n_val.dl_train):
+                n_samples += batch[AtomicDataDict.BATCH_PTR_KEY].shape[0] - 1
+            if trainer_w_percent_n_train_n_val.n_train_per_epoch is not None:
+                assert n_samples == trainer_w_percent_n_train_n_val.n_train_per_epoch
+            else:
+                assert (
+                    n_samples != trainer_w_percent_n_train_n_val.n_train
+                )  # n_train now a percentage
+                assert trainer_w_percent_n_train_n_val.n_train == n_train_percent  # 75%
+                assert n_samples == int(
+                    (float(n_train_percent.strip("%")) / 100) * len(nequip_dataset)
+                )  # 6
+                assert trainer_w_percent_n_train_n_val.n_val == n_val_percent  # 15%
+
+            for i, batch in enumerate(trainer_w_percent_n_train_n_val.dl_val):
+                n_val_samples += batch[AtomicDataDict.BATCH_PTR_KEY].shape[0] - 1
+
+            assert (
+                n_val_samples != trainer_w_percent_n_train_n_val.n_val
+            )  # n_val now a percentage
+            assert trainer_w_percent_n_train_n_val.n_val == n_val_percent  # 15%
+            assert n_val_samples == int(
+                (float(n_val_percent.strip("%")) / 100) * len(nequip_dataset)
+            )  # 1 (floored)
+
+    @pytest.mark.parametrize("mode", ["random", "sequential"])
+    @pytest.mark.parametrize(
+        "n_train_percent, n_val_percent", [("70%", "30%"), ("55%", "45%")]
+    )
+    def test_split_w_percent_n_train_n_val_flooring(
+        self, nequip_dataset, mode, float_tolerance, n_train_percent, n_val_percent
+    ):
+        """
+        Test case where n_train and n_val are given as percentage of the
+        dataset size, summing to 100% but with a split that gives
+        non-integer numbers of frames for n_train and n_val.
+        (i.e. n_train = 70% = 5.6 frames, n_val = 30% = 2.4 frames,
+        so final n_train is 6 and n_val is 2)
+        """
+        # nequip_dataset has 8 frames, so n_train = 70% = 5.6 frames, n_val = 30% = 2.4 frames,
+        # so final n_train is 6 and n_val is 2
+        trainer_w_percent_n_train_n_val_flooring = next(
+            create_trainer(
+                float_tolerance=float_tolerance,
+                n_train=n_train_percent,
+                n_val=n_val_percent,
+            )
+        )
+        trainer_w_percent_n_train_n_val_flooring.train_val_split = mode
+        trainer_w_percent_n_train_n_val_flooring.set_dataset(nequip_dataset)
+        for epoch_i in range(3):
+            trainer_w_percent_n_train_n_val_flooring.dl_train_sampler.step_epoch(
+                epoch_i
+            )
+            n_samples: int = 0
+            n_val_samples: int = 0
+            for i, batch in enumerate(
+                trainer_w_percent_n_train_n_val_flooring.dl_train
+            ):
+                n_samples += batch[AtomicDataDict.BATCH_PTR_KEY].shape[0] - 1
+            if trainer_w_percent_n_train_n_val_flooring.n_train_per_epoch is not None:
+                assert (
+                    n_samples
+                    == trainer_w_percent_n_train_n_val_flooring.n_train_per_epoch
+                )
+            else:
+                assert (
+                    n_samples != trainer_w_percent_n_train_n_val_flooring.n_train
+                )  # n_train now a percentage
+                assert (
+                    trainer_w_percent_n_train_n_val_flooring.n_train == n_train_percent
+                )  # 70%
+                # _not_ equal to the bare floored value now:
+                assert n_samples != int(
+                    (float(n_train_percent.strip("%")) / 100) * len(nequip_dataset)
+                )  # 5
+                assert (
+                    n_samples
+                    == int(  # equal to floored value plus 1
+                        (float(n_train_percent.strip("%")) / 100) * len(nequip_dataset)
+                    )
+                    + 1
+                )  # 6
+                assert (
+                    trainer_w_percent_n_train_n_val_flooring.n_val == n_val_percent
+                )  # 30%
+
+            for i, batch in enumerate(trainer_w_percent_n_train_n_val_flooring.dl_val):
+                n_val_samples += batch[AtomicDataDict.BATCH_PTR_KEY].shape[0] - 1
+
+            assert (
+                n_val_samples != trainer_w_percent_n_train_n_val_flooring.n_val
+            )  # n_val now a percentage
+            assert (
+                trainer_w_percent_n_train_n_val_flooring.n_val == n_val_percent
+            )  # 30%
+            assert n_val_samples == int(
+                (float(n_val_percent.strip("%")) / 100) * len(nequip_dataset)
+            )  # 2 (floored)
+
+            assert n_samples + n_val_samples == len(nequip_dataset)  # 100% coverage
 
 
 class TestTrain:

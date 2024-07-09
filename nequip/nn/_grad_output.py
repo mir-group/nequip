@@ -20,6 +20,7 @@ class GradientOutput(GraphModuleMixin, torch.nn.Module):
         out_field: the field in which to return the computed gradients. Defaults to ``f"d({of})/d({wrt})"`` for each field in ``wrt``.
         sign: either 1 or -1; the returned gradient is multiplied by this.
     """
+
     sign: float
     _negate: bool
     skip: bool
@@ -119,6 +120,7 @@ class PartialForceOutput(GraphModuleMixin, torch.nn.Module):
         vectorize: the vectorize option to ``torch.autograd.functional.jacobian``,
             false by default since it doesn't work well.
     """
+
     vectorize: bool
 
     def __init__(
@@ -183,6 +185,7 @@ class StressOutput(GraphModuleMixin, torch.nn.Module):
         func: the energy model to wrap
         do_forces: whether to compute forces as well
     """
+
     do_forces: bool
 
     def __init__(

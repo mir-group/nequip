@@ -2,7 +2,7 @@ from typing import Union, Optional, List
 
 import torch
 from e3nn import o3
-from e3nn.util.test import equivariance_error, FLOAT_TOLERANCE
+from e3nn.util.test import equivariance_error
 
 from nequip.nn import GraphModuleMixin, GraphModel
 from nequip.data import (
@@ -10,8 +10,19 @@ from nequip.data import (
     AtomicDataDict,
     _NODE_FIELDS,
     _EDGE_FIELDS,
+    _CARTESIAN_TENSOR_FIELDS,
 )
+from nequip.utils.misc import dtype_from_name
 
+# The default float tolerance
+FLOAT_TOLERANCE = {
+    t: torch.as_tensor(v, dtype=dtype_from_name(t))
+    for t, v in {"float32": 1e-3, "float64": 1e-10}.items()
+}
+# Allow lookup by name or dtype object:
+for t, v in list(FLOAT_TOLERANCE.items()):
+    FLOAT_TOLERANCE[dtype_from_name(t)] = v
+del t, v
 
 # This has to be somewhat large because of float32 sum reductions over many edges/atoms
 PERMUTATION_FLOAT_TOLERANCE = {torch.float32: 1e-4, torch.float64: 1e-10}
@@ -45,9 +56,11 @@ def assert_permutation_equivariant(
 
     if tolerance is None:
         atol = PERMUTATION_FLOAT_TOLERANCE[
-            func.model_dtype
-            if isinstance(func, GraphModel)
-            else torch.get_default_dtype()
+            (
+                func.model_dtype
+                if isinstance(func, GraphModel)
+                else torch.get_default_dtype()
+            )
         ]
     else:
         atol = tolerance
@@ -209,17 +222,26 @@ def assert_AtomicData_equivariant(
             # must be this to actually rotate it when flattened
             irps[AtomicDataDict.CELL_KEY] = "3x1o"
 
-    stress_keys = (AtomicDataDict.STRESS_KEY, AtomicDataDict.VIRIAL_KEY)
-    for k in stress_keys:
+    cartesian_keys = _CARTESIAN_TENSOR_FIELDS.keys()
+    for k in (
+        AtomicDataDict.STRESS_KEY,
+        AtomicDataDict.VIRIAL_KEY,
+    ):  # TODO should this be cartesian_keys?
         irreps_in.pop(k, None)
-    if any(k in irreps_out for k in stress_keys):
+    if any(k in irreps_out for k in cartesian_keys):
         from e3nn.io import CartesianTensor
 
-        stress_cart_tensor = CartesianTensor("ij=ji")  # stress is symmetric
-        stress_rtp = stress_cart_tensor.reduced_tensor_products().to(device, dtype)
-        # symmetric 3x3 cartesian tensor as irreps
-        for k in stress_keys:
-            irreps_out[k] = stress_cart_tensor
+        cartesian_tensor = {
+            k: CartesianTensor(_CARTESIAN_TENSOR_FIELDS[k])
+            for k in cartesian_keys
+            if k in irreps_out
+        }
+        cartesian_rtp = {
+            k: ct.reduced_tensor_products().to(device, dtype)
+            for k, ct in cartesian_tensor.items()
+        }
+        for k, ct in cartesian_tensor.items():
+            irreps_out[k] = ct
 
     def wrapper(*args):
         arg_dict = {k: v for k, v in zip(irreps_in, args)}
@@ -238,12 +260,12 @@ def assert_AtomicData_equivariant(
                 val = output[key]
                 assert val.shape[-2:] == (3, 3)
                 output[key] = val.reshape(val.shape[:-2] + (9,))
-        # stress is also a special case,
+        # cartesian tensors like stress are also a special case,
         # we need it to be decomposed into irreps for equivar testing
-        for k in stress_keys:
+        for k in cartesian_keys:
             if k in output:
-                output[k] = stress_cart_tensor.from_cartesian(
-                    output[k], rtp=stress_rtp.to(output[k].dtype)
+                output[k] = cartesian_tensor[k].from_cartesian(
+                    output[k], rtp=cartesian_rtp[k].to(output[k].dtype)
                 )
         return [output[k] for k in irreps_out]
 
