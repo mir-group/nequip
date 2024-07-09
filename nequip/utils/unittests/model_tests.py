@@ -170,7 +170,7 @@ class BaseModelTests:
             for out_field in out_fields:
                 assert torch.allclose(
                     out_ref[out_field], out_unwrapped[out_field], atol=float_tolerance
-                )
+                ), f'failed for key "{out_field}" with max absolute diff {torch.abs(out_ref[out_field] - out_unwrapped[out_field]).max().item():.5f} (tol={float_tolerance:.5f})'
 
     def test_batch(self, model, atomic_batch, device, float_tolerance):
         """Confirm that the results for individual examples are the same regardless of whether they are batched."""
