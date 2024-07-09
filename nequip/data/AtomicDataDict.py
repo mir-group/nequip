@@ -54,7 +54,10 @@ def with_edge_vectors(data: Type, with_lengths: bool = True) -> Type:
     Returns:
         Tensor [n_edges, 3] edge displacement vectors
     """
-    model_dtype: torch.dtype = data[_keys.MODEL_DTYPE_KEY].dtype
+    # if present in AtomicDataDict, use MODEL_DTYPE_KEY; otherwise, use dtype of positions
+    model_dtype: torch.dtype = data.get(
+        _keys.MODEL_DTYPE_KEY, data[_keys.POSITIONS_KEY]
+    ).dtype
     # We do calculations on the positions and cells in whatever dtype they
     # were provided in, and only convert to model_dtype after
     if _keys.EDGE_VECTORS_KEY in data:
