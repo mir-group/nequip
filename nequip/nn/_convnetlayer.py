@@ -149,9 +149,9 @@ class ConvNetLayer(GraphModuleMixin, torch.nn.Module):
         # updated with whatever the convolution outputs (which is a full graph module)
         self.irreps_out.update(self.conv.irreps_out)
         # but with the features updated by the nonlinearity
-        self.irreps_out[
-            AtomicDataDict.NODE_FEATURES_KEY
-        ] = self.equivariant_nonlin.irreps_out
+        self.irreps_out[AtomicDataDict.NODE_FEATURES_KEY] = (
+            self.equivariant_nonlin.irreps_out
+        )
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
         # save old features for resnet
