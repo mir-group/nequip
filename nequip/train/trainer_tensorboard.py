@@ -4,10 +4,15 @@ from .trainer import Trainer, TRAIN, VALIDATION
 
 
 class TrainerTensorBoard(Trainer):
-    """Trainer class that adds WandB features"""
+    """Trainer class that adds Tensorboard features"""
 
     def end_of_epoch_log(self):
         Trainer.end_of_epoch_log(self)
+
+        if self.distributed and dist.get_rank() != 0:
+            # We should only interface with Tensorboard if we are rank 0
+            return
+        
         kwargs = dict(
             global_step=self.iepoch, walltime=self.mae_dict["cumulative_wall"]
         )
@@ -24,6 +29,10 @@ class TrainerTensorBoard(Trainer):
         super().init()
 
         if not self._initialized:
+            return
+
+        if self.distributed and dist.get_rank() != 0:
+            # We should only interface with Tensorboard if we are rank 0
             return
 
         self.tb_writer = SummaryWriter(
