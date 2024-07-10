@@ -2,7 +2,7 @@ from typing import Union, Optional, List
 
 import torch
 from e3nn import o3
-from e3nn.util.test import equivariance_error, FLOAT_TOLERANCE
+from e3nn.util.test import equivariance_error
 
 from nequip.nn import GraphModuleMixin, GraphModel
 from nequip.data import (
@@ -12,7 +12,17 @@ from nequip.data import (
     _EDGE_FIELDS,
     _CARTESIAN_TENSOR_FIELDS,
 )
+from nequip.utils.misc import dtype_from_name
 
+# The default float tolerance
+FLOAT_TOLERANCE = {
+    t: torch.as_tensor(v, dtype=dtype_from_name(t))
+    for t, v in {"float32": 1e-3, "float64": 1e-10}.items()
+}
+# Allow lookup by name or dtype object:
+for t, v in list(FLOAT_TOLERANCE.items()):
+    FLOAT_TOLERANCE[dtype_from_name(t)] = v
+del t, v
 
 # This has to be somewhat large because of float32 sum reductions over many edges/atoms
 PERMUTATION_FLOAT_TOLERANCE = {torch.float32: 1e-4, torch.float64: 1e-10}

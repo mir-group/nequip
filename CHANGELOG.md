@@ -7,7 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Most recent change on the bottom.
 
 
-## Unreleased - 0.6.1
+## Unreleased
+
+
+## [0.6.1] - 2024-7-9
 ### Added
 - add support for equivariance testing of arbitrary Cartesian tensor outputs
 - [Breaking] use entry points for `nequip.extension`s (e.g. for field registration)
