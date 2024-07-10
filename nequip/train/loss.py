@@ -109,6 +109,15 @@ class Loss:
 
         return loss, contrib
 
+    def state_dict(self):
+        # verbose key names to avoid repetition/clashes
+        dictionary = {"loss_obj_coeffs": self.coeffs}
+        return dictionary
+
+    def load_state_dict(self, state_dict):
+        # only need to save/load loss weights (or coefficients)
+        self.coeffs = state_dict.get("loss_obj_coeffs")
+
 
 class LossStat:
     """

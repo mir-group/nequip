@@ -42,7 +42,6 @@ from nequip.utils import (
     instantiate,
     save_file,
     load_file,
-    load_callable,
     atomic_write,
     finish_all_writes,
     atomic_write_group,
@@ -56,6 +55,7 @@ from .loss import Loss, LossStat
 from .metrics import Metrics
 from ._key import ABBREV, LOSS_KEY, TRAIN, VALIDATION
 from .early_stopping import EarlyStopping
+from .callback_manager import CallbackManager
 
 
 class Trainer:
@@ -217,7 +217,14 @@ class Trainer:
     """
 
     stop_keys = ["max_epochs", "early_stopping", "early_stopping_kwargs"]
-    object_keys = ["lr_sched", "optim", "ema", "early_stopping_conds"]
+    object_keys = [
+        "loss",
+        "callback_manager",
+        "lr_sched",
+        "optim",
+        "ema",
+        "early_stopping_conds",
+    ]
     lr_scheduler_module = torch.optim.lr_scheduler
     optim_module = torch.optim
 
@@ -258,12 +265,6 @@ class Trainer:
         train_idcs: Optional[list] = None,
         val_idcs: Optional[list] = None,
         train_val_split: str = "random",
-        init_callbacks: list = [],
-        start_of_epoch_callbacks: list = [],
-        end_of_epoch_callbacks: list = [],
-        end_of_batch_callbacks: list = [],
-        end_of_train_callbacks: list = [],
-        final_callbacks: list = [],
         log_batch_freq: int = 100,
         log_epoch_freq: int = 1,
         save_checkpoint_freq: int = -1,
@@ -343,28 +344,17 @@ class Trainer:
         )
         self.loss_stat = LossStat(self.loss)
 
+        # initialize callback manager
+        self.callback_manager, _ = instantiate(
+            builder=CallbackManager,
+            prefix="callbacks",
+            all_args=self.kwargs,
+        )
+
         # what do we train on?
         self.train_on_keys = self.loss.keys
         if train_on_keys is not None:
             assert set(train_on_keys) == set(self.train_on_keys)
-
-        # load all callbacks
-        self._init_callbacks = [load_callable(callback) for callback in init_callbacks]
-        self._start_of_epoch_callbacks = [
-            load_callable(callback) for callback in start_of_epoch_callbacks
-        ]
-        self._end_of_epoch_callbacks = [
-            load_callable(callback) for callback in end_of_epoch_callbacks
-        ]
-        self._end_of_batch_callbacks = [
-            load_callable(callback) for callback in end_of_batch_callbacks
-        ]
-        self._end_of_train_callbacks = [
-            load_callable(callback) for callback in end_of_train_callbacks
-        ]
-        self._final_callbacks = [
-            load_callable(callback) for callback in final_callbacks
-        ]
 
         self.init()
 
@@ -761,8 +751,7 @@ class Trainer:
         if not self._initialized:
             self.init()
 
-        for callback in self._init_callbacks:
-            callback(self)
+        self.callback_manager.apply(self, "init")
 
         self.init_log()
         self.wall = perf_counter()
@@ -784,8 +773,7 @@ class Trainer:
             self.epoch_step()
             self.end_of_epoch_save()
 
-        for callback in self._final_callbacks:
-            callback(self)
+        self.callback_manager.apply(self, "final")
 
         self.final_log()
 
@@ -891,8 +879,7 @@ class Trainer:
         self.metrics.to(self.torch_device)
 
     def epoch_step(self):
-        for callback in self._start_of_epoch_callbacks:
-            callback(self)
+        self.callback_manager.apply(self, "start_of_epoch")
 
         dataloaders = {TRAIN: self.dl_train, VALIDATION: self.dl_val}
         categories = [TRAIN, VALIDATION] if self.iepoch >= 0 else [VALIDATION]
@@ -921,14 +908,12 @@ class Trainer:
                         validation=(category == VALIDATION),
                     )
                     self.end_of_batch_log(batch_type=category)
-                    for callback in self._end_of_batch_callbacks:
-                        callback(self)
+                    self.callback_manager.apply(self, "end_of_batch")
                 self.metrics_dict[category] = self.metrics.current_result()
                 self.loss_dict[category] = self.loss_stat.current_result()
 
                 if category == TRAIN:
-                    for callback in self._end_of_train_callbacks:
-                        callback(self)
+                    self.callback_manager.apply(self, "end_of_train")
 
         self.iepoch += 1
 
@@ -941,8 +926,7 @@ class Trainer:
         if self.iepoch > 0 and self.lr_scheduler_name == "ReduceLROnPlateau":
             self.lr_sched.step(metrics=self.mae_dict[self.metrics_key])
 
-        for callback in self._end_of_epoch_callbacks:
-            callback(self)
+        self.callback_manager.apply(self, "end_of_epoch")
 
     def end_of_batch_log(self, batch_type: str):
         """

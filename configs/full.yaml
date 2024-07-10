@@ -256,10 +256,17 @@ loss_coeffs:                                                                    
 # In the "schedule" key each entry is a two-element list of:
 #  - the 1-based epoch index at which to start the new loss coefficients
 #  - the new loss coefficients as a dict
-#
-# start_of_epoch_callbacks:
-#  - !!python/object:nequip.train.callbacks.loss_schedule.SimpleLossSchedule {"schedule": [[2, {"forces": 0.0, "total_energy": 1.0}]]}
-#
+# callbacks:
+#   start_of_epoch:
+#   - !!python/object:nequip.train.callbacks.SimpleLossSchedule {"schedule": [[2, {"forces": 0.0, "total_energy": 1.0}]]}
+
+# You can also try using the SoftAdapt strategy for adaptively changing loss coefficients
+# (see https://arxiv.org/abs/2403.18122)
+#callbacks:
+#  end_of_batch:
+#  - !!python/object:nequip.train.callbacks.SoftAdapt {"batches_per_update": 5, "beta": 1.1}
+
+
 
 # output metrics
 metrics_components:
