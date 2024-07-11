@@ -229,13 +229,15 @@ def parse_command_line(args=None):
 
 def fresh_start(config):
 
+    # forbid default_dtype!=float64
+    if config["default_dtype"] != "float64":
+        raise ValueError(
+            f"config option default_dtype={config['default_dtype']} is forbidden, use default_dtype=float64 instead"
+        )
+
     # we use add_to_config cause it's a fresh start and need to record it
     check_code_version(config, add_to_config=True)
     _set_global_options(config)
-    if config["default_dtype"] != "float64":
-        warnings.warn(
-            f"default_dtype={config['default_dtype']} but we strongly recommend float64"
-        )
 
     # = Make the trainer =
     if config.wandb:
