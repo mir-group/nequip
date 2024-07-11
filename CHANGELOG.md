@@ -11,10 +11,14 @@ Most recent change on the bottom.
 ### Added
 - `--override` now supported as a `nequip-train` flag (similar to its use in `nequip-deploy`)
 - add SoftAdapt (https://arxiv.org/abs/2403.18122) callback option
+- float64 versions of edge vectors and edge lengths are now provided in AtomicDataDict for modules that require higher precision inputs
 
 ### Changed
 - [Breaking] training restart behavior altered: file-wise consistency checks performed between original config and config passed to `nequip-train` on restart (instead of checking the config dicts)
 - [Breaking] config format for callbacks changed (see `configs/full.yaml` for an example)
+- [Breaking] positions and cell inputs are now expected to be `float64` always, rather than matching `model_dtype`
+- [Breaking] default for `allow_tf32` is now `False`
+- [Breaking] fresh start in training will now forbid `default_dtype=float32`
 
 ### Fixed
 - fixed `wandb_watch` bug
