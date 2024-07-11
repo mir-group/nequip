@@ -74,12 +74,7 @@ def model_from_config(
     default_dtype = torch.get_default_dtype()
     model_dtype: torch.dtype = dtype_from_name(config.get("model_dtype", default_dtype))
     config["model_dtype"] = str(model_dtype).lstrip("torch.")
-    # confirm sanity
-    assert default_dtype in (torch.float32, torch.float64)
-    if default_dtype == torch.float32 and model_dtype == torch.float64:
-        raise ValueError(
-            "Overall default_dtype=float32, but model_dtype=float64 is a higher precision- change default_dtype to float64"
-        )
+
     # temporarily set the default dtype
     start_graph_model_builders = None
     with torch_default_dtype(model_dtype):
