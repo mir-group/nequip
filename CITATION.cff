@@ -3,22 +3,31 @@ message: "If you use this software, please cite our article."
 authors:
 - family-names: Batzner
   given-names: Simon
+  orcid: "https://orcid.org/0000-0000-0000-0000"
 - family-names: Musaelian
   given-names: Albert
+  orcid: "https://orcid.org/0000-0000-0000-0000"
 - family-names: Sun
   given-names: Lixin
+  orcid: "https://orcid.org/0000-0000-0000-0000"
 - family-names: Geiger
   given-names: Mario
+  orcid: "https://orcid.org/0000-0000-0000-0000"
 - family-names: Mailoa
   given-names: Jonathan P.
+  orcid: "https://orcid.org/0000-0000-0000-0000"
 - family-names: Kornbluth
   given-names: Mordechai
+  orcid: "https://orcid.org/0000-0000-0000-0000"
 - family-names: Molinari
   given-names: Nicola
+  orcid: "https://orcid.org/0000-0000-0000-0000"
 - family-names: Smidt
   given-names: Tess E.
+  orcid: "https://orcid.org/0000-0000-0000-0000"
 - family-names: Kozinsky
   given-names: Boris
+  orcid: "https://orcid.org/0000-0000-0000-0000"
 doi: 10.1038/s41467-022-29939-5
 date-published: 2022-05-04
 issn: 2041-1723
