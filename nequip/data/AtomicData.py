@@ -48,6 +48,8 @@ _DEFAULT_EDGE_FIELDS: Set[str] = {
     AtomicDataDict.EDGE_CELL_SHIFT_KEY,
     AtomicDataDict.EDGE_VECTORS_KEY,
     AtomicDataDict.EDGE_LENGTH_KEY,
+    AtomicDataDict.EDGE_VECTORS_F64_KEY,
+    AtomicDataDict.EDGE_LENGTH_F64_KEY,
     AtomicDataDict.EDGE_ATTRS_KEY,
     AtomicDataDict.EDGE_EMBEDDING_KEY,
     AtomicDataDict.EDGE_FEATURES_KEY,
