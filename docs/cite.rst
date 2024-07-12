@@ -2,7 +2,7 @@ Citing NequIP
 =============
 If you use ``NequIP`` in your research, please cite our `article <https://doi.org/10.1038/s41467-022-29939-5>`_:
 
-.. code-block::
+.. code-block:: bibtex
 
     @article{batzner_e3-equivariant_2022,
       title = {E(3)-Equivariant Graph Neural Networks for Data-Efficient and Accurate Interatomic Potentials},
