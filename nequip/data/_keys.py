@@ -41,6 +41,11 @@ BASIC_STRUCTURE_KEYS: Final[List[str]] = [
 EDGE_VECTORS_KEY: Final[str] = "edge_vectors"
 # A [n_edge] tensor of the lengths of EDGE_VECTORS
 EDGE_LENGTH_KEY: Final[str] = "edge_lengths"
+
+# float64 versions of the above
+EDGE_VECTORS_F64_KEY: Final[str] = "float64_edge_vectors"
+EDGE_LENGTH_F64_KEY: Final[str] = "float64_edge_lengths"
+
 # [n_edge, dim] (possibly equivariant) attributes of each edge
 EDGE_ATTRS_KEY: Final[str] = "edge_attrs"
 # [n_edge, dim] invariant embedding of the edges
