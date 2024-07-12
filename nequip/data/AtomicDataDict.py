@@ -62,9 +62,9 @@ def with_edge_vectors(data: Type, with_lengths: bool = True) -> Type:
     # were provided in, and only convert to model_dtype after
     if _keys.EDGE_VECTORS_KEY in data:
         if with_lengths and _keys.EDGE_LENGTH_KEY not in data:
-            data[_keys.EDGE_LENGTH_KEY] = torch.linalg.norm(
-                data[_keys.EDGE_VECTORS_KEY], dim=-1
-            ).to(model_dtype)
+            edge_len = torch.linalg.norm(data[_keys.EDGE_VECTORS_F64_KEY], dim=-1)
+            data[_keys.EDGE_LENGTH_F64_KEY] = edge_len
+            data[_keys.EDGE_LENGTH_KEY] = edge_len.to(model_dtype)
         return data
     else:
         # Build it dynamically
@@ -74,7 +74,6 @@ def with_edge_vectors(data: Type, with_lengths: bool = True) -> Type:
         # (2) works on a Batch constructed from AtomicData
         pos = data[_keys.POSITIONS_KEY]
         edge_index = data[_keys.EDGE_INDEX_KEY]
-        # edge_vec = pos[edge_index[1]] - pos[edge_index[0]]
         edge_vec = torch.index_select(pos, 0, edge_index[1]) - torch.index_select(
             pos, 0, edge_index[0]
         )
@@ -104,11 +103,12 @@ def with_edge_vectors(data: Type, with_lengths: bool = True) -> Type:
                     edge_cell_shift,
                     cell.squeeze(0),  # remove batch dimension
                 )
+        data[_keys.EDGE_VECTORS_F64_KEY] = edge_vec
         data[_keys.EDGE_VECTORS_KEY] = edge_vec.to(model_dtype)
         if with_lengths:
-            data[_keys.EDGE_LENGTH_KEY] = torch.linalg.norm(edge_vec, dim=-1).to(
-                model_dtype
-            )
+            edge_len = torch.linalg.norm(edge_vec, dim=-1)
+            data[_keys.EDGE_LENGTH_F64_KEY] = edge_len
+            data[_keys.EDGE_LENGTH_KEY] = edge_len.to(model_dtype)
         return data
 
 
