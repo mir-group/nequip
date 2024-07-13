@@ -13,6 +13,7 @@ from torch.nn import Linear
 
 from nequip.model import model_from_config
 from nequip.data import AtomicDataDict
+from nequip.utils import torch_default_dtype, dtype_from_name, dtype_to_name
 from nequip.train.trainer import Trainer
 from nequip.utils.savenload import load_file
 from nequip.nn import GraphModuleMixin, GraphModel, RescaleOutput
@@ -46,7 +47,7 @@ minimal_config = dict(
 )
 
 
-def create_trainer(float_tolerance, **kwargs):
+def create_trainer(float_tolerance, model_dtype, **kwargs):
     """
     Generate a class instance with minimal configurations,
     with the option to modify the configurations using
@@ -54,8 +55,14 @@ def create_trainer(float_tolerance, **kwargs):
     """
     conf = minimal_config.copy()
     conf.update(kwargs)
-    conf["default_dtype"] = str(torch.get_default_dtype())[len("torch.") :]
-    model = model_from_config(conf)
+    conf.update(
+        {
+            "model_dtype": model_dtype,
+            "default_dtype": dtype_to_name(torch.get_default_dtype()),
+        }
+    )
+    with torch_default_dtype(dtype_from_name(model_dtype)):
+        model = model_from_config(conf)
     with tempfile.TemporaryDirectory(prefix="output") as path:
         conf["root"] = path
         c = Trainer(model=model, **conf)
@@ -63,11 +70,11 @@ def create_trainer(float_tolerance, **kwargs):
 
 
 @pytest.fixture(scope="function")
-def trainer(float_tolerance):
+def trainer(float_tolerance, model_dtype):
     """
     Generate a class instance with minimal configurations.
     """
-    yield from create_trainer(float_tolerance)
+    yield from create_trainer(float_tolerance, model_dtype)
 
 
 class TestTrainerSetUp:
@@ -174,7 +181,13 @@ class TestData:
         "n_train_percent, n_val_percent", [("75%", "15%"), ("20%", "30%")]
     )
     def test_split_w_percent_n_train_n_val(
-        self, nequip_dataset, mode, float_tolerance, n_train_percent, n_val_percent
+        self,
+        nequip_dataset,
+        mode,
+        float_tolerance,
+        model_dtype,
+        n_train_percent,
+        n_val_percent,
     ):
         """
         Test case where n_train and n_val are given as percentage of the
@@ -185,6 +198,7 @@ class TestData:
         trainer_w_percent_n_train_n_val = next(
             create_trainer(
                 float_tolerance=float_tolerance,
+                model_dtype=model_dtype,
                 n_train=n_train_percent,
                 n_val=n_val_percent,
             )
@@ -225,7 +239,13 @@ class TestData:
         "n_train_percent, n_val_percent", [("70%", "30%"), ("55%", "45%")]
     )
     def test_split_w_percent_n_train_n_val_flooring(
-        self, nequip_dataset, mode, float_tolerance, n_train_percent, n_val_percent
+        self,
+        nequip_dataset,
+        mode,
+        float_tolerance,
+        model_dtype,
+        n_train_percent,
+        n_val_percent,
     ):
         """
         Test case where n_train and n_val are given as percentage of the
@@ -239,6 +259,7 @@ class TestData:
         trainer_w_percent_n_train_n_val_flooring = next(
             create_trainer(
                 float_tolerance=float_tolerance,
+                model_dtype=model_dtype,
                 n_train=n_train_percent,
                 n_val=n_val_percent,
             )
@@ -407,6 +428,7 @@ class DummyNet(GraphModuleMixin, torch.nn.Module):
         self.nydim = nydim
         self.linear1 = Linear(ndim, nydim)
         self.linear2 = Linear(ndim, nydim * 3)
+        self.dtype = torch.get_default_dtype()
         self._init_irreps(
             irreps_in={"pos": "1x1o"},
             irreps_out={
@@ -418,10 +440,11 @@ class DummyNet(GraphModuleMixin, torch.nn.Module):
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
         data = data.copy()
         x = data["pos"]
+        # float64 pos (may be) downcasted for the operation
         data.update(
             {
-                AtomicDataDict.FORCE_KEY: self.linear2(x),
-                AtomicDataDict.TOTAL_ENERGY_KEY: self.linear1(x),
+                AtomicDataDict.FORCE_KEY: self.linear2(x.to(self.dtype)),
+                AtomicDataDict.TOTAL_ENERGY_KEY: self.linear1(x.to(self.dtype)),
             }
         )
         return data
@@ -434,15 +457,17 @@ class DummyScale(RescaleOutput):
     def __init__(self, key, scale, shift) -> None:
         torch.nn.Module.__init__(self)  # skip RescaleOutput's __init__
         self.key = key
-        self.scale_by = torch.as_tensor(scale, dtype=torch.get_default_dtype())
-        self.shift_by = torch.as_tensor(shift, dtype=torch.get_default_dtype())
+        self.scale_by = torch.as_tensor(scale)
+        self.shift_by = torch.as_tensor(shift)
         self.linear2 = Linear(3, 3)
+        self.dtype = torch.get_default_dtype()
         self.irreps_in = {}
         self.irreps_out = {key: "3x0e"}
         self.model = None
 
     def forward(self, data):
-        out = self.linear2(data["pos"])
+        # float64 pos (may be) downcasted for the operation
+        out = self.linear2(data["pos"].to(self.dtype))
         if not self.training:
             out = out * self.scale_by
             out = out + self.shift_by
