@@ -19,6 +19,7 @@ from nequip.utils.torch_geometric import Batch
 from nequip.utils._global_options import _set_global_options
 from nequip.utils import dtype_to_name
 
+
 # Sometimes we run parallel using pytest-xdist, and want to be able to use
 # as many GPUs as are available
 # https://pytest-xdist.readthedocs.io/en/latest/how-to.html#identifying-the-worker-process-during-a-test
@@ -130,7 +131,7 @@ def Cu_bulk(float_tolerance) -> Tuple[Atoms, AtomicData]:
 
 
 @pytest.fixture(scope="session")
-def molecules() -> List[Atoms]:
+def molecules(float_tolerance) -> List[Atoms]:
     atoms_list = []
     for i in range(8):
         atoms = molecule("CH3CHO" if i % 2 == 0 else "H2")
