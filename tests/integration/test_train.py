@@ -9,6 +9,7 @@ import numpy as np
 import torch
 
 from nequip.data import AtomicDataDict
+import nequip.utils
 
 from conftest import (
     IdentityModel,
@@ -19,7 +20,7 @@ from conftest import (
 
 
 def test_metrics(fake_model_training_session, model_dtype):
-    default_dtype = str(torch.get_default_dtype()).lstrip("torch.")
+    default_dtype = nequip.utils.dtype_to_name(torch.get_default_dtype())
     builder, true_config, tmpdir, env = fake_model_training_session
 
     # == Load metrics ==
@@ -122,7 +123,12 @@ def test_metrics(fake_model_training_session, model_dtype):
 def test_requeue(nequip_dataset, BENCHMARK_ROOT, conffile):
     # TODO test metrics against one that goes all the way through
     builder = IdentityModel  # TODO: train a real model?
-    dtype = str(torch.get_default_dtype())[len("torch.") :]
+
+    dtype = nequip.utils.dtype_to_name(torch.get_default_dtype())
+    if dtype != "float64":
+        pytest.skip(
+            f"found default_dtype={dtype} - only default_dtype=float64 will be tested"
+        )
 
     path_to_this_file = pathlib.Path(__file__)
     config_path = path_to_this_file.parents[2] / f"configs/{conffile}"

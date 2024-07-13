@@ -10,6 +10,7 @@ import torch
 
 import nequip
 from nequip.data import AtomicDataDict, AtomicData, dataset_from_config
+import nequip.utils
 from nequip.utils import Config
 from nequip.scripts import deploy
 from nequip.train import Trainer
@@ -18,14 +19,13 @@ from nequip.ase import NequIPCalculator
 from conftest import _check_and_print
 
 
+# use model_dtype from conftest.py
 @pytest.mark.parametrize(
     "device", ["cpu"] + (["cuda"] if torch.cuda.is_available() else [])
 )
-@pytest.mark.parametrize("model_dtype", ["float32", "float64"])
 def test_deploy(BENCHMARK_ROOT, device, model_dtype):
-    dtype = str(torch.get_default_dtype())[len("torch.") :]
-    if dtype == "float32" and model_dtype == "float64":
-        pytest.skip("default_dtype=float32 and model_dtype=float64 doesn't make sense")
+    dtype = nequip.utils.dtype_to_name(torch.get_default_dtype())
+
     # atol on MODEL dtype, since a mostly float32 model still has float32 variation
     atol = {"float32": 1e-5, "float64": 1e-7}[model_dtype]
 

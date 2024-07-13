@@ -8,6 +8,7 @@ import sys
 
 import torch
 
+from nequip.utils import dtype_to_name
 from nequip.data import AtomicDataDict
 from nequip.nn import GraphModuleMixin
 
@@ -97,10 +98,7 @@ class LearningFactorModel(GraphModuleMixin, torch.nn.Module):
 
 
 def _training_session(conffile, model_dtype, builder, BENCHMARK_ROOT):
-    default_dtype = str(torch.get_default_dtype())[len("torch.") :]
-    if default_dtype == "float32" and model_dtype == "float64":
-        pytest.skip("default_dtype=float32 and model_dtype=float64 doesn't make sense")
-
+    default_dtype = dtype_to_name(torch.get_default_dtype())
     path_to_this_file = pathlib.Path(__file__)
     config_path = path_to_this_file.parents[2] / f"configs/{conffile}"
     true_config = yaml.load(config_path.read_text(), Loader=yaml.Loader)
@@ -164,8 +162,11 @@ def conffile(request):
     params=["float32", "float64"],
 )
 def model_dtype(request, float_tolerance):
-    if torch.get_default_dtype() == torch.float32 and model_dtype == "float64":
-        pytest.skip("default_dtype=float32 and model_dtype=float64 doesn't make sense")
+    default_dtype = dtype_to_name(torch.get_default_dtype())
+    if default_dtype != "float64":
+        pytest.skip(
+            f"found default_dtype={default_dtype} - only default_dtype=float64 will be tested"
+        )
     return request.param
 
 
