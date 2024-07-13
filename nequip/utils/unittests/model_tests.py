@@ -19,8 +19,9 @@ from nequip.data import (
 from nequip.data.transforms import TypeMapper
 from nequip.model import model_from_config
 from nequip.nn import GraphModuleMixin
+from nequip.utils import dtype_to_name
 from nequip.utils import Config
-from nequip.utils.test import assert_AtomicData_equivariant
+from nequip.utils.test import assert_AtomicData_equivariant, FLOAT_TOLERANCE
 
 
 # see https://github.com/pytest-dev/pytest/issues/421#issuecomment-943386533
@@ -63,8 +64,9 @@ class BaseModelTests:
         return model
 
     @pytest.fixture(scope="class")
-    def model(self, config, device, float_tolerance):
+    def model(self, config, device, model_dtype):
         config, out_fields = config
+        config.update({"model_dtype": model_dtype})
         model = self.make_model(config, device=device)
         return model, out_fields
 
@@ -84,7 +86,7 @@ class BaseModelTests:
             # plus model insides are still float32 with global dtype float64 in the tests
             torch.float32: 5e-5,
             torch.float64: 5e-7,
-        }[torch.get_default_dtype()]
+        }[instance.model_dtype]
 
         out_instance = instance(data.copy())
         out_script = model_script(data.copy())
@@ -132,6 +134,7 @@ class BaseModelTests:
         data[AtomicDataDict.ATOM_TYPE_KEY] = data_orig[AtomicDataDict.ATOM_TYPE_KEY]
         data.to(device)
         out_ref = instance(AtomicData.to_AtomicDataDict(data))
+
         # now put things in other periodic images
         rng = torch.Generator(device=device).manual_seed(12345)
         # try a few different shifts
@@ -167,16 +170,19 @@ class BaseModelTests:
                 data2[AtomicDataDict.EDGE_CELL_SHIFT_KEY],
             )
             out_unwrapped = instance(AtomicData.to_AtomicDataDict(data2))
+            tolerance = FLOAT_TOLERANCE[dtype_to_name(instance.model_dtype)]
             for out_field in out_fields:
                 assert torch.allclose(
-                    out_ref[out_field], out_unwrapped[out_field], atol=float_tolerance
-                ), f'failed for key "{out_field}" with max absolute diff {torch.abs(out_ref[out_field] - out_unwrapped[out_field]).max().item():.5f} (tol={float_tolerance:.5f})'
+                    out_ref[out_field], out_unwrapped[out_field], atol=tolerance
+                ), f'failed for key "{out_field}" with max absolute diff {torch.abs(out_ref[out_field] - out_unwrapped[out_field]).max().item():.5g} (tol={tolerance:.5g})'
 
-    def test_batch(self, model, atomic_batch, device, float_tolerance):
+    def test_batch(self, model, atomic_batch, device):
         """Confirm that the results for individual examples are the same regardless of whether they are batched."""
-        allclose = functools.partial(torch.allclose, atol=float_tolerance)
         instance, out_fields = model
         instance.to(device)
+
+        tolerance = FLOAT_TOLERANCE[dtype_to_name(instance.model_dtype)]
+        allclose = functools.partial(torch.allclose, atol=tolerance)
         data = atomic_batch.to(device)
         data1 = data.get_example(0)
         data2 = data.get_example(1)
@@ -228,11 +234,12 @@ class BaseModelTests:
         instance, out_fields = model
         instance = instance.to(device=device)
         atomic_batch = atomic_batch.to(device=device)
+
         assert_AtomicData_equivariant(
             func=instance,
             data_in=atomic_batch,
             e3_tolerance={torch.float32: 1e-3, torch.float64: 1e-8}[
-                torch.get_default_dtype()
+                instance.model_dtype
             ],
         )
 
@@ -316,9 +323,9 @@ class BaseModelTests:
 
 class BaseEnergyModelTests(BaseModelTests):
     def test_large_separation(self, model, config, molecules, device):
-        atol = {torch.float32: 1e-4, torch.float64: 1e-10}[torch.get_default_dtype()]
         instance, _ = model
         instance.to(device)
+        atol = {torch.float32: 1e-4, torch.float64: 1e-10}[instance.model_dtype]
         config, out_fields = config
         r_max = config["r_max"]
         atoms1 = molecules[0].copy()
@@ -402,36 +409,47 @@ class BaseEnergyModelTests(BaseModelTests):
         model, out_fields = model
         if AtomicDataDict.FORCE_KEY not in out_fields:
             pytest.skip()
+
+        # physical predictions (energy, forces, etc) will be converted to default_dtype (float64) before comparing
         model.to(device)
         data = atomic_batch.to(device)
         output = model(AtomicData.to_AtomicDataDict(data))
-
         forces = output[AtomicDataDict.FORCE_KEY]
+        epsilon = 1e-3
 
-        epsilon = torch.as_tensor(1e-3)
-        epsilon2 = torch.as_tensor(2e-3)
         iatom = 1
         for idir in range(3):
             pos = data[AtomicDataDict.POSITIONS_KEY][iatom, idir]
             data[AtomicDataDict.POSITIONS_KEY][iatom, idir] = pos + epsilon
             output = model(AtomicData.to_AtomicDataDict(data.to(device)))
-            e_plus = output[AtomicDataDict.TOTAL_ENERGY_KEY].sum()
-
-            data[AtomicDataDict.POSITIONS_KEY][iatom, idir] -= epsilon2
-            output = model(AtomicData.to_AtomicDataDict(data.to(device)))
-            e_minus = output[AtomicDataDict.TOTAL_ENERGY_KEY].sum()
-
-            numeric = -(e_plus - e_minus) / epsilon2
-            analytical = forces[iatom, idir]
-            print(numeric.item(), analytical.item())
-            assert torch.isclose(numeric, analytical, atol=2e-2) or torch.isclose(
-                numeric, analytical, rtol=5e-2
+            e_plus = (
+                output[AtomicDataDict.TOTAL_ENERGY_KEY]
+                .sum()
+                .to(torch.get_default_dtype())
             )
 
-    def test_partial_forces(self, config, atomic_batch, device, strict_locality):
+            data[AtomicDataDict.POSITIONS_KEY][iatom, idir] -= epsilon * 2
+            output = model(AtomicData.to_AtomicDataDict(data.to(device)))
+            e_minus = (
+                output[AtomicDataDict.TOTAL_ENERGY_KEY]
+                .sum()
+                .to(torch.get_default_dtype())
+            )
+
+            numeric = -(e_plus - e_minus) / (epsilon * 2)
+            analytical = forces[iatom, idir].to(torch.get_default_dtype())
+
+            assert torch.isclose(numeric, analytical, atol=2e-2) or torch.isclose(
+                numeric, analytical, rtol=5e-2
+            ), f"numeric: {numeric.item()}, analytical: {analytical.item()}"
+
+    def test_partial_forces(
+        self, config, atomic_batch, device, strict_locality, model_dtype
+    ):
         config, out_fields = config
         if "ForceOutput" not in config["model_builders"]:
             pytest.skip()
+        config.update({"model_dtype": model_dtype})
         config = config.copy()
         partial_config = config.copy()
         partial_config["model_builders"] = [
@@ -458,7 +476,7 @@ class BaseEnergyModelTests(BaseModelTests):
                     atol=(
                         1e-8
                         if k == AtomicDataDict.TOTAL_ENERGY_KEY
-                        and torch.get_default_dtype() == torch.float64
+                        and model.model_dtype == torch.float64
                         else 1e-5
                     ),
                 )
