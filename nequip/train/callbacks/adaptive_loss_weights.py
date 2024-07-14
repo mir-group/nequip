@@ -51,7 +51,7 @@ class SoftAdapt:
         # collect loss for each training target
         losses = []
         for key in trainer.loss.coeffs.keys():
-            losses.append(trainer.batch_losses[f"loss_{ABBREV.get(key)}"])
+            losses.append(trainer.batch_losses[f"loss_{ABBREV.get(key, key)}"])
         new_losses = torch.tensor(losses)
 
         # compute and cache new loss weights over the update cycle
