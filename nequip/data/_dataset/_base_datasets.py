@@ -309,7 +309,7 @@ class AtomicInMemoryDataset(AtomicDataset):
             graph_selector = torch.arange(0, self.len(), stride)
 
         node_selector = torch.as_tensor(
-            np.in1d(self.data.batch.numpy(), graph_selector.numpy())
+            np.isin(self.data.batch.numpy(), graph_selector.numpy())
         )
 
         edge_index = self.data[AtomicDataDict.EDGE_INDEX_KEY]
