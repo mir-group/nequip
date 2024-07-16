@@ -265,21 +265,32 @@ class Metrics:
 
     def gather(self):
         """Use `torch.distributed` to gather and accumulate state of this Metrics across nodes to rank 0."""
+        # this version makes sure that the tensors are on the same device 
         state = (
             dist.get_rank(),
             {
-                k1: {k2: rs.get_state() for k2, rs in v1.items()}
+                k1: {k2: (rs._state, rs._n) for k2, rs in v1.items()}  # Access _state and _n
                 for k1, v1 in self.running_stats.items()
             },
         )
         states = [None for _ in range(dist.get_world_size())]
-        dist.all_gather_object(states, state)  # list of dict
+        dist.all_gather_object(states, state)  # Gather state from all nodes
+
         if dist.get_rank() == 0:
             # accumulate on rank 0
             for from_rank, state in states:
                 if from_rank == 0:
-                    # we already have this don't accumulate it
+                    # Skip the current rank's state as it's already included
                     continue
                 for k1, v1 in state.items():
-                    for k2, rs_state in v1.items():
-                        self.running_stats[k1][k2].accumulate_state(rs_state)
+                    for k2, (rs_state, rs_n) in v1.items():
+                        # Ensure tensors are on the same device
+                        rs_state = rs_state.to(self.running_stats[k1][k2]._state.device)
+                        rs_n = rs_n.to(self.running_stats[k1][k2]._n.device)
+
+                        # Accumulate the state by updating _state and _n
+                        self.running_stats[k1][k2]._state = (self.running_stats[k1][k2]._state * self.running_stats[k1][k2]._n + rs_state * rs_n) / (self.running_stats[k1][k2]._n + rs_n)
+                        self.running_stats[k1][k2]._n += rs_n
+                        # Ensure no division by zero issues
+                        self.running_stats[k1][k2]._state = torch.nan_to_num_(self.running_stats[k1][k2]._state, nan=0.0)
+

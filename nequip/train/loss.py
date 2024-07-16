@@ -191,15 +191,24 @@ class LossStat:
         """Use `torch.distributed` to gather and accumulate state of this LossStat across nodes to rank 0."""
         state = (
             dist.get_rank(),
-            {k: rs.get_state() for k, rs in self.loss_stat.items()},
+            {k: (rs._state, rs._n) for k, rs in self.loss_stat.items()},  # Access _state and _n
         )
         states = [None for _ in range(dist.get_world_size())]
-        dist.all_gather_object(states, state)  # list of dict
+        dist.all_gather_object(states, state)  # Gather state from all nodes
+
         if dist.get_rank() == 0:
             # accumulate on rank 0
             for from_rank, state in states:
                 if from_rank == 0:
-                    # we already have this don't accumulate it
+                    # Skip the current rank's state as it's already included
                     continue
-                for k, rs_state in state.items():
-                    self.loss_stat[k].accumulate_state(rs_state)
+                for k, (rs_state, rs_n) in state.items():
+                    # Ensure tensors are on the same device
+                    rs_state = rs_state.to(self.loss_stat[k]._state.device)
+                    rs_n = rs_n.to(self.loss_stat[k]._n.device)
+
+                    # Accumulate the state by updating _state and _n
+                    self.loss_stat[k]._state = (self.loss_stat[k]._state * self.loss_stat[k]._n + rs_state * rs_n) / (self.loss_stat[k]._n + rs_n)
+                    self.loss_stat[k]._n += rs_n
+                    # Ensure no division by zero issues
+                    self.loss_stat[k]._state = torch.nan_to_num_(self.loss_stat[k]._state, nan=0.0)
