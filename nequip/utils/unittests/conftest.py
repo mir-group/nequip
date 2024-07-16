@@ -12,11 +12,12 @@ from ase.io import write
 
 import torch
 
-from nequip.utils.test import set_irreps_debug, FLOAT_TOLERANCE
 from nequip.data import AtomicData, ASEDataset
 from nequip.data.transforms import TypeMapper
+from nequip.utils.test import set_irreps_debug, FLOAT_TOLERANCE
 from nequip.utils.torch_geometric import Batch
 from nequip.utils._global_options import _set_global_options
+from nequip.utils import dtype_to_name
 
 # Sometimes we run parallel using pytest-xdist, and want to be able to use
 # as many GPUs as are available
@@ -40,6 +41,16 @@ if _is_pytest_xdist and torch.cuda.is_available():
 if "NEQUIP_NUM_TASKS" not in os.environ:
     # Test parallelization, but don't waste time spawning tons of workers if lots of cores available
     os.environ["NEQUIP_NUM_TASKS"] = "2"
+
+
+@pytest.fixture(scope="class", params=["float32", "float64"])
+def model_dtype(float_tolerance, request):
+    default_dtype = dtype_to_name(torch.get_default_dtype())
+    if default_dtype != "float64":
+        pytest.skip(
+            f"found default_dtype={default_dtype} - only default_dtype=float64 will be tested"
+        )
+    return request.param
 
 
 @pytest.fixture(scope="session", autouse=True, params=["float32", "float64"])
