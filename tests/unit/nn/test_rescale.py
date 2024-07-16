@@ -12,10 +12,11 @@ import torch
 
 from e3nn.util.test import assert_auto_jitable
 
-from nequip.nn import RescaleOutput
-from nequip.data import AtomicDataDict, AtomicData
-from nequip.utils.test import assert_AtomicData_equivariant
+from nequip.nn import RescaleOutput, GraphModel
 from nequip.nn.embedding import OneHotAtomEncoding
+from nequip.data import AtomicDataDict, AtomicData
+from nequip.utils import dtype_from_name, torch_default_dtype
+from nequip.utils.test import assert_AtomicData_equivariant
 
 
 @pytest.mark.parametrize("scale_by", [0.77, 1.0, None])
@@ -28,12 +29,17 @@ def test_rescale(
     shift_by,
     scale_trainable,
     shift_trainable,
+    model_dtype,
 ):
     _, data = CH3CHO
-    oh = OneHotAtomEncoding(
-        num_types=3,
-        irreps_in=data.irreps,
-    )
+    with torch_default_dtype(dtype_from_name(model_dtype)):
+        oh = GraphModel(
+            OneHotAtomEncoding(
+                num_types=3,
+                irreps_in=data.irreps,
+            ),
+            model_dtype=dtype_from_name(model_dtype),
+        )
 
     # some combinations are illegal and should raise
     build_with = contextlib.nullcontext()
@@ -67,10 +73,19 @@ def test_rescale(
     # == Check scale/shift ==
     for training_mode in [True, False]:
         rescale.train(training_mode)
+
+        # oh_out is in model_dtype
         oh_out = oh(AtomicData.to_AtomicDataDict(data))[AtomicDataDict.NODE_ATTRS_KEY]
+        # rescale_out is in default_dtype
         rescale_out = rescale(AtomicData.to_AtomicDataDict(data))[
             AtomicDataDict.NODE_ATTRS_KEY
         ]
+
+        # only default_dtype=float64 will be tested (see above pytest.skip check)
+        # model_dtype can be float32 or float64
+        # so we cast oh_out (model_dtype) to rescale_out (model_dtype) for testing
+        oh_out = oh_out.to(dtype=rescale_out.dtype)
+
         if training_mode:
             assert torch.all(oh_out == rescale_out)
             continue  # don't test anything else
