@@ -208,7 +208,11 @@ class LossStat:
                     rs_n = rs_n.to(self.loss_stat[k]._n.device)
 
                     # Accumulate the state by updating _state and _n
-                    self.loss_stat[k]._state = (self.loss_stat[k]._state * self.loss_stat[k]._n + rs_state * rs_n) / (self.loss_stat[k]._n + rs_n)
+                    self.loss_stat[k]._state = (
+                        self.loss_stat[k]._state * self.loss_stat[k]._n + rs_state * rs_n
+                    ) / (self.loss_stat[k]._n + rs_n)
                     self.loss_stat[k]._n += rs_n
                     # Ensure no division by zero issues
-                    self.loss_stat[k]._state = torch.nan_to_num_(self.loss_stat[k]._state, nan=0.0)
+                    self.loss_stat[k]._state = torch.nan_to_num_(
+                        self.loss_stat[k]._state, nan=0.0
+                    )

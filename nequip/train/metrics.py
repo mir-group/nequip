@@ -289,8 +289,12 @@ class Metrics:
                         rs_n = rs_n.to(self.running_stats[k1][k2]._n.device)
 
                         # Accumulate the state by updating _state and _n
-                        self.running_stats[k1][k2]._state = (self.running_stats[k1][k2]._state * self.running_stats[k1][k2]._n + rs_state * rs_n) / (self.running_stats[k1][k2]._n + rs_n)
+                        self.running_stats[k1][k2]._state = (
+                            self.running_stats[k1][k2]._state * self.running_stats[k1][k2]._n + rs_state * rs_n
+                        ) / (self.running_stats[k1][k2]._n + rs_n)
                         self.running_stats[k1][k2]._n += rs_n
                         # Ensure no division by zero issues
-                        self.running_stats[k1][k2]._state = torch.nan_to_num_(self.running_stats[k1][k2]._state, nan=0.0)
+                        self.running_stats[k1][k2]._state = torch.nan_to_num_(
+                            self.running_stats[k1][k2]._state, nan=0.0
+                        )
 
