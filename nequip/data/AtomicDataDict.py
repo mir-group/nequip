@@ -45,11 +45,23 @@ def _irreps_compatible(ir1: Dict[str, o3.Irreps], ir2: Dict[str, o3.Irreps]):
 
 
 @torch.jit.script
-def with_edge_vectors(data: Type, with_lengths: bool = True) -> Type:
+def with_edge_vectors(
+    data: Type,
+    with_lengths: bool = True,
+    edge_index_field: str = _keys.EDGE_INDEX_KEY,
+    edge_cell_shift_field: str = _keys.EDGE_CELL_SHIFT_KEY,
+    edge_vec_field: str = _keys.EDGE_VECTORS_KEY,
+    edge_vec_f64_field: str = _keys.EDGE_VECTORS_F64_KEY,
+    edge_len_field: str = _keys.EDGE_LENGTH_KEY,
+    edge_len_f64_field: str = _keys.EDGE_LENGTH_F64_KEY,
+) -> Type:
     """Compute the edge displacement vectors for a graph.
 
     If ``data.pos.requires_grad`` and/or ``data.cell.requires_grad``, this
     method will return edge vectors correctly connected in the autograd graph.
+
+    The availability of various custom field options enables reuse of this function
+    for nonconventional field options.
 
     Returns:
         Tensor [n_edges, 3] edge displacement vectors
@@ -60,11 +72,11 @@ def with_edge_vectors(data: Type, with_lengths: bool = True) -> Type:
     ).dtype
     # We do calculations on the positions and cells in whatever dtype they
     # were provided in, and only convert to model_dtype after
-    if _keys.EDGE_VECTORS_KEY in data:
-        if with_lengths and _keys.EDGE_LENGTH_KEY not in data:
-            edge_len = torch.linalg.norm(data[_keys.EDGE_VECTORS_F64_KEY], dim=-1)
-            data[_keys.EDGE_LENGTH_F64_KEY] = edge_len
-            data[_keys.EDGE_LENGTH_KEY] = edge_len.to(model_dtype)
+    if edge_vec_field in data:
+        if with_lengths and edge_len_field not in data:
+            edge_len = torch.linalg.norm(data[edge_vec_f64_field], dim=-1)
+            data[edge_len_f64_field] = edge_len
+            data[edge_len_field] = edge_len.to(model_dtype)
         return data
     else:
         # Build it dynamically
@@ -73,7 +85,7 @@ def with_edge_vectors(data: Type, with_lengths: bool = True) -> Type:
         #     is Tensors.
         # (2) works on a Batch constructed from AtomicData
         pos = data[_keys.POSITIONS_KEY]
-        edge_index = data[_keys.EDGE_INDEX_KEY]
+        edge_index = data[edge_index_field]
         edge_vec = torch.index_select(pos, 0, edge_index[1]) - torch.index_select(
             pos, 0, edge_index[0]
         )
@@ -81,7 +93,7 @@ def with_edge_vectors(data: Type, with_lengths: bool = True) -> Type:
             # ^ note that to save time we don't check that the edge_cell_shifts are trivial if no cell is provided; we just assume they are either not present or all zero.
             # -1 gives a batch dim no matter what
             cell = data[_keys.CELL_KEY].view(-1, 3, 3)
-            edge_cell_shift = data[_keys.EDGE_CELL_SHIFT_KEY]
+            edge_cell_shift = data[edge_cell_shift_field]
             if cell.shape[0] > 1:
                 batch = data[_keys.BATCH_KEY]
                 # Cell has a batch dimension
@@ -103,12 +115,12 @@ def with_edge_vectors(data: Type, with_lengths: bool = True) -> Type:
                     edge_cell_shift,
                     cell.squeeze(0),  # remove batch dimension
                 )
-        data[_keys.EDGE_VECTORS_F64_KEY] = edge_vec
-        data[_keys.EDGE_VECTORS_KEY] = edge_vec.to(model_dtype)
+        data[edge_vec_f64_field] = edge_vec
+        data[edge_vec_field] = edge_vec.to(model_dtype)
         if with_lengths:
             edge_len = torch.linalg.norm(edge_vec, dim=-1)
-            data[_keys.EDGE_LENGTH_F64_KEY] = edge_len
-            data[_keys.EDGE_LENGTH_KEY] = edge_len.to(model_dtype)
+            data[edge_len_f64_field] = edge_len
+            data[edge_len_field] = edge_len.to(model_dtype)
         return data
 
 
