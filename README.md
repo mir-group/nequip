@@ -141,7 +141,9 @@ Details on writing and using plugins can be found in the [Allegro tutorial](http
 
 ## References & citing
 
-The theory behind NequIP is described in our preprint (1). NequIP's backend builds on e3nn, a general framework for building E(3)-equivariant neural networks (2). If you use this repository in your work, please consider citing NequIP (1) and e3nn (3):
+The theory behind NequIP is described in our [article](https://www.nature.com/articles/s41467-022-29939-5) (1). 
+NequIP's backend builds on [`e3nn`](https://e3nn.org), a general framework for building E(3)-equivariant 
+neural networks (2). If you use this repository in your work, please consider citing `NequIP` (1) and `e3nn` (3):
 
  1. https://www.nature.com/articles/s41467-022-29939-5
  2. https://e3nn.org

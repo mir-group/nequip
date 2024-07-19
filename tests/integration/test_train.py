@@ -148,7 +148,6 @@ def test_requeue(nequip_dataset, BENCHMARK_ROOT, conffile):
 
         for irun in range(3):
 
-            true_config["max_epochs"] = 2 * (irun + 1)
             config_path = tmpdir + "/conf.yaml"
             with open(config_path, "w+") as fp:
                 yaml.dump(true_config, fp)
@@ -162,7 +161,13 @@ def test_requeue(nequip_dataset, BENCHMARK_ROOT, conffile):
 
             retcode = subprocess.run(
                 # Supress the warning cause we use general config for all the fake models
-                ["nequip-train", "conf.yaml", "--warn-unused"],
+                [
+                    "nequip-train",
+                    "conf.yaml",
+                    "--warn-unused",
+                    "--override",
+                    f"max_epochs: {2 * (irun + 1)}",
+                ],
                 cwd=tmpdir,
                 env=env,
                 stdout=subprocess.PIPE,
@@ -178,4 +183,4 @@ def test_requeue(nequip_dataset, BENCHMARK_ROOT, conffile):
                 dtype=None,
             )
 
-            assert len(dat["epoch"]) == true_config["max_epochs"]
+            assert len(dat["epoch"]) == (2 * (irun + 1))
