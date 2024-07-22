@@ -5,10 +5,10 @@ from typing import Dict, Any, List, Optional
 
 from .. import AtomicDataDict, _LONG_FIELDS, _NODE_FIELDS, _GRAPH_FIELDS
 from ..transforms import TypeMapper
-from ._base_datasets import AtomicInMemoryDataset
+from ._base_datasets import AtomicDataset
 
 
-class NpzDataset(AtomicInMemoryDataset):
+class NpzDataset(AtomicDataset):
     """Load data from an npz file.
 
     To avoid loading unneeded data, keys are ignored by default unless they are in ``key_mapping``, ``include_keys``,
