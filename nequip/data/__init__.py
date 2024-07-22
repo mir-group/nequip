@@ -12,11 +12,11 @@ from .AtomicData import (
 )
 from ._dataset import (
     AtomicDataset,
-    AtomicInMemoryDataset,
     NpzDataset,
     ASEDataset,
     HDF5Dataset,
 )
+
 from .dataloader import DataLoader, Collater, PartialSampler
 from ._build import dataset_from_config
 from ._test_data import EMTTestDataset
@@ -28,7 +28,6 @@ __all__ = [
     deregister_fields,
     _register_field_prefix,
     AtomicDataset,
-    AtomicInMemoryDataset,
     NpzDataset,
     ASEDataset,
     HDF5Dataset,

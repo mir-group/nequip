@@ -7,11 +7,11 @@ import ase
 import ase.build
 from ase.calculators.emt import EMT
 
-from nequip.data import AtomicInMemoryDataset, AtomicData
+from nequip.data import AtomicDataset, AtomicData
 from .transforms import TypeMapper
 
 
-class EMTTestDataset(AtomicInMemoryDataset):
+class EMTTestDataset(AtomicDataset):
     """Test dataset with PBC based on the toy EMT potential included in ASE.
 
     Randomly generates (in a reproducable manner) a basic bulk with added

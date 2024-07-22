@@ -14,7 +14,7 @@ import torch.multiprocessing as mp
 from nequip.utils.multiprocessing import num_tasks
 from .. import AtomicData
 from ..transforms import TypeMapper
-from ._base_datasets import AtomicInMemoryDataset
+from ._base_datasets import AtomicDataset
 
 
 def _ase_dataset_reader(
@@ -72,7 +72,7 @@ def _ase_dataset_reader(
         return datas
 
 
-class ASEDataset(AtomicInMemoryDataset):
+class ASEDataset(AtomicDataset):
     """
 
     Args:
