@@ -1,77 +1,67 @@
-from typing import List, Callable, Union, Optional
+from typing import Union, List, Callable
 
 import torch
-from ..transforms import TypeMapper
+from .. import AtomicDataDict
 
 
 class AtomicDataset(torch.utils.data.Dataset):
     """The base class for all NequIP datasets.
 
-    Like any PyTorch dataset, subclasses must implement:
-     - `__len__`
-     - `__getitem__`
-    and optionally but encouraged,
-     - `__getitems__`
+    Subclasses must implement:
+     - `__len__()`
+     - `get_data_list()`
+
+    Or may optionally directly override `__getitem__` and `__getitems__` at their own risk.
     """
 
-    root: str
     dtype: torch.dtype
-    type_mapper: TypeMapper
 
     def __init__(
         self,
-        root: str,
-        type_mapper: Optional[TypeMapper] = None,
+        transforms: List[Callable] = [],
     ):
         self.dtype = torch.get_default_dtype()
-        self.root = root
-        self.type_mapper = type_mapper
+        self.transforms = transforms
 
-    def statistics(
+    def __getitem__(
         self,
-        fields: List[Union[str, Callable]],
-        modes: List[str],
-        stride: int = 1,
-        unbiased: bool = True,
-    ) -> List[tuple]:
-        """Compute the statistics of ``fields`` in the dataset.
+        index: Union[int, List[int], torch.Tensor, slice],
+    ) -> AtomicDataDict.Type:
+        if isinstance(index, slice):
+            return self.__getitems__(index)
+        elif isinstance(index, int):
+            return self.__getitems__([index])[0]
+        else:
+            return self.__getitems__(index)
 
-        If the values at the fields are vectors/multidimensional, they must be of fixed shape
-        and elementwise statistics will be computed.
+    def __getitems__(
+        self,
+        indices: Union[List[int], torch.Tensor, slice],
+    ) -> List[AtomicDataDict.Type]:
+        data_list: List[AtomicDataDict.Type] = self.get_data_list(indices)
+        return [self._transform(data) for data in data_list]
 
-        Args:
-            fields: the names of the fields to compute statistics for.
-                Instead of a field name, a callable can also be given that reuturns a quantity
-                to compute the statisics for.
+    def _transform(self, x: AtomicDataDict.Type) -> AtomicDataDict.Type:
+        # TODO: this is very confusing
+        # when training with a DataLoader, the transforms don't seem to mutate the underlying data
+        # but if Datasets are called by index directly, e.g. dataset[[1,3]], the underlying dicts are mutated
+        x = x.copy()
+        for t in self.transforms:
+            x = t(x)
+        return x
 
-                If a callable is given, it will be called with a (possibly batched) ``Data``-like
-                object and must return a sequence of points to add to the set over which the statistics
-                will be computed. The callable must also return a string, one of ``"node"`` or ``"graph"``,
-                indicating whether the value it returns is a per-node or per-graph quantity.
-
-                PLEASE NOTE: the argument to the callable may be "batched", and it may not be batched
-                "contiguously": ``batch`` and ``edge_index`` may have "gaps" in their values.
-
-                For example, to compute the overall statistics of the x,y,z components of a per-node vector
-                ``force`` field:
-
-                    data.statistics([lambda data: (data.force.flatten(), "node")])
-
-                The above computes the statistics over a set of size 3N, where N is the total number of nodes
-                in the dataset.
-
-            modes: the statistic to compute for each field. Valid options are:
-                 - ``count``
-                 - ``rms``
-                 - ``mean_std``
-                 - ``per_atom_*``
-
-            stride: the stride over the dataset while computing statistcs.
-
-            unbiased: whether to use unbiased for standard deviations.
-
-        Returns:
-            List of statistics for each field.
+    def num_atoms(self, indices: Union[List[int], torch.Tensor, slice]) -> List[int]:
         """
-        # TODO: pytorch_runstats implementation
-        raise NotImplementedError
+        Subclasses may override this.
+        """
+        # Note that get_data_list does _not_ call the transforms
+        data_list = self.get_data_list(indices)
+        return [AtomicDataDict.num_nodes(data) for data in data_list]
+
+    def get_data_list(
+        self,
+        indices: Union[List[int], slice],
+    ) -> List[AtomicDataDict.Type]:
+        raise NotImplementedError(
+            "Subclasses of AtomicDataset should define get_data_list"
+        )
