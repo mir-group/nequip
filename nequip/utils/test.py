@@ -1,5 +1,6 @@
 from typing import Union, Optional, List
 
+import ase
 import torch
 from e3nn import o3
 from e3nn.util.test import equivariance_error
@@ -403,3 +404,26 @@ def set_irreps_debug(enabled: bool = False) -> None:
 
     _DEBUG_HOOKS = (h1, h2)
     return
+
+
+def edgeset_from_AtomicDataDict(data, **nl_kwargs):
+    data = AtomicDataDict.compute_neighborlist_(data, **nl_kwargs)
+    return set([tuple(edge) for edge in data["edge_index"].numpy().T])
+
+
+def compare_neighborlists(
+    atoms_or_data: ase.Atoms | AtomicDataDict.Type, nl1: str, nl2: str, **nl_kwargs
+):
+    """
+    Args:
+        nl1, nl2: the neighborlists to compare -- currently "ase", "matscipy", "vesin"
+    """
+    assert "r_max" in nl_kwargs
+    assert "NL" not in nl_kwargs
+    if isinstance(atoms_or_data, ase.Atoms):
+        data = AtomicDataDict.from_ase(atoms_or_data)
+    else:
+        data = atoms_or_data
+    edges1 = edgeset_from_AtomicDataDict(data, NL=nl1, **nl_kwargs)
+    edges2 = edgeset_from_AtomicDataDict(data, NL=nl1, **nl_kwargs)
+    assert edges1 == edges2
