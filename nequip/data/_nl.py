@@ -7,11 +7,8 @@ import numpy as np
 import torch
 
 import ase.neighborlist
+from matscipy.neighbours import neighbour_list as matscipy_nl
 
-try:
-    from matscipy.neighbours import neighbour_list as matscipy_nl
-except ImportError:
-    pass
 try:
     from vesin import NeighborList as vesin_nl
 except ImportError:
@@ -22,11 +19,11 @@ _ERROR_ON_NO_EDGES: bool = os.environ.get("NEQUIP_ERROR_ON_NO_EDGES", "true").lo
 assert _ERROR_ON_NO_EDGES in ("true", "false")
 _ERROR_ON_NO_EDGES = _ERROR_ON_NO_EDGES == "true"
 
-# use "ase" as default
+# use "matscipy" as default
 # NOTE:
 # - vesin and matscipy do not support self-interaction
 # - vesin does not allow for mixed pbcs
-_NEQUIP_NL: Final[str] = os.environ.get("NEQUIP_NL", "ase").lower()
+_NEQUIP_NL: Final[str] = os.environ.get("NEQUIP_NL", "matscipy").lower()
 assert _NEQUIP_NL in [
     "ase",
     "matscipy",
