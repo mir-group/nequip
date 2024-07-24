@@ -26,7 +26,8 @@ setup(
         ]
     },
     install_requires=[
-        "numpy",
+        "numpy<2.0",  # TODO: remove the constraint when matscipy is compatible
+        "matscipy",
         "ase",
         "tqdm",
         "e3nn>=0.4.4,<0.6.0",
