@@ -8,8 +8,8 @@ from ._key_registry import (
     _LONG_FIELDS,
     _CARTESIAN_TENSOR_FIELDS,
 )
-from ._dataset import AtomicDataset, NpzDataset, ASEDataset, HDF5Dataset, EMTTestDataset
 
+from ._dataset import AtomicDataset, ASEDataset, HDF5Dataset, EMTTestDataset
 from ._sampler import PartialSampler
 from ._build import dataset_from_config
 
@@ -18,7 +18,6 @@ __all__ = [
     deregister_fields,
     _register_field_prefix,
     AtomicDataset,
-    NpzDataset,
     ASEDataset,
     HDF5Dataset,
     EMTTestDataset,
