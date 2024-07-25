@@ -8,7 +8,7 @@ import ase.build
 from ase.calculators.emt import EMT
 
 from nequip.data import AtomicDataset, AtomicData
-from .transforms import TypeMapper
+from ..transforms import TypeMapper
 
 
 class EMTTestDataset(AtomicDataset):
