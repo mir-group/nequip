@@ -7,10 +7,10 @@ class NeighborListTransform:
     def __init__(
         self,
         r_max: float,
-        **nl_kwargs,
+        **kwargs,
     ):
         self.r_max = r_max
-        self.nl_kwargs = nl_kwargs
+        self.kwargs = kwargs
 
     def __call__(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
-        return AtomicDataDict.compute_neighborlist_(data, self.r_max, **self.nl_kwargs)
+        return AtomicDataDict.compute_neighborlist_(data, self.r_max, **self.kwargs)

@@ -2,7 +2,7 @@ import inspect
 from importlib import import_module
 
 from nequip import data
-from nequip.data.transforms import TypeMapper
+from nequip.data.transforms import TypeMapper, NeighborListTransform
 from nequip.data import AtomicDataset
 from nequip.utils import instantiate, get_w_prefix
 
@@ -68,13 +68,16 @@ def dataset_from_config(config, prefix: str = "dataset") -> AtomicDataset:
         arg_dicts=[config[prefixed_eff_key], config],
     )
 
-    # Build a TypeMapper from the config
+    # TODO: more general transforms parser
+    # Build a TypeMapper and NeighborListTransform from the config
     type_mapper, _ = instantiate(TypeMapper, prefix=prefix, optional_args=config)
+    nl, _ = instantiate(NeighborListTransform, prefix=prefix, optional_args=config)
+    transforms = [type_mapper, nl]
 
     instance, _ = instantiate(
         class_name,
         prefix=prefix,
-        positional_args={"type_mapper": type_mapper},
+        positional_args={"transforms": transforms},
         optional_args=config,
     )
 
