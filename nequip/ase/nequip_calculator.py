@@ -1,13 +1,15 @@
-from typing import Union, Optional, Callable, Dict
+from typing import Union, Optional, Callable, Dict, List
 import warnings
 import torch
 
-import ase.data
 from ase.calculators.calculator import Calculator, all_changes
 from ase.stress import full_3x3_to_voigt_6_stress
 
-from nequip.data import AtomicData, AtomicDataDict
-from nequip.data.transforms import TypeMapper
+from nequip.data import AtomicDataDict
+from nequip.data.transforms import (
+    ChemicalSpeciesToAtomTypeMapper,
+    NeighborListTransform,
+)
 import nequip.scripts.deploy
 
 
@@ -30,11 +32,10 @@ class NequIPCalculator(Calculator):
     def __init__(
         self,
         model: torch.jit.ScriptModule,
-        r_max: float,
         device: Union[str, torch.device],
         energy_units_to_eV: float = 1.0,
         length_units_to_A: float = 1.0,
-        transform: Callable = lambda x: x,
+        transforms: List[Callable] = [],
         **kwargs
     ):
         Calculator.__init__(self, **kwargs)
@@ -43,21 +44,27 @@ class NequIPCalculator(Calculator):
         assert isinstance(
             model, torch.nn.Module
         ), "To build a NequIPCalculator from a deployed model, use NequIPCalculator.from_deployed_model"
-        self.r_max = r_max
         self.device = device
         self.energy_units_to_eV = energy_units_to_eV
         self.length_units_to_A = length_units_to_A
-        self.transform = transform
+        self.transforms = transforms
 
     @classmethod
     def from_deployed_model(
         cls,
-        model_path,
+        model_path: str,
         device: Union[str, torch.device] = "cpu",
-        species_to_type_name: Optional[Dict[str, str]] = None,
+        chemical_symbols: Optional[Union[List[str], Dict[str, str]]] = None,
         set_global_options: Union[str, bool] = "warn",
         **kwargs
     ):
+        """
+        Args:
+            model_path (str): path to deployed model
+            device (torch.device): the device to use
+            chemical_symbols (List[str] or Dict[str, str]): mapping between chemical symbols and model type names
+            set_global_options (str or bool): whether to set global options
+        """
         # load model
         model, metadata = nequip.scripts.deploy.load_deployed_model(
             model_path=model_path,
@@ -68,29 +75,26 @@ class NequIPCalculator(Calculator):
 
         # build typemapper
         type_names = metadata[nequip.scripts.deploy.TYPE_NAMES_KEY].split(" ")
-        if species_to_type_name is None:
+        if chemical_symbols is None:
             # Default to species names
             warnings.warn(
-                "Trying to use chemical symbols as NequIP type names; this may not be correct for your model! To avoid this warning, please provide `species_to_type_name` explicitly."
+                "Trying to use model type names as chemical symbols; this may not be correct for your model (and may cause an error if model type names are not chemical symbols)! To avoid this warning, please provide `chemical_symbols` explicitly."
             )
-            species_to_type_name = {s: s for s in ase.data.chemical_symbols}
-        type_name_to_index = {n: i for i, n in enumerate(type_names)}
-        chemical_symbol_to_type = {
-            sym: type_name_to_index[species_to_type_name[sym]]
-            for sym in ase.data.chemical_symbols
-            if sym in type_name_to_index
-        }
-        if len(chemical_symbol_to_type) != len(type_names):
-            raise ValueError(
-                "The default mapping of chemical symbols as type names didn't make sense; please provide an explicit mapping in `species_to_type_name`"
-            )
-        transform = TypeMapper(chemical_symbol_to_type=chemical_symbol_to_type)
+            chemical_symbols = type_names
 
         # build nequip calculator
-        if "transform" in kwargs:
-            raise TypeError("`transform` not allowed here")
+        if "transforms" in kwargs:
+            raise KeyError("`transforms` not allowed here")
+
         return cls(
-            model=model, r_max=r_max, device=device, transform=transform, **kwargs
+            model=model,
+            r_max=r_max,
+            device=device,
+            transforms=[
+                ChemicalSpeciesToAtomTypeMapper(chemical_symbols),
+                NeighborListTransform(r_max=r_max),
+            ],
+            **kwargs
         )
 
     def calculate(self, atoms=None, properties=["energy"], system_changes=all_changes):
@@ -106,13 +110,11 @@ class NequIPCalculator(Calculator):
         Calculator.calculate(self, atoms)
 
         # prepare data
-        data = AtomicData.from_ase(atoms=atoms, r_max=self.r_max)
-        for k in AtomicDataDict.ALL_ENERGY_KEYS:
-            if k in data:
-                del data[k]
-        data = self.transform(data)
-        data = data.to(self.device)
-        data = AtomicData.to_AtomicDataDict(data)
+        # TODO handle from_ase kwargs?
+        data = AtomicDataDict.from_ase(atoms)
+        for t in self.transforms:
+            data = t(data)
+        data = AtomicDataDict.to_(data, self.device)
 
         # predict + extract data
         out = self.model(data)
