@@ -1,5 +1,4 @@
 from .AtomicData import (
-    AtomicData,
     PBC,
     register_fields,
     deregister_fields,
@@ -10,19 +9,12 @@ from .AtomicData import (
     _LONG_FIELDS,
     _CARTESIAN_TENSOR_FIELDS,
 )
-from ._dataset import (
-    AtomicDataset,
-    NpzDataset,
-    ASEDataset,
-    HDF5Dataset,
-)
+from ._dataset import AtomicDataset, NpzDataset, ASEDataset, HDF5Dataset, EMTTestDataset
 
 from .dataloader import DataLoader, Collater, PartialSampler
 from ._build import dataset_from_config
-from ._test_data import EMTTestDataset
 
 __all__ = [
-    AtomicData,
     PBC,
     register_fields,
     deregister_fields,
@@ -31,6 +23,7 @@ __all__ = [
     NpzDataset,
     ASEDataset,
     HDF5Dataset,
+    EMTTestDataset,
     DataLoader,
     Collater,
     PartialSampler,
@@ -40,5 +33,4 @@ __all__ = [
     _GRAPH_FIELDS,
     _LONG_FIELDS,
     _CARTESIAN_TENSOR_FIELDS,
-    EMTTestDataset,
 ]
