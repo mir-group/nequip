@@ -5,10 +5,13 @@ from nequip.data import AtomicDataDict
 from nequip.nn.embedding import OneHotAtomEncoding
 from nequip.nn import SequentialGraphNetwork, AtomwiseLinear
 
+# TODO: make these tests use the model_dtype fixture
+# not too urgent/essential because of nature of these tests
+
 
 def test_basic():
     sgn = SequentialGraphNetwork.from_parameters(
-        shared_params={"num_types": 3},
+        shared_params={"type_names": ["A", "B", "C"]},
         layers={"one_hot": OneHotAtomEncoding, "linear": AtomwiseLinear},
     )
     sgn(
@@ -22,7 +25,8 @@ def test_basic():
 
 def test_append():
     sgn = SequentialGraphNetwork.from_parameters(
-        shared_params={"num_types": 3}, layers={"one_hot": OneHotAtomEncoding}
+        shared_params={"type_names": ["A", "B", "C"]},
+        layers={"one_hot": OneHotAtomEncoding},
     )
     sgn.append_from_parameters(
         shared_params={"out_field": AtomicDataDict.NODE_FEATURES_KEY},
@@ -44,7 +48,7 @@ def test_append():
 @pytest.mark.parametrize("mode", {"before", "after"})
 def test_insert(mode):
     sgn = SequentialGraphNetwork.from_parameters(
-        shared_params={"num_types": 3},
+        shared_params={"type_names": ["A", "B", "C"]},
         layers={"one_hot": OneHotAtomEncoding, "lin2": AtomwiseLinear},
     )
     keys = {"before": "lin2", "after": "one_hot"}

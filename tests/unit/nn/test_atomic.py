@@ -1,28 +1,26 @@
 import pytest
 import torch
 
-from nequip.data import AtomicData
+from nequip.data import AtomicDataDict
 from nequip.nn import (
     AtomwiseLinear,
     AtomwiseReduce,
-    PerSpeciesScaleShift,
+    PerTypeScaleShift,
     SequentialGraphNetwork,
     GraphModel,
 )
 from nequip.nn.embedding import (
     OneHotAtomEncoding,
 )
-from nequip.utils.torch_geometric import Batch
 from nequip.utils import dtype_from_name, torch_default_dtype
 
 
 @pytest.fixture(scope="class", params=[0, 1, 2])
-def model(model_dtype, float_tolerance, request):
+def model(model_dtype, request):
     zero_species = request.param
     shifts = [3, 5, 7]
     shifts[zero_species] = 0
     params = dict(
-        num_types=3,
         type_names=["A", "B", "C"],
         total_shift=1.0,
         shifts=shifts,
@@ -39,7 +37,7 @@ def model(model_dtype, float_tolerance, request):
                         dict(irreps_out="1x0e", out_field="e"),
                     ),
                     "shift": (
-                        PerSpeciesScaleShift,
+                        PerTypeScaleShift,
                         dict(
                             field="e",
                             out_field="shifted",
@@ -56,15 +54,18 @@ def model(model_dtype, float_tolerance, request):
                 },
             ),
             model_dtype=dtype_from_name(model_dtype),
+            type_names=["A", "B", "C"],
         )
     return model
 
 
 @pytest.fixture(scope="class")
-def batches(float_tolerance, nequip_dataset):
+def batches(nequip_dataset):
+    print(nequip_dataset[0])
+    print(nequip_dataset[1])
     b = []
     for idx in [[0], [1], [0, 1]]:
-        b += [AtomicData.to_AtomicDataDict(Batch.from_data_list(nequip_dataset[idx]))]
+        b += [AtomicDataDict.batched_from_list(nequip_dataset[idx])]
     return b
 
 
