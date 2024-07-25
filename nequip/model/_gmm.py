@@ -8,8 +8,12 @@ from nequip.nn import GraphModel, SequentialGraphNetwork
 from nequip.nn import (
     GaussianMixtureModelUncertainty as GaussianMixtureModelUncertaintyModule,
 )
-from nequip.data import AtomicDataDict, AtomicData, AtomicDataset, Collater
+from nequip.data import AtomicDataDict
+from nequip.data.dataset import AtomicDataset
 from nequip.utils import find_first_of_type
+
+
+# TODO: update in accordance to dataset vs model-builder separation update
 
 
 def GaussianMixtureModelUncertainty(
@@ -61,7 +65,6 @@ def GaussianMixtureModelUncertainty(
     graph_model.to(device=device)
     # evaluate
     features = []
-    collater = Collater.for_dataset(dataset=dataset)
     batch_size: int = config.get("validation_batch_size", config.batch_size)
     stride: int = config.get("dataset_statistics_stride", 1)
     # TODO: guard TQDM on interactive?
@@ -69,7 +72,7 @@ def GaussianMixtureModelUncertainty(
         range(0, len(dataset), stride * batch_size),
         desc="GMM eval features on train set",
     ):
-        batch = collater(
+        batch = AtomicDataDict.batched_from_list(
             [dataset[batch_start_i + i * stride] for i in range(batch_size)]
         )
         # TODO: !! assumption that final value of feature_field is what the
@@ -78,9 +81,7 @@ def GaussianMixtureModelUncertainty(
         #          give it a training mode and exfiltrate it through a buffer?
         #          it is correct, however, for NequIP and Allegro energy models
         features.append(
-            graph_model(AtomicData.to_AtomicDataDict(batch.to(device=device)))[
-                feature_field
-            ]
+            graph_model(AtomicDataDict.to_(batch, device))[feature_field]
             .detach()
             .to("cpu")  # offload to not run out of GPU RAM
         )
