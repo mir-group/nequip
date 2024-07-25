@@ -1,6 +1,7 @@
 import wandb
 
 from .trainer import Trainer
+import torch.distributed as dist
 
 
 class TrainerWandB(Trainer):
