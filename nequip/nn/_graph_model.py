@@ -38,7 +38,7 @@ class GraphModel(GraphModuleMixin, torch.nn.Module):
             AtomicDataDict.EDGE_CELL_SHIFT_KEY: None,
             AtomicDataDict.CELL_KEY: "1o",  # 3 of them, but still
             AtomicDataDict.BATCH_KEY: None,
-            AtomicDataDict.BATCH_PTR_KEY: None,
+            AtomicDataDict.NUM_NODES_KEY: None,
             AtomicDataDict.ATOM_TYPE_KEY: None,
         }
         model_input_fields = AtomicDataDict._fix_irreps_dict(model_input_fields)
