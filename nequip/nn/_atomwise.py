@@ -97,7 +97,7 @@ class AtomwiseReduce(GraphModuleMixin, torch.nn.Module):
                 field,
                 data[AtomicDataDict.BATCH_KEY],
                 dim=0,
-                dim_size=len(data[AtomicDataDict.BATCH_PTR_KEY]) - 1,
+                dim_size=AtomicDataDict.num_frames(data),
                 reduce=self.reduce,
             )
         else:

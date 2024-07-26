@@ -218,7 +218,7 @@ class StressOutput(GraphModuleMixin, torch.nn.Module):
 
         if AtomicDataDict.BATCH_KEY in data:
             batch = data[AtomicDataDict.BATCH_KEY]
-            num_batch: int = len(data[AtomicDataDict.BATCH_PTR_KEY]) - 1
+            num_batch: int = AtomicDataDict.num_frames(data)
         else:
             # Special case for efficiency
             batch = self._empty
