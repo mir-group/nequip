@@ -26,7 +26,7 @@ setup(
         ]
     },
     install_requires=[
-        "numpy<2.0",  # TODO: remove the constraint when matscipy is compatible
+        "numpy",
         "matscipy",
         "ase",
         "tqdm",
@@ -38,6 +38,9 @@ setup(
         "importlib_metadata;python_version<'3.10'",  # backport of importlib
         "torch-runstats>=0.2.0",
         "torch-ema>=0.3.0",
+        "hydra-core",
+        "lightning",
+        "torchmetrics",
     ],
     zip_safe=True,
 )
