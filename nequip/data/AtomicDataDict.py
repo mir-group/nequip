@@ -27,15 +27,18 @@ Some standard fields:
     atom_type (Tensor [n_atom]): optional
 """
 
-from typing import Dict, Union, Tuple, List, Optional
+from typing import Dict, Union, Tuple, List, Optional, Any
 from copy import deepcopy
 import warnings
 
+from e3nn import o3
+
+import numpy as np
 import torch
 import ase
 from ase.calculators.singlepoint import SinglePointCalculator, SinglePointDFTCalculator
 from ase.calculators.calculator import all_properties as ase_all_properties
-from ase.stress import voigt_6_to_full_3x3_stress, full_3x3_to_voigt_6_stress
+from ase.stress import full_3x3_to_voigt_6_stress
 
 # Make the keys available in this module
 from ._keys import *  # noqa: F403, F401
@@ -51,6 +54,19 @@ Type = Dict[str, torch.Tensor]
 # A type representing ASE-style periodic boundary condtions, which can be partial (the tuple case)
 PBCType = Union[bool, Tuple[bool, bool, bool]]
 
+# == Irrep checking ==
+
+_SPECIAL_IRREPS = [None]
+
+
+def _fix_irreps_dict(d: Dict[str, Any]):
+    return {k: (i if i in _SPECIAL_IRREPS else o3.Irreps(i)) for k, i in d.items()}
+
+
+def _irreps_compatible(ir1: Dict[str, o3.Irreps], ir2: Dict[str, o3.Irreps]):
+    return all(ir1[k] == ir2[k] for k in ir1 if k in ir2)
+
+
 # == JIT-unsafe "methods" for general data processing ==
 
 
@@ -60,13 +76,11 @@ def from_dict(data: dict) -> Type:
 
 def to_(
     data: Type,
-    device: Optional[torch.device] = None,
-    dtype: Optional[torch.dtype] = None,
-    exclude_keys: List[str] = [],
+    device: Optional[torch.device],
 ) -> Type:
+    """Move an AtomicDataDict to a device"""
     for k, v in data.items():
-        if k not in exclude_keys:
-            v.to(device=device, dtype=dtype)
+        data[k] = v.to(device=device)
     return data
 
 
@@ -79,62 +93,60 @@ def batched_from_list(data_list: List[Type]) -> Type:
     num_data = len(data_list)
     if num_data == 0:
         raise RuntimeError("Cannot batch empty list of AtomicDataDict.Type")
+    elif num_data == 1:
+        # Short circuit
+        return with_batch_(data_list[0].copy())
 
     # first make sure every AtomicDataDict is batched (even if trivially so)
-    # with_batch_() is a no-op if data already has BATCH_KEY and BATCH_PTR_KEY
-    data_list = [with_batch_(data) for data in data_list]
+    # with_batch_() is a no-op if data already has BATCH_KEY and NUM_NODES_KEY
+    data_list = [with_batch_(data.copy()) for data in data_list]
 
-    # now every data entry should have BATCH_KEY and BATCH_PTR_KEY
+    # now every data entry should have BATCH_KEY and NUM_NODES_KEY
     # check for inconsistent keys over the AtomicDataDicts in the list
     dict_keys = data_list[0].keys()
     assert all(
         [dict_keys == data_list[i].keys() for i in range(len(data_list))]
     ), "Found inconsistent keys across AtomicDataDict list to be batched."
-    has_edges = _keys.EDGE_INDEX_KEY in dict_keys
 
     # == Batching Procedure ==
     out = {}
 
+    # get special keys that are related to edge indices (neighborlist)
+    edge_idxs = {}
+    for k in dict_keys:
+        if "edge_index" in k:
+            edge_idxs[k] = []
+
     # first handle edge indices and batch properties separately
     cum_nodes: int = 0  # for edge indices
     cum_frames: int = 0  # for batch
-    edge_idxs = []
     batches = []
-    batch_ptrs = []
     for idx in range(num_data):
-        if has_edges:
-            edge_idxs.append(data_list[idx][_keys.EDGE_INDEX_KEY] + cum_nodes)
+        for key in edge_idxs.keys():
+            edge_idxs[key].append(data_list[idx][key] + cum_nodes)
         batches.append(data_list[idx][_keys.BATCH_KEY] + cum_frames)
-        if idx == 0:
-            batch_ptrs.append(data_list[idx][_keys.BATCH_PTR_KEY])
-        else:
-            batch_ptrs.append(data_list[idx][_keys.BATCH_PTR_KEY][1:] + cum_nodes)
-        cum_frames += num_frames(data_list[idx])  # num_frames
-        cum_nodes += num_nodes(data_list[idx])  # num_nodes
-    if has_edges:
-        out[_keys.EDGE_INDEX_KEY] = torch.cat(edge_idxs, dim=1)  # (2, num_edges)
-    out[_keys.BATCH_KEY] = torch.cat(batches, dim=0)
-    out[_keys.BATCH_PTR_KEY] = torch.cat(batch_ptrs, dim=0)
+        cum_frames += num_frames(data_list[idx])
+        cum_nodes += num_nodes(data_list[idx])
 
-    # then collect the rest by field...
-    batched = {}
+    for key in edge_idxs.keys():
+        out[key] = torch.cat(edge_idxs[key], dim=1)  # (2, num_edges)
+
+    out[_keys.BATCH_KEY] = torch.cat(batches, dim=0)
+
+    # then handle the rest
+    ignore = set(edge_idxs.keys()) | {_keys.BATCH_KEY}
     for k in dict_keys:
         # ignore these since handled previously
-        if k in [_keys.EDGE_INDEX_KEY, _keys.BATCH_KEY, _keys.BATCH_PTR_KEY]:
+        if k in ignore:
             continue
-        batched[k] = [d[k] for d in data_list]
-    # ... and concatenate
-    for k, vs in batched.items():
-        if k in _key_registry._GRAPH_FIELDS:
-            # graph-level properties and so need a new batch dimension
-            out[k] = torch.cat(vs, dim=0)
-        elif k in (_key_registry._NODE_FIELDS | _key_registry._EDGE_FIELDS):
-            # cat along the node or edge dim (dim 0)
-            out[k] = torch.cat(vs, dim=0)
+        elif k in (
+            _key_registry._GRAPH_FIELDS
+            | _key_registry._NODE_FIELDS
+            | _key_registry._EDGE_FIELDS
+        ):
+            out[k] = torch.cat([d[k] for d in data_list], dim=0)
         else:
-            # TODO: rethink this
-            if k not in ase_all_properties:
-                raise KeyError(f"Unregistered key {k}")
+            raise KeyError(f"Unregistered key {k}")
 
     return out
 
@@ -142,45 +154,43 @@ def batched_from_list(data_list: List[Type]) -> Type:
 def frame_from_batched(batched_data: Type, index: int) -> Type:
     """Returns a single frame from batched data."""
     # get data with batches just in case this is called on unbatched data
-    batched_data = with_batch_(batched_data)
+    if len(batched_data.get(_keys.NUM_NODES_KEY, (None,))) == 1:
+        assert index == 0
+        return batched_data
     # use zero-indexing as per python norm
     N_frames = num_frames(batched_data)
-    assert index < num_frames(
-        batched_data
+    assert (
+        0 <= index < N_frames
     ), f"Input data consists of {N_frames} frames so index can run from 0 to {N_frames-1} -- but given index of {index}!"
     batches = batched_data[_keys.BATCH_KEY]
-    node_idx_offset = batched_data[_keys.BATCH_PTR_KEY][index]
+    node_idx_offset = (
+        0
+        if index == 0
+        else torch.cumsum(batched_data[_keys.NUM_NODES_KEY], 0)[index - 1]
+    )
     if _keys.EDGE_INDEX_KEY in batched_data:
         edge_center_idx = batched_data[_keys.EDGE_INDEX_KEY][0]
 
     out = {}
     for k, v in batched_data.items():
-        #  will handle batch properties later
-        if k in [_keys.BATCH_KEY, _keys.BATCH_PTR_KEY]:
-            continue
-        elif k == _keys.EDGE_INDEX_KEY:
+        if k == _keys.EDGE_INDEX_KEY:
             # special case since shape is (2, num_edges), and to remove edge index offset
-            out[k] = (
-                torch.masked_select(v, torch.eq(batches[edge_center_idx], index)).view(
-                    2, -1
-                )
-                - node_idx_offset
-            )
+            mask = torch.eq(batches[edge_center_idx], index).unsqueeze(0)
+            out[k] = torch.masked_select(v, mask).view(2, -1) - node_idx_offset
         elif k in _key_registry._GRAPH_FIELDS:
             # index out relevant frame
             out[k] = v[[index]]  # to ensure batch dimension remains
         elif k in _key_registry._NODE_FIELDS:
             # mask out relevant portion
             out[k] = v[batches == index]
+            if k == _keys.BATCH_KEY:
+                out[k] = torch.zeros_like(out[k])
         elif k in _key_registry._EDGE_FIELDS:  # excluding edge indices
-            out[k] = v[torch.eq(batches[edge_center_idx], index)]
+            out[k] = v[torch.eq(torch.index_select(batches, 0, edge_center_idx), index)]
         else:
-            # TODO: rethink this
-            if k not in ase_all_properties:
+            if k != _keys.MODEL_DTYPE_KEY:
                 raise KeyError(f"Unregistered key {k}")
 
-    # account for batch information
-    out = with_batch_(out)
     return out
 
 
@@ -196,15 +206,11 @@ def from_ase(
     First tries to extract energies and forces from a single-point calculator associated with the ``Atoms`` if one is present and has those fields.
     If either is not found, the method will look for ``energy``/``energies`` and ``force``/``forces`` in ``atoms.arrays``.
 
-    `get_atomic_numbers()` will be stored as the atomic_numbers attribute.
-
     Args:
         atoms (ase.Atoms): the input.
-        features (torch.Tensor shape [N, M], optional): per-atom M-dimensional feature vectors. If ``None`` (the
-            default), uses a one-hot encoding of the species present in ``atoms``.
+        key_mapping (dict): rename ase property name to a new string name. Optional
         include_keys (list): list of additional keys to include in AtomicData aside from the ones defined in
                 ase.calculators.calculator.all_properties. Optional
-        key_mapping (dict): rename ase property name to a new string name. Optional
 
     Returns:
         A ``AtomicData``.
@@ -217,7 +223,7 @@ def from_ase(
             "positions",
         ]  # ase internal names for position and atomic_numbers
         + [
-            "pbc",
+            _keys.PBC_KEY,
             _keys.CELL_KEY,
             _keys.POSITIONS_KEY,
         ]  # arguments for from_dict method
@@ -229,6 +235,7 @@ def from_ase(
     km = {
         "forces": _keys.FORCE_KEY,
         "energy": _keys.TOTAL_ENERGY_KEY,
+        "energies": _keys.PER_ATOM_ENERGY_KEY,
     }
     km.update(key_mapping)
     key_mapping = km
@@ -261,56 +268,19 @@ def from_ase(
                 f"`from_ase` does not support calculator {atoms.calc}"
             )
 
-    add_fields[_keys.ATOMIC_NUMBERS_KEY] = atoms.get_atomic_numbers()
-
-    cell = atoms.get_cell()
-    pbc = atoms.pbc
-    # IMPORTANT: the following reshape logic only applies to rank-2 Cartesian tensor fields
-    for key in add_fields:
-        if key in _key_registry._CARTESIAN_TENSOR_FIELDS:
-            # enforce (3, 3) shape for graph fields, e.g. stress, virial
-            if key in _key_registry._GRAPH_FIELDS:
-                # handle ASE-style 6 element Voigt order stress
-                if key in (_keys.STRESS_KEY, _keys.VIRIAL_KEY):
-                    if add_fields[key].shape == (6,):
-                        add_fields[key] = voigt_6_to_full_3x3_stress(add_fields[key])
-                if add_fields[key].shape == (3, 3):
-                    # it's already 3x3, do nothing else
-                    pass
-                elif add_fields[key].shape == (9,):
-                    add_fields[key] = add_fields[key].reshape((3, 3))
-                else:
-                    raise RuntimeError(
-                        f"bad shape for {key} registered as a Cartesian tensor graph field---please note that only rank-2 Cartesian tensors are currently supported"
-                    )
-            # enforce (N_atom, 3, 3) shape for node fields, e.g. Born effective charges
-            elif key in _key_registry._NODE_FIELDS:
-                if add_fields[key].shape[1:] == (3, 3):
-                    pass
-                elif add_fields[key].shape[1:] == (9,):
-                    add_fields[key] = add_fields[key].reshape((-1, 3, 3))
-                else:
-                    raise RuntimeError(
-                        f"bad shape for {key} registered as a Cartesian tensor node field---please note that only rank-2 Cartesian tensors are currently supported"
-                    )
-            else:
-                raise RuntimeError(
-                    f"{key} registered as a Cartesian tensor field was not registered as either a graph or node field"
-                )
     data = {
         _keys.POSITIONS_KEY: atoms.positions,
-        _keys.CELL_KEY: cell,
-        _keys.PBC_KEY: pbc,
+        _keys.CELL_KEY: np.array(atoms.get_cell()),
+        _keys.PBC_KEY: atoms.get_pbc(),
+        _keys.ATOMIC_NUMBERS_KEY: atoms.get_atomic_numbers(),
     }
     data.update(**add_fields)
+    return from_dict(data)
 
-    return with_batch_(from_dict(data))
 
-
-# TODO: this can potentially be cleaner if we iterate and use frame_from_batched()
 def to_ase(
     data: Type,
-    type_mapper=None,
+    chemical_symbols: Optional[List[str]] = None,
     extra_fields: List[str] = [],
 ) -> Union[List[ase.Atoms], ase.Atoms]:
     """Build a (list of) ``ase.Atoms`` object(s) from an ``AtomicData`` object.
@@ -320,7 +290,7 @@ def to_ase(
     exist in self, a single ``ase.Atoms`` object is created.
 
     Args:
-        type_mapper: if provided, will be used to map ``ATOM_TYPES`` back into
+        chemical_symbols: if provided, will be used to map ``ATOM_TYPES`` back into
             elements, if the configuration of the ``type_mapper`` allows.
         extra_fields: fields other than those handled explicitly (currently
             those defining the structure as well as energy, per-atom energy,
@@ -332,37 +302,7 @@ def to_ase(
         A list of ``ase.Atoms`` objects if ``AtomicDataDict.BATCH_KEY`` is in self
         and is not None. Otherwise, a single ``ase.Atoms`` object is returned.
     """
-    positions = data[_keys.POSITIONS_KEY]
-    edge_index = data[_keys.EDGE_INDEX_KEY]
-    if positions.device != torch.device("cpu"):
-        raise TypeError(
-            "Explicitly move this `AtomicData` to CPU using `.to()` before calling `to_ase()`."
-        )
-    if _keys.ATOMIC_NUMBERS_KEY in data:
-        atomic_nums = data[_keys.ATOMIC_NUMBERS_KEY]
-    elif type_mapper is not None and type_mapper.has_chemical_symbols:
-        atomic_nums = type_mapper.untransform(data[_keys.ATOM_TYPE_KEY])
-    else:
-        warnings.warn(
-            "AtomicData.to_ase(): data didn't contain atomic numbers... using atom_type as atomic numbers instead, but this means the chemical symbols in ASE (outputs) will be wrong"
-        )
-        atomic_nums = data[_keys.ATOM_TYPE_KEY]
-    pbc = data.get(_keys.PBC_KEY, None)
-    cell = data.get(_keys.CELL_KEY, None)
-    batch = data.get(_keys.BATCH_KEY, None)
-    energy = data.get(_keys.TOTAL_ENERGY_KEY, None)
-    energies = data.get(_keys.PER_ATOM_ENERGY_KEY, None)
-    force = data.get(_keys.FORCE_KEY, None)
-    do_calc = any(
-        k in data
-        for k in [
-            _keys.TOTAL_ENERGY_KEY,
-            _keys.FORCE_KEY,
-            _keys.PER_ATOM_ENERGY_KEY,
-            _keys.STRESS_KEY,
-        ]
-    )
-
+    # === sanity check ===
     # exclude those that are special for ASE and that we process seperately
     special_handling_keys = [
         _keys.POSITIONS_KEY,
@@ -378,47 +318,83 @@ def to_ase(
         len(set(extra_fields).intersection(special_handling_keys)) == 0
     ), f"Cannot specify keys handled in special ways ({special_handling_keys}) as `extra_fields` for atoms output--- they are output by default"
 
-    if cell is not None:
-        cell = cell.view(-1, 3, 3)
-    if pbc is not None:
-        pbc = pbc.view(-1, 3)
-
-    if batch is not None:
-        n_batches = batch.max() + 1
-        cell = cell.expand(n_batches, 3, 3) if cell is not None else None
-        pbc = pbc.expand(n_batches, 3) if pbc is not None else None
+    # == sort out logic for atomic numbers ==
+    if _keys.ATOMIC_NUMBERS_KEY in data:
+        pass
+    elif chemical_symbols is not None:
+        atomic_num_to_atom_type_map = torch.tensor(
+            [ase.data.atomic_numbers[spec] for spec in chemical_symbols],
+            dtype=torch.int64,
+            device="cpu",
+        )
     else:
-        n_batches = 1
+        warnings.warn(
+            "Input data does not contain atomic numbers and `chemical_symbols` mapping to type index not provided ... using atom_type as atomic numbers instead, but this means the chemical symbols in ASE (outputs) will be wrong"
+        )
 
-    batch_atoms = []
-    for batch_idx in range(n_batches):
-        if batch is not None:
-            mask = batch == batch_idx
-            mask = mask.view(-1)
-            # if both ends of the edge are in the batch, the edge is in the batch
-            edge_mask = mask[edge_index[0]] & mask[edge_index[1]]
+    do_calc = any(
+        k in data
+        for k in [
+            _keys.TOTAL_ENERGY_KEY,
+            _keys.FORCE_KEY,
+            _keys.PER_ATOM_ENERGY_KEY,
+            _keys.STRESS_KEY,
+        ]
+    )
+
+    # only select out fields that should be converted to ase
+    fields = (
+        special_handling_keys
+        + extra_fields
+        + [_keys.ATOM_TYPE_KEY, _keys.BATCH_KEY, _keys.NUM_NODES_KEY]
+    )
+    data_pruned = {}
+    for field in fields:
+        if field in data:
+            data_pruned[field] = data[field].to("cpu")
+
+    atoms_list = []
+    for idx in range(num_frames(data_pruned)):
+        # extract a single frame from the (possibly) batched data
+        frame = frame_from_batched(data_pruned, idx)
+
+        if _keys.ATOMIC_NUMBERS_KEY in frame:
+            atomic_nums = frame[_keys.ATOMIC_NUMBERS_KEY]
+        elif chemical_symbols is not None:
+            atomic_nums = torch.index_select(
+                atomic_num_to_atom_type_map, 0, frame[_keys.ATOM_TYPE_KEY]
+            )
         else:
-            mask = slice(None)
-            edge_mask = slice(None)
+            atomic_nums = frame[_keys.ATOM_TYPE_KEY]
+
+        if _keys.CELL_KEY in frame:
+            cell = frame[_keys.CELL_KEY].reshape((3, 3)).numpy()
+        else:
+            cell = None
+
+        if _keys.PBC_KEY in frame:
+            pbc = frame[_keys.PBC_KEY].reshape(-1).numpy()
+        else:
+            pbc = None
 
         mol = ase.Atoms(
-            numbers=atomic_nums[mask].view(-1),  # must be flat for ASE
-            positions=positions[mask],
-            cell=cell[batch_idx] if cell is not None else None,
-            pbc=pbc[batch_idx] if pbc is not None else None,
+            numbers=atomic_nums.reshape(-1).numpy(),
+            positions=frame[_keys.POSITIONS_KEY].numpy(),
+            cell=cell,
+            pbc=pbc,
         )
 
         if do_calc:
             fields = {}
-            if energies is not None:
-                fields["energies"] = energies[mask].cpu().numpy()
-            if energy is not None:
-                fields["energy"] = energy[batch_idx].cpu().numpy()
-            if force is not None:
-                fields["forces"] = force[mask].cpu().numpy()
-            if _keys.STRESS_KEY in data:
+            if _keys.TOTAL_ENERGY_KEY in frame:
+                fields["energy"] = frame[_keys.TOTAL_ENERGY_KEY].reshape(-1).numpy()
+            if _keys.PER_ATOM_ENERGY_KEY in frame:
+                fields["energies"] = frame[_keys.PER_ATOM_ENERGY_KEY].numpy()
+            if _keys.FORCE_KEY in frame:
+                fields["forces"] = frame[_keys.FORCE_KEY].numpy()
+            if _keys.STRESS_KEY in frame:
                 fields["stress"] = full_3x3_to_voigt_6_stress(
-                    data["stress"].view(-1, 3, 3)[batch_idx].cpu().numpy()
+                    frame[_keys.STRESS_KEY].reshape((3, 3)).numpy()
                 )
             mol.calc = SinglePointCalculator(mol, **fields)
 
@@ -426,27 +402,21 @@ def to_ase(
         for key in extra_fields:
             if key in _key_registry._NODE_FIELDS:
                 # mask it
-                mol.arrays[key] = data[key][mask].cpu().numpy().reshape(mask.sum(), -1)
+                mol.arrays[key] = frame[key].numpy()
             elif key in _key_registry._EDGE_FIELDS:
-                mol.info[key] = (
-                    data[key][edge_mask].cpu().numpy().reshape(edge_mask.sum(), -1)
-                )
+                mol.info[key] = frame[key].numpy()
             elif key == _keys.EDGE_INDEX_KEY:
-                mol.info[key] = data[key][:, edge_mask].cpu().numpy()
+                mol.info[key] = frame[key].numpy()
             elif key in _key_registry._GRAPH_FIELDS:
-                mol.info[key] = data[key][batch_idx].cpu().numpy().reshape(-1)
+                mol.info[key] = frame[key].reshape(-1).numpy()
             else:
                 raise RuntimeError(
                     f"Extra field `{key}` isn't registered as node/edge/graph"
                 )
 
-        batch_atoms.append(mol)
+        atoms_list.append(mol)
 
-    if batch is not None:
-        return batch_atoms
-    else:
-        assert len(batch_atoms) == 1
-        return batch_atoms[0]
+    return atoms_list
 
 
 def compute_neighborlist_(data: Type, r_max: float, **kwargs) -> Type:
@@ -454,8 +424,7 @@ def compute_neighborlist_(data: Type, r_max: float, **kwargs) -> Type:
 
     This can be called on alredy-batched data.
     """
-    to_batch = []
-    data = with_batch_(data)
+    to_batch: List[Type] = []
     for idx in range(num_frames(data)):
         data_per_frame = frame_from_batched(data, idx)
 
@@ -533,8 +502,10 @@ def without_nodes(data: Type, which_nodes: torch.Tensor) -> Type:
 
 @torch.jit.script
 def num_frames(data: Type) -> int:
-    # will not check if batch information is present
-    return len(data[_keys.BATCH_PTR_KEY]) - 1
+    if _keys.NUM_NODES_KEY not in data:
+        return 1
+    else:
+        return len(data[_keys.NUM_NODES_KEY])
 
 
 @torch.jit.script
@@ -555,9 +526,7 @@ def with_edge_vectors(
     edge_index_field: str = _keys.EDGE_INDEX_KEY,
     edge_cell_shift_field: str = _keys.EDGE_CELL_SHIFT_KEY,
     edge_vec_field: str = _keys.EDGE_VECTORS_KEY,
-    edge_vec_f64_field: str = _keys.EDGE_VECTORS_F64_KEY,
     edge_len_field: str = _keys.EDGE_LENGTH_KEY,
-    edge_len_f64_field: str = _keys.EDGE_LENGTH_F64_KEY,
 ) -> Type:
     """Compute the edge displacement vectors for a graph.
 
@@ -570,24 +539,13 @@ def with_edge_vectors(
     Returns:
         Tensor [n_edges, 3] edge displacement vectors
     """
-    # if present in AtomicDataDict, use MODEL_DTYPE_KEY; otherwise, use dtype of positions
-    model_dtype: torch.dtype = data.get(
-        _keys.MODEL_DTYPE_KEY, data[_keys.POSITIONS_KEY]
-    ).dtype
-    # We do calculations on the positions and cells in whatever dtype they
-    # were provided in, and only convert to model_dtype after
     if edge_vec_field in data:
         if with_lengths and edge_len_field not in data:
-            edge_len = torch.linalg.norm(data[edge_vec_f64_field], dim=-1)
-            data[edge_len_f64_field] = edge_len
-            data[edge_len_field] = edge_len.to(model_dtype)
+            data[edge_len_field] = torch.linalg.norm(data[edge_vec_field], dim=-1)
         return data
     else:
         # Build it dynamically
-        # Note that this is
-        # (1) backwardable, because everything (pos, cell, shifts)
-        #     is Tensors.
-        # (2) works on a Batch constructed from AtomicData
+        # Note that this is backwardable, because everything (pos, cell, shifts) is Tensors.
         pos = data[_keys.POSITIONS_KEY]
         edge_index = data[edge_index_field]
         edge_vec = torch.index_select(pos, 0, edge_index[1]) - torch.index_select(
@@ -619,12 +577,9 @@ def with_edge_vectors(
                     edge_cell_shift,
                     cell.squeeze(0),  # remove batch dimension
                 )
-        data[edge_vec_f64_field] = edge_vec
-        data[edge_vec_field] = edge_vec.to(model_dtype)
+        data[edge_vec_field] = edge_vec
         if with_lengths:
-            edge_len = torch.linalg.norm(edge_vec, dim=-1)
-            data[edge_len_f64_field] = edge_len
-            data[edge_len_field] = edge_len.to(model_dtype)
+            data[edge_len_field] = torch.linalg.norm(edge_vec, dim=-1)
         return data
 
 
@@ -636,19 +591,18 @@ def with_batch_(data: Type) -> Type:
     allocated and returned.
     """
     if _keys.BATCH_KEY in data:
-        assert _keys.BATCH_PTR_KEY in data
+        assert _keys.NUM_NODES_KEY in data
         return data
     else:
+        # This is a single frame, so put in info for the trivial batch
         pos = data[_keys.POSITIONS_KEY]
-        batch = torch.zeros(len(pos), dtype=torch.long, device=pos.device)
-        data[_keys.BATCH_KEY] = batch
-        # ugly way to make a tensor of [0, len(pos)], but it avoids transfers or casts
-        data[_keys.BATCH_PTR_KEY] = torch.arange(
-            start=0,
-            end=len(pos) + 1,
-            step=len(pos),
-            dtype=torch.long,
-            device=pos.device,
+        # Use .expand here to avoid allocating num nodes worth of memory
+        # https://pytorch.org/docs/stable/generated/torch.Tensor.expand.html
+        data[_keys.BATCH_KEY] = torch.zeros(
+            1, dtype=torch.long, device=pos.device
+        ).expand(len(pos))
+        data[_keys.NUM_NODES_KEY] = torch.full(
+            (1,), len(pos), dtype=torch.long, device=pos.device
         )
         return data
 

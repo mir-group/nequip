@@ -1,42 +1,14 @@
-"""_key_registry.py: manage information about what kinds of data different keys refer to.
-"""
+"""_key_registry.py: manage information about what kinds of data different keys refer to."""
 
-import warnings
-from typing import Any, Dict, Set, Sequence
+from typing import Dict, Set, Sequence
 
 import numpy as np
 import torch
 
-from e3nn import o3
 from e3nn.io import CartesianTensor
 
 from . import _keys
-from ._util import _TORCH_INTEGER_DTYPES
-
-# == Irrep checking ==
-# TODO: unclear if these three functions used, delete?
-# I think `_process_dict` (which could have a better name)
-# does what this was supposed to.
-
-
-def validate_keys(keys, graph_required=True):
-    # Validate combinations
-    if graph_required:
-        if not (_keys.POSITIONS_KEY in keys and _keys.EDGE_INDEX_KEY in keys):
-            raise KeyError("At least pos and edge_index must be supplied")
-    if _keys.EDGE_CELL_SHIFT_KEY in keys and "cell" not in keys:
-        raise ValueError("If `edge_cell_shift` given, `cell` must be given.")
-
-
-_SPECIAL_IRREPS = [None]
-
-
-def _fix_irreps_dict(d: Dict[str, Any]):
-    return {k: (i if i in _SPECIAL_IRREPS else o3.Irreps(i)) for k, i in d.items()}
-
-
-def _irreps_compatible(ir1: Dict[str, o3.Irreps], ir2: Dict[str, o3.Irreps]):
-    return all(ir1[k] == ir2[k] for k in ir1 if k in ir2)
+from .AtomicDataDict import num_frames, num_nodes, num_edges
 
 
 # === Key Registration ===
@@ -46,7 +18,7 @@ _DEFAULT_LONG_FIELDS: Set[str] = {
     _keys.ATOMIC_NUMBERS_KEY,
     _keys.ATOM_TYPE_KEY,
     _keys.BATCH_KEY,
-    _keys.BATCH_PTR_KEY,
+    _keys.NUM_NODES_KEY,
 }
 _DEFAULT_GRAPH_FIELDS: Set[str] = {
     _keys.TOTAL_ENERGY_KEY,
@@ -55,7 +27,7 @@ _DEFAULT_GRAPH_FIELDS: Set[str] = {
     _keys.VIRIAL_KEY,
     _keys.PBC_KEY,
     _keys.CELL_KEY,
-    _keys.BATCH_PTR_KEY,
+    _keys.NUM_NODES_KEY,
     _keys.TOTAL_MAGMOM_KEY,
     _keys.POLARIZATION_KEY,
     _keys.DIELECTRIC_KEY,
@@ -108,12 +80,7 @@ def register_fields(
     long_fields: Sequence[str] = [],
     cartesian_tensor_fields: Dict[str, str] = {},
 ) -> None:
-    r"""Register fields as being per-atom, per-edge, or per-frame.
-
-    Args:
-        node_permute_fields: fields that are equivariant to node permutations.
-        edge_permute_fields: fields that are equivariant to edge permutations.
-    """
+    r"""Register fields as being per-frame, per-atom, per-edge, long dtype and/or Cartesian tensors."""
     node_fields: set = set(node_fields)
     edge_fields: set = set(edge_fields)
     graph_fields: set = set(graph_fields)
@@ -182,14 +149,29 @@ def _register_field_prefix(prefix: str) -> None:
         edge_fields=[prefix + e for e in _EDGE_FIELDS],
         graph_fields=[prefix + e for e in _GRAPH_FIELDS],
         long_fields=[prefix + e for e in _LONG_FIELDS],
+        cartesian_tensor_fields={
+            prefix + e: v for e, v in _CARTESIAN_TENSOR_FIELDS.items()
+        },
     )
+
+
+def get_field_type(field: str) -> str:
+    if field in _GRAPH_FIELDS:
+        return "graph"
+    elif field in _NODE_FIELDS:
+        return "node"
+    elif field in _EDGE_FIELDS:
+        return "edge"
+    else:
+        raise KeyError(f"Unregistered field {field} found")
 
 
 #  === AtomicData ===
 
 
-def _process_dict(data, ignore_fields=[]):
+def _process_dict(data):
     """Convert a dict of data into correct dtypes/shapes according to key"""
+
     data = data.copy()
 
     # == Deal with basic variables pos, cell, pbc ==
@@ -202,27 +184,26 @@ def _process_dict(data, ignore_fields=[]):
             raise ValueError(
                 "A cell was provided, but pbc's were not. Please explicitly provide PBC."
             )
-        # there are no PBC if cell and pbc are not provided
         pbc = False
 
     if isinstance(pbc, bool):
         pbc = (pbc,) * 3
+    elif isinstance(pbc, torch.Tensor):
+        assert len(pbc) == 3 or pbc.shape[1] == 3  # account for batch dims
     else:
-        assert len(pbc) == 3
+        assert len(pbc) == 3, pbc
 
     if cell is not None:
+        # the reshape accounts for both (3, 3) or (N_frames, 3, 3) shaped cells
         data[_keys.CELL_KEY] = torch.as_tensor(
             cell, dtype=torch.get_default_dtype()
-        ).view(-1, 3, 3)
+        ).reshape(-1, 3, 3)
 
     if pbc is not None:
-        data[_keys.PBC_KEY] = torch.as_tensor(pbc, dtype=torch.bool).view(-1, 3)
+        data[_keys.PBC_KEY] = torch.as_tensor(pbc, dtype=torch.bool).reshape(-1, 3)
 
     # == Deal with _some_ dtype issues ==
     for k, v in data.items():
-        if k in ignore_fields:
-            continue
-
         if k in _LONG_FIELDS:
             # Any property used as an index must be long (or byte or bool, but those are not relevant for atomic scale systems)
             # int32 would pass later checks, but is actually disallowed by torch
@@ -252,66 +233,137 @@ def _process_dict(data, ignore_fields=[]):
             # This is a tensor, so we just don't do anything except avoid the warning in the `else`
             pass
         else:
-            warnings.warn(
+            # Guerantee all values are torch.Tensors
+            raise TypeError(
                 f"Value for field {k} was of unsupported type {type(v)} (value was {v})"
             )
 
-    if _keys.BATCH_PTR_KEY in data:
-        num_frames = len(data[_keys.BATCH_PTR_KEY]) - 1
+        # make sure evrything is contiguous
+        data[k] = data[k].contiguous()
+
+    # == get useful data properties ==
+    if _keys.NUM_NODES_KEY in data:
+        N_frames = num_frames(data)
     else:
-        num_frames = 1
+        N_frames = 1
+    N_nodes = num_nodes(data)
+    if _keys.EDGE_INDEX_KEY in data:
+        N_edges = num_edges(data)
+    else:
+        N_edges = None
 
+    # == Cartesian tensor field reshapes (ensure batch dimension present) ==
+
+    # IMPORTANT: the following reshape logic only applies to rank-2 Cartesian tensor fields
     for k, v in data.items():
-        if k in ignore_fields:
-            continue
+        if k in _CARTESIAN_TENSOR_FIELDS:
+            # enforce (N_frames, 3, 3) shape for graph fields, e.g. stress, virial
+            # remembering to handle ASE-style 6 element Voigt order stress
+            if k in _GRAPH_FIELDS:
+                err_msg = f"bad shape {v.shape} for {k} registered as a Cartesian tensor graph field---please note that only rank-2 Cartesian tensors are currently supported"
+                if v.dim() == 1:  # two possibilities
+                    if v.shape == (6,):
+                        assert k in (_keys.STRESS_KEY, _keys.VIRIAL_KEY)
+                        data[k] = _voigt_6_to_full_3x3_stress(v).reshape(1, 3, 3)
+                    elif v.shape == (9,):
+                        data[k] = v.reshape(1, 3, 3)
+                    else:
+                        raise RuntimeError(err_msg)
+                elif v.dim() == 2:  # three cases
+                    if v.shape == (N_frames, 6):
+                        raise NotImplementedError(
+                            f"File a GitHub issue if the parsing of shape signature (N_frames, 6) is required for {k}"
+                        )
+                    elif v.shape == (N_frames, 9):
+                        data[k] = v.reshape((N_frames, 3, 3))
+                    elif v.shape == (3, 3):
+                        data[k] = v.reshape((1, 3, 3))
+                    else:
+                        raise RuntimeError(err_msg)
+                elif v.dim() == 3:  # one possibility - it's already correctly shaped
+                    assert v.shape == (N_frames, 3, 3), err_msg
+            # enforce (N_nodes, 3, 3) shape for node fields, e.g. Born effective charges
+            elif k in _NODE_FIELDS:
+                err_msg = f"bad shape {v.shape} for {k} registered as a Cartesian tensor node field---please note that only rank-2 Cartesian tensors are currently supported"
+                if v.dim() == 1:  # one possibility
+                    assert v.shape[0] == 9, err_msg
+                    data[k] = v.reshape((1, 3, 3))
+                elif v.dim() == 2:  # two possibilities
+                    if v.shape == (3, 3):
+                        data[k] = v.reshape(-1, 3, 3)
+                    elif v.shape == (N_nodes, 9):
+                        data[k] = v.reshape(N_nodes, 3, 3)
+                    else:
+                        raise RuntimeError(err_msg)
+                elif v.dim() == 3:  # one possibility
+                    assert v.shape == (N_nodes, 3, 3), err_msg
+                else:
+                    raise RuntimeError(err_msg)
+            else:
+                raise RuntimeError(
+                    f"{k} registered as a Cartesian tensor field was not registered as either a graph or node field"
+                )
 
+    # == general shape checks ==
+    for k, v in data.items():
         if len(v.shape) == 0:
             data[k] = v.unsqueeze(-1)
             v = data[k]
 
-        if k in set.union(_NODE_FIELDS, _EDGE_FIELDS) and len(v.shape) == 1:
-            data[k] = v.unsqueeze(-1)
-            v = data[k]
+        if k in _GRAPH_FIELDS:
+            assert (
+                v.shape[0] == N_frames
+            ), f"Leading dimension of registered graph field {k} should be {N_frames}, but found shape {v.shape}."
 
-        if (
-            k in _NODE_FIELDS
-            and _keys.POSITIONS_KEY in data
-            and v.shape[0] != data[_keys.POSITIONS_KEY].shape[0]
-        ):
-            raise ValueError(
-                f"{k} is a node field but has the wrong dimension {v.shape}"
-            )
-        elif (
-            k in _EDGE_FIELDS
-            and _keys.EDGE_INDEX_KEY in data
-            and v.shape[0] != data[_keys.EDGE_INDEX_KEY].shape[1]
-        ):
-            raise ValueError(
-                f"{k} is a edge field but has the wrong dimension {v.shape}"
-            )
-        elif k in _GRAPH_FIELDS:
-            if num_frames > 1 and v.shape[0] != num_frames:
-                raise ValueError(f"Wrong shape for graph property {k}")
+            # TODO: consider removing -- why not?
+            if v.dim() == 1 and k not in [_keys.NUM_NODES_KEY]:
+                data[k] = v.reshape((N_frames, 1))
 
-    # validate shapes and dtypes
-    assert (
-        data[_keys.POSITIONS_KEY].dim() == 2 and data[_keys.POSITIONS_KEY].shape[1] == 3
-    )
+        elif k in _NODE_FIELDS:
+            assert (
+                v.shape[0] == N_nodes
+            ), f"Leading dimension of registered node field {k} should be {N_nodes}, but found shape {v.shape}."
 
-    if _keys.CELL_KEY in data and data[_keys.CELL_KEY] is not None:
-        assert (data[_keys.CELL_KEY].shape == (3, 3)) or (
-            data[_keys.CELL_KEY].dim() == 3 and data[_keys.CELL_KEY].shape[1:] == (3, 3)
-        )
-        assert data[_keys.CELL_KEY].dtype == data[_keys.POSITIONS_KEY].dtype
+            # TODO: consider removing -- why not?
+            if v.dim() == 1 and k not in [
+                _keys.BATCH_KEY,
+                _keys.ATOMIC_NUMBERS_KEY,
+                _keys.ATOM_TYPE_KEY,
+            ]:
+                data[k] = v.reshape((N_nodes, 1))
 
-    if _keys.ATOMIC_NUMBERS_KEY in data and data[_keys.ATOMIC_NUMBERS_KEY] is not None:
-        assert data[_keys.ATOMIC_NUMBERS_KEY].dtype in _TORCH_INTEGER_DTYPES
-    if _keys.BATCH_KEY in data and data[_keys.BATCH_KEY] is not None:
-        assert data[_keys.BATCH_KEY].dim() == 1 and data[_keys.BATCH_KEY].shape[
-            0
-        ] == len(data[_keys.POSITIONS_KEY])
-        # Check that there are the right number of cells
-        if _keys.CELL_KEY in data and data[_keys.CELL_KEY] is not None:
-            cell = data[_keys.CELL_KEY].view(-1, 3, 3)
-            assert cell.shape[0] == num_frames
+        elif k in _EDGE_FIELDS:
+            if N_edges is None:
+                raise ValueError(
+                    f"Inconsistent data -- {k} was registered as an edge field, but no edge indices found."
+                )
+            else:
+                assert (
+                    v.shape[0] == N_edges
+                ), f"Leading dimension of registered edge field {k} should be {N_edges}, but found shape {v.shape}."
+
+    # == specific checks for basic properties (pos, cell) ==
+    pos = data[_keys.POSITIONS_KEY]
+    assert pos.dim() == 2 and pos.shape[1] == 3
+
+    if _keys.CELL_KEY in data:
+        cell = data[_keys.CELL_KEY]
+        assert cell.dim() == 3 and cell.shape == (N_frames, 3, 3)
+        assert cell.dtype == pos.dtype
+        pbc = data[_keys.PBC_KEY]
+        assert pbc.dim() == 2 and pbc.shape == (N_frames, 3)
+
     return data
+
+
+def _voigt_6_to_full_3x3_stress(voigt_stress):
+    """
+    Form a 3x3 stress matrix from a 6 component vector in Voigt notation
+    """
+    return torch.Tensor(
+        [
+            [voigt_stress[0], voigt_stress[5], voigt_stress[4]],
+            [voigt_stress[5], voigt_stress[1], voigt_stress[3]],
+            [voigt_stress[4], voigt_stress[3], voigt_stress[2]],
+        ]
+    )
