@@ -4,10 +4,7 @@ import numpy as np
 
 import torch
 
-from .. import (
-    AtomicData,
-    AtomicDataDict,
-)
+from .. import AtomicDataDict
 from ..transforms import TypeMapper
 from ._base_datasets import AtomicDataset
 
@@ -85,7 +82,7 @@ class HDF5Dataset(AtomicDataset):
     def len(self) -> int:
         return self.num_frames
 
-    def get(self, idx: int) -> AtomicData:
+    def get(self, idx: int) -> AtomicDataDict:
         if self.index is None:
             self.setup_index()
         data = self.index[idx]
@@ -94,7 +91,7 @@ class HDF5Dataset(AtomicDataset):
         for j, value in enumerate(self.value_list):
             if data[j] is not None:
                 args[value] = data[j][i]
-        return AtomicData.from_points(**args)
+        return AtomicDataDict.from_points(**args)
 
     def statistics(
         self,

@@ -1,5 +1,4 @@
-from .AtomicData import (
-    PBC,
+from ._key_registry import (
     register_fields,
     deregister_fields,
     _register_field_prefix,
@@ -15,7 +14,6 @@ from ._sampler import PartialSampler
 from ._build import dataset_from_config
 
 __all__ = [
-    PBC,
     register_fields,
     deregister_fields,
     _register_field_prefix,
