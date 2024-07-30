@@ -9,7 +9,7 @@ from ._key_registry import (
     _CARTESIAN_TENSOR_FIELDS,
 )
 
-from ._dataset import AtomicDataset, ASEDataset, HDF5Dataset, EMTTestDataset
+from ._statistics import statistics
 from ._sampler import PartialSampler
 from ._build import dataset_from_config
 
@@ -17,10 +17,7 @@ __all__ = [
     register_fields,
     deregister_fields,
     _register_field_prefix,
-    AtomicDataset,
-    ASEDataset,
-    HDF5Dataset,
-    EMTTestDataset,
+    statistics,
     PartialSampler,
     dataset_from_config,
     _NODE_FIELDS,
