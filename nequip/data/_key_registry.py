@@ -48,14 +48,31 @@ _DEFAULT_LONG_FIELDS: Set[str] = {
     _keys.BATCH_KEY,
     _keys.BATCH_PTR_KEY,
 }
+_DEFAULT_GRAPH_FIELDS: Set[str] = {
+    _keys.TOTAL_ENERGY_KEY,
+    _keys.FREE_ENERGY_KEY,
+    _keys.STRESS_KEY,
+    _keys.VIRIAL_KEY,
+    _keys.PBC_KEY,
+    _keys.CELL_KEY,
+    _keys.BATCH_PTR_KEY,
+    _keys.TOTAL_MAGMOM_KEY,
+    _keys.POLARIZATION_KEY,
+    _keys.DIELECTRIC_KEY,
+}
 _DEFAULT_NODE_FIELDS: Set[str] = {
     _keys.POSITIONS_KEY,
     _keys.NODE_FEATURES_KEY,
     _keys.NODE_ATTRS_KEY,
     _keys.ATOMIC_NUMBERS_KEY,
     _keys.ATOM_TYPE_KEY,
-    _keys.FORCE_KEY,
     _keys.PER_ATOM_ENERGY_KEY,
+    _keys.CHARGE_KEY,
+    _keys.FORCE_KEY,
+    _keys.PER_ATOM_STRESS_KEY,
+    _keys.MAGMOM_KEY,
+    _keys.DIPOLE_KEY,
+    _keys.BORN_CHARGE_KEY,
     _keys.BATCH_KEY,
 }
 _DEFAULT_EDGE_FIELDS: Set[str] = {
@@ -70,22 +87,17 @@ _DEFAULT_EDGE_FIELDS: Set[str] = {
     _keys.EDGE_CUTOFF_KEY,
     _keys.EDGE_ENERGY_KEY,
 }
-_DEFAULT_GRAPH_FIELDS: Set[str] = {
-    _keys.TOTAL_ENERGY_KEY,
-    _keys.STRESS_KEY,
-    _keys.VIRIAL_KEY,
-    _keys.PBC_KEY,
-    _keys.CELL_KEY,
-    _keys.BATCH_PTR_KEY,
-}
 _DEFAULT_CARTESIAN_TENSOR_FIELDS: Dict[str, str] = {
     _keys.STRESS_KEY: "ij=ji",
     _keys.VIRIAL_KEY: "ij=ji",
+    _keys.PER_ATOM_STRESS_KEY: "ij=ji",
+    _keys.DIELECTRIC_KEY: "ij=ji",
+    _keys.BORN_CHARGE_KEY: "ij",
 }
+_LONG_FIELDS: Set[str] = set(_DEFAULT_LONG_FIELDS)
+_GRAPH_FIELDS: Set[str] = set(_DEFAULT_GRAPH_FIELDS)
 _NODE_FIELDS: Set[str] = set(_DEFAULT_NODE_FIELDS)
 _EDGE_FIELDS: Set[str] = set(_DEFAULT_EDGE_FIELDS)
-_GRAPH_FIELDS: Set[str] = set(_DEFAULT_GRAPH_FIELDS)
-_LONG_FIELDS: Set[str] = set(_DEFAULT_LONG_FIELDS)
 _CARTESIAN_TENSOR_FIELDS: Dict[str, str] = dict(_DEFAULT_CARTESIAN_TENSOR_FIELDS)
 
 

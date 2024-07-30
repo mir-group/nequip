@@ -76,6 +76,19 @@ ALL_ENERGY_KEYS: Final[List[str]] = [
     VIRIAL_KEY,
 ]
 
+# misc ase property keys
+# except for "energy", "energies" (handled with key_mapping)
+FREE_ENERGY_KEY: Final[str] = "free_energy"
+PER_ATOM_STRESS_KEY: Final[str] = "stresses"
+TOTAL_MAGMOM_KEY: Final[str] = "magmom"
+MAGMOM_KEY: Final[str] = "magmoms"
+CHARGE_KEY: Final[str] = "charges"
+DIPOLE_KEY: Final[str] = "dipole"
+DIELECTRIC_KEY: Final[str] = "dielectric_tensor"
+BORN_CHARGE_KEY: Final[str] = "born_effective_charges"
+POLARIZATION_KEY: Final[str] = "polarization"
+
+# batch related keys
 BATCH_KEY: Final[str] = "batch"
 BATCH_PTR_KEY: Final[str] = "ptr"
 
