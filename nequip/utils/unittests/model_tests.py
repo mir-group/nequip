@@ -10,13 +10,11 @@ from e3nn.util.jit import script
 
 from nequip.data import (
     AtomicDataDict,
-    AtomicData,
-    Collater,
     _GRAPH_FIELDS,
     _NODE_FIELDS,
     _EDGE_FIELDS,
 )
-from nequip.data.transforms import TypeMapper
+from nequip.data.transforms import ChemicalSpeciesToAtomTypeMapper
 from nequip.model import model_from_config
 from nequip.nn import GraphModuleMixin
 from nequip.utils import dtype_to_name
@@ -48,15 +46,7 @@ class BaseModelTests:
 
     @staticmethod
     def make_model(config, device, initialize: bool = True, deploy: bool = False):
-        torch.manual_seed(127)
-        np.random.seed(193)
         config = config.copy()
-        config.update(
-            {
-                "num_types": 3,
-                "types_names": ["H", "C", "O"],
-            }
-        )
         model = model_from_config(
             Config.from_dict(config), initialize=initialize, deploy=deploy
         )
@@ -77,7 +67,7 @@ class BaseModelTests:
 
     def test_jit(self, model, atomic_batch, device):
         instance, out_fields = model
-        data = AtomicData.to_AtomicDataDict(atomic_batch.to(device=device))
+        data = AtomicDataDict.to_(atomic_batch, device)
         instance = instance.to(device=device)
         model_script = script(instance)
 
@@ -121,19 +111,19 @@ class BaseModelTests:
 
     def test_forward(self, model, atomic_batch, device):
         instance, out_fields = model
-        instance.to(device)
-        data = atomic_batch.to(device)
-        output = instance(AtomicData.to_AtomicDataDict(data))
+        data = AtomicDataDict.to_(atomic_batch, device)
+        output = instance(data)
         for out_field in out_fields:
             assert out_field in output
 
-    def test_wrapped_unwrapped(self, model, device, Cu_bulk, float_tolerance):
+    def test_wrapped_unwrapped(self, model, device, Cu_bulk):
         atoms, data_orig = Cu_bulk
         instance, out_fields = model
-        data = AtomicData.from_ase(atoms, r_max=3.5)
+        data = AtomicDataDict.from_ase(atoms)
+        data = AtomicDataDict.compute_neighborlist_(data, r_max=3.5)
         data[AtomicDataDict.ATOM_TYPE_KEY] = data_orig[AtomicDataDict.ATOM_TYPE_KEY]
-        data.to(device)
-        out_ref = instance(AtomicData.to_AtomicDataDict(data))
+        data = AtomicDataDict.to_(data, device)
+        out_ref = instance(data)
 
         # now put things in other periodic images
         rng = torch.Generator(device=device).manual_seed(12345)
@@ -148,14 +138,15 @@ class BaseModelTests:
                 generator=rng,
             )
             shifts = torch.einsum(
-                "zi,ix->zx", cell_shifts, data[AtomicDataDict.CELL_KEY]
+                "zi,ix->zx", cell_shifts, data[AtomicDataDict.CELL_KEY].reshape((3, 3))
             )
             atoms2 = atoms.copy()
             atoms2.positions += shifts.detach().cpu().numpy()
             # must recompute the neighborlist for this, since the edge_cell_shifts changed
-            data2 = AtomicData.from_ase(atoms2, r_max=3.5)
+            data2 = AtomicDataDict.from_ase(atoms2)
+            data2 = AtomicDataDict.compute_neighborlist_(data2, r_max=3.5)
             data2[AtomicDataDict.ATOM_TYPE_KEY] = data[AtomicDataDict.ATOM_TYPE_KEY]
-            data2.to(device)
+            data2 = AtomicDataDict.to_(data2, device)
             assert torch.equal(
                 data[AtomicDataDict.EDGE_INDEX_KEY],
                 data2[AtomicDataDict.EDGE_INDEX_KEY],
@@ -169,7 +160,7 @@ class BaseModelTests:
                 tmp,
                 data2[AtomicDataDict.EDGE_CELL_SHIFT_KEY],
             )
-            out_unwrapped = instance(AtomicData.to_AtomicDataDict(data2))
+            out_unwrapped = instance(AtomicDataDict.from_dict(data2))
             tolerance = FLOAT_TOLERANCE[dtype_to_name(instance.model_dtype)]
             for out_field in out_fields:
                 assert torch.allclose(
@@ -179,16 +170,15 @@ class BaseModelTests:
     def test_batch(self, model, atomic_batch, device):
         """Confirm that the results for individual examples are the same regardless of whether they are batched."""
         instance, out_fields = model
-        instance.to(device)
 
         tolerance = FLOAT_TOLERANCE[dtype_to_name(instance.model_dtype)]
         allclose = functools.partial(torch.allclose, atol=tolerance)
-        data = atomic_batch.to(device)
-        data1 = data.get_example(0)
-        data2 = data.get_example(1)
-        output1 = instance(AtomicData.to_AtomicDataDict(data1))
-        output2 = instance(AtomicData.to_AtomicDataDict(data2))
-        output = instance(AtomicData.to_AtomicDataDict(data))
+        data = AtomicDataDict.to_(atomic_batch, device)
+        data1 = AtomicDataDict.frame_from_batched(data, 0)
+        data2 = AtomicDataDict.frame_from_batched(data, 1)
+        output1 = instance(data1)
+        output2 = instance(data2)
+        output = instance(data)
         for out_field in out_fields:
             if out_field in _GRAPH_FIELDS:
                 assert allclose(
@@ -233,7 +223,7 @@ class BaseModelTests:
     def test_equivariance(self, model, atomic_batch, device):
         instance, out_fields = model
         instance = instance.to(device=device)
-        atomic_batch = atomic_batch.to(device=device)
+        atomic_batch = AtomicDataDict.to_(atomic_batch, device)
 
         assert_AtomicData_equivariant(
             func=instance,
@@ -261,13 +251,13 @@ class BaseModelTests:
         r_max = config["r_max"]
 
         # make a synthetic three atom example
-        data = AtomicData(
-            atom_types=np.random.choice([0, 1, 2], size=3),
-            pos=np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]),
-            edge_index=np.array([[0, 1, 0, 2], [1, 0, 2, 0]]),
-        )
-        data = data.to(device)
-        edge_embed = instance(AtomicData.to_AtomicDataDict(data))
+        data = {
+            "atom_types": np.random.choice([0, 1, 2], size=3),
+            "pos": np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]),
+            "edge_index": np.array([[0, 1, 0, 2], [1, 0, 2, 0]]),
+        }
+        data = AtomicDataDict.to_(AtomicDataDict.from_dict(data), device)
+        edge_embed = instance(data)
         if AtomicDataDict.EDGE_FEATURES_KEY in edge_embed:
             key = AtomicDataDict.EDGE_FEATURES_KEY
         elif AtomicDataDict.EDGE_EMBEDDING_KEY in edge_embed:
@@ -275,8 +265,8 @@ class BaseModelTests:
         else:
             pytest.skip()
         edge_embed = edge_embed[key]
-        data.pos[2, 1] = r_max  # put it past the cutoff
-        edge_embed2 = instance(AtomicData.to_AtomicDataDict(data))[key]
+        data[AtomicDataDict.POSITIONS_KEY][2, 1] = r_max  # put it past the cutoff
+        edge_embed2 = instance(AtomicDataDict.from_dict(data))[key]
 
         if key == AtomicDataDict.EDGE_EMBEDDING_KEY:
             # we can only check that other edges are unaffected if we know it's an embedding
@@ -288,7 +278,7 @@ class BaseModelTests:
         )
 
         # test gradients
-        in_dict = AtomicData.to_AtomicDataDict(data)
+        in_dict = AtomicDataDict.from_dict(data)
         in_dict[AtomicDataDict.POSITIONS_KEY].requires_grad_(True)
 
         with torch.autograd.set_detect_anomaly(True):
@@ -324,7 +314,6 @@ class BaseModelTests:
 class BaseEnergyModelTests(BaseModelTests):
     def test_large_separation(self, model, config, molecules, device):
         instance, _ = model
-        instance.to(device)
         atol = {torch.float32: 1e-4, torch.float64: 1e-10}[instance.model_dtype]
         config, out_fields = config
         r_max = config["r_max"]
@@ -334,19 +323,45 @@ class BaseEnergyModelTests(BaseModelTests):
         atoms2.positions += 40.0 + np.random.randn(3)
         atoms_both = atoms1.copy()
         atoms_both.extend(atoms2)
-        tm = TypeMapper(chemical_symbols=["H", "C", "O"])
-        data1 = tm(AtomicData.from_ase(atoms1, r_max=r_max).to(device=device))
-        data2 = tm(AtomicData.from_ase(atoms2, r_max=r_max).to(device=device))
-        data_both = tm(AtomicData.from_ase(atoms_both, r_max=r_max).to(device=device))
+        tm = ChemicalSpeciesToAtomTypeMapper(
+            chemical_symbols=["H", "C", "O"],
+        )
+
+        data1 = AtomicDataDict.to_(
+            tm(
+                AtomicDataDict.compute_neighborlist_(
+                    AtomicDataDict.from_ase(atoms1), r_max=r_max
+                )
+            ),
+            device,
+        )
+
+        data2 = AtomicDataDict.to_(
+            tm(
+                AtomicDataDict.compute_neighborlist_(
+                    AtomicDataDict.from_ase(atoms2), r_max=r_max
+                )
+            ),
+            device,
+        )
+
+        data_both = AtomicDataDict.to_(
+            tm(
+                AtomicDataDict.compute_neighborlist_(
+                    AtomicDataDict.from_ase(atoms_both), r_max=r_max
+                )
+            ),
+            device,
+        )
         assert (
             data_both[AtomicDataDict.EDGE_INDEX_KEY].shape[1]
             == data1[AtomicDataDict.EDGE_INDEX_KEY].shape[1]
             + data2[AtomicDataDict.EDGE_INDEX_KEY].shape[1]
         )
 
-        out1 = instance(AtomicData.to_AtomicDataDict(data1))
-        out2 = instance(AtomicData.to_AtomicDataDict(data2))
-        out_both = instance(AtomicData.to_AtomicDataDict(data_both))
+        out1 = instance(AtomicDataDict.from_dict(data1))
+        out2 = instance(AtomicDataDict.from_dict(data2))
+        out_both = instance(AtomicDataDict.from_dict(data_both))
 
         assert torch.allclose(
             out1[AtomicDataDict.TOTAL_ENERGY_KEY]
@@ -369,8 +384,17 @@ class BaseEnergyModelTests(BaseModelTests):
         atoms3 = atoms2.copy()
         atoms3.positions += np.random.randn(3)
         atoms_both2.extend(atoms3)
-        data_both2 = tm(AtomicData.from_ase(atoms_both2, r_max=r_max).to(device=device))
-        out_both2 = instance(AtomicData.to_AtomicDataDict(data_both2))
+
+        data_both2 = AtomicDataDict.to_(
+            tm(
+                AtomicDataDict.compute_neighborlist_(
+                    AtomicDataDict.from_ase(atoms_both2), r_max=r_max
+                )
+            ),
+            device,
+        )
+
+        out_both2 = instance(data_both2)
         assert torch.allclose(
             out_both2[AtomicDataDict.TOTAL_ENERGY_KEY],
             out_both[AtomicDataDict.TOTAL_ENERGY_KEY],
@@ -383,11 +407,11 @@ class BaseEnergyModelTests(BaseModelTests):
         )
 
     def test_cross_frame_grad(self, model, device, nequip_dataset):
-        c = Collater.for_dataset(nequip_dataset)
-        batch = c([nequip_dataset[i] for i in range(len(nequip_dataset))])
+        batch = AtomicDataDict.batched_from_list(
+            [nequip_dataset[i] for i in range(len(nequip_dataset))]
+        )
         energy_model, out_fields = model
-        energy_model.to(device)
-        data = AtomicData.to_AtomicDataDict(batch.to(device))
+        data = AtomicDataDict.to_(batch, device)
         data[AtomicDataDict.POSITIONS_KEY].requires_grad = True
 
         output = energy_model(data)
@@ -397,7 +421,7 @@ class BaseEnergyModelTests(BaseModelTests):
             allow_unused=True,
         )[0]
 
-        last_frame_n_atom = batch.ptr[-1] - batch.ptr[-2]
+        last_frame_n_atom = batch[AtomicDataDict.NUM_NODES_KEY][-1]
 
         in_frame_grad = grads[-last_frame_n_atom:]
         cross_frame_grad = grads[:-last_frame_n_atom]
@@ -411,9 +435,8 @@ class BaseEnergyModelTests(BaseModelTests):
             pytest.skip()
 
         # physical predictions (energy, forces, etc) will be converted to default_dtype (float64) before comparing
-        model.to(device)
-        data = atomic_batch.to(device)
-        output = model(AtomicData.to_AtomicDataDict(data))
+        data = AtomicDataDict.to_(atomic_batch, device)
+        output = model(data)
         forces = output[AtomicDataDict.FORCE_KEY]
         epsilon = 1e-3
 
@@ -421,7 +444,7 @@ class BaseEnergyModelTests(BaseModelTests):
         for idir in range(3):
             pos = data[AtomicDataDict.POSITIONS_KEY][iatom, idir]
             data[AtomicDataDict.POSITIONS_KEY][iatom, idir] = pos + epsilon
-            output = model(AtomicData.to_AtomicDataDict(data.to(device)))
+            output = model(data)
             e_plus = (
                 output[AtomicDataDict.TOTAL_ENERGY_KEY]
                 .sum()
@@ -429,7 +452,7 @@ class BaseEnergyModelTests(BaseModelTests):
             )
 
             data[AtomicDataDict.POSITIONS_KEY][iatom, idir] -= epsilon * 2
-            output = model(AtomicData.to_AtomicDataDict(data.to(device)))
+            output = model(data)
             e_minus = (
                 output[AtomicDataDict.TOTAL_ENERGY_KEY]
                 .sum()
@@ -461,9 +484,9 @@ class BaseEnergyModelTests(BaseModelTests):
         model.to(device)
         partial_model.to(device)
         partial_model.load_state_dict(model.state_dict())
-        data = atomic_batch.to(device)
-        output = model(AtomicData.to_AtomicDataDict(data))
-        output_partial = partial_model(AtomicData.to_AtomicDataDict(data))
+        data = AtomicDataDict.to_(atomic_batch, device)
+        output = model(data)
+        output_partial = partial_model(AtomicDataDict.from_dict(data))
         # everything should be the same
         # including the
         for k in output:
@@ -517,13 +540,12 @@ class BaseEnergyModelTests(BaseModelTests):
         r_max = config["r_max"]
 
         # make a synthetic three atom example
-        data = AtomicData(
-            atom_types=np.random.choice([0, 1, 2], size=3),
-            pos=np.array([[0.0, 0.0, 0.0], [0.0, 1.0, 0.0], [r_max, 0.0, 0.0]]),
-            edge_index=np.array([[0, 1, 0, 2], [1, 0, 2, 0]]),
-        )
-        data = data.to(device)
-        out = instance(AtomicData.to_AtomicDataDict(data))
+        data = {
+            "atom_types": np.random.choice([0, 1, 2], size=3),
+            "pos": np.array([[0.0, 0.0, 0.0], [0.0, 1.0, 0.0], [r_max, 0.0, 0.0]]),
+            "edge_index": np.array([[0, 1, 0, 2], [1, 0, 2, 0]]),
+        }
+        out = instance(AtomicDataDict.to_(AtomicDataDict.from_dict(data), device))
         forces = out[AtomicDataDict.FORCE_KEY]
         assert (
             forces[:2].abs().sum() > 1e-4

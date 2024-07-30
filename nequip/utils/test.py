@@ -1,5 +1,3 @@
-from typing import Union, Optional, List
-
 import ase
 import torch
 from e3nn import o3
@@ -7,13 +5,15 @@ from e3nn.util.test import equivariance_error
 
 from nequip.nn import GraphModuleMixin, GraphModel
 from nequip.data import (
-    AtomicData,
     AtomicDataDict,
     _NODE_FIELDS,
     _EDGE_FIELDS,
     _CARTESIAN_TENSOR_FIELDS,
 )
 from nequip.utils.misc import dtype_from_name
+
+from typing import Union, Optional, List
+
 
 # The default float tolerance
 FLOAT_TOLERANCE = {
@@ -157,9 +157,7 @@ def assert_permutation_equivariant(
 
 def assert_AtomicData_equivariant(
     func: GraphModuleMixin,
-    data_in: Union[
-        AtomicData, AtomicDataDict.Type, List[Union[AtomicData, AtomicDataDict.Type]]
-    ],
+    data_in: Union[AtomicDataDict.Type, List[AtomicDataDict.Type]],
     permutation_tolerance: Optional[float] = None,
     e3_tolerance: Optional[float] = None,
     **kwargs,
@@ -184,7 +182,7 @@ def assert_AtomicData_equivariant(
 
     if not isinstance(data_in, list):
         data_in = [data_in]
-    data_in = [AtomicData.to_AtomicDataDict(d) for d in data_in]
+    data_in = [AtomicDataDict.from_dict(d) for d in data_in]
     device, dtype = (
         data_in[0][AtomicDataDict.POSITIONS_KEY].device,
         data_in[0][AtomicDataDict.POSITIONS_KEY].dtype,
@@ -341,7 +339,6 @@ def set_irreps_debug(enabled: bool = False) -> None:
         pass
 
     import torch.nn.modules
-    from nequip.utils.torch_geometric import Data
 
     def pre_hook(mod: GraphModuleMixin, inp):
         __tracebackhide__ = True
@@ -357,9 +354,9 @@ def set_irreps_debug(enabled: bool = False) -> None:
                 f"Module {mname} didn't get any arguments; this case is correctly handled with an empty dict."
             )
         inp = inp[0]
-        if not (isinstance(inp, dict) or isinstance(inp, Data)):
+        if not (isinstance(inp, dict)):
             raise TypeError(
-                f"Module {mname} should have received a dict or a torch_geometric Data, instead got a {type(inp).__name__}"
+                f"Module {mname} should have received a dict, instead got a {type(inp).__name__}"
             )
         for k, ir in mod.irreps_in.items():
             if k not in inp:
@@ -382,9 +379,9 @@ def set_irreps_debug(enabled: bool = False) -> None:
         if not isinstance(mod, GraphModuleMixin):
             return
         mname = type(mod).__name__
-        if not (isinstance(out, dict) or isinstance(out, Data)):
+        if not (isinstance(out, dict)):
             raise TypeError(
-                f"Module {mname} should have returned a dict or a torch_geometric Data, instead got a {type(out).__name__}"
+                f"Module {mname} should have returned a dict, instead got a {type(out).__name__}"
             )
         for k, ir in mod.irreps_out.items():
             if k not in out:
@@ -412,7 +409,10 @@ def edgeset_from_AtomicDataDict(data, **nl_kwargs):
 
 
 def compare_neighborlists(
-    atoms_or_data: ase.Atoms | AtomicDataDict.Type, nl1: str, nl2: str, **nl_kwargs
+    atoms_or_data: Union[ase.Atoms, AtomicDataDict.Type],
+    nl1: str,
+    nl2: str,
+    **nl_kwargs,
 ):
     """
     Args:
