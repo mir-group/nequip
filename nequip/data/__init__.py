@@ -13,7 +13,6 @@ from ._key_registry import (
 
 from ._statistics import statistics, compute_stats_for_model
 from ._sampler import PartialSampler
-from ._build import dataset_from_config
 
 
 __all__ = [
@@ -24,7 +23,6 @@ __all__ = [
     statistics,
     compute_stats_for_model,
     PartialSampler,
-    dataset_from_config,
     _NODE_FIELDS,
     _EDGE_FIELDS,
     _GRAPH_FIELDS,
