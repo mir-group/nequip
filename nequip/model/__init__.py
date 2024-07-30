@@ -11,7 +11,6 @@ from ._pair_potential import PairPotential, PairPotentialTerm
 
 from ._build import model_from_config
 
-from . import builder_utils
 
 __all__ = [
     SimpleIrrepsConfig,
@@ -28,5 +27,4 @@ __all__ = [
     model_from_config,
     PairPotential,
     PairPotentialTerm,
-    builder_utils,
 ]
