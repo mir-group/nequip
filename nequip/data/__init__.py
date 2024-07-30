@@ -11,7 +11,7 @@ from .AtomicData import (
 )
 from ._dataset import AtomicDataset, NpzDataset, ASEDataset, HDF5Dataset, EMTTestDataset
 
-from .dataloader import DataLoader, Collater, PartialSampler
+from ._sampler import PartialSampler
 from ._build import dataset_from_config
 
 __all__ = [
@@ -24,8 +24,6 @@ __all__ = [
     ASEDataset,
     HDF5Dataset,
     EMTTestDataset,
-    DataLoader,
-    Collater,
     PartialSampler,
     dataset_from_config,
     _NODE_FIELDS,
