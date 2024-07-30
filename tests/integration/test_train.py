@@ -1,192 +1,158 @@
-import pytest
 import tempfile
-import pathlib
-import yaml
+
 import subprocess
 import os
 
-import numpy as np
-import torch
+import math
 
-from nequip.data import AtomicDataDict
-import nequip.utils
+from nequip.train import NequIPLightningModule
 
-from conftest import (
-    IdentityModel,
-    ConstFactorModel,
-    LearningFactorModel,
-    _check_and_print,
-)
+from omegaconf import OmegaConf, open_dict
+
+from conftest import _check_and_print
 
 
-def test_metrics(fake_model_training_session, model_dtype):
-    default_dtype = nequip.utils.dtype_to_name(torch.get_default_dtype())
-    builder, true_config, tmpdir, env = fake_model_training_session
+def test_batch_invariance(fake_model_training_session):
+    # This actually tests two features:
+    # 1. reproducibility of training with the same data, model and global seeds (we train in exactly the same way as in fake_model_training_session)
+    # 2. invariance of validation metrics with the validation batch sizes
 
-    # == Load metrics ==
-    outdir = f"{tmpdir}/{true_config['root']}/{true_config['run_name']}/"
+    # NOTE: at the time the tests were written, both minimal configs have val dataloader batch sizes of 5, so we only train again with batch_size=1 here
+    config, tmpdir, env = fake_model_training_session
+    tol = {"float32": 1e-5, "float64": 1e-8}[config.model.model_dtype]
 
-    if builder == IdentityModel or builder == LearningFactorModel:
-        for which in ("train", "val"):
+    # == get necessary info from checkpoint ==
+    nequip_module = NequIPLightningModule.load_from_checkpoint(f"{tmpdir}/last.ckpt")
+    orig_train_loss = nequip_module.loss.metrics_values_epoch
+    batchsize5_val_metrics = nequip_module.val_metrics[0].metrics_values_epoch
 
-            dat = np.genfromtxt(
-                f"{outdir}/metrics_batch_{which}.csv",
-                delimiter=",",
-                names=True,
-                dtype=None,
-            )
-            for field in dat.dtype.names:
-                if field == "epoch" or field == "batch":
-                    continue
-                # Everything else should be a loss or a metric
-                if builder == IdentityModel:
-                    if model_dtype == default_dtype:
-                        # We have a true identity model
-                        assert np.allclose(
-                            dat[field],
-                            0.0,
-                            atol=1e-6 if default_dtype == "float32" else 1e-9,
-                        ), f"Loss/metric `{field}` wasn't all zeros for {which}"
-                    else:
-                        # we have an approximate identity model that applies a floating point truncation
-                        # in the actual aspirin test data used here, the truncation error is maximally 0.0155
-                        # there is also no rescaling so everything is in real units here
-                        assert np.all(
-                            dat[field] < 0.02
-                        ), f"Loss/metric `{field}` wasn't approximately zeros for {which}"
-                elif builder == LearningFactorModel:
-                    assert (
-                        dat[field][-1] < dat[field][0]
-                    ), f"Loss/metric `{field}` didn't go down for {which}"
+    # == train again with validation batch size 1 ==
+    with tempfile.TemporaryDirectory() as new_tmpdir:
+        new_config = config.copy()
+        new_config.data.val_dataloader_kwargs.batch_size = 1
+        with open_dict(new_config):
+            new_config["hydra"] = {"run": {"dir": new_tmpdir}}
+        new_config = OmegaConf.create(new_config)
+        config_path = new_tmpdir + "/newconf.yaml"
+        OmegaConf.save(config=new_config, f=config_path)
 
-    # epoch metrics
-    dat = np.genfromtxt(
-        f"{outdir}/metrics_epoch.csv",
-        delimiter=",",
-        names=True,
-        dtype=None,
-    )
-    for field in dat.dtype.names:
-        if field == "epoch" or field == "wall" or field == "LR":
-            continue
+        # == Train model ==
+        env = dict(os.environ)
+        retcode = subprocess.run(
+            ["nequip-train", "-cn", "newconf"],
+            cwd=new_tmpdir,
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        _check_and_print(retcode)
+        nequip_module = NequIPLightningModule.load_from_checkpoint(
+            f"{new_tmpdir}/last.ckpt"
+        )
 
-        # Everything else should be a loss or a metric
-        if builder == IdentityModel:
-            if model_dtype == default_dtype:
-                # we have a true identity model
-                assert np.allclose(
-                    dat[field][1:],
-                    0.0,
-                    atol=1e-6 if default_dtype == "float32" else 1e-9,
-                ), f"Loss/metric `{field}` wasn't all equal to zero for epoch"
-            else:
-                # we have an approximate identity model that applies a floating point truncation
-                # see above
-                assert np.all(
-                    dat[field][1:] < 0.02
-                ), f"Loss/metric `{field}` wasn't approximately zeros for {which}"
-        elif builder == ConstFactorModel:
-            # otherwise just check its constant.
-            # epoch-wise numbers should be the same, since there's no randomness at this level
-            assert np.allclose(
-                dat[field], dat[field][0]
-            ), f"Loss/metric `{field}` wasn't all equal to {dat[field][0]} for epoch"
-        elif builder == LearningFactorModel:
-            assert (
-                dat[field][-1] < dat[field][0]
-            ), f"Loss/metric `{field}` didn't go down across epochs"
+        # == test training loss reproduced ==
+        new_train_loss = nequip_module.loss.metrics_values_epoch
+        assert len(orig_train_loss) == len(new_train_loss)
+        assert all(
+            [
+                math.isclose(a, b, rel_tol=tol)
+                for a, b in zip(orig_train_loss, new_train_loss)
+            ]
+        )
 
-    # == Check model ==
-    model = torch.load(outdir + "/last_model.pth")
+        # == test val metrics invariance to batch size ==
+        batchsize1_val_metrics = nequip_module.val_metrics[0].metrics_values_epoch
 
-    if builder == IdentityModel:
-        # GraphModel.IdentityModel
-        zero = model["model.zero"]
-        # Since the loss is always zero, even though the constant
-        # 1 was trainable, it shouldn't have changed
-        # the tolerances when loss is nonzero are large-ish because the default learning rate 0.01 is high
-        # these tolerances are _also_ in real units
-        assert torch.allclose(
-            zero,
-            torch.zeros(1, device=zero.device, dtype=zero.dtype),
-            atol=1e-7 if model_dtype == default_dtype else 1e-2,
+        assert len(batchsize5_val_metrics) == len(batchsize1_val_metrics)
+        assert all(
+            [
+                math.isclose(a, b, rel_tol=tol)
+                for a, b in zip(batchsize5_val_metrics, batchsize1_val_metrics)
+            ]
         )
 
 
-@pytest.mark.parametrize(
-    "conffile",
-    [
-        "minimal.yaml",
-        "minimal_eng.yaml",
-    ],
-)
-def test_requeue(nequip_dataset, BENCHMARK_ROOT, conffile):
-    # TODO test metrics against one that goes all the way through
-    builder = IdentityModel  # TODO: train a real model?
+# TODO: will fail if train dataloader has shuffle=True
+def test_restarts(fake_model_training_session):
+    config, tmpdir, env = fake_model_training_session
+    tol = {"float32": 1e-5, "float64": 1e-8}[config.model.model_dtype]
+    orig_max_epochs = config.train.trainer.max_epochs
+    new_max_epochs = orig_max_epochs + 5
 
-    dtype = nequip.utils.dtype_to_name(torch.get_default_dtype())
-    if dtype != "float64":
-        pytest.skip(
-            f"found default_dtype={dtype} - only default_dtype=float64 will be tested"
+    # == continue training for a few more epochs ==
+    with tempfile.TemporaryDirectory() as new_tmpdir_1:
+        new_config = config.copy()
+        new_config.train.trainer.max_epochs = new_max_epochs
+        with open_dict(new_config):
+            new_config["hydra"] = {"run": {"dir": new_tmpdir_1}}
+        new_config = OmegaConf.create(new_config)
+        config_path = new_tmpdir_1 + "/newconf.yaml"
+        OmegaConf.save(config=new_config, f=config_path)
+        retcode = subprocess.run(
+            [
+                "nequip-train",
+                "-cn",
+                "newconf",
+                f"++ckpt_path='{tmpdir}/last.ckpt'",
+            ],
+            cwd=new_tmpdir_1,
+            env=dict(os.environ),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
         )
+        _check_and_print(retcode)
 
-    path_to_this_file = pathlib.Path(__file__)
-    config_path = path_to_this_file.parents[2] / f"configs/{conffile}"
-    true_config = yaml.load(config_path.read_text(), Loader=yaml.Loader)
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-
-        run_name = "test_requeue_" + dtype
-        true_config["run_name"] = run_name
-        true_config["append"] = True
-        true_config["root"] = "./"
-        true_config["dataset_file_name"] = str(
-            BENCHMARK_ROOT / "aspirin_ccsd-train.npz"
+        nequip_module = NequIPLightningModule.load_from_checkpoint(
+            f"{new_tmpdir_1}/last.ckpt"
         )
-        true_config["default_dtype"] = dtype
-        # We just don't add rescaling:
-        true_config["model_builders"] = [builder]
-        # We need truth labels as inputs for these fake testing models
-        true_config["model_input_fields"] = {
-            AtomicDataDict.FORCE_KEY: "1o",
-            AtomicDataDict.TOTAL_ENERGY_KEY: "0e",
-        }
+        restart_train_loss = nequip_module.loss.metrics_values_epoch
+        restart_val_metrics = nequip_module.val_metrics[0].metrics_values_epoch
 
-        for irun in range(3):
-
-            config_path = tmpdir + "/conf.yaml"
-            with open(config_path, "w+") as fp:
-                yaml.dump(true_config, fp)
+        # == retrain from scratch up to new_max_epochs ==
+        with tempfile.TemporaryDirectory() as new_tmpdir_2:
+            new_config = config.copy()
+            new_config.train.trainer.max_epochs = new_max_epochs
+            with open_dict(new_config):
+                new_config["hydra"] = {"run": {"dir": new_tmpdir_2}}
+            new_config = OmegaConf.create(new_config)
+            config_path = new_tmpdir_2 + "/newconf.yaml"
+            OmegaConf.save(config=new_config, f=config_path)
 
             # == Train model ==
-            env = dict(os.environ)
-            # make this script available so model builders can be loaded
-            env["PYTHONPATH"] = ":".join(
-                [str(path_to_this_file.parent)] + env.get("PYTHONPATH", "").split(":")
-            )
-
             retcode = subprocess.run(
-                # Supress the warning cause we use general config for all the fake models
-                [
-                    "nequip-train",
-                    "conf.yaml",
-                    "--warn-unused",
-                    "--override",
-                    f"max_epochs: {2 * (irun + 1)}",
-                ],
-                cwd=tmpdir,
-                env=env,
+                ["nequip-train", "-cn", "newconf"],
+                cwd=new_tmpdir_2,
+                env=dict(os.environ),
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
             )
             _check_and_print(retcode)
-
-            # == Load metrics ==
-            dat = np.genfromtxt(
-                f"{tmpdir}/{run_name}/metrics_epoch.csv",
-                delimiter=",",
-                names=True,
-                dtype=None,
+            nequip_module = NequIPLightningModule.load_from_checkpoint(
+                f"{new_tmpdir_2}/last.ckpt"
             )
 
-            assert len(dat["epoch"]) == (2 * (irun + 1))
+            # == test training loss reproduced ==
+            oneshot_train_loss = nequip_module.loss.metrics_values_epoch
+
+            print(restart_train_loss)
+            print(oneshot_train_loss)
+            assert len(restart_train_loss) == len(oneshot_train_loss)
+            assert all(
+                [
+                    math.isclose(a, b, rel_tol=tol)
+                    for a, b in zip(restart_train_loss, oneshot_train_loss)
+                ]
+            )
+
+            # == test val metrics reproduced ==
+            oneshot_val_metrics = nequip_module.val_metrics[0].metrics_values_epoch
+
+            print(restart_val_metrics)
+            print(oneshot_val_metrics)
+            assert len(restart_val_metrics) == len(oneshot_val_metrics)
+            assert all(
+                [
+                    math.isclose(a, b, rel_tol=tol)
+                    for a, b in zip(restart_val_metrics, oneshot_val_metrics)
+                ]
+            )
