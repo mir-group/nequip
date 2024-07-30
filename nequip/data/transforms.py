@@ -1,11 +1,9 @@
-from typing import Dict, Optional, Union, List
+from typing import Dict, Optional, List
 import warnings
 
 import torch
-
 import ase.data
-
-from nequip.data import AtomicData, AtomicDataDict
+from nequip.data import AtomicDataDict
 
 
 class TypeMapper:
@@ -111,8 +109,8 @@ class TypeMapper:
             assert set(type_to_chemical_symbol.keys()) == set(range(self.num_types))
 
     def __call__(
-        self, data: Union[AtomicDataDict.Type, AtomicData], types_required: bool = True
-    ) -> Union[AtomicDataDict.Type, AtomicData]:
+        self, data: AtomicDataDict.Type, types_required: bool = True
+    ) -> AtomicDataDict.Type:
         if AtomicDataDict.ATOM_TYPE_KEY in data:
             if AtomicDataDict.ATOMIC_NUMBERS_KEY in data:
                 warnings.warn(

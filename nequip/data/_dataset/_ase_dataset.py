@@ -12,7 +12,7 @@ import torch.multiprocessing as mp
 
 
 from nequip.utils.multiprocessing import num_tasks
-from .. import AtomicData
+from .. import AtomicDataDict
 from ..transforms import TypeMapper
 from ._base_datasets import AtomicDataset
 
@@ -25,7 +25,7 @@ def _ase_dataset_reader(
     atomicdata_kwargs: dict,
     include_frames,
     global_options: dict,
-) -> Union[str, List[AtomicData]]:
+) -> Union[str, List[AtomicDataDict]]:
     """Parallel reader for all frames in file."""
     if world_size > 1:
         from nequip.utils._global_options import _set_global_options
@@ -52,7 +52,7 @@ def _ase_dataset_reader(
             (
                 global_index,
                 (
-                    AtomicData.from_ase(atoms=atoms, **atomicdata_kwargs)
+                    AtomicDataDict.from_ase(atoms=atoms, **atomicdata_kwargs)
                     if global_index in include_frames
                     # in-memory dataset will ignore this later, but needed for indexing to work out
                     else None
@@ -236,5 +236,5 @@ class ASEDataset(AtomicDataset):
                 datas = reader(rank=0)
                 # datas here is already in order, stride 1 start 0
                 # no need to un-interleave
-        # return list of AtomicData:
+        # return list of AtomicDataDict:
         return [e[1] for e in datas]

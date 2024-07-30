@@ -7,7 +7,8 @@ import ase
 import ase.build
 from ase.calculators.emt import EMT
 
-from nequip.data import AtomicDataset, AtomicData
+from .. import AtomicDataDict
+from ._base_datasets import AtomicDataset
 from ..transforms import TypeMapper
 
 
@@ -72,7 +73,7 @@ class EMTTestDataset(AtomicDataset):
             )
 
             datas.append(
-                AtomicData.from_ase(
+                AtomicDataDict.from_ase(
                     base_atoms.copy(),
                     forces=base_atoms.get_forces(),
                     total_energy=base_atoms.get_potential_energy(),
