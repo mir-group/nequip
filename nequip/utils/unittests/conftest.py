@@ -12,10 +12,13 @@ from ase.io import write
 
 import torch
 
-from nequip.data import AtomicData, ASEDataset
-from nequip.data.transforms import TypeMapper
-from nequip.utils.test import set_irreps_debug, FLOAT_TOLERANCE
-from nequip.utils.torch_geometric import Batch
+from nequip.data import AtomicDataDict
+from nequip.data.dataset import ASEDataset
+from nequip.data.transforms import (
+    ChemicalSpeciesToAtomTypeMapper,
+    NeighborListTransform,
+)
+from nequip.utils.test import set_irreps_debug
 from nequip.utils._global_options import _set_global_options
 from nequip.utils import dtype_to_name
 
@@ -44,8 +47,8 @@ if "NEQUIP_NUM_TASKS" not in os.environ:
     os.environ["NEQUIP_NUM_TASKS"] = "2"
 
 
-@pytest.fixture(scope="class", params=["float32", "float64"])
-def model_dtype(float_tolerance, request):
+@pytest.fixture(scope="session", params=["float32", "float64"])
+def model_dtype(default_dtype, request):
     default_dtype = dtype_to_name(torch.get_default_dtype())
     if default_dtype != "float64":
         pytest.skip(
@@ -54,27 +57,13 @@ def model_dtype(float_tolerance, request):
     return request.param
 
 
-@pytest.fixture(scope="session", autouse=True, params=["float32", "float64"])
-def float_tolerance(request):
-    """Run all tests with various PyTorch default dtypes.
-
-    This is a session-wide, autouse fixture — you only need to request it explicitly if a test needs to know the tolerance for the current default dtype.
-
-    Returns
-    --------
-        A precision threshold to use for closeness tests.
-    """
+@pytest.fixture(scope="session", autouse=True)
+def default_dtype(request):
     old_dtype = torch.get_default_dtype()
-    dtype = request.param
-    _set_global_options({"default_dtype": dtype})
-    yield FLOAT_TOLERANCE[dtype]
-    _set_global_options(
-        {
-            "default_dtype": {torch.float32: "float32", torch.float64: "float64"}[
-                old_dtype
-            ]
-        }
-    )
+    # global dtype is always set to float64
+    _set_global_options(seed=123)
+    yield torch.get_default_dtype()
+    torch.set_default_dtype(old_dtype)
 
 
 # - Ampere and TF32 -
@@ -100,38 +89,47 @@ def BENCHMARK_ROOT():
 
 
 @pytest.fixture(scope="session")
-def temp_data(float_tolerance):
+def temp_data(default_dtype):
     with tempfile.TemporaryDirectory() as tmpdirname:
         yield tmpdirname
 
 
 @pytest.fixture(scope="session")
-def CH3CHO(CH3CHO_no_typemap) -> Tuple[Atoms, AtomicData]:
+def CH3CHO(CH3CHO_no_typemap) -> Tuple[Atoms, AtomicDataDict.Type]:
     atoms, data = CH3CHO_no_typemap
-    tm = TypeMapper(chemical_symbol_to_type={"C": 0, "O": 1, "H": 2})
+    tm = ChemicalSpeciesToAtomTypeMapper(
+        chemical_symbols=["C", "O", "H"],
+    )
     data = tm(data)
     return atoms, data
 
 
 @pytest.fixture(scope="session")
-def CH3CHO_no_typemap(float_tolerance) -> Tuple[Atoms, AtomicData]:
+def CH3CHO_no_typemap(default_dtype) -> Tuple[Atoms, AtomicDataDict.Type]:
     atoms = molecule("CH3CHO")
-    data = AtomicData.from_ase(atoms, r_max=2.0)
+    data = AtomicDataDict.compute_neighborlist_(
+        AtomicDataDict.from_ase(atoms),
+        r_max=2.0,
+    )
     return atoms, data
 
 
 @pytest.fixture(scope="session")
-def Cu_bulk(float_tolerance) -> Tuple[Atoms, AtomicData]:
+def Cu_bulk(default_dtype) -> Tuple[Atoms, AtomicDataDict.Type]:
     atoms = bulk("Cu") * (2, 2, 1)
     atoms.rattle()
-    data = AtomicData.from_ase(atoms, r_max=3.5)
-    tm = TypeMapper(chemical_symbol_to_type={"Cu": 0})
+    data = AtomicDataDict.compute_neighborlist_(
+        AtomicDataDict.from_ase(atoms), r_max=3.5, NL="ase"
+    )
+    tm = ChemicalSpeciesToAtomTypeMapper(
+        chemical_symbols=["Cu"],
+    )
     data = tm(data)
     return atoms, data
 
 
 @pytest.fixture(scope="session")
-def molecules(float_tolerance) -> List[Atoms]:
+def molecules(default_dtype) -> List[Atoms]:
     atoms_list = []
     for i in range(8):
         atoms = molecule("CH3CHO" if i % 2 == 0 else "H2")
@@ -148,23 +146,25 @@ def molecules(float_tolerance) -> List[Atoms]:
 
 
 @pytest.fixture(scope="session")
-def nequip_dataset(molecules, temp_data, float_tolerance):
+def nequip_dataset(molecules):
     with tempfile.NamedTemporaryFile(suffix=".xyz") as fp:
         for atoms in molecules:
             write(fp.name, atoms, format="extxyz", append=True)
-        a = ASEDataset(
-            file_name=fp.name,
-            root=temp_data,
-            AtomicData_options={"r_max": 3.0},
+        yield ASEDataset(
+            transforms=[
+                ChemicalSpeciesToAtomTypeMapper(
+                    chemical_symbols=["H", "C", "O"],
+                ),
+                NeighborListTransform(r_max=3.0),
+            ],
+            file_path=fp.name,
             ase_args=dict(format="extxyz"),
-            type_mapper=TypeMapper(chemical_symbol_to_type={"H": 0, "C": 1, "O": 2}),
         )
-        yield a
 
 
 @pytest.fixture(scope="session")
 def atomic_batch(nequip_dataset):
-    return Batch.from_data_list([nequip_dataset[0], nequip_dataset[1]])
+    return AtomicDataDict.batched_from_list([nequip_dataset[0], nequip_dataset[1]])
 
 
 @pytest.fixture(scope="function")
