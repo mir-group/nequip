@@ -90,7 +90,7 @@ POLARIZATION_KEY: Final[str] = "polarization"
 
 # batch related keys
 BATCH_KEY: Final[str] = "batch"
-BATCH_PTR_KEY: Final[str] = "ptr"
+NUM_NODES_KEY: Final[str] = "num_atoms"
 
 MODEL_DTYPE_KEY: Final[str] = "_model_dtype_indicator"
 
