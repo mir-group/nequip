@@ -1,15 +1,14 @@
-import warnings
-from packaging import version
-import os
-
 import torch
+
+from lightning.pytorch import seed_everything
 
 import e3nn
 import e3nn.util.jit
 
-from .misc import dtype_from_name
-from .test import set_irreps_debug
-from .config import Config
+import warnings
+from packaging import version
+import os
+from typing import List, Tuple, Union, Final, Optional
 
 
 # for multiprocessing, we need to keep track of our latest global options so
@@ -17,6 +16,15 @@ from .config import Config
 # to keep only relevant keys, configs should have only small values (no big objects)
 # and those should have references elsewhere anyway, so keeping references here is fine.
 _latest_global_config = {}
+
+# singular source of global dtype that dictates the dtype of the data
+# which is always float64
+_GLOBAL_DTYPE = torch.float64
+
+
+_MULTIPROCESSING_SHARING_STRATEGY: Final[str] = os.environ.get(
+    "NEQUIP_MULTIPROCESSING_SHARING_STRATEGY", "file_system"
+)
 
 
 def _get_latest_global_options() -> dict:
@@ -28,7 +36,27 @@ def _get_latest_global_options() -> dict:
     return _latest_global_config
 
 
-def _set_global_options(config, warn_on_override: bool = False) -> None:
+def _set_global_options(
+    seed: Optional[int] = None,
+    _jit_bailout_depth: int = 2,
+    # avoid 20 iters of pain, see https://github.com/pytorch/pytorch/issues/52286
+    # Quote from eelison in PyTorch slack:
+    # https://pytorch.slack.com/archives/CDZD1FANA/p1644259272007529?thread_ts=1644064449.039479&cid=CDZD1FANA
+    # > Right now the default behavior is to specialize twice on static shapes and then on dynamic shapes.
+    # > To reduce warmup time you can do something like setFusionStrartegy({{FusionBehavior::DYNAMIC, 3}})
+    # > ... Although we would wouldn't really expect to recompile a dynamic shape fusion in a model,
+    # > provided broadcasting patterns remain fixed
+    # We default to DYNAMIC alone because the number of edges is always dynamic,
+    # even if the number of atoms is fixed:
+    _jit_fusion_strategy: List[Tuple[Union[str, int]]] = [("DYNAMIC", 3)],
+    # Due to what appear to be ongoing bugs with nvFuser, we default to NNC (fuser1) for now:
+    # TODO: still default to NNC on CPU regardless even if change this for GPU
+    # TODO: default for ROCm?
+    # _jit_fuser="fuser1",  # TODO: what is this?
+    allow_tf32: bool = False,
+    e3nn_optimization_defaults: dict = {},
+    warn_on_override: bool = False,
+) -> None:
     """Configure global options of libraries like `torch` and `e3nn` based on `config`.
 
     Args:
@@ -36,43 +64,54 @@ def _set_global_options(config, warn_on_override: bool = False) -> None:
     """
     # update these options into the latest global config.
     global _latest_global_config
-    _latest_global_config.update(Config.as_dict(config))
+    _latest_global_config.update(
+        {
+            "seed": seed,
+            "_jit_bailout_depth": _jit_bailout_depth,
+            "_jit_fusion_strategy": _jit_fusion_strategy,
+            "allow_tf32": allow_tf32,
+            "e3nn_optimization_defaults": e3nn_optimization_defaults,
+            "warn_on_override": warn_on_override,
+            "default_dtype": _GLOBAL_DTYPE,
+        }
+    )
+
+    # set global seed
+    if seed is not None:
+        seed_everything(seed, workers=True)
+
     # Set TF32 support
     # See https://pytorch.org/docs/stable/notes/cuda.html#tensorfloat-32-tf32-on-ampere-devices
-    if torch.cuda.is_available() and "allow_tf32" in config:
-        if torch.torch.backends.cuda.matmul.allow_tf32 is not config["allow_tf32"]:
+    if torch.cuda.is_available():
+        if torch.torch.backends.cuda.matmul.allow_tf32 is not allow_tf32:
             # update the setting
             if warn_on_override:
                 warnings.warn(
-                    f"Setting the GLOBAL value for allow_tf32 to {config['allow_tf32']} which is different than the previous value of {torch.torch.backends.cuda.matmul.allow_tf32}"
+                    f"Setting the GLOBAL value for allow_tf32 to {allow_tf32} which is different than the previous value of {torch.torch.backends.cuda.matmul.allow_tf32}"
                 )
-            torch.backends.cuda.matmul.allow_tf32 = config["allow_tf32"]
-            torch.backends.cudnn.allow_tf32 = config["allow_tf32"]
+            torch.backends.cuda.matmul.allow_tf32 = allow_tf32
+            torch.backends.cudnn.allow_tf32 = allow_tf32
 
     # Temporary warning due to unresolved upstream issue
     torch_version = version.parse(torch.__version__)
 
     if torch_version >= version.parse("1.11"):
         # PyTorch >= 1.11
-        k = "_jit_fusion_strategy"
-        if k in config:
-            new_strat = config.get(k)
-            old_strat = torch.jit.set_fusion_strategy(new_strat)
-            if warn_on_override and old_strat != new_strat:
-                warnings.warn(
-                    f"Setting the GLOBAL value for jit fusion strategy to `{new_strat}` which is different than the previous value of `{old_strat}`"
-                )
+        new_strat = _jit_fusion_strategy
+        old_strat = torch.jit.set_fusion_strategy(new_strat)
+        if warn_on_override and old_strat != new_strat:
+            warnings.warn(
+                f"Setting the GLOBAL value for jit fusion strategy to `{new_strat}` which is different than the previous value of `{old_strat}`"
+            )
     else:
         # For avoiding 20 steps of painfully slow JIT recompilation
         # See https://github.com/pytorch/pytorch/issues/52286
-        k = "_jit_bailout_depth"
-        if k in config:
-            new_depth = config[k]
-            old_depth = torch._C._jit_set_bailout_depth(new_depth)
-            if warn_on_override and old_depth != new_depth:
-                warnings.warn(
-                    f"Setting the GLOBAL value for jit bailout depth to `{new_depth}` which is different than the previous value of `{old_depth}`"
-                )
+        new_depth = _jit_bailout_depth
+        old_depth = torch._C._jit_set_bailout_depth(new_depth)
+        if warn_on_override and old_depth != new_depth:
+            warnings.warn(
+                f"Setting the GLOBAL value for jit bailout depth to `{new_depth}` which is different than the previous value of `{old_depth}`"
+            )
 
     # Deal with fusers
     # The default PyTorch fuser changed to nvFuser in 1.12
@@ -99,33 +138,12 @@ def _set_global_options(config, warn_on_override: bool = False) -> None:
     else:
         os.environ[k] = "1"
 
-    # TODO: warn_on_override for the rest here?
-    if config.get("model_debug_mode", False):
-        set_irreps_debug(enabled=True)
+    torch.set_default_dtype(_GLOBAL_DTYPE)
+    e3nn.set_optimization_defaults(**e3nn_optimization_defaults)
 
-    if "default_dtype" in config:
-        old_dtype = torch.get_default_dtype()
-        new_dtype = dtype_from_name(config["default_dtype"])
-
-        if new_dtype != torch.float64:
-            warnings.warn(
-                f"config option default_dtype={new_dtype} found -- we strongly recommend float64 unless you have clear intentions for using default_dtype={new_dtype}."
-            )
-
-        if warn_on_override and old_dtype != new_dtype:
-            warnings.warn(
-                f"Setting the GLOBAL value for torch.set_default_dtype to `{new_dtype}` which is different than the previous value of `{old_dtype}`"
-            )
-        torch.set_default_dtype(new_dtype)
-
-    elif torch.get_default_dtype() != torch.float64:
-        warnings.warn(
-            "config option default_dtype not found and torch.get_default_dtype() is not float64 -- it is recommended that config option default_dtype is set to float64"
-        )
-
-    if config.get("grad_anomaly_mode", False):
-        torch.autograd.set_detect_anomaly(True)
-
-    e3nn.set_optimization_defaults(**config.get("e3nn_optimization_defaults", {}))
+    # ENVIRONMENT VARIABLES
+    # torch.multiprocessing fix for batch_size=1
+    # see https://stackoverflow.com/questions/48250053/pytorchs-dataloader-too-many-open-files-error-when-no-files-should-be-open
+    torch.multiprocessing.set_sharing_strategy(_MULTIPROCESSING_SHARING_STRATEGY)
 
     return
