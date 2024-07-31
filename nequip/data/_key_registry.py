@@ -166,6 +166,19 @@ def get_field_type(field: str) -> str:
         raise KeyError(f"Unregistered field {field} found")
 
 
+# === abbreviations ===
+ABBREV = {
+    _keys.TOTAL_ENERGY_KEY: "E",
+    _keys.PER_ATOM_ENERGY_KEY: "Ei",
+    _keys.FORCE_KEY: "F",
+    _keys.TOTAL_MAGMOM_KEY: "M",
+    _keys.CHARGE_KEY: "Q",
+    _keys.POLARIZATION_KEY: "pol",
+    _keys.BORN_CHARGE_KEY: "Z*",
+    _keys.DIELECTRIC_KEY: "ε",
+}
+
+
 #  === AtomicData ===
 
 
