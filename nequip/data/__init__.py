@@ -8,6 +8,7 @@ from ._key_registry import (
     _GRAPH_FIELDS,
     _LONG_FIELDS,
     _CARTESIAN_TENSOR_FIELDS,
+    ABBREV,
 )
 
 from ._statistics import statistics
@@ -27,4 +28,5 @@ __all__ = [
     _GRAPH_FIELDS,
     _LONG_FIELDS,
     _CARTESIAN_TENSOR_FIELDS,
+    ABBREV,
 ]
