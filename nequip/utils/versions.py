@@ -1,13 +1,17 @@
-from typing import Tuple, Final
 import packaging.version
-
-import logging
 
 import torch
 import e3nn
 import nequip
 
+from omegaconf import open_dict
 from .git import get_commit
+
+from typing import Tuple, Final
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 _TORCH_IS_GE_1_13: Final[bool] = packaging.version.parse(
     torch.__version__
@@ -37,7 +41,7 @@ def get_current_code_versions(config) -> Tuple[dict, dict]:
     for code in _DEFAULT_VERSION_CODES:
         code_versions[code.__name__] = code.__version__
     code_commits = set(_DEFAULT_COMMIT_CODES)
-    for builder in config["model_builders"]:
+    for builder in config.model.model_builders:
         if not isinstance(builder, str):
             continue
         builder = builder.split(".")
@@ -56,7 +60,7 @@ def check_code_version(config, add_to_config: bool = False):
     for code, version in code_versions.items():
         # we use .get just in case we recorded something in an old version we don't in a new one
         if version != current_code_versions.get(code, version):
-            logging.error(
+            logger.error(
                 "Loading a saved model created with different library version(s) may cause issues."
                 f" Current {code} version: {current_code_versions[code]} "
                 f"vs  original version: {version}"
@@ -65,13 +69,14 @@ def check_code_version(config, add_to_config: bool = False):
     for code, commit in code_commits.items():
         # see why .get above
         if commit != current_code_commits.get(code, commit):
-            logging.error(
+            logger.error(
                 "Loading a saved model created with different library git commit(s) may cause issues."
                 f" Currently {code}'s git commit: {current_code_commits[code]} "
                 f"vs  original commit: {commit}"
             )
 
     if add_to_config:
-        for code, version in current_code_versions.items():
-            config[f"{code}_version"] = version
-        config[CODE_COMMITS_KEY] = current_code_commits
+        with open_dict(config):
+            for code, version in current_code_versions.items():
+                config[f"{code}_version"] = str(version)
+            config[CODE_COMMITS_KEY] = current_code_commits
