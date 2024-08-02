@@ -1,6 +1,4 @@
-from typing import Dict, Callable
 import torch
-import logging
 
 from e3nn import o3
 from e3nn.nn import Gate, NormActivation
@@ -12,6 +10,11 @@ from nequip.nn import (
 )
 from nequip.nn.nonlinearities import ShiftedSoftPlus
 from nequip.utils.tp_utils import tp_path_exists
+
+from typing import Dict, Callable
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 acts = {
@@ -132,7 +135,7 @@ class ConvNetLayer(GraphModuleMixin, torch.nn.Module):
             self.resnet = False
 
         # TODO: last convolution should go to explicit irreps out
-        logging.debug(
+        logger.debug(
             f" parameters used to initialize {convolution.__name__}={convolution_kwargs}"
         )
 
