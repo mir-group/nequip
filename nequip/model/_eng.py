@@ -1,6 +1,3 @@
-from typing import Optional
-import logging
-
 from e3nn import o3
 
 from nequip.data import AtomicDataDict
@@ -16,6 +13,11 @@ from nequip.nn.embedding import (
     RadialBasisEdgeEncoding,
     SphericalHarmonicEdgeAttrs,
 )
+
+from typing import Optional
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def SimpleIrrepsConfig(config, prefix: Optional[str] = None):
@@ -87,7 +89,7 @@ def EnergyModel(config, initialize: bool) -> SequentialGraphNetwork:
 
     For minimal and full configuration option listings, see ``minimal.yaml`` and ``example.yaml``.
     """
-    logging.debug("Start building the network model")
+    logger.debug("Start building the network model")
 
     num_layers = config.get("num_layers", 3)
 

@@ -1,6 +1,3 @@
-import logging
-from typing import Optional, List
-
 import torch
 import torch.nn.functional
 from torch_runstats.scatter import scatter
@@ -8,11 +5,15 @@ from torch_runstats.scatter import scatter
 from e3nn.o3 import Linear
 
 from nequip.data import AtomicDataDict
-from nequip.data.transforms import TypeMapper
-from nequip.utils import dtype_from_name
+from nequip.utils import dtype_from_name, format_type_vals
 from nequip.utils.versions import _TORCH_IS_GE_1_13
 from ._graph_mixin import GraphModuleMixin
 from ._rescale import RescaleOutput
+
+from typing import Optional, List
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class AtomwiseOperation(GraphModuleMixin, torch.nn.Module):
@@ -146,7 +147,6 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
     def __init__(
         self,
         field: str,
-        num_types: int,
         type_names: List[str],
         shifts: Optional[List[float]],
         scales: Optional[List[float]],
@@ -158,7 +158,7 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
         irreps_in={},
     ):
         super().__init__()
-        self.num_types = num_types
+        self.num_types = len(type_names)
         self.type_names = type_names
         self.field = field
         self.out_field = f"shifted_{field}" if out_field is None else out_field
@@ -177,10 +177,12 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
             shifts = torch.as_tensor(shifts, dtype=self.default_dtype)
             if len(shifts.reshape([-1])) == 1:
                 shifts = (
-                    torch.ones(num_types, dtype=shifts.dtype, device=shifts.device)
+                    torch.ones(self.num_types, dtype=shifts.dtype, device=shifts.device)
                     * shifts
                 )
-            assert shifts.shape == (num_types,), f"Invalid shape of shifts {shifts}"
+            assert shifts.shape == (
+                self.num_types,
+            ), f"Invalid shape of shifts {shifts}"
             self.shifts_trainable = shifts_trainable
             if shifts_trainable:
                 self.shifts = torch.nn.Parameter(shifts)
@@ -194,10 +196,12 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
             scales = torch.as_tensor(scales, dtype=self.default_dtype)
             if len(scales.reshape([-1])) == 1:
                 scales = (
-                    torch.ones(num_types, dtype=scales.dtype, device=scales.device)
+                    torch.ones(self.num_types, dtype=scales.dtype, device=scales.device)
                     * scales
                 )
-            assert scales.shape == (num_types,), f"Invalid shape of scales {scales}"
+            assert scales.shape == (
+                self.num_types,
+            ), f"Invalid shape of scales {scales}"
             self.scales_trainable = scales_trainable
             if scales_trainable:
                 self.scales = torch.nn.Parameter(scales)
@@ -264,17 +268,39 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
         ):
             raise AssertionError("Some unsupported energy scaling arangement...")
         if self.arguments_in_dataset_units and rescale_module.has_scale:
-            logging.debug(
-                f"PerSpeciesScaleShift's arguments were in dataset units; rescaling:\n  "
-                f"Original scales: {TypeMapper.format(self.scales, self.type_names) if self.has_scales else 'n/a'} "
-                f"shifts: {TypeMapper.format(self.shifts, self.type_names) if self.has_shifts else 'n/a'}"
+
+            orig_scale_str = (
+                format_type_vals(self.scales, self.type_names)
+                if self.has_scales
+                else "n/a"
             )
+            orig_shift_str = (
+                format_type_vals(self.shifts, self.type_names)
+                if self.has_shifts
+                else "n/a"
+            )
+
             with torch.no_grad():
                 if self.has_scales:
                     self.scales.div_(rescale_module.scale_by)
                 if self.has_shifts:
                     self.shifts.div_(rescale_module.scale_by)
-            logging.debug(
-                f"  New scales: {TypeMapper.format(self.scales, self.type_names) if self.has_scales else 'n/a'} "
-                f"shifts: {TypeMapper.format(self.shifts, self.type_names) if self.has_shifts else 'n/a'}"
+
+            new_scale_str = (
+                format_type_vals(self.scales, self.type_names)
+                if self.has_scales
+                else "n/a"
+            )
+            new_shift_str = (
+                format_type_vals(self.shifts, self.type_names)
+                if self.has_shifts
+                else "n/a"
+            )
+
+            logger.info(
+                f"PerSpeciesScaleShift's arguments were in dataset units; rescaling:\n"
+                f"Original scales: {orig_scale_str}\n"
+                f"Original shifts: {orig_shift_str}\n"
+                f"Updated scales : {new_scale_str}\n"
+                f"Updated shifts : {new_shift_str}"
             )

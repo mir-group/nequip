@@ -1,5 +1,4 @@
 import math
-import logging
 
 import torch
 
@@ -8,6 +7,10 @@ import e3nn.nn
 
 from nequip.nn import GraphModuleMixin, GraphModel
 from nequip.utils import Config
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 # == Load old state ==
@@ -60,7 +63,7 @@ def load_model_state(
     )
     strict: bool = config.get(_prefix + "_strict", True)
     graph_model.load_state_dict(state, strict=strict)
-    logging.info(
+    logger.info(
         f"Loaded model state {'' if strict else ' with strict=False'} (parameters/weights/persistent buffers) from state {_prefix}={config[_prefix]}"
     )
     return graph_model

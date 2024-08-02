@@ -4,6 +4,11 @@ import torch
 
 from nequip.nn import RescaleOutput, GraphModuleMixin, PerSpeciesScaleShift
 from nequip.data import AtomicDataDict
+from nequip.utils import format_type_vals
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 RESCALE_THRESHOLD = 1e-6
@@ -54,10 +59,7 @@ def GlobalRescale(
                 f"Global energy scaling was very low: {global_scale}. If dataset values were used, does the dataset contain insufficient variation? Maybe try disabling global scaling with global_scale=None."
             )
 
-        # TODO: who logs?
-        # logging.info(
-        #    f"Initially outputs are globally scaled by: {global_scale}."
-        # )
+        logger.info(f"Outputs are globally scaled by: {global_scale}.")
 
     else:
         # Put dummy values
@@ -152,10 +154,11 @@ def _PerSpeciesRescale(
                 f"Per species scaling was very low: {scales}. Maybe try setting {module_prefix}_scales = 1."
             )
 
-        # TODO: who logs?
-        # logging.info(
-        #    f"Atomic outputs are scaled by: {TypeMapper.format(scales, config.type_names)}, shifted by {TypeMapper.format(shifts, config.type_names)}."
-        # )
+        scale_str = format_type_vals(scales, config["type_names"])
+        shift_str = format_type_vals(shifts, config["type_names"])
+        logger.info(
+            f"Atomic outputs are scaled by: {scale_str}, shifted by {shift_str}."
+        )
 
     else:
         # Put dummy values
