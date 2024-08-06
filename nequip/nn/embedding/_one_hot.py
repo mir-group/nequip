@@ -21,12 +21,12 @@ class OneHotAtomEncoding(GraphModuleMixin, torch.nn.Module):
 
     def __init__(
         self,
-        num_types: int,
+        type_names: int,
         set_features: bool = True,
         irreps_in=None,
     ):
         super().__init__()
-        self.num_types = num_types
+        self.num_types = len(type_names)
         self.set_features = set_features
         # Output irreps are num_types even (invariant) scalars
         irreps_out = {AtomicDataDict.NODE_ATTRS_KEY: Irreps([(self.num_types, (0, 1))])}
