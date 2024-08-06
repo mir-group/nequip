@@ -32,7 +32,7 @@ class LennardJones(GraphModuleMixin, torch.nn.Module):
 
     def __init__(
         self,
-        num_types: int,
+        type_names: List[str],
         lj_sigma: Union[torch.Tensor, float],
         lj_delta: Union[torch.Tensor, float] = 0,
         lj_epsilon: Optional[Union[torch.Tensor, float]] = None,
@@ -45,6 +45,7 @@ class LennardJones(GraphModuleMixin, torch.nn.Module):
         irreps_in=None,
     ) -> None:
         super().__init__()
+        num_types = len(type_names)
         self._init_irreps(
             irreps_in=irreps_in, irreps_out={AtomicDataDict.PER_ATOM_ENERGY_KEY: "0e"}
         )
@@ -257,16 +258,15 @@ class ZBL(GraphModuleMixin, torch.nn.Module):
         units (str): what units the model/data are in using LAMMPS names.
     """
 
-    num_types: int
-
     def __init__(
         self,
-        num_types: int,
+        type_names: List[str],
         units: str,
         type_to_chemical_symbol: Optional[Dict[int, str]] = None,
         irreps_in=None,
     ):
         super().__init__()
+        num_types = len(type_names)
         self._init_irreps(
             irreps_in=irreps_in, irreps_out={AtomicDataDict.PER_ATOM_ENERGY_KEY: "0e"}
         )
