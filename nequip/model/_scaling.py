@@ -1,4 +1,3 @@
-import logging
 from typing import Union
 
 import torch
@@ -47,24 +46,9 @@ def GlobalRescale(
     """
 
     global_scale = config.get(f"{module_prefix}_scale", default_scale)
-    global_shift = config.get(f"{module_prefix}_shift", default_shift)
-
-    if global_shift is not None:
-        logging.warning(
-            f"!!!! Careful global_shift is set to {global_shift}."
-            f"The model for {default_shift_keys} will no longer be size extensive"
-        )
 
     # = Get statistics of training dataset =
     if initialize:
-        for value in [global_scale, global_shift]:
-            if not (
-                value is None
-                or isinstance(value, float)
-                or isinstance(value, torch.Tensor)
-            ):
-                raise ValueError(f"Invalid global scale `{value}`")
-
         if global_scale is not None and global_scale < RESCALE_THRESHOLD:
             raise ValueError(
                 f"Global energy scaling was very low: {global_scale}. If dataset values were used, does the dataset contain insufficient variation? Maybe try disabling global scaling with global_scale=None."
@@ -72,29 +56,22 @@ def GlobalRescale(
 
         # TODO: who logs?
         # logging.info(
-        #    f"Initially outputs are globally scaled by: {global_scale}, total_energy are globally shifted by {global_shift}."
+        #    f"Initially outputs are globally scaled by: {global_scale}."
         # )
 
     else:
         # Put dummy values
-        if global_shift is not None:
-            global_shift = 0.0  # it has some kind of value
         if global_scale is not None:
-            global_scale = 1.0  # same,
+            global_scale = 1.0
 
     error_string = "keys need to be a list"
     assert isinstance(default_scale_keys, list), error_string
-    assert isinstance(default_shift_keys, list), error_string
 
     # == Build the model ==
     return RescaleOutput(
         model=model,
         scale_keys=[k for k in default_scale_keys if k in model.irreps_out],
         scale_by=global_scale,
-        shift_keys=[k for k in default_shift_keys if k in model.irreps_out],
-        shift_by=global_shift,
-        shift_trainable=config.get(f"{module_prefix}_shift_trainable", False),
-        scale_trainable=config.get(f"{module_prefix}_scale_trainable", False),
         default_dtype=config.get("default_dtype", None),
     )
 
