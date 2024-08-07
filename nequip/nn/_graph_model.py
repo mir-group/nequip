@@ -7,7 +7,6 @@ from e3nn.util._argtools import _get_device
 from nequip.data import AtomicDataDict
 
 from ._graph_mixin import GraphModuleMixin
-from ._rescale import RescaleOutput
 
 
 class GraphModel(GraphModuleMixin, torch.nn.Module):
@@ -21,8 +20,6 @@ class GraphModel(GraphModuleMixin, torch.nn.Module):
 
     model_dtype: torch.dtype
     model_input_fields: List[str]
-
-    _num_rescale_layers: int
 
     def __init__(
         self,
@@ -58,46 +55,6 @@ class GraphModel(GraphModuleMixin, torch.nn.Module):
         self.register_buffer(
             "_model_dtype_example", torch.as_tensor(0.0, dtype=model_dtype)
         )
-
-        self._num_rescale_layers = 0
-        outer_layer = self.model
-        while isinstance(outer_layer, RescaleOutput):
-            self._num_rescale_layers += 1
-            outer_layer = outer_layer.model
-
-    # == Rescaling ==
-    @torch.jit.unused
-    def all_RescaleOutputs(self) -> List[RescaleOutput]:
-        """All ``RescaleOutput``s wrapping the model, in evaluation order."""
-        if self._num_rescale_layers == 0:
-            return []
-        # we know there's at least one
-        out = [self.model]
-        for _ in range(self._num_rescale_layers - 1):
-            out.append(out[-1].model)
-        # we iterated outermost to innermost, which is opposite of evaluation order
-        assert len(out) == self._num_rescale_layers
-        return out[::-1]
-
-    @torch.jit.unused
-    def unscale(
-        self, data: AtomicDataDict.Type, force_process: bool = False
-    ) -> AtomicDataDict.Type:
-        data_unscaled = data.copy()
-        # we need to unscale from the outside-in:
-        for layer in self.all_RescaleOutputs()[::-1]:
-            data_unscaled = layer.unscale(data_unscaled, force_process=force_process)
-        return data_unscaled
-
-    @torch.jit.unused
-    def scale(
-        self, data: AtomicDataDict.Type, force_process: bool = False
-    ) -> AtomicDataDict.Type:
-        data_scaled = data.copy()
-        # we need to scale from the inside out:
-        for layer in self.all_RescaleOutputs():
-            data_scaled = layer.scale(data_scaled, force_process=force_process)
-        return data_scaled
 
     # == Inference ==
 
