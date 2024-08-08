@@ -11,8 +11,18 @@ from ._key_registry import (
     ABBREV,
 )
 
-from ._statistics import statistics, compute_stats_for_model
 from ._sampler import PartialSampler
+from .stats import (
+    Count,
+    Mean,
+    MeanAbsolute,
+    RootMeanSquare,
+    StandardDeviation,
+    Max,
+    Min,
+)
+from .stats_manager import DataStatisticsManager
+from .modifier import BaseModifier, PerAtomModifier, EdgeLengths, NumNeighbors
 
 
 __all__ = [
@@ -20,8 +30,6 @@ __all__ = [
     deregister_fields,
     _register_field_prefix,
     get_field_type,
-    statistics,
-    compute_stats_for_model,
     PartialSampler,
     _NODE_FIELDS,
     _EDGE_FIELDS,
@@ -29,4 +37,16 @@ __all__ = [
     _LONG_FIELDS,
     _CARTESIAN_TENSOR_FIELDS,
     ABBREV,
+    DataStatisticsManager,
+    Count,
+    Mean,
+    MeanAbsolute,
+    RootMeanSquare,
+    StandardDeviation,
+    Max,
+    Min,
+    BaseModifier,
+    PerAtomModifier,
+    EdgeLengths,
+    NumNeighbors,
 ]
