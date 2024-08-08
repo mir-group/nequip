@@ -1,4 +1,4 @@
-from .adaptive_loss_weights import SoftAdapt
-from .loss_schedule import SimpleLossSchedule
+from .softadapt import SoftAdapt
+from .loss_coeff_scheduler import LossCoefficientScheduler
 
-__all__ = [SoftAdapt, SimpleLossSchedule]
+__all__ = [SoftAdapt, LossCoefficientScheduler]
