@@ -115,7 +115,7 @@ class AtomwiseReduce(GraphModuleMixin, torch.nn.Module):
         return data
 
 
-class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
+class PerTypeScaleShift(GraphModuleMixin, torch.nn.Module):
     """Scale and/or shift a predicted per-atom property based on (learnable) per-species/type parameters.
 
     Note that scaling/shifting is always done (casting into) ``default_dtype``, even if ``model_dtype`` is lower precision.
@@ -217,7 +217,6 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
         self._use_fma = _TORCH_IS_GE_1_13
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
-
         if not (self.has_scales or self.has_shifts):
             return data
 
@@ -268,7 +267,6 @@ class PerSpeciesScaleShift(GraphModuleMixin, torch.nn.Module):
         ):
             raise AssertionError("Some unsupported energy scaling arangement...")
         if self.arguments_in_dataset_units and rescale_module.has_scale:
-
             orig_scale_str = (
                 format_type_vals(self.scales, self.type_names)
                 if self.has_scales
