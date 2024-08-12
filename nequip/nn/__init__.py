@@ -4,7 +4,7 @@ from ._atomwise import (
     AtomwiseOperation,
     AtomwiseReduce,
     AtomwiseLinear,
-    PerSpeciesScaleShift,
+    PerTypeScaleShift,
 )
 from ._interaction_block import InteractionBlock
 from ._grad_output import GradientOutput, PartialForceOutput, StressOutput
@@ -21,7 +21,7 @@ __all__ = [
     AtomwiseOperation,
     AtomwiseReduce,
     AtomwiseLinear,
-    PerSpeciesScaleShift,
+    PerTypeScaleShift,
     InteractionBlock,
     GradientOutput,
     PartialForceOutput,

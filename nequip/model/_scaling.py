@@ -1,11 +1,14 @@
-from typing import Union
-
 import torch
 
-from nequip.nn import RescaleOutput, GraphModuleMixin, PerSpeciesScaleShift
+from nequip.nn import PerTypeScaleShift as PerTypeScaleShiftModule
+from nequip.nn import RescaleOutput as RescaleOutputModule
+from nequip.nn import GraphModuleMixin
 from nequip.data import AtomicDataDict
 from nequip.utils import format_type_vals
 
+from omegaconf import ListConfig
+import warnings
+from typing import Union
 import logging
 
 logger = logging.getLogger(__name__)
@@ -24,14 +27,8 @@ def RescaleEnergyEtc(
         config=config,
         initialize=initialize,
         module_prefix="global_rescale",
-        default_scale=(
-            f"dataset_{AtomicDataDict.FORCE_KEY}_rms"
-            if AtomicDataDict.FORCE_KEY in model.irreps_out
-            else f"dataset_{AtomicDataDict.TOTAL_ENERGY_KEY}_std"
-        ),
-        default_shift=None,
+        default_scale=None,
         default_scale_keys=AtomicDataDict.ALL_ENERGY_KEYS,
-        default_shift_keys=[AtomicDataDict.TOTAL_ENERGY_KEY],
     )
 
 
@@ -41,16 +38,18 @@ def GlobalRescale(
     initialize: bool,
     module_prefix: str,
     default_scale: Union[str, float, list],
-    default_shift: Union[str, float, list],
     default_scale_keys: list,
-    default_shift_keys: list,
 ):
     """Add global rescaling for energy(-based quantities).
 
     If ``initialize`` is false, doesn't compute statistics.
     """
-
     global_scale = config.get(f"{module_prefix}_scale", default_scale)
+
+    if global_scale is None:
+        warnings.warn(
+            f"Module `{module_prefix}` added but global_scale is `None`. Please check to ensure this is intended. To set global_scale, `{module_prefix}_global_scale` must be provided in the config."
+        )
 
     # = Get statistics of training dataset =
     if initialize:
@@ -67,10 +66,12 @@ def GlobalRescale(
             global_scale = 1.0
 
     error_string = "keys need to be a list"
-    assert isinstance(default_scale_keys, list), error_string
+    assert isinstance(default_scale_keys, list) or isinstance(
+        default_scale_keys, ListConfig
+    ), error_string
 
     # == Build the model ==
-    return RescaleOutput(
+    return RescaleOutputModule(
         model=model,
         scale_keys=[k for k in default_scale_keys if k in model.irreps_out],
         scale_by=global_scale,
@@ -78,41 +79,25 @@ def GlobalRescale(
     )
 
 
-def PerSpeciesRescale(
+def PerTypeEnergyScaleShift(
     model: GraphModuleMixin,
     config,
     initialize: bool,
 ):
-    """Add per-atom rescaling (and shifting) for per-atom energies."""
-    module_prefix = "per_species_rescale"
-
-    # Check for common double shift mistake with defaults
-    if "RescaleEnergyEtc" in config.get("model_builders", []):
-        # if the defaults are enabled, then we will get bad double shift
-        # THIS CHECK IS ONLY GOOD ENOUGH FOR EMITTING WARNINGS
-        has_global_shift = config.get("global_rescale_shift", None) is not None
-        if has_global_shift:
-            if config.get(module_prefix + "_shifts", True) is not None:
-                # using default of per_atom shift
-                raise RuntimeError(
-                    "A global_rescale_shift was provided, but the default per-atom energy shift was not disabled."
-                )
-        del has_global_shift
-
-    return _PerSpeciesRescale(
+    """Add per-atom rescaling and shifting for per-atom energies."""
+    return _PerTypeScaleShift(
         scales_default=None,
-        shifts_default=f"dataset_per_atom_{AtomicDataDict.TOTAL_ENERGY_KEY}_mean",
+        shifts_default=None,
         field=AtomicDataDict.PER_ATOM_ENERGY_KEY,
         out_field=AtomicDataDict.PER_ATOM_ENERGY_KEY,
-        module_prefix=module_prefix,
+        module_prefix="per_type_energy_scale_shift",
         insert_before="total_energy_sum",
         model=model,
         config=config,
-        initialize=initialize,
     )
 
 
-def _PerSpeciesRescale(
+def _PerTypeScaleShift(
     scales_default,
     shifts_default,
     field: str,
@@ -121,55 +106,47 @@ def _PerSpeciesRescale(
     insert_before: str,
     model: GraphModuleMixin,
     config,
-    initialize: bool,
 ):
-    """Add per-atom rescaling (and shifting) for a field
+    """Add per-atom rescaling and shifting for a field
 
     If ``initialize`` is false, doesn't compute statistics.
     """
     scales = config.get(module_prefix + "_scales", scales_default)
     shifts = config.get(module_prefix + "_shifts", shifts_default)
 
-    # = Determine what statistics need to be compute =
-    assert config.get(
-        module_prefix + "_arguments_in_dataset_units", True
-    ), f"The PerSpeciesRescale builder is only compatible with {module_prefix + '_arguments_in_dataset_units'} set to True"
-
-    if initialize:
-        for value in [scales, shifts]:
-            if not (
-                value is None
-                or isinstance(value, float)
-                or isinstance(value, list)
-                or isinstance(value, torch.Tensor)
-            ):
-                raise ValueError(f"Invalid value `{value}` of type {type(value)}")
-
-        scales = torch.as_tensor(scales)
-        shifts = torch.as_tensor(shifts)
-
-        # TODO kind of weird error to check for here
-        if scales is not None and torch.min(scales) < RESCALE_THRESHOLD:
-            raise ValueError(
-                f"Per species scaling was very low: {scales}. Maybe try setting {module_prefix}_scales = 1."
-            )
-
-        scale_str = format_type_vals(scales, config["type_names"])
-        shift_str = format_type_vals(shifts, config["type_names"])
-        logger.info(
-            f"Atomic outputs are scaled by: {scale_str}, shifted by {shift_str}."
+    if scales is None and shifts is None:
+        warnings.warn(
+            f"Module `{module_prefix}` added but both scales and shifts are `None`. Please check to ensure this is intended. To set scales and/or shifts, `{module_prefix}_scales` and/or `{module_prefix}_shifts` must be provided in the config."
         )
 
-    else:
-        # Put dummy values
-        # the real ones will be loaded from the state dict later
-        # note that the state dict includes buffers,
-        # so this is fine regardless of whether its trainable.
-        scales = 1.0 if scales is not None else None
-        shifts = 0.0 if shifts is not None else None
-        # values from the previously initialized model
-        # will be brought in from the state dict later,
-        # so these values (and rescaling them) doesn't matter
+    for value in [scales, shifts]:
+        if not (
+            value is None
+            or any(
+                [
+                    isinstance(value, val_type)
+                    for val_type in [float, list, torch.Tensor, ListConfig]
+                ]
+            )
+        ):
+            raise ValueError(f"Invalid value `{value}` of type {type(value)}")
+
+    scales = 1.0 if scales is None else scales
+    scales = torch.as_tensor(scales)
+    shifts = 0.0 if shifts is None else shifts
+    shifts = torch.as_tensor(shifts)
+
+    # TODO kind of weird error to check for here
+    if scales is not None and torch.min(scales) < RESCALE_THRESHOLD:
+        raise ValueError(
+            f"Per species scaling was very low: {scales}. Maybe try setting {module_prefix}_scales = 1."
+        )
+
+    scale_str = format_type_vals(scales, config["type_names"])
+    shift_str = format_type_vals(shifts, config["type_names"])
+    logger.info(
+        "Atomic outputs are \n" f"scaled by : {scale_str}\n" f"shifted by: {shift_str}"
+    )
 
     # insert in per species shift
     params = dict(
@@ -183,9 +160,7 @@ def _PerSpeciesRescale(
         before=insert_before,
         name=module_prefix,
         shared_params=config,
-        builder=PerSpeciesScaleShift,
+        builder=PerTypeScaleShiftModule,
         params=params,
     )
-
-    # == Build the model ==
     return model
