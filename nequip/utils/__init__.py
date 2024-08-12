@@ -14,7 +14,7 @@ from .savenload import (
 from .config import Config
 from .output import Output
 from .modules import find_first_of_type
-from .misc import dtype_to_name, dtype_from_name, torch_default_dtype
+from .misc import dtype_to_name, dtype_from_name, torch_default_dtype, format_type_vals
 
 __all__ = [
     instantiate_from_cls_name,
@@ -32,4 +32,5 @@ __all__ = [
     dtype_to_name,
     dtype_from_name,
     torch_default_dtype,
+    format_type_vals,
 ]
