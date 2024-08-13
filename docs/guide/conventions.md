@@ -6,17 +6,16 @@
 
 ## Units
 
-`nequip` has no prefered system of units; models, errors, predictions, etc. will always be in the units of the original dataset used.
+`nequip` has no prefered system of units and uses the units of the data provided. Model inputs, outputs, error metrics, and all other quantities follow the units of the dataset. Users **must** use consistent input and output units. For example, if the length unit is Å and the energy labels are in eV, the force predictions from the model will be in eV/Å. The provided force labels should hence also be in eV/Å. 
 
 ```{warning}
 `nequip` cannot and does not check the consistency of units in inputs you provide, and it is your responsibility to ensure consistent treatment of input and output units
 ```
 
-Losses (`training_loss_f`, `validation_loss_e`, etc.) do **not** have physical units. Errors (`training_f_rmse`, `validation_f_rmse`) are always reported in physical units.
 
 ## Pressure / stress / virials
 
-`nequip` always expresses stress in the "consistent" units of `energy / length^3`, which are **not** the typical physical units used by many codes for stress.
+`nequip` always expresses stress in the "consistent" units of `energy / length³`, which are **not** the typical physical units used by many codes for stress. For example, consider data where the cell and atomic positions are provided in Å and the energy labels are in eV but the stress is given in GPa or kbar. The user would then need to convert the stress to eV/Å³ before providing the data to `nequip`.
 
 ```{warning}
 Training labels for stress in the original dataset must be pre-processed by the user to be in consistent units.

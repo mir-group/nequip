@@ -3,5 +3,6 @@ Python API
 
  .. toctree::
 
-    data
-    trainer
+  data
+  datamodule
+  train
