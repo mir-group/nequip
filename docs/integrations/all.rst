@@ -1,7 +1,9 @@
-Integration to LAMMPS, ASE
-==========================
+Integrations
+============
 
  .. toctree::
 
     lammps
     ase
+    wandb
+    other

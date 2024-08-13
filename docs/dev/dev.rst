@@ -1,0 +1,6 @@
+Developer Guide
+===============
+
+ .. toctree::
+
+    extending

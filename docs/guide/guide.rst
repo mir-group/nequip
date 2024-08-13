@@ -1,7 +1,9 @@
-How-to Tutorials
-================
+User Guide
+==========
 
  .. toctree::
 
     conventions
+    workflow
     dataset
+    loss
