@@ -6,6 +6,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Most recent change on the bottom.
 
+## Unreleased - next major
+
+### Added
+ - migrate to `Lightning`, `torchmetrics` and `hydra` (and `omegaconf`) based infrastructure
+ - `NequIPLightningModule` for facilitating training
+ - `LightningDataModule`s for dataset management
+ - dataset statistics managed by a `DataStatisticsManager`
+ - error metrics managed by a `MetricsManager`
+ - `torchmetrics` based metrics for both dataset statistics and error metrics
+ - multi-GPU training
+ - `Lightning` based callbacks
+
+### Changed
+ - [Breaking] migrate existing callbacks (loss weight scheduler and SoftAdapt) to `Lightning`'s callbacks systems
+ - replace example configs with new `hydra` based ones
+ - NequIP model computes initial embeddings in dataset dtype (usually the global default dtype float64)
+
+### Removed
+ - [Breaking] `AtomicDataset.rdf` and `examples/rdf.py` and `AtomicInMemoryDataset`
+ - [Breaking] `dataset_per_species_*` statistics
+ - [Breaking] `NpzDataset`
+ - [Breaking] NequIP's `Trainer`, `Loss`, `Metrics`
+ - [Breaking] most remaining `torch.geometric` code, except for some utility functions 
 
 ## Unreleased - 0.7.0
 ### Added
