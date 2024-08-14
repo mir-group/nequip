@@ -5,20 +5,16 @@ import torch
 
 from nequip.data import PartialSampler
 
-from test_dataloader import npz_dataset, NPZ_DATASET_FIXTURE_N_FRAMES  # noqa
-
 
 @pytest.fixture(params=[True, False], scope="module")
 def shuffle(request) -> bool:
     return request.param
 
 
-@pytest.fixture(
-    params=[None, 1, 2, 5, 7, NPZ_DATASET_FIXTURE_N_FRAMES], scope="function"
-)
-def sampler(request, npz_dataset, shuffle) -> PartialSampler:  # noqa: F811
+@pytest.fixture(params=[None, 1, 2, 5, 7], scope="function")
+def sampler(request, dataset, shuffle) -> PartialSampler:  # noqa: F811
     return PartialSampler(
-        data_source=npz_dataset,
+        data_source=dataset,
         shuffle=shuffle,
         num_samples_per_epoch=request.param,
         generator=torch.Generator().manual_seed(0),
