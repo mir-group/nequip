@@ -1,11 +1,10 @@
 import logging
-from typing import List, Optional, Union
+from typing import Union
 
 import torch
 
 from nequip.nn import RescaleOutput, GraphModuleMixin, PerSpeciesScaleShift
-from nequip.data import AtomicDataDict, AtomicDataset
-from nequip.data.transforms import TypeMapper
+from nequip.data import AtomicDataDict
 
 
 RESCALE_THRESHOLD = 1e-6
@@ -15,12 +14,10 @@ def RescaleEnergyEtc(
     model: GraphModuleMixin,
     config,
     initialize: bool,
-    dataset: Optional[AtomicDataset] = None,
 ):
     return GlobalRescale(
         model=model,
         config=config,
-        dataset=dataset,
         initialize=initialize,
         module_prefix="global_rescale",
         default_scale=(
@@ -43,7 +40,6 @@ def GlobalRescale(
     default_shift: Union[str, float, list],
     default_scale_keys: list,
     default_shift_keys: list,
-    dataset: Optional[AtomicDataset] = None,
 ):
     """Add global rescaling for energy(-based quantities).
 
@@ -61,45 +57,23 @@ def GlobalRescale(
 
     # = Get statistics of training dataset =
     if initialize:
-        str_names = []
         for value in [global_scale, global_shift]:
-            if isinstance(value, str):
-                str_names += [value]
-            elif (
+            if not (
                 value is None
                 or isinstance(value, float)
                 or isinstance(value, torch.Tensor)
             ):
-                # valid values
-                pass
-            else:
                 raise ValueError(f"Invalid global scale `{value}`")
-
-        # = Compute shifts and scales =
-        if len(str_names) > 0:
-            computed_stats = _compute_stats(
-                str_names=str_names,
-                dataset=dataset,
-                stride=config.dataset_statistics_stride,
-            )
-
-        if isinstance(global_scale, str):
-            s = global_scale
-            global_scale = computed_stats[str_names.index(global_scale)]
-            logging.info(f"Replace string {s} to {global_scale}")
-        if isinstance(global_shift, str):
-            s = global_shift
-            global_shift = computed_stats[str_names.index(global_shift)]
-            logging.info(f"Replace string {s} to {global_shift}")
 
         if global_scale is not None and global_scale < RESCALE_THRESHOLD:
             raise ValueError(
                 f"Global energy scaling was very low: {global_scale}. If dataset values were used, does the dataset contain insufficient variation? Maybe try disabling global scaling with global_scale=None."
             )
 
-        logging.info(
-            f"Initially outputs are globally scaled by: {global_scale}, total_energy are globally shifted by {global_shift}."
-        )
+        # TODO: who logs?
+        # logging.info(
+        #    f"Initially outputs are globally scaled by: {global_scale}, total_energy are globally shifted by {global_shift}."
+        # )
 
     else:
         # Put dummy values
@@ -129,7 +103,6 @@ def PerSpeciesRescale(
     model: GraphModuleMixin,
     config,
     initialize: bool,
-    dataset: Optional[AtomicDataset] = None,
 ):
     """Add per-atom rescaling (and shifting) for per-atom energies."""
     module_prefix = "per_species_rescale"
@@ -157,7 +130,6 @@ def PerSpeciesRescale(
         model=model,
         config=config,
         initialize=initialize,
-        dataset=dataset,
     )
 
 
@@ -171,7 +143,6 @@ def _PerSpeciesRescale(
     model: GraphModuleMixin,
     config,
     initialize: bool,
-    dataset: Optional[AtomicDataset] = None,
 ):
     """Add per-atom rescaling (and shifting) for a field
 
@@ -186,45 +157,17 @@ def _PerSpeciesRescale(
     ), f"The PerSpeciesRescale builder is only compatible with {module_prefix + '_arguments_in_dataset_units'} set to True"
 
     if initialize:
-        str_names = []
         for value in [scales, shifts]:
-            if isinstance(value, str):
-                str_names += [value]
-            elif (
+            if not (
                 value is None
                 or isinstance(value, float)
                 or isinstance(value, list)
                 or isinstance(value, torch.Tensor)
             ):
-                # valid values
-                pass
-            else:
                 raise ValueError(f"Invalid value `{value}` of type {type(value)}")
 
-        # = Compute shifts and scales =
-        if len(str_names) > 0:
-            computed_stats = _compute_stats(
-                str_names=str_names,
-                dataset=dataset,
-                stride=config.dataset_statistics_stride,
-                kwargs=config.get(module_prefix + "_kwargs", {}),
-            )
-
-        if isinstance(scales, str):
-            s = scales
-            # energy or other property is 1D:
-            scales = computed_stats[str_names.index(scales)].squeeze(-1)
-            logging.info(f"Replace string {s} to {scales}")
-        elif isinstance(scales, (list, float)):
-            scales = torch.as_tensor(scales)
-
-        if isinstance(shifts, str):
-            s = shifts
-            # energy or other property is 1D:
-            shifts = computed_stats[str_names.index(shifts)].squeeze(-1)
-            logging.info(f"Replace string {s} to {shifts}")
-        elif isinstance(shifts, (list, float)):
-            shifts = torch.as_tensor(shifts)
+        scales = torch.as_tensor(scales)
+        shifts = torch.as_tensor(shifts)
 
         # TODO kind of weird error to check for here
         if scales is not None and torch.min(scales) < RESCALE_THRESHOLD:
@@ -232,9 +175,10 @@ def _PerSpeciesRescale(
                 f"Per species scaling was very low: {scales}. Maybe try setting {module_prefix}_scales = 1."
             )
 
-        logging.info(
-            f"Atomic outputs are scaled by: {TypeMapper.format(scales, config.type_names)}, shifted by {TypeMapper.format(shifts, config.type_names)}."
-        )
+        # TODO: who logs?
+        # logging.info(
+        #    f"Atomic outputs are scaled by: {TypeMapper.format(scales, config.type_names)}, shifted by {TypeMapper.format(shifts, config.type_names)}."
+        # )
 
     else:
         # Put dummy values
@@ -265,72 +209,3 @@ def _PerSpeciesRescale(
 
     # == Build the model ==
     return model
-
-
-def _compute_stats(
-    str_names: List[str], dataset, stride: int, kwargs: Optional[dict] = {}
-):
-    """return the values of statistics over dataset
-    quantity name should be dataset_key_stat, where key can be any key
-    that exists in the dataset, stat can be mean, std
-
-    Args:
-
-    str_names: list of strings that define the quantity to compute
-    dataset: dataset object to run the stats over
-    stride: # frames to skip for every one frame to include
-    """
-
-    # parse the list of string to field, mode
-    # and record which quantity correspond to which computed_item
-    stat_modes = []
-    stat_fields = []
-    stat_strs = []
-    ids = []
-    tuple_ids = []
-    tuple_id_map = {"mean": 0, "std": 1, "rms": 0, "absmax": 0}
-    input_kwargs = {}
-    for name in str_names:
-
-        # remove dataset prefix
-        if name.startswith("dataset_"):
-            name = name[len("dataset_") :]
-        # identify per_species and per_atom modes
-        prefix = ""
-        if name.startswith("per_species_"):
-            name = name[len("per_species_") :]
-            prefix = "per_species_"
-        elif name.startswith("per_atom_"):
-            name = name[len("per_atom_") :]
-            prefix = "per_atom_"
-
-        stat = name.split("_")[-1]
-        field = "_".join(name.split("_")[:-1])
-        if stat in ["mean", "std"]:
-            stat_mode = prefix + "mean_std"
-            stat_str = field + prefix + "mean_std"
-        elif stat in ["rms", "absmax"]:
-            stat_mode = prefix + stat
-            stat_str = field + prefix + stat
-        else:
-            raise ValueError(f"Cannot handle {stat} type quantity")
-
-        if stat_str in stat_strs:
-            ids += [stat_strs.index(stat_str)]
-        else:
-            ids += [len(stat_strs)]
-            stat_strs += [stat_str]
-            stat_modes += [stat_mode]
-            stat_fields += [field]
-            if stat_mode.startswith("per_species_"):
-                if field in kwargs:
-                    input_kwargs[field + stat_mode] = kwargs[field]
-        tuple_ids += [tuple_id_map[stat]]
-
-    values = dataset.statistics(
-        fields=stat_fields,
-        modes=stat_modes,
-        stride=stride,
-        kwargs=input_kwargs,
-    )
-    return [values[idx][tuple_ids[i]] for i, idx in enumerate(ids)]
