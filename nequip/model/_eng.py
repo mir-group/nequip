@@ -3,7 +3,8 @@ import logging
 
 from e3nn import o3
 
-from nequip.data import AtomicDataDict, AtomicDataset
+from nequip.data import AtomicDataDict
+
 from nequip.nn import (
     SequentialGraphNetwork,
     AtomwiseLinear,
@@ -15,8 +16,6 @@ from nequip.nn.embedding import (
     RadialBasisEdgeEncoding,
     SphericalHarmonicEdgeAttrs,
 )
-
-from . import builder_utils
 
 
 def SimpleIrrepsConfig(config, prefix: Optional[str] = None):
@@ -83,18 +82,12 @@ def SimpleIrrepsConfig(config, prefix: Optional[str] = None):
         config[k] = v
 
 
-def EnergyModel(
-    config, initialize: bool, dataset: Optional[AtomicDataset] = None
-) -> SequentialGraphNetwork:
+def EnergyModel(config, initialize: bool) -> SequentialGraphNetwork:
     """Base default energy model archetecture.
 
     For minimal and full configuration option listings, see ``minimal.yaml`` and ``example.yaml``.
     """
     logging.debug("Start building the network model")
-
-    builder_utils.add_avg_num_neighbors(
-        config=config, initialize=initialize, dataset=dataset
-    )
 
     num_layers = config.get("num_layers", 3)
 
