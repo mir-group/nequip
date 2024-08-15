@@ -1,4 +1,4 @@
-from typing import Union, Optional, Dict, List
+from typing import Union, Optional, List
 
 import torch
 from torch_runstats.scatter import scatter
@@ -261,8 +261,8 @@ class ZBL(GraphModuleMixin, torch.nn.Module):
     def __init__(
         self,
         type_names: List[str],
+        chemical_species: List[str],
         units: str,
-        type_to_chemical_symbol: Optional[Dict[int, str]] = None,
         irreps_in=None,
     ):
         super().__init__()
@@ -270,21 +270,16 @@ class ZBL(GraphModuleMixin, torch.nn.Module):
         self._init_irreps(
             irreps_in=irreps_in, irreps_out={AtomicDataDict.PER_ATOM_ENERGY_KEY: "0e"}
         )
-        if type_to_chemical_symbol is not None:
-            assert set(type_to_chemical_symbol.keys()) == set(range(num_types))
-            atomic_numbers: List[int] = [
-                ase.data.atomic_numbers[type_to_chemical_symbol[type_i]]
-                for type_i in range(num_types)
-            ]
-            if min(atomic_numbers) < 1:
-                raise ValueError(
-                    f"Your chemical symbols don't seem valid (minimum atomic number is {min(atomic_numbers)} < 1); did you try to use fake chemical symbols for arbitrary atom types?  If so, instead provide atom_types directly in your dataset and specify `type_names` and `type_to_chemical_symbol` in your config. `type_to_chemical_symbol` then tells ZBL what atomic numbers to use for the various atom types in your system."
-                )
-        else:
-            raise RuntimeError(
-                "Either chemical_symbol_to_type or type_to_chemical_symbol is required."
+        assert len(chemical_species) == num_types
+        atomic_numbers: List[int] = [
+            ase.data.atomic_numbers[chemical_species[type_i]]
+            for type_i in range(num_types)
+        ]
+        if min(atomic_numbers) < 1:
+            raise ValueError(
+                f"Your chemical symbols don't seem valid (minimum atomic number is {min(atomic_numbers)} < 1); did you try to use fake chemical symbols for arbitrary atom types?"
             )
-        assert len(atomic_numbers) == num_types
+
         # LAMMPS note on units:
         # > The numerical values of the exponential decay constants in the
         # > screening function depend on the unit of distance. In the above
