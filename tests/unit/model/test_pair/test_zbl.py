@@ -9,7 +9,10 @@ import ase.data
 
 import torch
 
-from nequip.data.transforms import TypeMapper
+from nequip.data.transforms import (
+    ChemicalSpeciesToAtomTypeMapper,
+    NeighborListTransform,
+)
 from nequip.data import AtomicDataDict
 from nequip.model import model_from_config
 from nequip.ase import NequIPCalculator
@@ -38,7 +41,9 @@ class TestNequIPModel(BaseEnergyModelTests):
             "pair_style": "ZBL",
             "units": "metal",
             "r_max": 5.0,
-            "chemical_symbol_to_type": {"H": 0, "C": 1, "O": 2},
+            "type_names": ["H", "C", "O"],
+            "ZBL_chemical_species": ["H", "C", "O"],
+            "seed": 123,
         }
         return config, [
             AtomicDataDict.TOTAL_ENERGY_KEY,
@@ -59,23 +64,19 @@ class TestNequIPModel(BaseEnergyModelTests):
                 "PolynomialCutoff_p": 80,  # almost a step function
             }
         )
-        config["chemical_symbol_to_type"] = {
-            "H": 0,
-            "O": 1,
-            "C": 2,
-            "N": 3,
-            "Cu": 4,
-            "Au": 5,
-        }
-        tm = TypeMapper(chemical_symbol_to_type=config["chemical_symbol_to_type"])
-        config["num_types"] = tm.num_types
+        config["type_names"] = ["H", "O", "C", "N", "Cu", "Au"]
+        config["ZBL_chemical_species"] = ["H", "O", "C", "N", "Cu", "Au"]
+        transforms = [
+            ChemicalSpeciesToAtomTypeMapper(
+                chemical_symbols=config["ZBL_chemical_species"],
+            ),
+            NeighborListTransform(r_max=r_max),
+        ]
         ZBL_model = model_from_config(Config.from_dict(config), initialize=True)
         ZBL_model.eval()
         # make test system of two atoms:
         atoms = ase.Atoms(positions=np.zeros((2, 3)), symbols=["H", "H"])
-        atoms.calc = NequIPCalculator(
-            ZBL_model, r_max=r_max, device="cpu", transform=tm
-        )
+        atoms.calc = NequIPCalculator(ZBL_model, device="cpu", transforms=transforms)
         # == load precomputed reference data ==
         # To regenerate this data, run
         # $ lmp -in zbl_data.lmps
