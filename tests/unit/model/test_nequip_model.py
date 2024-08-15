@@ -9,10 +9,11 @@ from nequip.utils.unittests.model_tests import BaseEnergyModelTests
 
 COMMON_CONFIG = {
     "avg_num_neighbors": None,
-    "num_types": 3,
-    "chemical_symbol_to_type": {"H": 0, "C": 1, "O": 2},
+    "type_names": ["H", "C", "O"],
+    "seed": 123,
     # Just in case for when that builder exists:
     "pair_style": "ZBL",
+    "ZBL_chemical_species": ["H", "C", "O"],
     "units": "metal",
 }
 r_max = 3
@@ -74,7 +75,7 @@ class TestNequIPModel(BaseEnergyModelTests):
     @pytest.fixture(
         params=[
             (
-                ["EnergyModel", "ForceOutput"],
+                ["NequIPGNNEnergyModel", "ForceOutput"],
                 [
                     AtomicDataDict.TOTAL_ENERGY_KEY,
                     AtomicDataDict.PER_ATOM_ENERGY_KEY,
@@ -83,14 +84,14 @@ class TestNequIPModel(BaseEnergyModelTests):
             ),
             # # Save some time in the tests
             # (
-            #     ["EnergyModel"],
+            #     ["NequIPGNNEnergyModel"],
             #     [
             #         AtomicDataDict.TOTAL_ENERGY_KEY,
             #         AtomicDataDict.PER_ATOM_ENERGY_KEY,
             #     ],
             # ),
             (
-                ["EnergyModel", "StressForceOutput"],
+                ["NequIPGNNEnergyModel", "StressForceOutput"],
                 [
                     AtomicDataDict.TOTAL_ENERGY_KEY,
                     AtomicDataDict.PER_ATOM_ENERGY_KEY,
@@ -100,7 +101,7 @@ class TestNequIPModel(BaseEnergyModelTests):
                 ],
             ),
             (
-                ["EnergyModel", "PairPotentialTerm", "StressForceOutput"],
+                ["NequIPGNNEnergyModel", "PairPotentialTerm", "StressForceOutput"],
                 [
                     AtomicDataDict.TOTAL_ENERGY_KEY,
                     AtomicDataDict.PER_ATOM_ENERGY_KEY,
@@ -121,7 +122,7 @@ class TestNequIPModel(BaseEnergyModelTests):
 
     def test_submods(self):
         config = minimal_config2.copy()
-        config["model_builders"] = ["EnergyModel"]
+        config["model_builders"] = ["NequIPGNNEnergyModel"]
         model = model_from_config(config=config, initialize=True)
         chemical_embedding = model.model.chemical_embedding
         assert isinstance(chemical_embedding, AtomwiseLinear)
