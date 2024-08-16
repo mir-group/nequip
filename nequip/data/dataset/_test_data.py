@@ -13,12 +13,21 @@ from ._base_datasets import AtomicDataset
 
 
 class EMTTestDataset(AtomicDataset):
-    """Test dataset with PBC based on the toy EMT potential included in ASE.
+    """Test dataset with PBC, based on the toy EMT potential included in ASE.
 
     Randomly generates (in a reproducable manner) a basic bulk with added
     Gaussian noise around equilibrium positions.
 
-    In ASE units (eV/Å).
+    In ASE units (eV, Å, eV/Å).
+
+    Args:
+        transforms (List[Callable]): list of data transforms
+        supercell (Tuple[int, int, int]): supercell in each lattice vector direction
+        sigma (float): standard deviation of Gaussian noise
+        element (str): element supported by ASE's `EMT <https://wiki.fysik.dtu.dk/ase/ase/calculators/emt.html>`_ calculator
+                       (supported elements: ``Cu``, ``Pd``, ``Au``, ``Pt``, ``Al``, ``Ni``, ``Ag``)
+        num_frames (int): number of structures to be generated in the dataset
+        seed (int): seed for the random Gaussian noise
     """
 
     def __init__(
@@ -28,7 +37,7 @@ class EMTTestDataset(AtomicDataset):
         sigma: float = 0.1,
         element: str = "Cu",
         num_frames: int = 10,
-        dataset_seed: int = 123456,
+        seed: int = 123456,
     ):
         super().__init__(transforms=transforms)
         assert element in ("Cu", "Pd", "Au", "Pt", "Al", "Ni", "Ag")
@@ -36,13 +45,13 @@ class EMTTestDataset(AtomicDataset):
         self.sigma = sigma
         self.supercell = tuple(supercell)
         self.num_frames = num_frames
-        self.dataset_seed = dataset_seed
+        self.seed = seed
 
         # generate data
         base_atoms = ase.build.bulk(self.element, "fcc").repeat(self.supercell)
         base_atoms.calc = EMT()
         orig_pos = copy.deepcopy(base_atoms.positions)
-        rng = np.random.default_rng(self.dataset_seed)
+        rng = np.random.default_rng(self.seed)
         self.data_list = []
         for idx in range(len(self)):
             base_atoms.positions[:] = orig_pos

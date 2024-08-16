@@ -8,10 +8,14 @@ class AtomicDataset(torch.utils.data.Dataset):
     """The base class for all NequIP datasets.
 
     Subclasses must implement:
-     - `__len__()`
-     - `get_data_list()`
 
-    Or may optionally directly override `__getitem__` and `__getitems__` at their own risk.
+     - ``__len__()``
+     - ``get_data_list()``
+
+    Or may optionally directly override ``__getitem__`` and ``__getitems__`` at their own risk.
+
+    Args:
+        transforms (List[Callable]): list of data transforms
     """
 
     dtype: torch.dtype
