@@ -9,52 +9,59 @@ from ._base_datasets import AtomicDataset
 
 
 class ASEDataset(AtomicDataset):
-    """
+    r"""``AtomicDataset`` for `ASE <https://wiki.fysik.dtu.dk/ase/ase/io/io.html>`_-readable file formats.
+
+    Example: Given an atomic data stored in ``H2.extxyz`` that looks like below:
+
+    ::
+
+      2
+      Properties=species:S:1:pos:R:3 energy=-10 user_label=2.0 pbc="F F F"
+       H       0.00000000       0.00000000       0.00000000
+       H       0.00000000       0.00000000       1.02000000
+
+    An example of the config would is as follows.
+
+    ::
+
+      _target_: nequip.data.dataset.ASEDataset
+      file_name: H2.extxyz
+      transforms:
+        - _target_: nequip.data.transforms.NeighborListTransform
+          r_max: 4.0
+        - _target_: nequip.data.transforms.ChemicalSpeciesToAtomTypeMapper
+          chemical_symbols: [H]
+      ase_args:
+        format: extxyz
+      include_keys:
+        - user_label
+      key_mapping:
+          user_label: label0
+
+    Any ASE-parsable file format works. For VASP files, the config could be
+
+    ::
+
+      _target_: nequip.data.dataset.ASEDataset
+      file_name: OUTCAR
+      transforms:
+      - _target_: nequip.data.transforms.NeighborListTransform
+        r_max: 4.0
+      - _target_: nequip.data.transforms.ChemicalSpeciesToAtomTypeMapper
+        chemical_symbols: [H]
+      ase_args:
+        format: vasp-out
+      key_mapping:
+        free_energy: total_energy
 
     Args:
-        ase_args (dict): arguments for ase.io.read
-        include_keys (list): in addition to forces and energy, the keys that needs to
-             be parsed into dataset
-             The data stored in ase.atoms.Atoms.array has the lowest priority,
-             and it will be overrided by data in ase.atoms.Atoms.info
-             and ase.atoms.Atoms.calc.results. Optional
-        key_mapping (dict): rename some of the keys to the value str. Optional
-
-    Example: Given an atomic data stored in "H2.extxyz" that looks like below:
-
-    ```H2.extxyz
-    2
-    Properties=species:S:1:pos:R:3 energy=-10 user_label=2.0 pbc="F F F"
-     H       0.00000000       0.00000000       0.00000000
-     H       0.00000000       0.00000000       1.02000000
-    ```
-
-    The yaml input should be
-
-    ```
-    dataset: ase
-    dataset_file_name: H2.extxyz
-    ase_args:
-      format: extxyz
-    include_keys:
-      - user_label
-    key_mapping:
-      user_label: label0
-    chemical_symbols:
-      - H
-    ```
-
-    for VASP parser, the yaml input should be
-    ```
-    dataset: ase
-    dataset_file_name: OUTCAR
-    ase_args:
-      format: vasp-out
-    key_mapping:
-      free_energy: total_energy
-    chemical_symbols:
-      - H
-    ```
+        file_name (str): path to ASE-readable file
+        transforms (List[Callable]): list of data transforms
+        ase_args (Dict[str, Any]): arguments for ``ase.io.iread`` (see `here <https://wiki.fysik.dtu.dk/ase/ase/io/io.html#ase.io.iread>`_)
+        include_keys (List[str]): the keys that needs to be parsed into dataset in addition to forces and energy.
+             The data stored in ``ase.atoms.Atoms.array`` has the lowest priority,
+             and it will be overrided by data in ``ase.atoms.Atoms.info`` and ``ase.atoms.Atoms.calc.results``
+        key_mapping (Dict[str, str]): mapping of ``ase`` keys to ``AtomicDataDict`` keys
 
     """
 

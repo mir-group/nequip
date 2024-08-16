@@ -7,9 +7,9 @@ from ._base_datasets import AtomicDataset
 
 
 class HDF5Dataset(AtomicDataset):
-    """A dataset that loads data from a HDF5 file.
+    """``AtomicDataset`` that loads data from a HDF5 file.
 
-    This class is useful for very large datasets that cannot fit in memory.  It
+    This class is useful for very large datasets that cannot fit in memory. It
     efficiently loads data from disk as needed without everything needing to be
     in memory at once.
 
@@ -21,8 +21,9 @@ class HDF5Dataset(AtomicDataset):
     type of data.  The names of the arrays can be specified with ``key_mapping``.
 
     Args:
-        key_mapping (Dict[str, str]): mapping of array names in the HDF5 file to ``AtomicData`` keys
-        file_name (string): a semicolon separated list of HDF5 files.
+        file_name (str): a semicolon separated list of HDF5 files.
+        transforms (List[Callable]): list of data transforms
+        key_mapping (Dict[str, str]): mapping of array names in the HDF5 file to ``AtomicDataDict`` keys
     """
 
     def __init__(
