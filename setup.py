@@ -20,7 +20,6 @@ setup(
         # make the scripts available as command line scripts
         "console_scripts": [
             "nequip-train = nequip.scripts.train:main",
-            "nequip-evaluate = nequip.scripts.evaluate:main",
             "nequip-benchmark = nequip.scripts.benchmark:main",
             "nequip-deploy = nequip.scripts.deploy:main",
         ]
