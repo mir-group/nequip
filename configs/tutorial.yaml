@@ -1,0 +1,349 @@
+# The config file is divided into 4 sections -- `data`, `train`, `model`, and `global_options`
+# The config system relies on omegaconf (https://omegaconf.readthedocs.io/en/2.3_branch/index.html)
+# and hydra (https://hydra.cc/docs/intro/) functionalities, such as
+# - omegaconf's variable interpolation (https://omegaconf.readthedocs.io/en/2.3_branch/usage.html#variable-interpolation)
+# - omegaconf's resolvers (https://omegaconf.readthedocs.io/en/2.3_branch/usage.html#resolvers)
+# - hydra's instantiate (https://hydra.cc/docs/advanced/instantiate_objects/overview/)
+# With hydra's instantiation (notice the "_target_"s everywhere), the config file (almost) directly corresponds
+# to instantiating objects as one would normally do in Python.
+# Much of the infrastructure is based on PyTorch Lightning (https://lightning.ai/docs/pytorch/stable/),
+# such as the use of Lightning's Trainer, DataModule, LightningModule, Callback objects.
+
+
+# the run types will be completed in sequence
+# one can do `train`, `val`, `test`, `predict` run types
+run: [train, test]
+
+
+# the following parameters (cutoff_radius, chemical_symbols, model_type_names) are not used direcly by the code
+# parameters that take thier values show up multiple times in the config, so this allows us to use
+# variable interpolation to keep their multiple instances consistent
+
+# data and model r_max can be different (model's r_max should be smaller), but we try to make them the same
+cutoff_radius: 5.0
+
+# There are two sets of atomic types to keep track of in most applications
+# -- there is the conventional atomic species (e.g. C, H), and a separate `type_names` known to the model.
+# The model only knows types based on a set of zero-based indices and user-given `type_names` argument.
+# An example where this distinction is necessary include datasets with the same atomic species with different charge states:
+# we could define `chemical_symbols: [C, C]` and model `type_names: [C3, C4]` for +3 and +4 charge states.
+# There could also be instances such as coarse graining we only care about the model's `type_names` (no need to define chemical species).
+# Because of this distinction, these variables show up as arguments across different categories, including, data, model, metrics and even callbacks.
+# In this case, we fix both to be the same, so we define a single set of each here and use variable interpolation to retrieve them below.
+# This ensures a single location where the values are set to reduce the chances of mis-configuring runs.
+chemical_symbols: [Li, W, O] 
+model_type_names: ${chemical_symbols}
+
+
+# data is managed by LightningDataModules
+# nequip provides some standard datamodules that can be found in nequip.data.datamodule
+# users are free to define and use their own datamodules that subclass nequip.data.datamodule.NequIPDataModule
+data:
+  _target_: nequip.data.datamodule.ASEDataModule
+  seed: 456             # dataset seed for reproducibility
+  
+  # here we take an ASE-readable file (in extxyz format) and split it into train:val:test = 80:10:10
+  split_dataset:
+    file_path: tutorial_data/LiWO3_700K_s0.xyz
+    train: 0.8
+    val: 0.1
+    test: 0.1
+
+  # `transforms` convert data from the Dataset to a form that can be used by the ML model
+  # the transforms are only performed right before data is given to the model
+  # data is kept in its untransformed form
+  
+  transforms:
+    # data doesn't usually come with a neighborlist -- this tranforms prepares the neighborlist
+    - _target_: nequip.data.transforms.NeighborListTransform
+      r_max: ${cutoff_radius}
+    # the models only know atom types, which can be different from the chemical species (e.g. C, H)
+    # for instance we can have data with different charge states of carbon, which means they are
+    # all labeled by chemical species `C`, but may have different atom type labels based on the charge states
+    # in this case, the atom types are the same as the chemical species, but we still have to include this
+    # transformation to ensure that the data has 0-indexed atom type lists used in the various model operations 
+    - _target_: nequip.data.transforms.ChemicalSpeciesToAtomTypeMapper
+      chemical_symbols: ${chemical_symbols}
+
+  # the following are torch.utils.data.dataloader arguments except for `dataset` and `collate_fn`
+  # https://pytorch.org/docs/stable/data.html#torch.utils.data.DataLoader
+  train_dataloader_kwargs:
+    batch_size: 5
+    num_workers: 5
+    shuffle: true
+  val_dataloader_kwargs:
+    batch_size: 10
+    num_workers: ${data.train_dataloader_kwargs.num_workers}  # we want to use the same num_workers -- variable interpolation helps
+  test_dataloader_kwargs: ${data.val_dataloader_kwargs}  # variable interpolation comes in handy again
+
+  # dataset statistics can be calculated to be used for model initialization such as for shifting, scaling and standardizing.
+  # it is advised to provide custom names -- you will have to retrieve them later under model to initialize certain parameters to the dataset statistics computed
+  stats_manager:
+    # dataset statistics is handled by the DataStatisticsManager
+    _target_: nequip.data.DataStatisticsManager
+    metrics:
+      - field:
+          _target_: nequip.data.NumNeighbors
+        metric: 
+          _target_: nequip.data.Mean
+        name: num_neighbors_mean
+      - field:
+          _target_: nequip.data.PerAtomModifier
+          field: total_energy
+        metric:
+          _target_: nequip.data.Mean
+        name: per_atom_energy_mean
+      # we can also compute per_type statistics
+      - field: forces
+        metric:
+          _target_: nequip.data.RootMeanSquare
+        per_type: true
+        name: per_type_forces_rms
+      # or compute the regular ones
+      #- field: forces
+      #  metric:
+      #    _target_: nequip.data.RootMeanSquare
+      #  name: forces_rms
+
+# train comprises 6 subsections -- `trainer`, `loss`, `val_metrics`, `train_metrics`, `optimizer`, `lr_scheduler`
+# - `trainer` (mandatory) is a Lightning.Trainer object (https://lightning.ai/docs/pytorch/stable/common/trainer.html#trainer-class-api)
+# - `loss` (mandatory), `val_metrics` (mandatory), and `train_metrics` (optional) are 
+#   nequip.train.MetricsManager objects (see docs here)  TODO: link to docs
+#   `loss` is used for taking optimzier steps while `val_metrics` and `train_metrics` are for monitoring
+# - `optimizer` (mandatory) and `lr_scheduler` (optional) can be any torch compliant ones (even from 3rd parties)
+train:
+  # training module
+  training_module: nequip.train.NequIPLightningModule
+
+  # Lightning Trainer object
+  trainer:
+    _target_: lightning.Trainer
+    accelerator: gpu
+    enable_checkpointing: true
+    max_epochs: 1000
+    max_time: 03:00:00:00
+    check_val_every_n_epoch: 1  # how often to validate
+    log_every_n_steps: 20       # how often to log
+
+    # use any Lightning supported logger
+    logger:
+      # Lightning wandb logger https://lightning.ai/docs/pytorch/stable/api/lightning.pytorch.loggers.wandb.html#module-lightning.pytorch.loggers.wandb
+      _target_: lightning.pytorch.loggers.wandb.WandbLogger
+      project: nequip
+      name: tutorial
+      save_dir: ${hydra:runtime.output_dir}  # use resolver to place wandb logs in hydra's output directory
+
+    # use any Lightning callbacks https://lightning.ai/docs/pytorch/stable/api_references.html#callbacks
+    # and any custom callbakcs that subclass Lightning's Callback parent class
+    callbacks:
+      # Common callbacks used in ML
+
+      # stop training when some criterion is met
+      - _target_: lightning.pytorch.callbacks.EarlyStopping
+        monitor: val0_epoch/weighted_sum        # validation metric to monitor
+        min_delta: 1e-3                         # how much to be considered a "change"
+        patience: 20                            # how many instances of "no change" before stopping
+
+      # checkpoint based on some criterion
+      - _target_: lightning.pytorch.callbacks.ModelCheckpoint
+        monitor: val0_epoch/weighted_sum        # validation metric to monitor
+        dirpath: ${hydra:runtime.output_dir}    # use hydra output directory
+        filename: best                          # best.ckpt is the checkpoint name
+        save_last: true                         # last.ckpt will be saved
+        
+      # log learning rate, e.g. to monitor what the learning rate scheduler is doing
+      - _target_: lightning.pytorch.callbacks.LearningRateMonitor
+        logging_interval: epoch
+
+      # use EMA for smoother validation curves and thus more reliable metrics for monitoring
+      - _target_: nequip.train.callbacks.NeMoExponentialMovingAverage
+        decay: 0.99
+        every_n_steps: 1
+
+      # or use Lightning's SWA
+      #- _target_: lightning.pytorch.callbacks.StochasticWeightAveraging
+      #  swa_lrs: 1e-4
+      #  swa_epoch_start: 50
+      #  annealing_epochs: 20
+
+      # Callbacks to handle loss coefficients to balance different objectives (energy, forces, etc)
+
+      # SoftAdapt scheme (https://arxiv.org/abs/2403.18122) to adaptively change loss coefficients
+      - _target_: nequip.train.callbacks.SoftAdapt
+        beta: 1.1         # controls strength of SoftAdapt loss coefficient updates
+        interval: epoch   # update on "epoch" or "batch" basis
+        frequency: 5      # number of intervals (epoch or batches) between SoftAdapt loss coefficient updates
+
+      # or manually schedule changing of loss coefficients at the start of each training epoch
+      #- _target_: nequip.train.callbacks.LossCoefficientScheduler
+      #  schedule:
+      #    - epoch: 2
+      #      coeffs: [3, 1]
+      #    - epoch: 5
+      #      coeffs: [10, 1]
+
+      # to log the loss coefficients
+      - _target_: nequip.train.callbacks.LossCoefficientMonitor
+        interval: epoch
+        frequency: 5
+  
+  # use a MetricsManager (see docs) to construct the loss function
+  loss:
+    _target_: nequip.train.MetricsManager
+    metrics:
+      - name: peratomE_MSE
+        field:
+          _target_: nequip.data.PerAtomModifier
+          field: total_energy
+        coeff: 1
+        metric:
+          _target_: nequip.train.MeanSquaredError
+      - name: force_MSE
+        field: forces
+        coeff: 1
+        metric:
+          _target_: nequip.train.MeanSquaredError
+      # one could also use a per-type averaged metric
+      # in this case, there are two types of atoms, C and H, so
+      # separate per-type C and H force MSEs are computed before averaging the two
+      # unlike the above that just averages all forces without accounting for the atom types
+      #- name: force_MSE
+      #  field: forces
+      #  per_type: true
+      #  coeff: 1
+      #  metric:
+      #    _target_: nequip.train.MeanSquaredError
+
+  # use a MetricsManager (see docs) to construct the metrics used for monitoring
+  # and influencing training, e.g. with LR schedulers or early stopping, etc
+  val_metrics:
+    _target_: nequip.train.MetricsManager
+    metrics:
+      - name: E_MAE
+        field: total_energy
+        coeff: 1
+        metric:
+          _target_: nequip.train.MeanAbsoluteError
+      - name: force_MAE
+        field: forces
+        coeff: 1
+        metric:
+          _target_: nequip.train.MeanAbsoluteError
+      # as before, possible to use a per-type averaged MAE
+      #- name: force_MAE
+      #  field: forces
+      #  per_type: true
+      #  coeff: 1
+      #  metric:
+      #    _target_: nequip.train.MeanAbsoluteError
+
+  # we could have train_metrics and test_metrics be different from val_metrics, but it makes sense to have them be the same
+  train_metrics: ${train.val_metrics}  # use variable interpolation
+  test_metrics: ${train.val_metrics}  # use variable interpolation
+
+  # any torch compatible optimizer: https://pytorch.org/docs/stable/optim.html#algorithms
+  optimizer:
+    _target_: torch.optim.Adam
+    lr: 0.01
+    amsgrad: true
+
+  # see options for lr_scheduler_config
+  # https://lightning.ai/docs/pytorch/stable/api/lightning.pytorch.core.LightningModule.html#lightning.pytorch.core.LightningModule.configure_optimizers
+  lr_scheduler:
+    # any torch compatible lr sceduler
+    scheduler:
+      _target_: torch.optim.lr_scheduler.ReduceLROnPlateau
+      factor: 0.6
+      patience: 5
+      threshold: 0.2
+      min_lr: 1e-6
+    monitor: val0_epoch/weighted_sum
+    interval: epoch
+    frequency: 1
+
+
+# same old flat model config as before -- that may change ... but not now
+model:
+  model_builders:
+   - SimpleIrrepsConfig        # update the config with all the irreps for the network if using the simplified `l_max` / `num_features` / `parity` syntax
+   - NequIPGNNEnergyModel      # build a full NequIP energy model
+   - PerTypeEnergyScaleShift   # add per-atom / per-species scaling and shifting to the NequIP model before the total energy sum
+   - PairPotentialTerm         # MUST come after PerTypeEnergyScaleShift
+   - StressForceOutput               # wrap the energy model in a module that uses autodifferention to compute the forces
+   - RescaleEnergyEtc          # wrap the entire model in the appropriate global rescaling of the energy, forces, etc.
+  #   ^ global rescaling blocks must always go last!
+
+  # network
+  seed: 123
+  r_max: ${cutoff_radius}
+  num_layers: 2
+
+  l_max: 2            # the maximum irrep order (rotation order) for the network's features, l=1 is a good default, l=2 is more accurate but slower
+  parity: true        # whether to include features with odd mirror parityy; often turning parity off gives equally good results but faster networks, so do consider this
+  num_features: 128   # the multiplicity of the features, 32 is a good default for accurate network, if you want to be more accurate, go larger, if you want to be faster, go lower
+  
+  # alternatively, the irreps of the features in various parts of the network can be specified directly:
+  # the following options use e3nn irreps notation
+  # either these four options, or the above three options, should be provided--- they cannot be mixed.
+  # chemical_embedding_irreps_out: 32x0e                                              # irreps for the chemical embedding of species
+  # feature_irreps_hidden: 32x0o + 32x0e + 32x1o + 32x1e                              # irreps used for hidden features, here we go up to lmax=1, with even and odd parities; for more accurate but slower networks, use l=2 or higher, smaller number of features is faster
+  # irreps_edge_sh: 0e + 1o                                                           # irreps of the spherical harmonics used for edges. If a single integer, indicates the full SH up to L_max=that_integer
+  # conv_to_output_hidden_irreps_out: 16x0e                                           # irreps used in hidden layer of output block
+  
+  
+  nonlinearity_type: gate    # may be 'gate' or 'norm', 'gate' is recommended
+  resnet: false              # set true to make interaction block a resnet-style update
+                             # the resnet update will only be applied when the input and output irreps of the layer are the same
+
+  # scalar nonlinearities to use — available options are silu, ssp (shifted softplus), tanh, and abs.
+  # Different nonlinearities are specified for e (even) and o (odd) parity;
+  # note that only tanh and abs are correct for o (odd parity).
+  # silu typically works best for even 
+  nonlinearity_scalars:
+    e: silu
+    o: tanh
+  
+  nonlinearity_gates:
+    e: silu
+    o: tanh
+  
+  # radial network basis
+  num_basis: 8                  # number of basis functions used in the radial basis, 8 usually works best
+  BesselBasis_trainable: false  # set true to train the bessel weights
+  PolynomialCutoff_p: 6         # p-exponent used in polynomial cutoff function, smaller p corresponds to stronger decay with distance
+  
+  # radial network
+  invariant_layers: 2           # number of radial layers, usually 1-3 works best, smaller is faster
+  invariant_neurons: 128        # number of hidden neurons in radial function, smaller is faster
+  use_sc: true                  # use self-connection or not, usually gives big improvement
+
+  # to specify different parameters for each convolutional layer, try examples below
+  # layer1_use_sc: true                                                             # use "layer{i}_" prefix to specify parameters for only one of the layer,
+  # priority for different definitions:
+  #   invariant_neurons < InteractionBlock_invariant_neurons < layer{i}_invariant_neurons
+
+  # bookkeeping
+  type_names: ${model_type_names}
+  model_dtype: float32
+
+  # dataset statistics used to inform the model's initial parameters for normalization, shifting and rescaling
+  # we use omegaconf's resolvers (https://omegaconf.readthedocs.io/en/2.3_branch/usage.html#resolvers)
+  # to facilitate getting the dataset statistics from the DataStatisticsManager
+  per_type_energy_scale_shift_shifts: ${training_data_stats:per_atom_energy_mean}
+  per_type_energy_scale_shift_scales: ${training_data_stats:per_type_forces_rms} #null
+  global_rescale_scale: null #${training_data_stats:forces_rms}
+  avg_num_neighbors: ${training_data_stats:num_neighbors_mean}
+
+  per_type_energy_scale_shift_scales_trainable: false
+  per_type_energy_scale_shift_shifts_trainable: false
+
+  # for pair potential
+  pair_style: ZBL  # useful for more stable MD
+  units: metal     # Ang and kcal/mol, LAMMPS unit names;  allowed values "metal" and "real"
+  ZBL_chemical_species: ${chemical_symbols}   # must tell ZBL the chemical species of the various model atom types
+ 
+
+# global options
+global_options:
+  seed: 789
+  allow_tf32: false
