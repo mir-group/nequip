@@ -50,10 +50,13 @@ class SphericalHarmonicEdgeAttrs(GraphModuleMixin, torch.nn.Module):
         )
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
+        model_dtype = data.get(
+            AtomicDataDict.MODEL_DTYPE_KEY, data[AtomicDataDict.POSITIONS_KEY]
+        ).dtype
         data = AtomicDataDict.with_edge_vectors(data, with_lengths=False)
         edge_vec = data[AtomicDataDict.EDGE_VECTORS_KEY]
         edge_sh = self.sh(edge_vec)
-        data[self.out_field] = edge_sh
+        data[self.out_field] = edge_sh.to(model_dtype)
         return data
 
 
@@ -83,12 +86,15 @@ class RadialBasisEdgeEncoding(GraphModuleMixin, torch.nn.Module):
         )
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
+        model_dtype = data.get(
+            AtomicDataDict.MODEL_DTYPE_KEY, data[AtomicDataDict.POSITIONS_KEY]
+        ).dtype
         data = AtomicDataDict.with_edge_vectors(data, with_lengths=True)
         edge_length = data[AtomicDataDict.EDGE_LENGTH_KEY]
         cutoff = self.cutoff(edge_length).unsqueeze(-1)
         edge_length_embedded = self.basis(edge_length) * cutoff
-        data[self.out_field] = edge_length_embedded
-        data[AtomicDataDict.EDGE_CUTOFF_KEY] = cutoff
+        data[self.out_field] = edge_length_embedded.to(model_dtype)
+        data[AtomicDataDict.EDGE_CUTOFF_KEY] = cutoff.to(model_dtype)
         return data
 
 
