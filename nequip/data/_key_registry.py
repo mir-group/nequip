@@ -51,8 +51,6 @@ _DEFAULT_EDGE_FIELDS: Set[str] = {
     _keys.EDGE_CELL_SHIFT_KEY,
     _keys.EDGE_VECTORS_KEY,
     _keys.EDGE_LENGTH_KEY,
-    _keys.EDGE_VECTORS_F64_KEY,
-    _keys.EDGE_LENGTH_F64_KEY,
     _keys.EDGE_ATTRS_KEY,
     _keys.EDGE_EMBEDDING_KEY,
     _keys.EDGE_FEATURES_KEY,
