@@ -15,15 +15,20 @@ class GraphModel(GraphModuleMixin, torch.nn.Module):
     Manages top-level rescaling, dtypes, and more.
 
     Args:
-
+        model (GraphModuleMixin): model to wrap
+        type_names (List[str]): model atom type names
+        model_dtype (torch.dtype): dtype of model (``torch.float32`` or ``torch.float64``)
+        model_input_fields (Dict[str, Any]): input fields and their irreps
     """
 
     model_dtype: torch.dtype
     model_input_fields: List[str]
+    type_names: List[str]
 
     def __init__(
         self,
         model: GraphModuleMixin,
+        type_names: List[str],
         model_dtype: Optional[torch.dtype] = None,
         model_input_fields: Dict[str, Any] = {},
     ) -> None:
@@ -55,32 +60,18 @@ class GraphModel(GraphModuleMixin, torch.nn.Module):
         self.register_buffer(
             "_model_dtype_example", torch.as_tensor(0.0, dtype=model_dtype)
         )
-
-    # == Inference ==
+        self.type_names = type_names
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
-        # restrict the input data to allowed keys, and cast to model_dtype
-        # this also prevents the model from direclty using the dict from the outside,
+        # restrict the input data to allowed keys to prevent the model from directly using the dict from the outside,
         # preventing weird pass-by-reference bugs
         new_data: AtomicDataDict.Type = {}
-        for k, v in data.items():
-            if k in self.model_input_fields:
-                # Allow input position and position-related
-                # fields to be maintained in their original dtype
-                if v.is_floating_point() and k not in (
-                    AtomicDataDict.POSITIONS_KEY,
-                    AtomicDataDict.CELL_KEY,
-                    AtomicDataDict.EDGE_CELL_SHIFT_KEY,
-                ):
-                    v = v.to(dtype=self.model_dtype)
-                new_data[k] = v
+        for k in self.model_input_fields:
+            if k in data:
+                new_data[k] = data[k]
         # Store the model dtype indicator tensor in all input data dicts
         new_data[AtomicDataDict.MODEL_DTYPE_KEY] = self._model_dtype_example
-        # run the model
-        data = self.model(new_data)
-        return data
-
-    # == Helpers ==
+        return self.model(new_data)
 
     @torch.jit.unused
     def get_device(self) -> torch.device:
