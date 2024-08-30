@@ -23,6 +23,9 @@ from nequip.scripts.deploy import _compile_for_deploy, load_deployed_model
 from nequip.scripts.train import default_config, check_code_version
 from nequip.utils._global_options import _set_global_options
 
+# TODO: add model-debug-mode
+# TODO: move interesting features of equivariance test from train
+
 
 def main(args=None):
     parser = argparse.ArgumentParser(
