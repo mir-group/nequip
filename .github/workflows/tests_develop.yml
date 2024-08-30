@@ -32,16 +32,12 @@ jobs:
         python -m pip install --upgrade pip
         pip install setuptools wheel
         pip install torch==${TORCH} -f https://download.pytorch.org/whl/cpu/torch_stable.html
-        pip install h5py scikit-learn  # install packages that aren't required dependencies but that the tests do need
+        pip install h5py scikit-learn  # install packages that aren't required dependencies but that the tests do need        
         pip install --upgrade-strategy only-if-needed .
     - name: Install pytest
       run: |
         pip install pytest
         pip install pytest-xdist[psutil]
-    - name: Download test data
-      run: |
-        mkdir benchmark_data
-        cd benchmark_data; wget "http://quantum-machine.org/gdml/data/npz/aspirin_ccsd.zip"; cd ..
     - name: Test with pytest
       run: |
         # See https://github.com/pytest-dev/pytest/issues/1075
