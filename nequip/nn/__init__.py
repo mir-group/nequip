@@ -12,7 +12,6 @@ from ._rescale import RescaleOutput
 from ._convnetlayer import ConvNetLayer
 from ._util import SaveForOutput
 from ._concat import Concat
-from ._gmm import GaussianMixtureModelUncertainty
 
 __all__ = [
     GraphModel,
@@ -30,5 +29,4 @@ __all__ = [
     ConvNetLayer,
     SaveForOutput,
     Concat,
-    GaussianMixtureModelUncertainty,
 ]
