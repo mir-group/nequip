@@ -220,7 +220,7 @@ class PerTypeScaleShift(GraphModuleMixin, torch.nn.Module):
         if not (self.has_scales or self.has_shifts):
             return data
 
-        species_idx = data[AtomicDataDict.ATOM_TYPE_KEY].squeeze(-1)
+        species_idx = data[AtomicDataDict.ATOM_TYPE_KEY].view(-1)
         in_field = data[self.field]
         assert len(in_field) == len(
             species_idx
