@@ -7,6 +7,8 @@ from e3nn.util.jit import compile_mode
 from nequip.data import AtomicDataDict
 from .._graph_mixin import GraphModuleMixin
 
+from typing import List
+
 
 @compile_mode("script")
 class OneHotAtomEncoding(GraphModuleMixin, torch.nn.Module):
@@ -21,7 +23,7 @@ class OneHotAtomEncoding(GraphModuleMixin, torch.nn.Module):
 
     def __init__(
         self,
-        type_names: int,
+        type_names: List[str],
         set_features: bool = True,
         irreps_in=None,
     ):
@@ -37,7 +39,7 @@ class OneHotAtomEncoding(GraphModuleMixin, torch.nn.Module):
         self._init_irreps(irreps_in=irreps_in, irreps_out=irreps_out)
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
-        type_numbers = data[AtomicDataDict.ATOM_TYPE_KEY].squeeze(-1)
+        type_numbers = data[AtomicDataDict.ATOM_TYPE_KEY].view(-1)
         one_hot = torch.nn.functional.one_hot(
             type_numbers, num_classes=self.num_types
         ).to(
