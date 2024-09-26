@@ -301,11 +301,16 @@ def _process_dict(data):
                 if v.dim() == 1:  # one possibility
                     assert v.shape[0] == 9, err_msg
                     data[k] = v.reshape((1, 3, 3))
-                elif v.dim() == 2:  # two possibilities
+                elif v.dim() == 2:  # three possibilities
                     if v.shape == (3, 3):
                         data[k] = v.reshape(-1, 3, 3)
                     elif v.shape == (N_nodes, 9):
                         data[k] = v.reshape(N_nodes, 3, 3)
+                    elif v.shape == (N_nodes, 6):  # i.e. Voigt format
+                        # TODO (maybe): this is inefficient, but who is going to train on per-atom stresses except for toy training runs?
+                        data[k] = torch.stack(
+                            [_voigt_6_to_full_3x3_stress(vec6) for vec6 in v]
+                        )
                     else:
                         raise RuntimeError(err_msg)
                 elif v.dim() == 3:  # one possibility
