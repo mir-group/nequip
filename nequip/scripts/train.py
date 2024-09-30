@@ -1,383 +1,189 @@
 """ Train a network."""
 
-import logging
-import argparse
-import warnings
-import shutil
-import difflib
-import yaml
-
 # This is a weird hack to avoid Intel MKL issues on the cluster when this is called as a subprocess of a process that has itself initialized PyTorch.
 # Since numpy gets imported later anyway for dataset stuff, this shouldn't affect performance.
 import numpy as np  # noqa: F401
 
-from os.path import exists, isdir
-from shutil import rmtree
-from pathlib import Path
-
-import torch
-
-from nequip.model import model_from_config
-from nequip.utils import Config
-from nequip.data import dataset_from_config
-from nequip.utils import load_file
-from nequip.utils.config import _GLOBAL_ALL_ASKED_FOR_KEYS
-from nequip.utils.test import assert_AtomicData_equivariant
 from nequip.utils.versions import check_code_version
-from nequip.utils.misc import get_default_device_name
 from nequip.utils._global_options import _set_global_options
-from nequip.scripts._logger import set_up_script_logger
+from nequip.utils.logger import RankedLogger
+from nequip.data.datamodule import NequIPDataModule
+from nequip.train import NequIPLightningModule
 
-default_config = dict(
-    root="./",
-    tensorboard=False,
-    wandb=False,
-    wandb_watch=False,
-    wandb_watch_kwargs={},
-    model_builders=[
-        "SimpleIrrepsConfig",
-        "EnergyModel",
-        "PerSpeciesRescale",
-        "StressForceOutput",
-        "RescaleEnergyEtc",
-    ],
-    dataset_statistics_stride=1,
-    device=get_default_device_name(),
-    default_dtype="float64",
-    model_dtype="float32",
-    allow_tf32=False,
-    verbose="INFO",
-    model_debug_mode=False,
-    equivariance_test=False,
-    grad_anomaly_mode=False,
-    gpu_oom_offload=False,
-    append=True,
-    warn_unused=False,
-    _jit_bailout_depth=2,  # avoid 20 iters of pain, see https://github.com/pytorch/pytorch/issues/52286
-    # Quote from eelison in PyTorch slack:
-    # https://pytorch.slack.com/archives/CDZD1FANA/p1644259272007529?thread_ts=1644064449.039479&cid=CDZD1FANA
-    # > Right now the default behavior is to specialize twice on static shapes and then on dynamic shapes.
-    # > To reduce warmup time you can do something like setFusionStrartegy({{FusionBehavior::DYNAMIC, 3}})
-    # > ... Although we would wouldn't really expect to recompile a dynamic shape fusion in a model,
-    # > provided broadcasting patterns remain fixed
-    # We default to DYNAMIC alone because the number of edges is always dynamic,
-    # even if the number of atoms is fixed:
-    _jit_fusion_strategy=[("DYNAMIC", 3)],
-    # Due to what appear to be ongoing bugs with nvFuser, we default to NNC (fuser1) for now:
-    # TODO: still default to NNC on CPU regardless even if change this for GPU
-    # TODO: default for ROCm?
-    _jit_fuser="fuser1",
-)
-# All default_config keys are valid / requested
-_GLOBAL_ALL_ASKED_FOR_KEYS.update(default_config.keys())
+from omegaconf import OmegaConf, DictConfig, ListConfig
+from hydra.utils import instantiate
+import hydra
+
+import os
+
+logger = RankedLogger(__name__, rank_zero_only=True)
 
 
-def main(args=None, running_as_script: bool = True):
-    config, path_to_config, override_options = parse_command_line(args)
+@hydra.main(version_base=None, config_path=os.getcwd(), config_name="config")
+def main(config: DictConfig) -> None:
+    # === sanity checks ===
 
-    if running_as_script:
-        set_up_script_logger(config.get("log", None), config.verbose)
-
-    train_dir = f"{config.root}/{config.run_name}"
-    found_restart_file = exists(f"{train_dir}/trainer.pth")
-    if found_restart_file and not config.append:
-        raise RuntimeError(
-            f"Training instance exists at {train_dir}; "
-            "either set append to True or use a different root or runname"
-        )
-    elif not found_restart_file and isdir(train_dir):
-        # output directory exists but no ``trainer.pth`` file, suggesting previous run crash during
-        # first training epoch (usually due to memory):
-        warnings.warn(
-            f"Previous run folder at {train_dir} exists, but a saved model "
-            f"(trainer.pth file) was not found. This folder will be cleared and a fresh training run will "
-            f"be started."
-        )
-        rmtree(train_dir)
-
-    if not found_restart_file:  # fresh start
-        # update config with override parameters for setting up train-dir
-        config.update(override_options)
-        trainer = fresh_start(config)
-        # copy original config to training directory
-        shutil.copyfile(path_to_config, f"{train_dir}/original_config.yaml")
-    else:  # restart
-        # perform string matching for original config and restart config
-        # throw error if they are different
-        with (
-            open(f"{train_dir}/original_config.yaml") as orig_f,
-            open(path_to_config) as current_f,
-        ):
-            diffs = [
-                x
-                for x in difflib.Differ().compare(
-                    orig_f.readlines(), current_f.readlines()
-                )
-                if x[0] in ("+", "-")
-            ]
-        if diffs:
-            raise RuntimeError(
-                f"Config {path_to_config} used for restart differs from original config for training run in {train_dir}.\n"
-                + "The following differences were found:\n\n"
-                + "".join(diffs)
-                + "\n"
-                + "If you intend to override the original config parameters, use the --override flag. For example, use\n"
-                + f'`nequip-train {path_to_config} --override "max_epochs: 42"`\n'
-                + 'on the command line to override the config parameter "max_epochs"\n'
-                + "BE WARNED that use of the --override flag is not protected by consistency checks performed by NequIP."
-            )
-        else:
-            trainer = restart(config, override_options)
-
-    # Train
-    trainer.save()
-    if config.get("gpu_oom_offload", False):
-        if not torch.cuda.is_available():
-            raise RuntimeError(
-                "CUDA is not available; --gpu-oom-offload doesn't make sense."
-            )
-        warnings.warn(
-            "! GPU OOM Offloading is ON:\n"
-            "This is meant for training models that would be impossible otherwise due to OOM.\n"
-            "Note that this comes at a speed cost and SHOULD NOT be used if your training fits in GPU memory without it.\n"
-            "Please also consider whether a smaller model is a more appropriate solution!\n"
-            "Also, a warning from PyTorch: 'If you overuse pinned memory, it can cause serious problems when running low on RAM!'"
-        )
-        with torch.autograd.graph.save_on_cpu(pin_memory=True):
-            trainer.train()
+    # determine run types
+    assert (
+        "run" in config
+    ), "`run` must provided in the config -- it is a list that could include `train`, `val`, `test`, and/or `predict`."
+    if isinstance(config.run, ListConfig) or isinstance(config.run, list):
+        runs = config.run
     else:
-        trainer.train()
+        runs = [config.run]
+    assert all([run_type in ["train", "val", "test", "predict"] for run_type in runs])
 
+    if "train" in runs:
+        assert (
+            "loss" in config.train
+        ), "`train.loss` must be provided in the config to perform a `train` run."
+        assert (
+            "val_metrics" in config.train
+        ), "`train.val_metrics` must be provided in the config to perform a `train` run."
+    if "val" in runs:
+        assert (
+            "val_metrics" in config.train
+        ), "`train.val_metrics` must be provided in the config to perform a `train` run."
+    if "test" in runs:
+        assert (
+            "test_metrics" in config.train
+        ), "`train.test_metrics` must be provided in the config to perform a `test` run."
+
+    logger.info(f"This `nequip-train` run will perform the following tasks: {runs}")
+    logger.info(
+        f"and use the output directory provided by Hydra: {hydra.core.hydra_config.HydraConfig.get().runtime.output_dir}"
+    )
+
+    # TODO: write versions into a `versions.txt` in the hydra output dir
+    check_code_version(config, add_to_config=True)
+    logger.debug("Setting global options ...")
+    _set_global_options(**OmegaConf.to_container(config.global_options, resolve=True))
+
+    # === instantiate datamodule ===
+    logger.info("Building datamodule ...")
+
+    # == silently include type_names in stats_manager if present ==
+    assert "type_names" in config.model
+    data = OmegaConf.to_container(config.data, resolve=True)
+    if "stats_manager" in data:
+        data["stats_manager"]["type_names"] = config.model.type_names
+    datamodule = instantiate(data, _recursive_=False)
+    assert isinstance(datamodule, NequIPDataModule)
+
+    # get training module
+    training_module = hydra.utils.get_class(config.train.training_module)
+    assert issubclass(training_module, NequIPLightningModule)
+
+    # get nequip_module config args and convert to pure Python dicts for wandb logging
+    loss_cfg = OmegaConf.to_container(
+        config.train.get("loss", DictConfig(None)), resolve=True
+    )
+    val_metrics_cfg = OmegaConf.to_container(
+        config.train.get("val_metrics", DictConfig(None)), resolve=True
+    )
+    train_metrics_cfg = OmegaConf.to_container(
+        config.train.get("train_metrics", DictConfig(None)), resolve=True
+    )
+    test_metrics_cfg = OmegaConf.to_container(
+        config.train.get("test_metrics", DictConfig(None)), resolve=True
+    )
+    optimizer_cfg = OmegaConf.to_container(
+        config.train.get("optimizer", DictConfig(None)), resolve=True
+    )
+    lr_scheduler_cfg = OmegaConf.to_container(
+        config.train.get("lr_scheduler", DictConfig(None)), resolve=True
+    )
+
+    # the trainer config is not actually used by the nequip_module, but is just used for logging purposes
+    trainer_cfg = OmegaConf.to_container(config.train.trainer, resolve=True)
+
+    if "ckpt_path" in config:
+        # === instantiate from checkpoint file ===
+        # dataset statistics need not be recalculated
+        logger.info(
+            f"Building model and training_module from checkpoint file {config.ckpt_path} ..."
+        )
+        # only the original model's config is used (with the dataset statistics already-computed)
+        # everything else can be overriden
+        # see https://lightning.ai/docs/pytorch/stable/common/checkpointing_basic.html
+        nequip_module = training_module.load_from_checkpoint(
+            config.ckpt_path,
+            loss_cfg=loss_cfg,
+            val_metrics_cfg=val_metrics_cfg,
+            train_metrics_cfg=train_metrics_cfg,
+            test_metrics_cfg=test_metrics_cfg,
+            optimizer_cfg=optimizer_cfg,
+            lr_scheduler_cfg=lr_scheduler_cfg,
+            num_datasets=datamodule.num_datasets,
+            trainer_cfg=trainer_cfg,
+        )
+    else:
+        # === compute dataset statistics use resolver to get dataset statistics to model config ===
+        stats_dict = datamodule.get_statistics(dataset="train")
+
+        def training_data_stats(stat_name: str):
+            stat = stats_dict.get(stat_name, None)
+            if stat is None:
+                raise RuntimeError(
+                    f"Data statistics field `{stat_name}` was requested for use in model initialization, but was not computed -- users must explicitly configure its computation with the `stats_manager` DataModule argument."
+                )
+            return stat
+
+        OmegaConf.register_new_resolver(
+            "training_data_stats",
+            training_data_stats,
+            use_cache=True,
+        )
+        # https://omegaconf.readthedocs.io/en/2.1_branch/usage.html#omegaconf-to-container
+        model_config = OmegaConf.to_container(config.model, resolve=True)
+
+        # === instantiate training module ===
+        logger.info("Building model and training_module from scratch ...")
+        nequip_module = training_module(
+            model_cfg=model_config,
+            loss_cfg=loss_cfg,
+            val_metrics_cfg=val_metrics_cfg,
+            train_metrics_cfg=train_metrics_cfg,
+            test_metrics_cfg=test_metrics_cfg,
+            optimizer_cfg=optimizer_cfg,
+            lr_scheduler_cfg=lr_scheduler_cfg,
+            num_datasets=datamodule.num_datasets,
+            trainer_cfg=trainer_cfg,
+        )
+
+    # === instantiate Lightning.Trainer ===
+    # enforce inference_mode=False to enable grad during inference
+    # see https://lightning.ai/docs/pytorch/stable/common/trainer.html#inference-mode
+    if "inference_mode" in config.train.trainer:
+        raise ValueError(
+            "`inference_mode` found in train.trainer in the config -- users shouldn't set this. NequIP will set `inference_mode=False`."
+        )
+    trainer = instantiate(trainer_cfg, inference_mode=False)
+
+    # === loop of run types ===
+    ckpt_path = config.get("ckpt_path", None)
+    for run_type in runs:
+        if run_type == "train":
+            logger.info("TRAIN RUN START")
+            trainer.fit(nequip_module, datamodule=datamodule, ckpt_path=ckpt_path)
+            # `fit` is the only task that changes the model, so we remove the ckpt_path if train ever gets called
+            # this means that the latest model information is used for other tasks (val, test, predict)
+            ckpt_path = None
+            logger.info("TRAIN RUN END")
+        elif run_type == "val":
+            logger.info("VAL RUN START")
+            trainer.validate(nequip_module, datamodule=datamodule, ckpt_path=ckpt_path)
+            logger.info("VAL RUN END")
+        elif run_type == "test":
+            logger.info("TEST RUN START")
+            trainer.test(nequip_module, datamodule=datamodule, ckpt_path=ckpt_path)
+            logger.info("TEST RUN END")
+        elif run_type == "predict":
+            logger.info("PREDICT RUN START")
+            trainer.predict(nequip_module, datamodule=datamodule, ckpt_path=ckpt_path)
+            logger.info("PREDICT RUN END")
     return
 
 
-def parse_command_line(args=None):
-    parser = argparse.ArgumentParser(
-        description="Train (or restart training of) a NequIP model."
-    )
-    parser.add_argument(
-        "config", help="YAML file configuring the model, dataset, and other options"
-    )
-    parser.add_argument(
-        "--equivariance-test",
-        help="test the model's equivariance before training on n (default 1) random frames from the dataset",
-        const=1,
-        type=int,
-        nargs="?",
-    )
-    parser.add_argument(
-        "--model-debug-mode",
-        help="enable model debug mode, which can sometimes give much more useful error messages at the cost of some speed. Do not use for production training!",
-        action="store_true",
-    )
-    parser.add_argument(
-        "--grad-anomaly-mode",
-        help="enable PyTorch autograd anomaly mode to debug NaN gradients. Do not use for production training!",
-        action="store_true",
-    )
-    parser.add_argument(
-        "--gpu-oom-offload",
-        help="Use `torch.autograd.graph.save_on_cpu` to offload intermediate tensors to CPU (host) memory in order to train models that would be impossible otherwise due to OOM. Note that this comes as at a speed cost and SHOULD NOT be used if your training fits in GPU memory without it. Please also consider whether a smaller model is a more appropriate solution.",
-        action="store_true",
-    )
-    parser.add_argument(
-        "--log",
-        help="log file to store all the screen logging",
-        type=Path,
-        default=None,
-    )
-    parser.add_argument(
-        "--warn-unused",
-        help="Warn instead of error when the config contains unused keys",
-        action="store_true",
-    )
-    parser.add_argument(
-        "--override",
-        help="Override top-level configuration keys from the `--train-dir`/`--model`'s config YAML file.  This should be a valid YAML string. Unless you know why you need to, do not use this option.",
-        type=str,
-        default=None,
-    )
-    args = parser.parse_args(args=args)
-
-    config = Config.from_file(args.config, defaults=default_config)
-    for flag in (
-        "model_debug_mode",
-        "equivariance_test",
-        "grad_anomaly_mode",
-        "warn_unused",
-        "gpu_oom_offload",
-    ):
-        config[flag] = getattr(args, flag) or config[flag]
-
-    # Set override options before _set_global_options so that things like allow_tf32 are correctly handled
-    if args.override is not None:
-        override_options = yaml.load(args.override, Loader=yaml.Loader)
-        assert isinstance(
-            override_options, dict
-        ), "--override's YAML string must define a dictionary of top-level options"
-        overridden_keys = set(config.keys()).intersection(override_options.keys())
-        set_keys = set(override_options.keys()) - set(overridden_keys)
-        logging.info(
-            f"--override:  overrode keys {list(overridden_keys)} and set new keys {list(set_keys)}"
-        )
-        del overridden_keys, set_keys
-    else:
-        override_options = {}
-
-    return config, args.config, override_options
-
-
-def fresh_start(config):
-
-    # forbid default_dtype!=float64
-    if config["default_dtype"] != "float64":
-        raise ValueError(
-            f"config option default_dtype={config['default_dtype']} is forbidden, use default_dtype=float64 instead"
-        )
-
-    # we use add_to_config cause it's a fresh start and need to record it
-    check_code_version(config, add_to_config=True)
-    _set_global_options(config)
-
-    # = Make the trainer =
-    if config.wandb:
-
-        import wandb  # noqa: F401
-        from nequip.train.trainer_wandb import TrainerWandB as Trainer
-
-        # download parameters from wandb in case of sweeping
-        from nequip.utils.wandb import init_n_update
-
-        config = init_n_update(config)
-
-    elif config.tensorboard:
-        from nequip.train.trainer_tensorboard import TrainerTensorBoard as Trainer
-    else:
-        from nequip.train.trainer import Trainer
-
-    trainer = Trainer(model=None, **Config.as_dict(config))
-
-    # what is this
-    # to update wandb data?
-    config.update(trainer.params)
-
-    # = Load the dataset =
-    dataset = dataset_from_config(config, prefix="dataset")
-    logging.info(f"Successfully loaded the data set of type {dataset}...")
-    try:
-        validation_dataset = dataset_from_config(config, prefix="validation_dataset")
-        logging.info(
-            f"Successfully loaded the validation data set of type {validation_dataset}..."
-        )
-    except KeyError:
-        # It couldn't be found
-        validation_dataset = None
-
-    # = Train/test split =
-    trainer.set_dataset(dataset, validation_dataset)
-
-    # = Build model =
-    final_model = model_from_config(
-        config=config, initialize=True, dataset=trainer.dataset_train
-    )
-    logging.info("Successfully built the network...")
-
-    # Equivar test
-    if config.equivariance_test > 0:
-        n_train: int = len(trainer.dataset_train)
-        assert config.equivariance_test <= n_train
-        final_model.eval()
-        indexes = torch.randperm(n_train)[: config.equivariance_test]
-        errstr = assert_AtomicData_equivariant(
-            final_model, [trainer.dataset_train[i] for i in indexes]
-        )
-        final_model.train()
-        logging.info(
-            "Equivariance test passed; equivariance errors:\n"
-            "   Errors are in real units, where relevant.\n"
-            "   Please note that the large scale of the typical\n"
-            "   shifts to the (atomic) energy can cause\n"
-            "   catastrophic cancellation and give incorrectly\n"
-            "   the equivariance error as zero for those fields.\n"
-            f"{errstr}"
-        )
-        del errstr, indexes, n_train
-
-    # Set the trainer
-    trainer.model = final_model
-
-    # Store any updated config information in the trainer
-    trainer.update_kwargs(config)
-
-    # Only run the unused check as a callback after the trainer has
-    # initialized everything (metrics, early stopping, etc.)
-    def _unused_check():
-        unused = config._unused_keys()
-        if len(unused) > 0:
-            message = f"The following keys in the config file were not used, did you make a typo?: {', '.join(unused)}. (If this sounds wrong, please file an issue. You can turn this error into a warning with `--warn-unused`, but please make sure that the key really is correctly spelled and used!.)"
-            if config.warn_unused:
-                warnings.warn(message)
-            else:
-                raise KeyError(message)
-
-    trainer._post_init_callback = _unused_check
-
-    return trainer
-
-
-def restart(config, override_options):
-    # load the dictionary
-    restart_file = f"{config.root}/{config.run_name}/trainer.pth"
-    dictionary = load_file(
-        supported_formats=dict(torch=["pt", "pth"]),
-        filename=restart_file,
-        enforced_format="torch",
-    )
-
-    # note, "trainer.pth"/dictionary also store code versions,
-    # which will not be stored in config and thus not checked here
-    check_code_version(config)
-
-    # recursive loop, if same type but different value
-    # raise error
-
-    config = Config(dictionary, exclude_keys=["state_dict", "progress"])
-
-    # override configs loaded from save
-    dictionary.update(override_options)
-    config.update(override_options)
-
-    # dtype, etc.
-    _set_global_options(config)
-
-    # note, the from_dict method will check whether the code version
-    # in trainer.pth is consistent and issue warnings
-    if config.wandb:
-        from nequip.train.trainer_wandb import TrainerWandB
-        from nequip.utils.wandb import resume
-
-        resume(config)
-        trainer = TrainerWandB.from_dict(dictionary)
-    else:
-        from nequip.train.trainer import Trainer
-
-        trainer = Trainer.from_dict(dictionary)
-
-    # = Load the dataset =
-    dataset = dataset_from_config(config, prefix="dataset")
-    logging.info(f"Successfully re-loaded the data set of type {dataset}...")
-    try:
-        validation_dataset = dataset_from_config(config, prefix="validation_dataset")
-        logging.info(
-            f"Successfully re-loaded the validation data set of type {validation_dataset}..."
-        )
-    except KeyError:
-        # It couldn't be found
-        validation_dataset = None
-    trainer.set_dataset(dataset, validation_dataset)
-
-    return trainer
-
-
 if __name__ == "__main__":
-    main(running_as_script=True)
+    main()
