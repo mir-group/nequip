@@ -197,9 +197,10 @@ def frame_from_batched(batched_data: Type, index: int) -> Type:
 def from_ase(
     atoms: ase.Atoms,
     key_mapping: Optional[Dict[str, str]] = {},
-    include_keys: Optional[list] = [],
+    include_keys: Optional[List] = [],
+    exclude_keys: Optional[List] = [],
 ) -> Type:
-    """Build a ``AtomicDataDict`` from an ``ase.Atoms`` object.
+    """Build an ``AtomicDataDict`` from an ``ase.Atoms`` object.
 
     Respects ``atoms``'s ``pbc`` and ``cell``.
 
@@ -208,12 +209,9 @@ def from_ase(
 
     Args:
         atoms (ase.Atoms): the input.
-        key_mapping (dict): rename ase property name to a new string name. Optional
-        include_keys (list): list of additional keys to include in AtomicData aside from the ones defined in
-                ase.calculators.calculator.all_properties. Optional
-
-    Returns:
-        A ``AtomicData``.
+        key_mapping (Optional[Dict]): rename ase property name to a new string name.
+        include_keys (Optional[List]): list of additional keys to include in AtomicData aside from the ones defined in ``ase.calculators.calculator.all_properties``
+        exclude_keys (Optional[List]): list of keys that may be present in the ``ase.Atoms`` object but the user wishes to exclude
     """
     from nequip.ase import NequIPCalculator
 
@@ -229,7 +227,9 @@ def from_ase(
         ]  # arguments for from_dict method
     )
     include_keys = list(
-        set(include_keys + ase_all_properties + list(key_mapping.keys())) - default_args
+        set(include_keys + ase_all_properties + list(key_mapping.keys()))
+        - default_args
+        - set(exclude_keys)
     )
 
     km = {

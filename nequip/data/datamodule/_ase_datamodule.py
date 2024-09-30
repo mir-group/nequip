@@ -19,6 +19,7 @@ class ASEDataModule(NequIPDataModule):
         transforms (List[Callable]): list of data transforms
         ase_args (Dict[str, Any]): arguments for ``ase.io.iread`` (see `here <https://wiki.fysik.dtu.dk/ase/ase/io/io.html#ase.io.iread>`_)
         include_keys (List[str]): the keys that needs to be parsed in addition to forces and energy; the data stored in ``ase.atoms.Atoms.array`` has the lowest priority, and it will be overrided by data in ``ase.atoms.Atoms.info`` and ``ase.atoms.Atoms.calc.results``
+        exclude_keys (List[str]): list of keys that may be present in the ASE-readable file but the user wishes to exclude
         key_mapping (Dict[str, str]): mapping of ``ase`` keys to ``AtomicDataDict`` keys
         train_dataloader_kwargs (Dict): arguments of the training ``DataLoader``
         val_dataloader_kwargs (Dict): arguments of the validation ``DataLoader``
@@ -40,7 +41,8 @@ class ASEDataModule(NequIPDataModule):
         transforms: List[Callable] = [],
         # ase params
         ase_args: dict = {},
-        include_keys: Optional[list] = [],
+        include_keys: Optional[List[str]] = [],
+        exclude_keys: Optional[List[str]] = [],
         key_mapping: Optional[Dict[str, str]] = {},
         # dataloader kwargs
         train_dataloader_kwargs: Union[dict, DictConfig] = {},
@@ -79,6 +81,7 @@ class ASEDataModule(NequIPDataModule):
             "transforms": transforms,
             "ase_args": ase_args,
             "include_keys": include_keys,
+            "exclude_keys": exclude_keys,
             "key_mapping": key_mapping,
         }
 
