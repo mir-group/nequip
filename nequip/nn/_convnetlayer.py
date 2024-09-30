@@ -12,9 +12,10 @@ from nequip.nn.nonlinearities import ShiftedSoftPlus
 from nequip.utils.tp_utils import tp_path_exists
 
 from typing import Dict, Callable
-import logging
 
-logger = logging.getLogger(__name__)
+from nequip.utils.logger import RankedLogger
+
+logger = RankedLogger(__name__, rank_zero_only=True)
 
 
 acts = {

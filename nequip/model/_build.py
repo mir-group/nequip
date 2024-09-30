@@ -12,9 +12,9 @@ from nequip.utils import (
 )
 from nequip.utils.config import _GLOBAL_ALL_ASKED_FOR_KEYS
 
-import logging
+from nequip.utils.logger import RankedLogger
 
-logger = logging.getLogger(__name__)
+logger = RankedLogger(__name__, rank_zero_only=True)
 
 
 default_config = dict(

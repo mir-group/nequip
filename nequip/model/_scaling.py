@@ -9,9 +9,10 @@ from nequip.utils import format_type_vals
 from omegaconf import ListConfig
 import warnings
 from typing import Union
-import logging
 
-logger = logging.getLogger(__name__)
+from nequip.utils.logger import RankedLogger
+
+logger = RankedLogger(__name__, rank_zero_only=True)
 
 
 RESCALE_THRESHOLD = 1e-6

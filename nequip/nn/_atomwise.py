@@ -11,9 +11,10 @@ from ._graph_mixin import GraphModuleMixin
 from ._rescale import RescaleOutput
 
 from typing import Optional, List
-import logging
 
-logger = logging.getLogger(__name__)
+from nequip.utils.logger import RankedLogger
+
+logger = RankedLogger(__name__, rank_zero_only=True)
 
 
 class AtomwiseOperation(GraphModuleMixin, torch.nn.Module):
