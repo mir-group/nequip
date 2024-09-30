@@ -15,6 +15,7 @@ from .AtomicDataDict import num_frames, num_nodes, num_edges
 
 _DEFAULT_LONG_FIELDS: Set[str] = {
     _keys.EDGE_INDEX_KEY,
+    _keys.EDGE_TYPE_KEY,
     _keys.ATOMIC_NUMBERS_KEY,
     _keys.ATOM_TYPE_KEY,
     _keys.BATCH_KEY,
@@ -51,6 +52,7 @@ _DEFAULT_EDGE_FIELDS: Set[str] = {
     _keys.EDGE_CELL_SHIFT_KEY,
     _keys.EDGE_VECTORS_KEY,
     _keys.EDGE_LENGTH_KEY,
+    _keys.NORM_LENGTH_KEY,
     _keys.EDGE_ATTRS_KEY,
     _keys.EDGE_EMBEDDING_KEY,
     _keys.EDGE_FEATURES_KEY,
