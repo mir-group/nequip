@@ -20,7 +20,7 @@ logger = RankedLogger(__name__, rank_zero_only=True)
 default_config = dict(
     model_builders=[
         "SimpleIrrepsConfig",
-        "EnergyModel",
+        "NequIPGNNEnergyModel",
         "PerSpeciesRescale",
         "StressForceOutput",
         "RescaleEnergyEtc",

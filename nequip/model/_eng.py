@@ -81,7 +81,7 @@ def SimpleIrrepsConfig(config, prefix: Optional[str] = None):
         config[k] = v
 
 
-def EnergyModel(config, initialize: bool) -> SequentialGraphNetwork:
+def NequIPGNNEnergyModel(config, initialize: bool) -> SequentialGraphNetwork:
     """Base default energy model archetecture.
 
     For minimal and full configuration option listings, see ``minimal.yaml`` and ``example.yaml``.
