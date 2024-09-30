@@ -41,6 +41,8 @@ BASIC_STRUCTURE_KEYS: Final[List[str]] = [
 EDGE_VECTORS_KEY: Final[str] = "edge_vectors"
 # A [n_edge] tensor of the lengths of EDGE_VECTORS
 EDGE_LENGTH_KEY: Final[str] = "edge_lengths"
+NORM_LENGTH_KEY: Final[str] = "normed_edge_lengths"
+EDGE_TYPE_KEY: Final[str] = "edge_type_flat"
 
 # [n_edge, dim] (possibly equivariant) attributes of each edge
 EDGE_ATTRS_KEY: Final[str] = "edge_attrs"
