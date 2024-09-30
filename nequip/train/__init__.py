@@ -1,3 +1,4 @@
 from .metrics import Metrics
+from .lightning import NequIPLightningModule
 
-__all__ = [Metrics]
+__all__ = [NequIPLightningModule, Metrics]
