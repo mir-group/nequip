@@ -8,9 +8,9 @@ import e3nn.nn
 from nequip.nn import GraphModuleMixin, GraphModel
 from nequip.utils import Config
 
-import logging
+from nequip.utils.logger import RankedLogger
 
-logger = logging.getLogger(__name__)
+logger = RankedLogger(__name__, rank_zero_only=True)
 
 
 # == Load old state ==
