@@ -21,7 +21,7 @@ class MetricsManager(torch.nn.ModuleList):
 
     The remaining keys are optional.
 
-      - ``per_type`` is a ``bool`` (defaults to ``False`` if not provided). If ``True``, node fields (such as ``forces``) will have their metrics computed separately for each node type based on the ``type_names`` argument. A simple average over the per-type metrics will be used as the "effective" metric returned.
+      - ``per_type`` is a ``bool`` (defaults to ``False`` if not provided). If ``True``, node fields (such as ``forces``) will have their metrics computed separately for each atom type based on the ``type_names`` argument. A simple average over the per-type metrics will be used as the "effective" metric returned. There are some subtleties. 1) During batch steps, the per-type metric for a particular type may be ``NaN`` (by design) if the batch does not contain that atom type. Correspondingly, the per-batch effective metric does not account for that particular type, and is only averaged over the number of atom types that were in that batch. 2) The per-epoch effective metric will always consider all atom types configured in its computation (i.e. when taking the simple average) since all atom types are expected to have contributed to at least one batch step over an epoch.
 
       - ``coeff`` is a ``float`` that determines the relative weight of the metric contribution to an overall ``weighted_sum`` of metrics. A ``weighted_sum`` is automatically computed if any input dictionary contains a float-valued ``coeff``. This feature is important for loss functions for multitask problems (e.g. training on ``total_energy`` and ``forces`` simultaneously), and for constructing an effective validation metrics for monitoring (e.g. for early stopping and lr scheduling). Entries without ``coeff`` will still have their metrics computed, but they will not be incorporated into the ``weighted_sum``. An example for the utility of this feature is for monitoring additional metrics of the same nature (e.g. energy MSE and MAE) but only wanting one of them be in the effective metric used for lr scheduling. Note that these coefficients will be **automatically normalized** to sum up to one, e.g. if one has an energy metric with ``coeff=3`` and a force metric with ``coeff=1``, the ``weighted_sum`` is computed with coefficients ``[0.75, 0.25]`` for the energy and force metric respectively.
 
@@ -129,6 +129,7 @@ class MetricsManager(torch.nn.ModuleList):
 
             if self.per_type[idx]:
                 metric = 0
+                num_contributing_types = 0
                 for type_idx, type_name in enumerate(self.type_names):
                     # index out each type
                     selector = torch.eq(preds[AtomicDataDict.ATOM_TYPE_KEY], type_idx)
@@ -150,8 +151,13 @@ class MetricsManager(torch.nn.ModuleList):
                         prefix + "_".join([self.names[idx], type_name]) + suffix
                     )
                     metric_dict.update({pt_metric_name: pt_metric})
-                    metric = metric + pt_metric
-                metric = metric / len(self.type_names)
+                    # account for batches without atom type
+                    assert pt_metric.numel() == 1
+                    if not torch.isnan(pt_metric):
+                        metric = metric + pt_metric
+                        num_contributing_types += 1
+                assert num_contributing_types <= len(self.type_names)
+                metric = metric / num_contributing_types
             else:
                 # mask out NaNs (based on target)
                 if self.ignore_nans[idx]:
