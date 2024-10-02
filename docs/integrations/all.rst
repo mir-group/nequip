@@ -5,5 +5,4 @@ Integrations
 
     lammps
     ase
-    wandb
     other
