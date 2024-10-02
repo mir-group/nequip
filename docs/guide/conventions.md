@@ -1,3 +1,10 @@
+# Glossary
+
+Some common terms used in the codebase are presented as follows.
+
+ - **config**: the `.yaml` file that is used to configure the training, validation, and/or testing run
+
+
 # Conventions and units
 
 ## Conventions
