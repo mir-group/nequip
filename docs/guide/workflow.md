@@ -3,21 +3,33 @@
 The `nequip` workflow has three steps:
  1. **Training**:  `nequip-train`, `nequip-benchmark`
  2. **Deploying**: `nequip-deploy`
- 3. **Using deployed models**: `nequip-evaluate`, [Integrations](../integrations/all.rst)
+ 3. **Using deployed models**: [Integrations](../integrations/all.rst)
 
-For details on the specific options of any of these commands, please run `nequip-* --help`.
 
 ## Training
 
-The core command in `nequip` is `nequip-train`, which takes in a YAML configuration file defining the model, its hyperparaters, a training and validation set, and other options, and then runs (or restarts) a training session:
+The core command in `nequip` is `nequip-train`, which takes in a YAML config file defining the dataset(s), model, and training hyperparameters, and then runs (or restarts) a training session. [Hydra](https://hydra.cc/) is used to manage the config files, and so many of the features and tricks from Hydra can be used if desired. `nequip-train` can be called as follows.
 ```bash
-$ nequip-train configs/example.yaml
+$ nequip-train -cp path/to/config/directory -cn config_name.yaml
 ```
-A good starting point can be found in `configs/example.yaml`; a comprehensive documentation of the options can be found in `configs/full.yaml`.
+Note that the flags `-cp` and `-cn` refer to the "config path" and "config name" respectively and are features of hydra's [command line flags](https://hydra.cc/docs/advanced/hydra-command-line-flags/). It is possible to use different flags to achieve the same effect if desired (follow the "command line flags" link to learn more).
 
-`nequip-train` logs out a variety of per-minibatch metrics throughout the training process (see [Loss functions and metrics](./loss.md)), reports metrics for the entire epoch at the end of each epoch to the log and to various interfaces, such as [Weights and Biases](../integrations/wandb.md).
+Under the hood, the [Hydra](https://hydra.cc/) config utilities and the [PyTorch Lightning](https://lightning.ai/docs/pytorch/stable/) framework are used to facilitate training and testing in the NequIP infrastructure. One can think of the config as consisting of a set of classes to be instantiated with user-given parameters to construct objects required for training and testing to be performed. Hence, the API of these classes form the central source of truth in terms of what configurable parameters there are. These classes could come from 
+ - `torch` in the case of [optimizers and learning rate scheduler](https://pytorch.org/docs/stable/optim.html), or 
+ - `Lightning` such as Lightning's [trainer](https://lightning.ai/docs/pytorch/stable/common/trainer.html) or Lightning's native [callbacks](https://lightning.ai/docs/pytorch/stable/api_references.html#callbacks), or 
+ - `nequip` itself such as the various [DataModules](../api/datamodule.rst), custom [callbacks](../api/train.rst), etc
 
-At the end of each epoch `nequip` saves the current state of the model and training process, which enables seamless restarts running the same `nequip-train` command of interupted training runs as long as the `append: true` option is set.
+Users are advised to look at `configs/tutorial.yaml` to understand how the config file is structured, and then to look up what each of the classes do and what parameters they can take (be they on `torch`, `Lightning` or `nequip`'s docs). The documentation for `nequip` native classes can be found under [Python API](../api/nequip.rst).
+
+Checkpointing behavior is controlled by `Lightning` and configuring it is the onus of the user. Checkpointing can be controlled by flags in Lightning's [trainer](https://lightning.ai/docs/pytorch/stable/common/trainer.html) and can be specified even further with Lightning's [ModelCheckpoint callback](https://lightning.ai/docs/pytorch/stable/api/lightning.pytorch.callbacks.ModelCheckpoint.html#lightning.pytorch.callbacks.ModelCheckpoint).
+
+One can continue training from a checkpoint file with the following command
+```bash
+nequip-train -cp path/to/config/directory -cn config_name.yaml ++ckpt_path="path/to/ckpt_file"
+```
+where we have used Hydra's [override syntax](https://hydra.cc/docs/advanced/override_grammar/basic/) (`++`). Note how one must still specify the config file used. Training from a checkpoint will always use the model from the checkpoint file, but other training hyperparameters (dataset, loss, metrics, callbacks, etc) is determined by the config file passed in the restart `nequip-train` (and can therefore be different from that of the original config used to generate the checkpoint).
+
+Note that the working directories are managed by Hydra, and users can configure how these directories behave, as well as pass these directories to `Lightning` objects (e.g. so that model checkpoints are saved in the Hydra generated directories). Visit Hydra's [output/working directory page](https://hydra.cc/docs/tutorials/basic/running_your_app/working_directory/) to learn more.
 
 For molecular dynamics simulations in particular, the speed of the interatomic potential model can be very important. `nequip` provides the `nequip-benchmark` command to more easily let you get an approximate sense of the speed of different combinations of hyperparaters and system structures. The command takes the exactly same config file as `nequip-train`, but instead of training it initializes a random model with the given hyperparameter and benchmarks it on the a frame from the training set:
 ```bash
