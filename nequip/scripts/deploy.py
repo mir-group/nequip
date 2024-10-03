@@ -187,13 +187,6 @@ def load_deployed_model(
     return model, metadata
 
 
-"""
-nequip-deploy -cp config_path -cn config_name ++mode=build ++ckpt_path='path/to/ckpt' ++out_file='path/to/output' ++arg_to_override=override_val
-nequip-deploy -cp config_path -cn config_name ++mode=info ++model_path='path/to/model'
-
-"""
-
-
 @hydra.main(version_base=None, config_path=os.getcwd(), config_name="config")
 def main(config: DictConfig) -> None:
 
