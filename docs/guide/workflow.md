@@ -1,9 +1,10 @@
 # The `nequip` workflow
 
 The `nequip` workflow has three steps:
- 1. **Training**:  `nequip-train`, `nequip-benchmark`
- 2. **Deploying**: `nequip-deploy`
- 3. **Using deployed models**: [Integrations](../integrations/all.rst)
+ 1. **Training**:  `nequip-train`
+ 2. **Testing**: `nequip-train`
+ 3. **Deploying**: `nequip-deploy`
+ 4. **Using deployed models**: [Integrations](../integrations/all.rst)
 
 
 ## Training
@@ -25,29 +26,30 @@ Checkpointing behavior is controlled by `Lightning` and configuring it is the on
 
 One can continue training from a checkpoint file with the following command
 ```bash
-nequip-train -cp path/to/config/directory -cn config_name.yaml ++ckpt_path="path/to/ckpt_file"
+nequip-train -cp path/to/config/directory -cn config_name.yaml ++ckpt_path='path/to/ckpt_file'
 ```
 where we have used Hydra's [override syntax](https://hydra.cc/docs/advanced/override_grammar/basic/) (`++`). Note how one must still specify the config file used. Training from a checkpoint will always use the model from the checkpoint file, but other training hyperparameters (dataset, loss, metrics, callbacks, etc) is determined by the config file passed in the restart `nequip-train` (and can therefore be different from that of the original config used to generate the checkpoint).
 
 Note that the working directories are managed by Hydra, and users can configure how these directories behave, as well as pass these directories to `Lightning` objects (e.g. so that model checkpoints are saved in the Hydra generated directories). Visit Hydra's [output/working directory page](https://hydra.cc/docs/tutorials/basic/running_your_app/working_directory/) to learn more.
 
-For molecular dynamics simulations in particular, the speed of the interatomic potential model can be very important. `nequip` provides the `nequip-benchmark` command to more easily let you get an approximate sense of the speed of different combinations of hyperparaters and system structures. The command takes the exactly same config file as `nequip-train`, but instead of training it initializes a random model with the given hyperparameter and benchmarks it on the a frame from the training set:
-```bash
-$ nequip-benchmark configs/minimal.yaml
-``` 
+
+## Testing
+
+Testing is also performed with `nequip-train` by adding `test` to the list of `run` parameters in the config. For example, to have testing be done automatically after training, one can specify `run: [train, test]` in the config. Testing requires test dataset(s) to be defined with the `DataModule` under `data` in the config. One can use `nequip.train.callbacks.TestTimeXYZFileWriter` ([see API](../api/train.rst)) as a callback to have `.xyz` files written with the predictions of the model on the test dataset(s). (This is the replacement for the role `nequip-evaluate` served before `nequip` version `0.7.0`)
+
 
 ## Deploying
 
 Once you have trained a model, you must deploy it to create an archive of its trained parameters and metadata that can be used for simulations and other calculations:
 ```bash
-$ nequip-deploy build path/to/training_session_directory deployed_model.pth
+nequip-deploy -cp path/to/config/directory -cn config_name.yaml ++mode=build ++ckpt_path='path/to/ckpt_file' ++out_file='path/to/deployed_model'
 ```
-which generates `deployed_model.pth`.
 
-You can get info about a deployed model using:
+One can inspect the deployed model with the following command
 ```bash
-$ nequip-deploy info deployed_model.pth
+nequip-deploy -cp path/to/config/directory -cn config_name.yaml ++mode=info ++model_path='path/to/deployed_model'
 ```
+
 
 ## Using deployed models
 
@@ -55,23 +57,8 @@ $ nequip-deploy info deployed_model.pth
 
 There are many ways a deployed model can be used. Most often it can be [used for moelcular dynamics and other calculations in LAMMPS](../integrations/lammps.md). For integrations with other codes and simulation engines, see [Integrations](../integrations/all.rst).
 
-### ...on a fixed set of inputs
-Deployed models can be easily evaluated on a fixed set of inputs using `nequip-evaluate`, with automatic support for batching, which provides a significant speedup on GPUs:
-```bash
-$ nequip-evaluate --model path/to/deployed.pth --dataset-config inputs_definition.yaml --batch-size 50 --output model_predictions.xyz
-```
-`inputs_definition.yaml` here defines a dataset using exactly the same options as a training dataset (see [Dataset](./dataset.md)), but which contains the inputs to evaluate the model on. 
-
-If you want to output fields from the model's prediction other than the defaults (energies, forces, virials/stress), you can request them in a comma-separated list with `--output-fields`:
-```bash
-$ nequip-evaluate --model path/to/deployed.pth --dataset-config inputs_definition.yaml --batch-size 50 --output model_predictions.xyz --output-fields node_features,edge_vectors
-```
-The output file, `model_predictions.xyz`, is in the extXYZ format and can be read with ASE or other tools. Nonstandard fields will show up in the `ase.Atoms` object in `.arrays` for per-atom quantities, or `.info` for system- or edge-level quantities.
-
-You may need to lower the batch size for large models or large systems, and may be able to increase it and improve performance for smaller ones.
-
 ### ...at a low level in your own code
-While LAMMPS, `nequip-evaluate`, or other integrations should be sufficient for the vast majority of usecases, deployed models can also be loaded as PyTorch TorchScript models to be called in your own code:
+While LAMMPS, or other integrations should be sufficient for the vast majority of usecases, deployed models can also be loaded as PyTorch TorchScript models to be called in your own code:
 ```python
 import torch
 import ase.io
