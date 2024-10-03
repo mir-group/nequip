@@ -7,3 +7,4 @@ User Guide
     workflow
     dataset
     loss
+    faq_errors

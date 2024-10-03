@@ -16,8 +16,6 @@ NequIP is an open-source package for creating, training, and using E(3)-equivari
    cite
    guide/guide
    integrations/all
-   faq/FAQ
-   errors/errors
    dev/dev
    api/nequip
 
