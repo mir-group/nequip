@@ -121,7 +121,7 @@ def assert_permutation_equivariant(
             if fail:
                 num_problems += 1
             messages.append(
-                f"   node permutation equivariance of field {k:20}       -> max error={err:.3e}{'  FAIL' if fail else ''}"
+                f"   node permutation equivariance of field {k:22}       -> max error={err:.3e}{'  FAIL' if fail else ''}"
             )
         elif k in edge_permute_fields:
             err = (out_orig[k][edge_perm] - out_perm[k]).abs().max()
@@ -129,7 +129,7 @@ def assert_permutation_equivariant(
             if fail:
                 num_problems += 1
             messages.append(
-                f"   edge permutation equivariance of field {k:20}       -> max error={err:.3e}{'  FAIL' if fail else ''}"
+                f"   edge permutation equivariance of field {k:22}       -> max error={err:.3e}{'  FAIL' if fail else ''}"
             )
         elif k == AtomicDataDict.EDGE_INDEX_KEY:
             pass
@@ -143,7 +143,7 @@ def assert_permutation_equivariant(
             if fail:
                 num_problems += 1
             messages.append(
-                f"   edge & node permutation invariance for field {k:20} -> max error={err:.3e}{'  FAIL' if fail else ''}"
+                f"   edge & node permutation invariance for field {k:22} -> max error={err:.3e}{'  FAIL' if fail else ''}"
             )
     msg = "\n".join(messages)
     if num_problems == 0:
@@ -266,7 +266,19 @@ def assert_AtomicData_equivariant(
                 output[k] = cartesian_tensor[k].from_cartesian(
                     output[k], rtp=cartesian_rtp[k].to(output[k].dtype)
                 )
-        return [output[k] for k in irreps_out]
+        output_list = []
+        # TODO: this is a bit duct-taped and special cased for cell, but maybe it's ok?
+        # potentially a more general solution is to inspect the irreps_out to set the dims of the dummy tensors accordingly
+        # but the irreps_out values are strings (sometimes?)
+        for k in irreps_out:
+            if k in output:
+                output_list.append(output[k])
+            elif k == AtomicDataDict.CELL_KEY:
+                # add a dummy cell
+                output_list.append(torch.zeros(9, dtype=dtype, device=device))
+            else:
+                output_list.append(torch.zeros((1,), dtype=dtype, device=device))
+        return output_list
 
     # prepare input data
     for d in data_in:
@@ -303,7 +315,7 @@ def assert_AtomicData_equivariant(
     is_problem = [e[-1] > e3_tolerance for e in all_errs]
 
     message = (permutation_message + "\n") + "\n".join(
-        f"   (parity_k={int(k[0]):1d}, did_translate={str(bool(k[1])):5}, field={str(k[2]):20})     -> max error={float(k[3]):.3e}{'  FAIL' if prob else ''}"
+        f"   (parity_k={int(k[0]):1d}, did_translate={str(bool(k[1])):5}, field={str(k[2]):22})     -> max error={float(k[3]):.3e}{'  FAIL' if prob else ''}"
         for k, prob in zip(all_errs, is_problem)
         if irreps_out[str(k[2])] is not None
     )
