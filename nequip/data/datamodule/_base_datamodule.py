@@ -151,10 +151,6 @@ class NequIPDataModule(lightning.LightningDataModule):
         """"""
         self.train_generator_state = state_dict["train_generator_state"]
         self.generator_state = state_dict["generator_state"]
-        if self.train_generator is not None:
-            self.train_generator.set_state(self.train_generator_state)
-        if self.generator is not None:
-            self.generator.set_state(self.generator_state)
 
     def state_dict(self) -> Dict[str, Any]:
         """"""
