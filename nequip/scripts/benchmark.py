@@ -3,8 +3,6 @@ import textwrap
 import tempfile
 import itertools
 import time
-import logging
-import sys
 import pdb
 import traceback
 import pickle
@@ -15,16 +13,23 @@ from torch.utils.benchmark.utils.common import trim_sigfig, select_unit
 
 from e3nn.util.jit import script
 
-from nequip.utils import Config
-from nequip.utils.test import assert_AtomicData_equivariant
-from nequip.data import AtomicData, AtomicDataDict, dataset_from_config
-from nequip.model import model_from_config
+from nequip.data import AtomicDataDict
+from nequip.data.datamodule import NequIPDataModule
+from nequip.train import NequIPLightningModule
 from nequip.scripts.deploy import _compile_for_deploy, load_deployed_model
-from nequip.scripts.train import default_config, check_code_version
-from nequip.utils._global_options import _set_global_options
+from nequip.utils.versions import check_code_version
+from nequip.utils._global_options import _set_global_options, _latest_global_config
+from nequip.utils.test import assert_AtomicData_equivariant
+from nequip.utils.logger import RankedLogger
+
+from omegaconf import OmegaConf, DictConfig
+from hydra.utils import instantiate
+import hydra
 
 # TODO: add model-debug-mode
-# TODO: move interesting features of equivariance test from train
+
+
+logger = RankedLogger(__name__, rank_zero_only=True)
 
 
 def main(args=None):
@@ -64,8 +69,8 @@ def main(args=None):
         default=None,
     )
     parser.add_argument(
-        "--n-data",
-        help="Number of frames to use.",
+        "--num_batch",
+        help="Number of batches to use (batch size is controlled by the datamodule's train dataloader arguments).",
         type=int,
         default=2,
     )
@@ -93,10 +98,6 @@ def main(args=None):
     if args.pdb:
         assert args.profile is None
 
-    root_logger = logging.getLogger()
-    root_logger.setLevel(getattr(logging, args.verbose.upper()))
-    root_logger.handlers = [logging.StreamHandler(sys.stderr)]
-
     if args.device is None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     else:
@@ -104,51 +105,62 @@ def main(args=None):
 
     print(f"Using device: {device}")
 
-    config = Config.from_file(args.config, defaults=default_config)
-    _set_global_options(config)
-    check_code_version(config)
+    config = OmegaConf.load(args.config)
 
-    # Load dataset to get something to benchmark on
-    print("Loading dataset... ")
-    dataset_time = time.time()
-    dataset = dataset_from_config(config)
-    dataset_time = time.time() - dataset_time
-    print(f"    loading dataset took {dataset_time:.4f}s")
-    print(
-        f"    loaded dataset of size {len(dataset)} and sampled --n-data={args.n_data} frames"
+    # TODO: write versions into a `versions.txt` in the hydra output dir
+    check_code_version(config, add_to_config=True)
+    logger.debug("Setting global options ...")
+    _set_global_options(**OmegaConf.to_container(config.global_options, resolve=True))
+
+    # === instantiate datamodule ===
+    logger.info("Building datamodule ...")
+
+    # == silently include type_names in stats_manager if present ==
+    assert "type_names" in config.model
+    data = OmegaConf.to_container(config.data, resolve=True)
+    if "stats_manager" in data:
+        data["stats_manager"]["type_names"] = config.model.type_names
+    datamodule = instantiate(data, _recursive_=False)
+    assert isinstance(datamodule, NequIPDataModule)
+
+    # === compute dataset statistics and use resolver to get dataset statistics to model config ===
+    dataset_stats_time = time.time()
+    stats_dict = datamodule.get_statistics(dataset="train")
+    dataset_stats_time = time.time() - dataset_stats_time
+    print(f"Train dataset statistics computation took {dataset_stats_time:.4f}s")
+
+    print("Train dataset statistics:")
+    for k, v in stats_dict.items():
+        print(f"{k:^30}: {v}")
+
+    def training_data_stats(stat_name: str):
+        stat = stats_dict.get(stat_name, None)
+        if stat is None:
+            raise RuntimeError(
+                f"Data statistics field `{stat_name}` was requested for use in model initialization, but was not computed -- users must explicitly configure its computation with the `stats_manager` DataModule argument."
+            )
+        return stat
+
+    OmegaConf.register_new_resolver(
+        "training_data_stats",
+        training_data_stats,
+        use_cache=True,
     )
-    dataset_rng = torch.Generator()
-    dataset_rng.manual_seed(config.get("dataset_seed", config.get("seed", 12345)))
-    dataset = dataset.index_select(
-        torch.randperm(len(dataset), generator=dataset_rng)[: args.n_data]
-    )
-    datas_list = [
-        AtomicData.to_AtomicDataDict(dataset[i].to(device)) for i in range(args.n_data)
-    ]
-    n_atom: int = len(datas_list[0]["pos"])
-    if not all(len(d["pos"]) == n_atom for d in datas_list):
-        raise NotImplementedError(
-            "nequip-benchmark does not currently handle benchmarking on data frames with variable number of atoms"
-        )
-    # print some dataset information
-    print("    benchmark frames statistics:")
-    print(f"         number of atoms: {n_atom}")
-    print(f"         number of types: {dataset.type_mapper.num_types}")
-    print(
-        f"          avg. num edges: {sum(d[AtomicDataDict.EDGE_INDEX_KEY].shape[1] for d in datas_list) / len(datas_list)}"
-    )
-    avg_edges_per_atom = torch.mean(
-        torch.cat(
-            [
-                torch.bincount(
-                    d[AtomicDataDict.EDGE_INDEX_KEY][0],
-                    minlength=d[AtomicDataDict.POSITIONS_KEY].shape[0],
-                ).float()
-                for d in datas_list
-            ]
-        )
-    ).item()
-    print(f"         avg. neigh/atom: {avg_edges_per_atom}")
+    # https://omegaconf.readthedocs.io/en/2.1_branch/usage.html#omegaconf-to-container
+    model_config = OmegaConf.to_container(config.model, resolve=True)
+
+    # === get smaller data list for testing ===
+    datas_list = []
+    try:
+        datamodule.prepare_data()
+        datamodule.setup(stage="fit")
+        dloader = datamodule.train_dataloader()
+        for data in dloader:
+            if len(datas_list) == args.num_batch:
+                break
+            datas_list.append(AtomicDataDict.to_(data, device))
+    finally:
+        datamodule.teardown(stage="fit")
 
     # cycle over the datas we loaded
     datas = itertools.cycle(datas_list)
@@ -160,14 +172,48 @@ def main(args=None):
     elif args.n is None:
         args.n = 5 if args.profile else 30
 
+    # === instantiate NequIP Lightning module ===
+
+    # get training module
+    training_module = hydra.utils.get_class(config.train.training_module)
+    assert issubclass(training_module, NequIPLightningModule)
+
+    # get nequip_module config args and convert to pure Python dicts for wandb logging
+    loss_cfg = OmegaConf.to_container(
+        config.train.get("loss", DictConfig(None)), resolve=True
+    )
+    val_metrics_cfg = OmegaConf.to_container(
+        config.train.get("val_metrics", DictConfig(None)), resolve=True
+    )
+    train_metrics_cfg = OmegaConf.to_container(
+        config.train.get("train_metrics", DictConfig(None)), resolve=True
+    )
+    test_metrics_cfg = OmegaConf.to_container(
+        config.train.get("test_metrics", DictConfig(None)), resolve=True
+    )
+    optimizer_cfg = OmegaConf.to_container(
+        config.train.get("optimizer", DictConfig(None)), resolve=True
+    )
+    lr_scheduler_cfg = OmegaConf.to_container(
+        config.train.get("lr_scheduler", DictConfig(None)), resolve=True
+    )
+
     # Load model:
     if args.model is None:
-        print("Building model... ")
+        print("Building model and training modules ... ")
         model_time = time.time()
         try:
-            model = model_from_config(
-                config, initialize=True, dataset=dataset, deploy=True
+            nequip_module = training_module(
+                model_cfg=model_config,
+                loss_cfg=loss_cfg,
+                val_metrics_cfg=val_metrics_cfg,
+                train_metrics_cfg=train_metrics_cfg,
+                test_metrics_cfg=test_metrics_cfg,
+                optimizer_cfg=optimizer_cfg,
+                lr_scheduler_cfg=lr_scheduler_cfg,
+                num_datasets=datamodule.num_datasets,
             )
+            model = nequip_module.model
         except:  # noqa: E722
             if args.pdb:
                 traceback.print_exc()
@@ -175,7 +221,7 @@ def main(args=None):
             else:
                 raise
         model_time = time.time() - model_time
-        print(f"    building model took {model_time:.4f}s")
+        print(f"    building model and training modules took {model_time:.4f}s")
     else:
         print("Loading model...")
         model, metadata = load_deployed_model(args.model, device=device, freeze=False)
@@ -221,7 +267,7 @@ def main(args=None):
             model = torch.jit.load(f.name, map_location=device)
 
     # Make sure we're warm past compilation
-    warmup = config["_jit_bailout_depth"] + 4  # just to be safe...
+    warmup = _latest_global_config["_jit_bailout_depth"] + 4  # just to be safe...
 
     if args.profile is not None:
 
@@ -309,7 +355,7 @@ def main(args=None):
 
         print(" -- Results --")
         print(
-            f"PLEASE NOTE: these are speeds for the MODEL, evaluated on --n-data={args.n_data} configurations kept in memory."
+            f"PLEASE NOTE: these are speeds for the MODEL, evaluated on --num_batch={args.num_batch} configurations kept in memory."
         )
         print(
             "A variety of factors affect the performance in real molecular dynamics calculations:"
