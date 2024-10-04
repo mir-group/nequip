@@ -116,7 +116,10 @@ def main(config: DictConfig) -> None:
             lr_scheduler_cfg=lr_scheduler_cfg,
             num_datasets=datamodule.num_datasets,
             trainer_cfg=trainer_cfg,
+            strict=False,
         )
+        # ^ strict=False and the next line required to override metrics, etc
+        nequip_module.strict_loading = False
     else:
         # === compute dataset statistics use resolver to get dataset statistics to model config ===
         stats_dict = datamodule.get_statistics(dataset="train")
