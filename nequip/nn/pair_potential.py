@@ -1,12 +1,12 @@
 from typing import Union, Optional, List
 
 import torch
-from torch_runstats.scatter import scatter
 
 from e3nn.util.jit import compile_mode
 
 import ase.data
 
+from nequip.utils import scatter
 from nequip.data import AtomicDataDict
 from nequip.nn import GraphModuleMixin, RescaleOutput
 

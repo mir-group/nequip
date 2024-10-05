@@ -35,7 +35,6 @@ setup(
         'contextvars;python_version<"3.7"',  # backport of contextvars for savenload
         "typing_extensions;python_version<'3.8'",  # backport of Final
         "importlib_metadata;python_version<'3.10'",  # backport of importlib
-        "torch-runstats>=0.2.0",
         "torch-ema>=0.3.0",
         "hydra-core",
         "lightning",
