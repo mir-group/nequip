@@ -1,11 +1,10 @@
 import torch
 import torch.nn.functional
-from torch_runstats.scatter import scatter
 
 from e3nn.o3 import Linear
 
 from nequip.data import AtomicDataDict
-from nequip.utils import dtype_from_name, format_type_vals
+from nequip.utils import scatter, dtype_from_name, format_type_vals
 from nequip.utils.versions import _TORCH_IS_GE_1_13
 from ._graph_mixin import GraphModuleMixin
 from ._rescale import RescaleOutput
