@@ -18,7 +18,6 @@ def _broadcast(src: torch.Tensor, other: torch.Tensor, dim: int):
     return src
 
 
-@torch.jit.script
 def scatter(
     src: torch.Tensor,
     index: torch.Tensor,

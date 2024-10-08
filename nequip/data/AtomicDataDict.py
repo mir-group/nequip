@@ -500,7 +500,6 @@ def without_nodes(data: Type, which_nodes: torch.Tensor) -> Type:
 # == JIT-safe "methods" for use in model code ==
 
 
-@torch.jit.script
 def num_frames(data: Type) -> int:
     if _keys.NUM_NODES_KEY not in data:
         return 1
@@ -508,18 +507,15 @@ def num_frames(data: Type) -> int:
         return len(data[_keys.NUM_NODES_KEY])
 
 
-@torch.jit.script
 def num_nodes(data: Type) -> int:
     return len(data[_keys.POSITIONS_KEY])
 
 
-@torch.jit.script
 def num_edges(data: Type) -> int:
     # will not check if neighborlist is present
     return data[_keys.EDGE_INDEX_KEY].shape[1]
 
 
-@torch.jit.script
 def with_edge_vectors(
     data: Type,
     with_lengths: bool = True,
@@ -583,7 +579,6 @@ def with_edge_vectors(
         return data
 
 
-@torch.jit.script
 def with_batch_(data: Type) -> Type:
     """Get batch Tensor.
 
