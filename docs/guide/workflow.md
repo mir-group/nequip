@@ -35,7 +35,16 @@ Note that the working directories are managed by Hydra, and users can configure 
 
 ## Testing
 
-Testing is also performed with `nequip-train` by adding `test` to the list of `run` parameters in the config. For example, to have testing be done automatically after training, one can specify `run: [train, test]` in the config. Testing requires test dataset(s) to be defined with the `DataModule` under `data` in the config. One can use `nequip.train.callbacks.TestTimeXYZFileWriter` ([see API](../api/train.rst)) as a callback to have `.xyz` files written with the predictions of the model on the test dataset(s). (This is the replacement for the role `nequip-evaluate` served before `nequip` version `0.7.0`)
+Testing is also performed with `nequip-train` by adding `test` to the list of `run` parameters in the config. Testing requires test dataset(s) to be defined with the `DataModule` defined by the `data` key in the config. 
+
+There are two main ways users can use `test`.
+ - One can have testing be done automatically after training in the same `nequip-train` session by specifying `run: [train, test]` in the config. The `test` phase will use the `best` model checkpoint from the `train` phase.
+ - One can run tests from a checkpoint file by having `run: [test]` in the config and using the same command as restarts in the command line, that is, 
+  ```bash
+  nequip-train -cp path/to/config/directory -cn config_name.yaml ++ckpt_path='path/to/ckpt_file'
+  ```
+
+One can use `nequip.train.callbacks.TestTimeXYZFileWriter` ([see API](../api/train.rst)) as a callback to have `.xyz` files written with the predictions of the model on the test dataset(s). (This is the replacement for the role `nequip-evaluate` served before `nequip` version `0.7.0`)
 
 
 ## Deploying
