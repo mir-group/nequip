@@ -142,15 +142,15 @@ def neighbor_list_and_relative_vec(
             use_scaled_positions=False,
         )
 
-    # TODO: should this logic go into the ASE branch only?
-    # Eliminate true self-edges that don't cross periodic boundaries
-    if not self_interaction:
-        bad_edge = first_idex == second_idex
-        bad_edge &= np.all(shifts == 0, axis=1)
-        keep_edge = ~bad_edge
-        first_idex = first_idex[keep_edge]
-        second_idex = second_idex[keep_edge]
-        shifts = shifts[keep_edge]
+        # eliminate true self-edges that don't cross periodic boundaries
+        # only relevant in ASE branch since it supports a self_interaction option
+        if not self_interaction:
+            bad_edge = first_idex == second_idex
+            bad_edge &= np.all(shifts == 0, axis=1)
+            keep_edge = ~bad_edge
+            first_idex = first_idex[keep_edge]
+            second_idex = second_idex[keep_edge]
+            shifts = shifts[keep_edge]
 
     # Build output:
     edge_index = torch.vstack(
