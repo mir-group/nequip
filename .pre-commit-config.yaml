@@ -12,3 +12,4 @@ repos:
     rev: 7.1.0
     hooks:
       - id: flake8
+        additional_dependencies: [Flake8-pyproject]
