@@ -33,11 +33,11 @@ def test_deploy(BENCHMARK_ROOT, fake_model_training_session, device):
     retcode = subprocess.run(
         [
             "nequip-deploy",
-            "-cn",
-            "conf",
-            "++mode=build",
-            f"++ckpt_path='{tmpdir}/last.ckpt'",
-            f"++out_file='{str(deployed_path)}'",
+            "build",
+            "-ckpt_path",
+            f"{tmpdir}/last.ckpt",
+            "-out_file",
+            f"{str(deployed_path)}",
         ],
         cwd=tmpdir,
     )
@@ -54,10 +54,8 @@ def test_deploy(BENCHMARK_ROOT, fake_model_training_session, device):
     retcode = subprocess.run(
         [
             "nequip-deploy",
-            "-cn",
-            "conf",
-            "++mode=info",
-            f"++model_path='{str(deployed_path)}'",
+            "info",
+            f"{str(deployed_path)}",
         ],
         cwd=tmpdir,
         stdout=subprocess.PIPE,
