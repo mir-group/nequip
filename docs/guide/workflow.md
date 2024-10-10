@@ -51,12 +51,12 @@ One can use `nequip.train.callbacks.TestTimeXYZFileWriter` ([see API](../api/tra
 
 Once you have trained a model, you must deploy it to create an archive of its trained parameters and metadata that can be used for simulations and other calculations:
 ```bash
-nequip-deploy -cp full/path/to/config/directory -cn config_name.yaml ++mode=build ++ckpt_path='path/to/ckpt_file' ++out_file='path/to/deployed_model'
+nequip-deploy build -ckpt_path path/to/ckpt_file -out_file path/to/deployed_model
 ```
 
 One can inspect the deployed model with the following command
 ```bash
-nequip-deploy -cp full/path/to/config/directory -cn config_name.yaml ++mode=info ++model_path='path/to/deployed_model'
+nequip-deploy info path/to/deployed_model
 ```
 
 
