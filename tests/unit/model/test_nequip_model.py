@@ -25,7 +25,7 @@ minimal_config1 = dict(
     num_basis=8,
     PolynomialCutoff_p=6,
     nonlinearity_type="norm",
-    **COMMON_CONFIG
+    **COMMON_CONFIG,
 )
 minimal_config2 = dict(
     irreps_edge_sh="0e + 1o",
@@ -33,7 +33,7 @@ minimal_config2 = dict(
     chemical_embedding_irreps_out="8x0e + 8x0o + 8x1e + 8x1o",
     irreps_mid_output_block="2x0e",
     feature_irreps_hidden="4x0e + 4x1o",
-    **COMMON_CONFIG
+    **COMMON_CONFIG,
 )
 minimal_config3 = dict(
     irreps_edge_sh="0e + 1o",
@@ -43,7 +43,7 @@ minimal_config3 = dict(
     num_basis=8,
     PolynomialCutoff_p=6,
     nonlinearity_type="gate",
-    **COMMON_CONFIG
+    **COMMON_CONFIG,
 )
 minimal_config4 = dict(
     irreps_edge_sh="0e + 1o + 2e",
@@ -56,7 +56,7 @@ minimal_config4 = dict(
     # test custom nonlinearities
     nonlinearity_scalars={"e": "silu", "o": "tanh"},
     nonlinearity_gates={"e": "silu", "o": "abs"},
-    **COMMON_CONFIG
+    **COMMON_CONFIG,
 )
 
 

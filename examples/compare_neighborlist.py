@@ -35,7 +35,7 @@ def main():
             atoms_or_data=atoms,
             nl1=getattr(args, "nl1"),
             nl2=getattr(args, "nl2"),
-            **nl_kwargs
+            **nl_kwargs,
         )
 
 
