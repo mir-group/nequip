@@ -1,0 +1,50 @@
+[build-system]
+requires = ["setuptools>=45", "wheel", "setuptools_scm[toml]>=6.2"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nequip"
+dynamic = ["version"]
+description = "NequIP is an open-source code for building E(3)-equivariant interatomic potentials."
+readme = "README.md"
+requires-python = ">=3.7"
+license = {file = "LICENSE"}
+authors = [
+    {name = "Simon Batzner"},
+    {name = "Albert Musealian"},
+    {name = "Lixin Sun"},
+    {name = "Anders Johansson"},
+    {name = "Mario Geiger"},
+    {name = "Tess Smidt"},
+]
+dependencies = [
+    "numpy",
+    "matscipy",
+    "ase",
+    "tqdm",
+    "e3nn>=0.4.4,<0.6.0",
+    "pyyaml",
+    "contextlib2; python_version<'3.7'",
+    "contextvars; python_version<'3.7'",
+    "typing_extensions; python_version<'3.8'",
+    "importlib_metadata; python_version<'3.10'",
+    "hydra-core",
+    "lightning",
+    "torchmetrics",
+]
+
+[project.urls]
+Homepage = "https://github.com/mir-group/nequip"
+Repository = "https://github.com/mir-group/nequip.git"
+
+[project.scripts]
+nequip-train = "nequip.scripts.train:main"
+nequip-benchmark = "nequip.scripts.benchmark:main"
+nequip-deploy = "nequip.scripts.deploy:main"
+
+[tool.setuptools]
+packages = {find = {include = ["nequip", "nequip.*"]}}
+zip-safe = true
+
+[tool.setuptools.dynamic]  # get version from nequip/_version.py
+version = {attr = "nequip._version.__version__"}
