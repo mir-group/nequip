@@ -63,8 +63,8 @@ class NequIPLightningModule(lightning.LightningModule):
             "test": 0,
             "predict": 0,
         },
-        # trainer_cfg is not used much by the class, but is here mainly for logging
-        trainer_cfg: Optional[Dict] = {},
+        # not used by the class, but is here mainly for logging
+        info_dict: Optional[Dict] = {},
     ):
 
         super().__init__()
