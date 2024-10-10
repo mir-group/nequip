@@ -209,6 +209,7 @@ def main(config: DictConfig) -> None:
         _set_global_options(**dict(instantiate(config.global_options)))
         lightning_module = NequIPLightningModule.load_from_checkpoint(config.ckpt_path)
         model = lightning_module.model
+        ckpt_versions = lightning_module.info_dict["versions"]
 
         # === compile model ===
         model = _compile_for_deploy(model)
@@ -220,6 +221,10 @@ def main(config: DictConfig) -> None:
         # === versions ===
         code_versions, code_commits = check_code_version(config)
         for code, version in code_versions.items():
+            if ckpt_versions[code] != version:
+                warnings.warn(
+                    f"`{code}` versions differ between the checkpoint file ({ckpt_versions[code]}) and the current `nequip-deploy` run ({version})"
+                )
             metadata[code + "_version"] = version
         if len(code_commits) > 0:
             metadata[CODE_COMMITS_KEY] = ";".join(
