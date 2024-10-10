@@ -11,9 +11,9 @@ The `nequip` workflow has three steps:
 
 The core command in `nequip` is `nequip-train`, which takes in a YAML config file defining the dataset(s), model, and training hyperparameters, and then runs (or restarts) a training session. [Hydra](https://hydra.cc/) is used to manage the config files, and so many of the features and tricks from Hydra can be used if desired. `nequip-train` can be called as follows.
 ```bash
-$ nequip-train -cp path/to/config/directory -cn config_name.yaml
+$ nequip-train -cp full/path/to/config/directory -cn config_name.yaml
 ```
-Note that the flags `-cp` and `-cn` refer to the "config path" and "config name" respectively and are features of hydra's [command line flags](https://hydra.cc/docs/advanced/hydra-command-line-flags/). It is possible to use different flags to achieve the same effect if desired (follow the "command line flags" link to learn more).
+Note that the flags `-cp` and `-cn` refer to the "config path" and "config name" respectively and are features of hydra's [command line flags](https://hydra.cc/docs/advanced/hydra-command-line-flags/). If one runs `nequip-train` in the same directory where the config file is located, the `-cp` part may be omitted. Note also that the full path is usually required if one uses `-cp`. Users who seek further configurability (e.g. using relative paths, multiple config files located in different directories, etc) are directed to the "[command line flags](https://hydra.cc/docs/advanced/hydra-command-line-flags/)" link to learn more. 
 
 Under the hood, the [Hydra](https://hydra.cc/) config utilities and the [PyTorch Lightning](https://lightning.ai/docs/pytorch/stable/) framework are used to facilitate training and testing in the NequIP infrastructure. One can think of the config as consisting of a set of classes to be instantiated with user-given parameters to construct objects required for training and testing to be performed. Hence, the API of these classes form the central source of truth in terms of what configurable parameters there are. These classes could come from 
  - `torch` in the case of [optimizers and learning rate scheduler](https://pytorch.org/docs/stable/optim.html), or 
@@ -26,7 +26,7 @@ Checkpointing behavior is controlled by `Lightning` and configuring it is the on
 
 One can continue training from a checkpoint file with the following command
 ```bash
-nequip-train -cp path/to/config/directory -cn config_name.yaml ++ckpt_path='path/to/ckpt_file'
+nequip-train -cp full/path/to/config/directory -cn config_name.yaml ++ckpt_path='path/to/ckpt_file'
 ```
 where we have used Hydra's [override syntax](https://hydra.cc/docs/advanced/override_grammar/basic/) (`++`). Note how one must still specify the config file used. Training from a checkpoint will always use the model from the checkpoint file, but other training hyperparameters (dataset, loss, metrics, callbacks, etc) is determined by the config file passed in the restart `nequip-train` (and can therefore be different from that of the original config used to generate the checkpoint).
 
@@ -41,7 +41,7 @@ There are two main ways users can use `test`.
  - One can have testing be done automatically after training in the same `nequip-train` session by specifying `run: [train, test]` in the config. The `test` phase will use the `best` model checkpoint from the `train` phase.
  - One can run tests from a checkpoint file by having `run: [test]` in the config and using the same command as restarts in the command line, that is, 
   ```bash
-  nequip-train -cp path/to/config/directory -cn config_name.yaml ++ckpt_path='path/to/ckpt_file'
+  nequip-train -cp full/path/to/config/directory -cn config_name.yaml ++ckpt_path='path/to/ckpt_file'
   ```
 
 One can use `nequip.train.callbacks.TestTimeXYZFileWriter` ([see API](../api/train.rst)) as a callback to have `.xyz` files written with the predictions of the model on the test dataset(s). (This is the replacement for the role `nequip-evaluate` served before `nequip` version `0.7.0`)
@@ -51,12 +51,12 @@ One can use `nequip.train.callbacks.TestTimeXYZFileWriter` ([see API](../api/tra
 
 Once you have trained a model, you must deploy it to create an archive of its trained parameters and metadata that can be used for simulations and other calculations:
 ```bash
-nequip-deploy -cp path/to/config/directory -cn config_name.yaml ++mode=build ++ckpt_path='path/to/ckpt_file' ++out_file='path/to/deployed_model'
+nequip-deploy -cp full/path/to/config/directory -cn config_name.yaml ++mode=build ++ckpt_path='path/to/ckpt_file' ++out_file='path/to/deployed_model'
 ```
 
 One can inspect the deployed model with the following command
 ```bash
-nequip-deploy -cp path/to/config/directory -cn config_name.yaml ++mode=info ++model_path='path/to/deployed_model'
+nequip-deploy -cp full/path/to/config/directory -cn config_name.yaml ++mode=info ++model_path='path/to/deployed_model'
 ```
 
 
