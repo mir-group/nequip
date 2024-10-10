@@ -21,7 +21,7 @@ We use the [`black`](https://black.readthedocs.io/en/stable/index.html) code for
 Please run the formatter before you commit and certainly before you make a PR. The formatter can be easily set up to run automatically on file save in various editors.
 You can also use ``pre-commit install`` to install a [pre-commit](https://pre-commit.com/) hook.
 
-You may need to install `black`, `flake8` and `Flake8-pyproject` (to read the `flake8` settings from `pyproject.toml`) to run the linter and formatter locally.
+You may need to install `black`, `flake8` and `Flake8-pyproject` (to read the `flake8` settings from `pyproject.toml`) to run the linter and formatter locally. If using a development IDE such as `VSCode` or `PyCharm`, you may need to update the default `flake8` config to match these settings (also listed in `pyproject.toml`).
 
 ## CUDA support
 
