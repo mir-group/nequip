@@ -59,8 +59,7 @@ def main(config: DictConfig) -> None:
         f"and use the output directory provided by Hydra: {hydra.core.hydra_config.HydraConfig.get().runtime.output_dir}"
     )
 
-    # TODO: write versions into a `versions.txt` in the hydra output dir
-    check_code_version(config, add_to_config=True)
+    versions, commits = check_code_version(config)
     logger.debug("Setting global options ...")
     _set_global_options(**OmegaConf.to_container(config.global_options, resolve=True))
 
