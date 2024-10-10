@@ -9,10 +9,10 @@ import torch
 # torch version checks
 torch_version = packaging.version.parse(torch.__version__)
 
-# only allow 1.11*, 1.13* or higher (no 1.12.*)
-assert (torch_version == packaging.version.parse("1.11")) or (
-    torch_version >= packaging.version.parse("1.13")
-), f"NequIP supports PyTorch 1.11.* or 1.13.* or later, but {torch_version} found"
+# only allow 1.13* or higher
+assert torch_version >= packaging.version.parse(
+    "1.13"
+), f"NequIP supports 1.13.* or later, but {torch_version} found"
 
 
 # Load all installed nequip extension packages
