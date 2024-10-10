@@ -22,8 +22,8 @@ import torch
 
 from e3nn.util.jit import script
 
-from nequip.train import NequIPLightningModule
 from omegaconf import OmegaConf
+import hydra
 
 from nequip.utils.misc import dtype_to_name
 from nequip.utils._global_options import _set_global_options, _get_latest_global_options
@@ -245,7 +245,7 @@ def main(args=None):
         # === load checkpoint and extract info ===
         checkpoint = torch.load(
             args.ckpt_path,
-            map_location=lambda storage, loc: storage,
+            map_location="cpu",
             weights_only=False,
         )
 
@@ -319,9 +319,10 @@ def main(args=None):
         metadata = {k: v.encode("ascii") for k, v in metadata.items()}
 
         # == build model from checkpoint and compile model ==
-        # TODO: build model with model_cfg and load weights from checkpoint["state_dict"].keys()
-        # bypassing the need to go through the LightningModule
-        lightning_module = NequIPLightningModule.load_from_checkpoint(args.ckpt_path)
+        training_module = hydra.utils.get_class(
+            checkpoint["hyper_parameters"]["info_dict"]["training_module"]
+        )
+        lightning_module = training_module.load_from_checkpoint(args.ckpt_path)
         model = _compile_for_deploy(lightning_module.model)
         print("Compiled & optimized model.")
 
