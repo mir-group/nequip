@@ -7,7 +7,7 @@ name = "nequip"
 dynamic = ["version"]
 description = "NequIP is an open-source code for building E(3)-equivariant interatomic potentials."
 readme = "README.md"
-requires-python = ">=3.7"
+requires-python = ">=3.9"
 license = {file = "LICENSE"}
 authors = [
     {name = "Simon Batzner"},
@@ -24,9 +24,6 @@ dependencies = [
     "tqdm",
     "e3nn>=0.4.4,<0.6.0",
     "pyyaml",
-    "contextlib2; python_version<'3.7'",
-    "contextvars; python_version<'3.7'",
-    "typing_extensions; python_version<'3.8'",
     "importlib_metadata; python_version<'3.10'",
     "hydra-core",
     "lightning",

@@ -176,7 +176,7 @@ class SequentialGraphNetwork(GraphModuleMixin, torch.nn.Sequential):
         Returns:
             The constructed SequentialGraphNetwork.
         """
-        # note that dictionary ordered gueranteed in >=3.7, so its fine to do an ordered sequential as a dict.
+        # note that dictionary ordered guaranteed in >=3.7, so it's fine to do an ordered sequential as a dict.
         built_modules = []
         for name, builder in layers.items():
             if not isinstance(name, str):
