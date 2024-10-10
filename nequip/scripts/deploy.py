@@ -8,7 +8,6 @@ from typing import Tuple, Dict, Union
 
 import itertools
 import pathlib
-import logging
 import yaml
 import packaging.version
 import warnings
@@ -22,15 +21,17 @@ import torch
 from e3nn.util.jit import script
 
 from nequip.train import NequIPLightningModule
-
 from omegaconf import OmegaConf, DictConfig
-from hydra.utils import instantiate
 import hydra
 import os
 
 from nequip.utils.versions import check_code_version
 from nequip.utils.misc import dtype_to_name
 from nequip.utils._global_options import _set_global_options, _get_latest_global_options
+from nequip.utils.logger import RankedLogger
+
+logger = RankedLogger(__name__, rank_zero_only=True)
+
 
 CONFIG_KEY: Final[str] = "config"
 NEQUIP_VERSION_KEY: Final[str] = "nequip_version"
@@ -205,20 +206,24 @@ def main(config: DictConfig) -> None:
         global _current_metadata
         _current_metadata = {}
 
-        # === build model from checkpoint ===
-        _set_global_options(**dict(instantiate(config.global_options)))
-        lightning_module = NequIPLightningModule.load_from_checkpoint(config.ckpt_path)
-        model = lightning_module.model
-        ckpt_versions = lightning_module.info_dict["versions"]
+        # === load checkpoint and extract info ===
+        checkpoint = torch.load(
+            config.ckpt_path,
+            map_location=lambda storage, loc: storage,
+            weights_only=False,
+        )
 
-        # === compile model ===
-        model = _compile_for_deploy(model)
-        logging.info("Compiled & optimized model.")
+        # == get global options from checkpoint and set them ==
+        global_options = checkpoint["hyper_parameters"]["info_dict"]["global_options"]
+        if "default_dtype" in global_options:
+            global_options.pop("default_dtype")
+        _set_global_options(**global_options)
 
-        # === deploy model with metadata ===
+        # == get metadata ==
         metadata: dict = {}
 
-        # === versions ===
+        # = versions =
+        ckpt_versions = checkpoint["hyper_parameters"]["info_dict"]["versions"]
         code_versions, code_commits = check_code_version(config)
         for code, version in code_versions.items():
             if ckpt_versions[code] != version:
@@ -231,42 +236,41 @@ def main(config: DictConfig) -> None:
                 f"{k}={v}" for k, v in code_commits.items()
             )
 
-        # === model metadata ===
-        metadata[MODEL_DTYPE_KEY] = dtype_to_name(config.model.model_dtype)
-        metadata[R_MAX_KEY] = str(config.model.r_max)
-        type_names = OmegaConf.to_container(config.model.type_names)
-        metadata[N_SPECIES_KEY] = str(len(type_names))
-        metadata[TYPE_NAMES_KEY] = " ".join(type_names)
+        # = model metadata =
+        model_cfg = checkpoint["hyper_parameters"]["model_cfg"]
+        metadata[MODEL_DTYPE_KEY] = dtype_to_name(model_cfg["model_dtype"])
+        metadata[R_MAX_KEY] = str(model_cfg["r_max"])
+        metadata[N_SPECIES_KEY] = str(len(model_cfg["type_names"]))
+        metadata[TYPE_NAMES_KEY] = " ".join(model_cfg["type_names"])
 
-        if "per_edge_type_cutoff" in config.model:
-            per_edge_type_cutoff = OmegaConf.to_container(
-                config.model.per_edge_type_cutoff
-            )
+        if "per_edge_type_cutoff" in model_cfg:
             from nequip.nn.embedding._edge import _process_per_edge_type_cutoff
 
             per_edge_type_cutoff = _process_per_edge_type_cutoff(
-                type_names, per_edge_type_cutoff, config.model.r_max
+                model_cfg["type_names"],
+                model_cfg["per_edge_type_cutoff"],
+                model_cfg["r_max"],
             )
             metadata[PER_EDGE_TYPE_CUTOFF_KEY] = " ".join(
                 str(e.item()) for e in per_edge_type_cutoff.view(-1)
             )
 
-        # === global metadata ===
-        global_config = _get_latest_global_options()
+        # == global metadata ==
+        global_options = _get_latest_global_options()
 
-        metadata[JIT_BAILOUT_KEY] = str(global_config[JIT_BAILOUT_KEY])
+        metadata[JIT_BAILOUT_KEY] = str(global_options[JIT_BAILOUT_KEY])
         if (
             packaging.version.parse(torch.__version__)
             >= packaging.version.parse("1.11")
             and JIT_FUSION_STRATEGY in config
         ):
             metadata[JIT_FUSION_STRATEGY] = ";".join(
-                "%s,%i" % e for e in global_config[JIT_FUSION_STRATEGY]
+                "%s,%i" % e for e in global_options[JIT_FUSION_STRATEGY]
             )
-        metadata[TF32_KEY] = str(int(global_config["allow_tf32"]))
-        metadata[DEFAULT_DTYPE_KEY] = dtype_to_name(global_config["default_dtype"])
+        metadata[TF32_KEY] = str(int(global_options["allow_tf32"]))
+        metadata[DEFAULT_DTYPE_KEY] = dtype_to_name(global_options["default_dtype"])
 
-        # === config metadata ===
+        # == config metadata ==
         metadata[CONFIG_KEY] = yaml.dump(
             OmegaConf.to_yaml(config), default_flow_style=False, default_style=">"
         )
@@ -277,6 +281,11 @@ def main(config: DictConfig) -> None:
             metadata[k] = v
         _current_metadata = None
         metadata = {k: v.encode("ascii") for k, v in metadata.items()}
+
+        # == build model from checkpoint and compile model ==
+        lightning_module = NequIPLightningModule.load_from_checkpoint(config.ckpt_path)
+        model = _compile_for_deploy(lightning_module.model)
+        logger.info("Compiled & optimized model.")
 
         torch.jit.save(model, config.out_file, _extra_files=metadata)
         return
@@ -294,12 +303,12 @@ def main(config: DictConfig) -> None:
 
         # TODO: cfg is from hydra -- which is not easily human readable
         metadata_str = "\n".join("  %s: %s" % e for e in metadata.items())
-        logging.info(f"Loaded TorchScript model with metadata:\n{metadata_str}\n")
-        logging.info(f"Model has {sum(p.numel() for p in model.parameters())} weights")
-        logging.info(
+        logger.info(f"Loaded TorchScript model with metadata:\n{metadata_str}\n")
+        logger.info(f"Model has {sum(p.numel() for p in model.parameters())} weights")
+        logger.info(
             f"Model has {sum(p.numel() for p in model.parameters() if p.requires_grad)} trainable weights"
         )
-        logging.info(
+        logger.info(
             f"Model weights and buffers take {sum(p.numel() * p.element_size() for p in itertools.chain(model.parameters(), model.buffers())) / (1024 * 1024):.2f} MB"
         )
         if config.get("print_config", False):
