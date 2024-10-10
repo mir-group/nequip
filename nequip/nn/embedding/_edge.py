@@ -4,6 +4,7 @@ from e3nn import o3
 from e3nn.util.jit import compile_mode
 
 from nequip.utils._global_options import _GLOBAL_DTYPE
+from nequip.utils import conditional_torchscript_jit
 from nequip.data import AtomicDataDict
 from .._graph_mixin import GraphModuleMixin
 from ..radial_basis import BesselBasis
@@ -163,7 +164,7 @@ class RadialBasisEdgeEncoding(GraphModuleMixin, torch.nn.Module):
     ):
         super().__init__()
         self.basis = basis(**basis_kwargs)
-        self.cutoff = cutoff(**cutoff_kwargs)
+        self.cutoff = conditional_torchscript_jit(cutoff(**cutoff_kwargs))
         self.out_field = out_field
         self._init_irreps(
             irreps_in=irreps_in,
@@ -195,7 +196,7 @@ class AddRadialCutoffToData(GraphModuleMixin, torch.nn.Module):
         irreps_in=None,
     ):
         super().__init__()
-        self.cutoff = cutoff(**cutoff_kwargs)
+        self.cutoff = conditional_torchscript_jit(cutoff(**cutoff_kwargs))
         self._init_irreps(
             irreps_in=irreps_in, irreps_out={AtomicDataDict.EDGE_CUTOFF_KEY: "0e"}
         )
