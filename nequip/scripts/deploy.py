@@ -1,3 +1,4 @@
+import argparse
 import sys
 
 if sys.version_info[1] >= 8:
@@ -7,6 +8,7 @@ else:
 from typing import Tuple, Dict, Union
 
 import itertools
+import importlib
 import pathlib
 import yaml
 import packaging.version
@@ -21,23 +23,16 @@ import torch
 from e3nn.util.jit import script
 
 from nequip.train import NequIPLightningModule
-from omegaconf import OmegaConf, DictConfig
-import hydra
-import os
+from omegaconf import OmegaConf
 
-from nequip.utils.versions import check_code_version
 from nequip.utils.misc import dtype_to_name
 from nequip.utils._global_options import _set_global_options, _get_latest_global_options
-from nequip.utils.logger import RankedLogger
-
-logger = RankedLogger(__name__, rank_zero_only=True)
 
 
 CONFIG_KEY: Final[str] = "config"
 NEQUIP_VERSION_KEY: Final[str] = "nequip_version"
 TORCH_VERSION_KEY: Final[str] = "torch_version"
 E3NN_VERSION_KEY: Final[str] = "e3nn_version"
-CODE_COMMITS_KEY: Final[str] = "code_commits"
 R_MAX_KEY: Final[str] = "r_max"
 PER_EDGE_TYPE_CUTOFF_KEY: Final[str] = "per_edge_type_cutoff"
 N_SPECIES_KEY: Final[str] = "n_species"
@@ -187,20 +182,61 @@ def load_deployed_model(
     return model, metadata
 
 
-@hydra.main(version_base=None, config_path=os.getcwd(), config_name="config")
-def main(config: DictConfig) -> None:
+def main(args=None):
+    parser = argparse.ArgumentParser(
+        description="Deploy and view information about previously deployed NequIP models."
+    )
+    # backward compat for 3.6
+    if sys.version_info[1] > 6:
+        required = {"required": True}
+    else:
+        required = {}
+    parser.add_argument("--verbose", help="log level", default="INFO", type=str)
+    subparsers = parser.add_subparsers(dest="command", title="commands", **required)
+    info_parser = subparsers.add_parser(
+        "info", help="Get information from a deployed model file"
+    )
+    info_parser.add_argument(
+        "model_path",
+        help="Path to a deployed model file.",
+        type=pathlib.Path,
+    )
+    info_parser.add_argument(
+        "--print-config",
+        help="Print the full config of the model.",
+        action="store_true",
+    )
 
-    assert (
-        "mode" in config
-    ), "`mode` not found -- please override with `++mode=build` or `++mode=info`."
+    build_parser = subparsers.add_parser("build", help="Build a deployment model")
+    build_parser.add_argument(
+        "-ckpt_path",
+        help="Path to checkpoint file",
+        type=str,
+    )
+    build_parser.add_argument(
+        "-out_file",
+        help="Output file for deployed model.",
+        type=pathlib.Path,
+        default="deployed.pt",
+    )
 
-    if config.mode == "build":
-        assert (
-            "ckpt_path" in config
-        ), " `ckpt_path` not found -- please override with `++ckpt_path='path/to/ckpt'` containing model to deploy."
-        assert (
-            "out_file" in config
-        ), "`out_file` not found -- please override with `++out_file='path/to/out_file'` for location to save the deployed model at."
+    # TODO: enable overriding logic when a use case arises
+    build_parser.add_argument(
+        "--override_model",
+        help="Add or override model configuration keys from the checkpoint file. Unless you know why you need to, do not use this option.",
+        type=str,
+        default=None,
+    )
+    build_parser.add_argument(
+        "--override_global_options",
+        help="Add or override global_options configuration keys from the checkpoint file. Unless you know why you need to, do not use this option.",
+        type=str,
+        default=None,
+    )
+
+    args = parser.parse_args(args=args)
+
+    if args.command == "build":
 
         # reset the global metadata dict so that model builders can fill it:
         global _current_metadata
@@ -208,7 +244,7 @@ def main(config: DictConfig) -> None:
 
         # === load checkpoint and extract info ===
         checkpoint = torch.load(
-            config.ckpt_path,
+            args.ckpt_path,
             map_location=lambda storage, loc: storage,
             weights_only=False,
         )
@@ -224,17 +260,15 @@ def main(config: DictConfig) -> None:
 
         # = versions =
         ckpt_versions = checkpoint["hyper_parameters"]["info_dict"]["versions"]
-        code_versions, code_commits = check_code_version(config)
-        for code, version in code_versions.items():
-            if ckpt_versions[code] != version:
+
+        for code, ckpt_version in ckpt_versions.items():
+            version = str(importlib.import_module(code).__version__)
+            # sanity check that versions for deploy matches versions from ckpt
+            if ckpt_version != version:
                 warnings.warn(
-                    f"`{code}` versions differ between the checkpoint file ({ckpt_versions[code]}) and the current `nequip-deploy` run ({version})"
+                    f"`{code}` versions differ between the checkpoint file ({ckpt_version}) and the current `nequip-deploy` run ({version}) -- metadata will use the version at deploy time (now), check that this is the intended behavior"
                 )
             metadata[code + "_version"] = version
-        if len(code_commits) > 0:
-            metadata[CODE_COMMITS_KEY] = ";".join(
-                f"{k}={v}" for k, v in code_commits.items()
-            )
 
         # = model metadata =
         model_cfg = checkpoint["hyper_parameters"]["model_cfg"]
@@ -262,7 +296,7 @@ def main(config: DictConfig) -> None:
         if (
             packaging.version.parse(torch.__version__)
             >= packaging.version.parse("1.11")
-            and JIT_FUSION_STRATEGY in config
+            and JIT_FUSION_STRATEGY in global_options
         ):
             metadata[JIT_FUSION_STRATEGY] = ";".join(
                 "%s,%i" % e for e in global_options[JIT_FUSION_STRATEGY]
@@ -272,7 +306,9 @@ def main(config: DictConfig) -> None:
 
         # == config metadata ==
         metadata[CONFIG_KEY] = yaml.dump(
-            OmegaConf.to_yaml(config), default_flow_style=False, default_style=">"
+            OmegaConf.to_yaml(checkpoint["hyper_parameters"]["info_dict"]),
+            default_flow_style=False,
+            default_style=">",
         )
 
         for k, v in _current_metadata.items():
@@ -283,36 +319,30 @@ def main(config: DictConfig) -> None:
         metadata = {k: v.encode("ascii") for k, v in metadata.items()}
 
         # == build model from checkpoint and compile model ==
-        lightning_module = NequIPLightningModule.load_from_checkpoint(config.ckpt_path)
+        # TODO: build model with model_cfg and load weights from checkpoint["state_dict"].keys()
+        # bypassing the need to go through the LightningModule
+        lightning_module = NequIPLightningModule.load_from_checkpoint(args.ckpt_path)
         model = _compile_for_deploy(lightning_module.model)
-        logger.info("Compiled & optimized model.")
+        print("Compiled & optimized model.")
 
-        torch.jit.save(model, config.out_file, _extra_files=metadata)
+        torch.jit.save(model, args.out_file, _extra_files=metadata)
         return
 
-    elif config.mode == "info":
-
-        assert (
-            "model_path" in config
-        ), " `model_path` not found -- please override with `++model_path='path/to/model'` containing a deployed model."
-
+    elif args.command == "info":
         model, metadata = load_deployed_model(
-            config.model_path, set_global_options=True, freeze=False
+            args.model_path, set_global_options=True, freeze=False
         )
-        cfg = metadata.pop(CONFIG_KEY)
-
-        # TODO: cfg is from hydra -- which is not easily human readable
         metadata_str = "\n".join("  %s: %s" % e for e in metadata.items())
-        logger.info(f"Loaded TorchScript model with metadata:\n{metadata_str}\n")
-        logger.info(f"Model has {sum(p.numel() for p in model.parameters())} weights")
-        logger.info(
+        print(f"Loaded TorchScript model with metadata:\n{metadata_str}\n")
+        print(f"Model has {sum(p.numel() for p in model.parameters())} weights")
+        print(
             f"Model has {sum(p.numel() for p in model.parameters() if p.requires_grad)} trainable weights"
         )
-        logger.info(
+        print(
             f"Model weights and buffers take {sum(p.numel() * p.element_size() for p in itertools.chain(model.parameters(), model.buffers())) / (1024 * 1024):.2f} MB"
         )
-        if config.get("print_config", False):
-            print(cfg)
+        if args.print_config:
+            print(metadata.pop(CONFIG_KEY))
 
 
 if __name__ == "__main__":
