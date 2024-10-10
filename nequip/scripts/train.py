@@ -5,7 +5,7 @@
 import numpy as np  # noqa: F401
 
 from nequip.utils.versions import check_code_version
-from nequip.utils._global_options import _set_global_options
+from nequip.utils._global_options import _set_global_options, _get_latest_global_options
 from nequip.utils.logger import RankedLogger
 from nequip.data.datamodule import NequIPDataModule
 from nequip.train import NequIPLightningModule
@@ -101,6 +101,14 @@ def main(config: DictConfig) -> None:
     # the trainer config is not actually used by the nequip_module, but is just used for logging purposes
     trainer_cfg = OmegaConf.to_container(config.train.trainer, resolve=True)
 
+    # assemble versions, global options and trainer dicts to be saved by the NequIPLightningModule
+    info_dict = {
+        "versions": versions,
+        "trainer": trainer_cfg,
+        "global_options": _get_latest_global_options(),
+        "training_module": str(config.train.training_module),
+    }
+
     if "ckpt_path" in config:
         # === instantiate from checkpoint file ===
         # dataset statistics need not be recalculated
@@ -112,6 +120,7 @@ def main(config: DictConfig) -> None:
         # see https://lightning.ai/docs/pytorch/stable/common/checkpointing_basic.html
         nequip_module = training_module.load_from_checkpoint(
             config.ckpt_path,
+            strict=False,
             loss_cfg=loss_cfg,
             val_metrics_cfg=val_metrics_cfg,
             train_metrics_cfg=train_metrics_cfg,
@@ -119,10 +128,9 @@ def main(config: DictConfig) -> None:
             optimizer_cfg=optimizer_cfg,
             lr_scheduler_cfg=lr_scheduler_cfg,
             num_datasets=datamodule.num_datasets,
-            trainer_cfg=trainer_cfg,
-            strict=False,
+            info_dict=info_dict,
         )
-        # ^ strict=False and the next line required to override metrics, etc
+        # `strict=False` above and the next line required to override metrics, etc
         nequip_module.strict_loading = False
     else:
         # === compute dataset statistics use resolver to get dataset statistics to model config ===
@@ -155,7 +163,7 @@ def main(config: DictConfig) -> None:
             optimizer_cfg=optimizer_cfg,
             lr_scheduler_cfg=lr_scheduler_cfg,
             num_datasets=datamodule.num_datasets,
-            trainer_cfg=trainer_cfg,
+            info_dict=info_dict,
         )
 
     # === instantiate Lightning.Trainer ===
