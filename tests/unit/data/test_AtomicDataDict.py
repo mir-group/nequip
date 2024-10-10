@@ -3,8 +3,10 @@ import copy
 
 import numpy as np
 import torch
+from ase import Atoms
 import ase.build
 import ase.geometry
+
 from ase.calculators.singlepoint import SinglePointCalculator
 
 from nequip.data import AtomicDataDict
@@ -82,16 +84,6 @@ def test_non_periodic_edge(CH3CHO):
         assert torch.allclose(
             AtomicDataDict.with_edge_vectors(data)["edge_vectors"][edge],
             torch.as_tensor(real_displacement, dtype=torch.get_default_dtype()),
-        )
-
-
-def test_edges_missing():
-    with pytest.raises(ValueError):
-        # Check that when the cutoff is too small, the code complains
-        # about a lack of edges in the graph.
-        atoms = ase.build.bulk("Cu", "fcc", a=3.6, cubic=True)
-        _ = AtomicDataDict.compute_neighborlist_(
-            AtomicDataDict.from_ase(atoms), r_max=2.5
         )
 
 
@@ -245,6 +237,29 @@ def test_neighborlist_consistency(alt_nl_method, CH3CHO, CuFcc, Si):
     Si_data = AtomicDataDict.from_dict(Si_points)
     for atoms_or_data in [CH3CHO_atoms, CuFcc_atoms, Si_data]:
         compare_neighborlists(atoms_or_data, nl1="ase", nl2=alt_nl_method, r_max=r_max)
+
+
+@pytest.mark.parametrize("nl_method", ["ase", "matscipy", "vesin"])
+def test_no_neighbors(nl_method):
+    """Tests that the neighborlist is empty if there are no neighbors."""
+    # check if modules are installed
+    try:
+        if nl_method == "vesin":
+            import vesin  # noqa: F401
+    except ImportError:
+        pytest.skip(f"package for {nl_method} neighborlist not available")
+
+    # isolated atom
+    H = Atoms("H", positions=[[0, 0, 0]], cell=20 * np.eye(3))
+    data = AtomicDataDict.compute_neighborlist_(AtomicDataDict.from_ase(H), r_max=2.5)
+    assert data[AtomicDataDict.EDGE_INDEX_KEY].numel() == 0
+    assert data[AtomicDataDict.EDGE_CELL_SHIFT_KEY].numel() == 0
+
+    # cutoff smaller than interatomic distance
+    Cu = ase.build.bulk("Cu", "fcc", a=3.6, cubic=True)
+    data = AtomicDataDict.compute_neighborlist_(AtomicDataDict.from_ase(Cu), r_max=2.5)
+    assert data[AtomicDataDict.EDGE_INDEX_KEY].numel() == 0
+    assert data[AtomicDataDict.EDGE_CELL_SHIFT_KEY].numel() == 0
 
 
 def test_batching(Si):
