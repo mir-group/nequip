@@ -36,7 +36,7 @@ class NequIPCalculator(Calculator):
         energy_units_to_eV: float = 1.0,
         length_units_to_A: float = 1.0,
         transforms: List[Callable] = [],
-        **kwargs
+        **kwargs,
     ):
         Calculator.__init__(self, **kwargs)
         self.results = {}
@@ -56,7 +56,7 @@ class NequIPCalculator(Calculator):
         device: Union[str, torch.device] = "cpu",
         chemical_symbols: Optional[Union[List[str], Dict[str, str]]] = None,
         set_global_options: Union[str, bool] = "warn",
-        **kwargs
+        **kwargs,
     ):
         """
         Args:
@@ -94,7 +94,7 @@ class NequIPCalculator(Calculator):
                 ChemicalSpeciesToAtomTypeMapper(chemical_symbols),
                 NeighborListTransform(r_max=r_max),
             ],
-            **kwargs
+            **kwargs,
         )
 
     def calculate(self, atoms=None, properties=["energy"], system_changes=all_changes):
