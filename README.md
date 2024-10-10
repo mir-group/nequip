@@ -14,7 +14,7 @@ NequIP is an open-source code for building E(3)-equivariant interatomic potentia
 
 NequIP requires:
 
-* Python >= 3.7
+* Python >= 3.9
 * PyTorch == `1.11.*` or `1.13.*` or later (do **not** use `1.12`). (Some users have observed silent issues with PyTorch 2+, as reported in #311. Please report any similar issues you encounter.) PyTorch can be installed following the [instructions from their documentation](https://pytorch.org/get-started/locally/). Note that neither `torchvision` nor `torchaudio`, included in the default install command, are needed for NequIP.
 
 **You must install PyTorch before installing NequIP, however it is not marked as a dependency of `nequip` to prevent `pip` from trying to overwrite your PyTorch installation.**
