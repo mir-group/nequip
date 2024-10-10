@@ -106,9 +106,7 @@ def main(args=None):
     print(f"Using device: {device}")
 
     config = OmegaConf.load(args.config)
-
-    # TODO: write versions into a `versions.txt` in the hydra output dir
-    check_code_version(config, add_to_config=True)
+    code_versions, code_commits = check_code_version(config)
     logger.debug("Setting global options ...")
     _set_global_options(**OmegaConf.to_container(config.global_options, resolve=True))
 

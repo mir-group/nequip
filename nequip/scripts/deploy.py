@@ -28,8 +28,7 @@ from hydra.utils import instantiate
 import hydra
 import os
 
-from nequip.utils.versions import check_code_version, get_current_code_versions
-
+from nequip.utils.versions import check_code_version
 from nequip.utils.misc import dtype_to_name
 from nequip.utils._global_options import _set_global_options, _get_latest_global_options
 
@@ -219,8 +218,7 @@ def main(config: DictConfig) -> None:
         metadata: dict = {}
 
         # === versions ===
-        check_code_version(config, add_to_config=True)
-        code_versions, code_commits = get_current_code_versions(config)
+        code_versions, code_commits = check_code_version(config)
         for code, version in code_versions.items():
             metadata[code + "_version"] = version
         if len(code_commits) > 0:
