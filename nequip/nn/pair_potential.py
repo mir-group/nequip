@@ -16,7 +16,7 @@ class _LJParam(torch.nn.Module):
     def __init__(self):
         super().__init__()
 
-    def forward(param, index1, index2):
+    def forward(self, param, index1, index2):
         if param.ndim == 2:
             # make it symmetric
             param = param.triu() + param.triu(1).transpose(-1, -2)
@@ -221,41 +221,46 @@ class SimpleLennardJones(GraphModuleMixin, torch.nn.Module):
         self.lj_epsilon /= rescale_module.scale_by.item()
 
 
-@torch.jit.script
-def _zbl(
-    Z: torch.Tensor,
-    r: torch.Tensor,
-    atom_types: torch.Tensor,
-    edge_index: torch.Tensor,
-    qqr2exesquare: float,
-) -> torch.Tensor:
-    # from LAMMPS pair_zbl_const.h
-    pzbl: float = 0.23
-    a0: float = 0.46850
-    c1: float = 0.02817
-    c2: float = 0.28022
-    c3: float = 0.50986
-    c4: float = 0.18175
-    d1: float = -0.20162
-    d2: float = -0.40290
-    d3: float = -0.94229
-    d4: float = -3.19980
-    # compute
-    edge_types = torch.index_select(atom_types, 0, edge_index.reshape(-1))
-    Z = torch.index_select(Z, 0, edge_types.view(-1)).view(
-        2, -1
-    )  # [center/neigh, n_edge]
-    Zi, Zj = Z[0], Z[1]
-    del edge_types, Z
-    x = ((torch.pow(Zi, pzbl) + torch.pow(Zj, pzbl)) * r) / a0
-    psi = (
-        c1 * (d1 * x).exp()
-        + c2 * (d2 * x).exp()
-        + c3 * (d3 * x).exp()
-        + c4 * (d4 * x).exp()
-    )
-    eng = qqr2exesquare * ((Zi * Zj) / r) * psi
-    return eng
+class _ZBL(torch.nn.Module):
+
+    def __init__(self):
+        super().__init__()
+
+    def forward(
+        self,
+        Z: torch.Tensor,
+        r: torch.Tensor,
+        atom_types: torch.Tensor,
+        edge_index: torch.Tensor,
+        qqr2exesquare: float,
+    ) -> torch.Tensor:
+        # from LAMMPS pair_zbl_const.h
+        pzbl: float = 0.23
+        a0: float = 0.46850
+        c1: float = 0.02817
+        c2: float = 0.28022
+        c3: float = 0.50986
+        c4: float = 0.18175
+        d1: float = -0.20162
+        d2: float = -0.40290
+        d3: float = -0.94229
+        d4: float = -3.19980
+        # compute
+        edge_types = torch.index_select(atom_types, 0, edge_index.reshape(-1))
+        Z = torch.index_select(Z, 0, edge_types.view(-1)).view(
+            2, -1
+        )  # [center/neigh, n_edge]
+        Zi, Zj = Z[0], Z[1]
+        del edge_types, Z
+        x = ((torch.pow(Zi, pzbl) + torch.pow(Zj, pzbl)) * r) / a0
+        psi = (
+            c1 * (d1 * x).exp()
+            + c2 * (d2 * x).exp()
+            + c3 * (d3 * x).exp()
+            + c4 * (d4 * x).exp()
+        )
+        eng = qqr2exesquare * ((Zi * Zj) / r) * psi
+        return eng
 
 
 @compile_mode("script")
@@ -316,12 +321,13 @@ class ZBL(GraphModuleMixin, torch.nn.Module):
             )
             * 0.5,  # Put half the energy on each of ij, ji
         )
+        self._zbl = conditional_torchscript_jit(_ZBL())
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
         data = AtomicDataDict.with_edge_vectors(data, with_lengths=True)
         edge_center = data[AtomicDataDict.EDGE_INDEX_KEY][0]
 
-        zbl_edge_eng = _zbl(
+        zbl_edge_eng = self._zbl(
             Z=self.atomic_numbers,
             r=data[AtomicDataDict.EDGE_LENGTH_KEY],
             atom_types=data[AtomicDataDict.ATOM_TYPE_KEY],
