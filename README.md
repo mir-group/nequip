@@ -10,56 +10,9 @@ NequIP is an open-source code for building E(3)-equivariant interatomic potentia
 
 **PLEASE NOTE:** the NequIP code is under active development and is still in beta versions 0.x.x. In general changes to the patch version (the third number) indicate backward compatible beta releases, but please be aware that file formats and APIs may change. Bug reports are also welcomed in the GitHub issues!
 
-## Installation
+## Install
 
-NequIP requires:
-
-* Python >= 3.9
-* PyTorch == `1.11.*` or `1.13.*` or later (do **not** use `1.12`). (Some users have observed silent issues with PyTorch 2+, as reported in #311. Please report any similar issues you encounter.) PyTorch can be installed following the [instructions from their documentation](https://pytorch.org/get-started/locally/). Note that neither `torchvision` nor `torchaudio`, included in the default install command, are needed for NequIP.
-
-**You must install PyTorch before installing NequIP, however it is not marked as a dependency of `nequip` to prevent `pip` from trying to overwrite your PyTorch installation.**
-
-To install:
-
-* We use [Weights&Biases](https://wandb.ai) (or TensorBoard) to keep track of experiments. This is not a strict requirement — you can use our package without it — but it may make your life easier. If you want to use it, create an account [here](https://wandb.ai) and install the Python package:
-
-  ```
-  pip install wandb
-  ```
-
-* Install NequIP
-
-  NequIP can be installed from PyPI:
-  ```
-  pip install nequip
-  ```
-  or directly from source:
-  ```
-  git clone https://github.com/mir-group/nequip.git
-  cd nequip
-  pip install . 
-  ```
-
-### Installation Issues
-
-The easiest way to check if your installation is working is to train a **toy** model:
-```bash
-$ nequip-train configs/minimal.yaml
-```
-
-If you suspect something is wrong, encounter errors, or just want to confirm that everything is in working order, you can also run the unit tests:
-
-```
-pip install pytest
-pytest tests/unit/
-```
-
-To run the full tests, including a set of longer/more intensive integration tests, run:
-```
-pytest tests/
-```
-
-If a GPU is present, the unit tests will use it.
+Installation instructions can be found [here](docs/guide/install.md).
 
 ## Tutorial 
 
@@ -67,47 +20,14 @@ The best way to learn how to use NequIP is through the [Colab Tutorial](https://
 
 ## Usage
 
-**! PLEASE NOTE:** the first few calls to a NequIP model can be painfully slow. This is expected behaviour as the [profile-guided optimization of TorchScript models](https://program-transformations.github.io/slides/pytorch_neurips.pdf) takes a number of calls to warm up before optimizing the model. (The `nequip-benchmark` script accounts for this.)
-
-### Basic network training
-
-To train a network, you run `nequip-train` with a YAML config file that describes your data set, model hyperparameters, and training options. 
-
-```bash
-$ nequip-train configs/example.yaml
-```
+This [document](docs/guide/workflow.md) explains the `nequip` workflow.
 
 A number of example configuration files are provided:
- - [`configs/minimal.yaml`](configs/minimal.yaml): A minimal example of training a **toy** model on force data.
- - [`configs/minimal_eng.yaml`](configs/minimal_eng.yaml): The same, but for a **toy** model that predicts and trains on only energy labels.
- - [`configs/example.yaml`](configs/example.yaml): Training a more realistic model on forces and energies. **Start here for real models!**
- - [`configs/full.yaml`](configs/full.yaml): A complete configuration file containing all available options along with documenting comments. This file is **for reference**, `example.yaml` is the right starting point for a project.
+ - [`configs/minimal.yaml`](configs/minimal.yaml): A minimal example of training.
+ - [`configs/tutorial.yaml`](configs/tutorial.yaml): A complete configuration file containing all available options along with documenting comments. This file is **for reference**.
 
-Training runs can also be restarted by running the same `nequip-train` command if the `append: True` option is specified in the original YAML. (Otherwise, a new training run with a different name can be started from the loaded state of the previous run.)
+**! PLEASE NOTE:** the first few calls to a NequIP model can be painfully slow. This is expected behaviour as the [profile-guided optimization of TorchScript models](https://program-transformations.github.io/slides/pytorch_neurips.pdf) takes a number of calls to warm up before optimizing the model. (The `nequip-benchmark` script accounts for this.)
 
-All `nequip-*` commands accept the `--help` option to show their call signatures and options.
-
-### Evaluating trained models (and their error)
-
-The `nequip-evaluate` command can be used to evaluate a trained model on a specified dataset, optionally computing error metrics or writing the results to an XYZ file for further processing.
-
-The simplest command is:
-```bash
-$ nequip-evaluate --train-dir /path/to/training/session/
-```
-which will evaluate the original training error metrics over any part of the original dataset not used in the training or validation sets.
-
-For more details on this command, please run `nequip-evaluate --help`.
-
-### Deploying models
-
-The `nequip-deploy` command is used to deploy the result of a training session into a model that can be stored and used for inference.
-It compiles a NequIP model trained in Python to [TorchScript](https://pytorch.org/docs/stable/jit.html).
-The result is an optimized model file that has no dependency on the `nequip` Python library, or even on Python itself:
-```bash
-nequip-deploy build --train-dir path/to/training/session/ where/to/put/deployed_model.pth
-```
-For more details on this command, please run `nequip-deploy --help`.
 
 ### Using models in Python
 
