@@ -54,7 +54,10 @@ def _set_global_options(
     # TODO: default for ROCm?
     # _jit_fuser="fuser1",  # TODO: what is this?
     allow_tf32: bool = False,
-    e3nn_optimization_defaults: dict = {},
+    # e3nn_optimization_defaults
+    specialized_code: bool = True,
+    optimize_einsums: bool = True,
+    jit_script_fx: bool = True,
     warn_on_override: bool = False,
 ) -> None:
     """Configure global options of libraries like `torch` and `e3nn` based on `config`.
@@ -70,7 +73,9 @@ def _set_global_options(
             "_jit_bailout_depth": _jit_bailout_depth,
             "_jit_fusion_strategy": _jit_fusion_strategy,
             "allow_tf32": allow_tf32,
-            "e3nn_optimization_defaults": e3nn_optimization_defaults,
+            "specialized_code": specialized_code,
+            "optimize_einsums": optimize_einsums,
+            "jit_script_fx": jit_script_fx,
             "warn_on_override": warn_on_override,
             "default_dtype": _GLOBAL_DTYPE,
         }
@@ -139,7 +144,12 @@ def _set_global_options(
         os.environ[k] = "1"
 
     torch.set_default_dtype(_GLOBAL_DTYPE)
-    e3nn.set_optimization_defaults(**e3nn_optimization_defaults)
+
+    e3nn.set_optimization_defaults(
+        specialized_code=specialized_code,
+        optimize_einsums=optimize_einsums,
+        jit_script_fx=jit_script_fx,
+    )
 
     # ENVIRONMENT VARIABLES
     # torch.multiprocessing fix for batch_size=1
