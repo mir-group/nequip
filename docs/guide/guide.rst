@@ -3,8 +3,9 @@ User Guide
 
  .. toctree::
 
-    conventions
+    install
     workflow
+    conventions
     dataset
     loss
     faq_errors
