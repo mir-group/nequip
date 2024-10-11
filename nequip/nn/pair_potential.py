@@ -6,21 +6,27 @@ from e3nn.util.jit import compile_mode
 
 import ase.data
 
-from nequip.utils import scatter
+from nequip.utils import scatter, conditional_torchscript_jit
 from nequip.data import AtomicDataDict
 from nequip.nn import GraphModuleMixin, RescaleOutput
 
 
-@torch.jit.script
-def _param(param, index1, index2):
-    if param.ndim == 2:
-        # make it symmetric
-        param = param.triu() + param.triu(1).transpose(-1, -2)
-        # get for each atom pair
-        param = torch.index_select(param.view(-1), 0, index1 * param.shape[0] + index2)
-    # make it positive
-    param = param.relu()  # TODO: better way?
-    return param
+class _LJParam(torch.nn.Module):
+
+    def __init__(self):
+        super().__init__()
+
+    def forward(param, index1, index2):
+        if param.ndim == 2:
+            # make it symmetric
+            param = param.triu() + param.triu(1).transpose(-1, -2)
+            # get for each atom pair
+            param = torch.index_select(
+                param.view(-1), 0, index1 * param.shape[0] + index2
+            )
+        # make it positive
+        param = param.relu()  # TODO: better way?
+        return param
 
 
 @compile_mode("script")
@@ -84,6 +90,8 @@ class LennardJones(GraphModuleMixin, torch.nn.Module):
             lj_exponent = 6.0
         self.exponent = lj_exponent
 
+        self._param = conditional_torchscript_jit(_LJParam())
+
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
         data = AtomicDataDict.with_edge_vectors(data, with_lengths=True)
         edge_center = data[AtomicDataDict.EDGE_INDEX_KEY][0]
@@ -95,9 +103,9 @@ class LennardJones(GraphModuleMixin, torch.nn.Module):
         index1 = edge_types[0]
         index2 = edge_types[1]
 
-        sigma = _param(self.sigma, index1, index2)
-        delta = _param(self.delta, index1, index2)
-        epsilon = _param(self.epsilon, index1, index2)
+        sigma = self._param(self.sigma, index1, index2)
+        delta = self._param(self.delta, index1, index2)
+        epsilon = self._param(self.epsilon, index1, index2)
 
         if self.lj_style == "repulsive":
             # 0.5 to assign half and half the energy to each side of the interaction
