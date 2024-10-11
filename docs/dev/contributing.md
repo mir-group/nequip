@@ -46,4 +46,4 @@
 
  All PRs should be onto the `develop` branch or other feature branches, and **NOT** `main` (unless they fix a significant bug with immediate impact).
 
- It is preferable to `rebase` wherever possible, and `merge` only if the situation calls for it. We strive towards a clean and easily-readable commit history.
+ On feature branches, it is preferable to `rebase` wherever possible, and `merge` only if the situation calls for it. We strive towards a clean and easily-readable commit history. Note that this does not apply to `develop` or `main` -- the commit history on these core branches are sacred.
