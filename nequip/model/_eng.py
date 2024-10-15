@@ -82,11 +82,21 @@ def SimpleIrrepsConfig(config, prefix: Optional[str] = None):
 
 
 def NequIPGNNEnergyModel(config, initialize: bool) -> SequentialGraphNetwork:
-    """Base default energy model archetecture.
+    """Base default energy model architecture.
 
-    For minimal and full configuration option listings, see ``minimal.yaml`` and ``example.yaml``.
+    For minimal and full configuration option listings, see ``minimal.yaml`` and ``tutorial.yaml``.
     """
+    # == provide default num_layers and sanity check ==
     num_layers = config.get("num_layers", 3)
+    assert (
+        num_layers > 0
+    ), f"at least one convnet layer required, but found `num_layers={num_layers}`"
+
+    # == to ensure isolated atoms have zero per-atom energies from the NequIPGNN model ==
+    # users can override this by providing the explicit config param `layer0_convnet_convolution_use_sc`
+    config["layer0_convnet_convolution_use_sc"] = config.get(
+        "layer0_convnet_convolution_use_sc", False
+    )
 
     layers = {
         # -- Encode --
