@@ -22,6 +22,7 @@ Most recent change on the bottom.
  - [Breaking] migrate existing callbacks (loss weight scheduler and SoftAdapt) to `Lightning`'s callbacks systems
  - replace example configs with new `hydra` based ones
  - NequIP model computes initial embeddings in dataset dtype (usually the global default dtype float64)
+ - [Breaking] first convnet layer in the NequIP GNN model has `use_sc=False` by default to ensure zero per-atom energies from the NequIPGNNEnergyModel for isolated atoms
 
 ### Removed
  - [Breaking] `AtomicDataset.rdf` and `examples/rdf.py` and `AtomicInMemoryDataset`
