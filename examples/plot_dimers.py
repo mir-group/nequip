@@ -2,21 +2,26 @@
 
 import argparse
 import itertools
-from pathlib import Path
 
 from scipy.special import comb
 import matplotlib.pyplot as plt
 
 import torch
 
-from nequip.data import AtomicData, AtomicDataDict
-from nequip.scripts.evaluate import _load_deployed_or_traindir
+from nequip.data import AtomicDataDict
+import hydra
 
 # Parse arguments:
 parser = argparse.ArgumentParser(
     description="Plot energies of two-atom dimers from a NequIP model"
 )
-parser.add_argument("model", help="Training dir or deployed model", type=Path)
+
+parser.add_argument(
+    "-ckpt_path",
+    help="Path to checkpoint file",
+    type=str,
+)
+
 parser.add_argument(
     "--device", help="Device", default="cuda" if torch.cuda.is_available() else "cpu"
 )
@@ -27,14 +32,26 @@ parser.add_argument("--n-samples", default=500, type=int)
 args = parser.parse_args()
 
 print("Loading model... ")
-model, loaded_deployed_model, model_r_max, type_names = _load_deployed_or_traindir(
-    args.model, device=args.device
+
+# === get model hyperparameters ===
+checkpoint = torch.load(
+    args.ckpt_path,
+    map_location="cpu",
+    weights_only=False,
 )
-print(f"    loaded{' deployed' if loaded_deployed_model else ''} model")
+
+training_module = checkpoint["hyper_parameters"]["info_dict"]["training_module"]
+model_cfg = training_module["model"]
+model_r_max = float(model_cfg["r_max"])
+type_names = model_cfg["type_names"]
 num_types = len(type_names)
 
-if args.r_max is not None:
-    model_r_max = args.r_max
+# === load model ===
+training_module = hydra.utils.get_class(training_module["_target_"])
+lightning_module = training_module.load_from_checkpoint(args.ckpt_path)
+model = lightning_module.model
+model.to(args.device)
+
 
 print("Computing dimers...")
 potential = {}
@@ -43,8 +60,14 @@ type_combos = [
     list(e) for e in itertools.combinations_with_replacement(range(num_types), 2)
 ]
 N_combos = len(type_combos)
-r = torch.zeros(N_sample * N_combos, 2, 3, device=args.device)
-rs_one = torch.linspace(args.r_min, model_r_max, N_sample, device=args.device)
+r = torch.zeros(N_sample * N_combos, 2, 3)
+
+if args.r_max is not None:
+    max_range = args.r_max
+else:
+    max_range = model_r_max
+
+rs_one = torch.linspace(args.r_min, max_range, N_sample)
 rs = rs_one.repeat([N_combos])
 assert rs.shape == (N_combos * N_sample,)
 r[:, 1, 0] += rs  # offset second atom along x axis
@@ -54,17 +77,26 @@ r = r.reshape(-1, 3)
 assert types.shape == r.shape[:1]
 N_at_total = N_sample * N_combos * 2
 assert len(types) == N_at_total
-edge_index = torch.vstack(
-    (
-        torch.arange(N_at_total, device=args.device, dtype=torch.long),
-        torch.arange(1, N_at_total + 1, device=args.device, dtype=torch.long)
-        % N_at_total,
+
+data = {
+    AtomicDataDict.POSITIONS_KEY: r,
+    AtomicDataDict.ATOM_TYPE_KEY: types,
+}
+
+data[AtomicDataDict.BATCH_KEY] = torch.repeat_interleave(
+    torch.arange(r.shape[0] // 2, dtype=torch.long), 2
+)
+data[AtomicDataDict.NUM_NODES_KEY] = torch.full((r.shape[0] // 2,), 2, dtype=torch.long)
+data[AtomicDataDict.PBC_KEY] = torch.full((r.shape[0] // 2, 3), False, dtype=torch.bool)
+
+result = model(
+    AtomicDataDict.to_(
+        AtomicDataDict.compute_neighborlist_(
+            AtomicDataDict.from_dict(data), r_max=model_r_max
+        ),
+        args.device,
     )
 )
-data = AtomicData(pos=r, atom_types=types, edge_index=edge_index)
-data.batch = torch.arange(N_sample * N_combos, device=args.device).repeat_interleave(2)
-data.ptr = torch.arange(0, 2 * N_sample * N_combos + 1, 2, device=args.device)
-result = model(AtomicData.to_AtomicDataDict(data.to(device=args.device)))
 
 print("Plotting...")
 energies = (
@@ -79,13 +111,17 @@ rs_one = rs_one.cpu().numpy()
 nrows = int(comb(N=num_types, k=2, repetition=True))
 fig, axs = plt.subplots(
     nrows=nrows,
+    ncols=1,
     sharex=True,
     figsize=(6, 2 * nrows),
     dpi=120,
 )
 
 for i, (type1, type2) in enumerate(type_combos):
-    ax = axs[i]
+    if nrows == 1:
+        ax = axs
+    else:
+        ax = axs[i]
     ax.set_ylabel(f"{type_names[type1]}-{type_names[type2]}")
     ax.plot(rs_one, energies[i])
 
