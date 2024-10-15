@@ -15,6 +15,8 @@ COMMON_CONFIG = {
     "pair_style": "ZBL",
     "ZBL_chemical_species": ["H", "C", "O"],
     "units": "metal",
+    # for the per-atom shift test
+    "per_type_energy_scale_shift_shifts": [3.45, 5.67, 7.89],
 }
 r_max = 3
 minimal_config1 = dict(
@@ -108,6 +110,13 @@ class TestNequIPModel(BaseEnergyModelTests):
                     AtomicDataDict.FORCE_KEY,
                     AtomicDataDict.STRESS_KEY,
                     AtomicDataDict.VIRIAL_KEY,
+                ],
+            ),
+            (
+                ["NequIPGNNEnergyModel", "PerTypeEnergyScaleShift"],
+                [
+                    AtomicDataDict.TOTAL_ENERGY_KEY,
+                    AtomicDataDict.PER_ATOM_ENERGY_KEY,
                 ],
             ),
         ],

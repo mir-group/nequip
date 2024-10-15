@@ -559,3 +559,34 @@ class BaseEnergyModelTests(BaseModelTests):
         with torch.no_grad():
             for p, v in zip(all_params, old_state):
                 p.copy_(v)
+
+    def test_isolated_atom_energies(self, model, config, device):
+        """Checks that isolated atom energies provided for the per-atom shifts are restored for isolated atoms."""
+        instance, out_fields = model
+        config, out_fields = config
+        if "PerTypeEnergyScaleShift" not in config["model_builders"]:
+            pytest.skip()
+
+        # get the isolated atom energies
+        isolated_energies = torch.tensor(
+            config["per_type_energy_scale_shift_shifts"], device=device
+        )
+
+        # make a synthetic data consisting of three isolated atom frames
+        data_list = []
+        for type_idx in range(3):
+            data = {
+                "atom_types": np.array([type_idx]),
+                "pos": np.array([[0.0, 0.0, 0.0]]),
+            }
+            data_list.append(AtomicDataDict.from_dict(data))
+        data = AtomicDataDict.to_(
+            AtomicDataDict.compute_neighborlist_(
+                AtomicDataDict.batched_from_list(data_list), r_max=config["r_max"]
+            ),
+            device,
+        )
+        out = instance(data)
+        assert torch.allclose(
+            out[AtomicDataDict.TOTAL_ENERGY_KEY], isolated_energies.reshape(3, 1)
+        )
