@@ -131,7 +131,7 @@ def assert_permutation_equivariant(
             messages.append(
                 f"   edge permutation equivariance of field {k:22}       -> max error={err:.3e}{'  FAIL' if fail else ''}"
             )
-        elif k == AtomicDataDict.EDGE_INDEX_KEY:
+        elif k in [AtomicDataDict.EDGE_INDEX_KEY, AtomicDataDict.EDGE_TYPE_KEY]:
             pass
         else:
             # Assume invariant
