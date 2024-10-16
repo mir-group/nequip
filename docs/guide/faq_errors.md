@@ -2,9 +2,18 @@
 
 ## FAQs
 
-examples of frequently asked questions
+Examples of frequently asked questions
 
 ## Commons Errors
+
+  - Problem: Trying to run `nequip-train` as follows fails.
+    ```bash
+	nequip-train config.yaml
+	```
+	Solution: Read the [workflow docs](workflow.md) and follow hydra's command line options, e.g.
+	```bash
+	nequip-train -cn config.yaml
+	```
 
   - Various shape errors
 
