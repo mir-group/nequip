@@ -126,28 +126,30 @@ def test_without_nodes(CH3CHO):
 
 
 @pytest.mark.parametrize("periodic", [True, False])
-def test_positions_grad(periodic, CH3CHO, CuFcc):
+def test_positions_grad(periodic, H2, CuFcc):
 
     if periodic:
         atoms, data = CuFcc
     else:
-        atoms, data = CH3CHO
+        atoms, data = H2
 
     data["pos"].requires_grad_(True)
-    assert AtomicDataDict.with_edge_vectors(data)["edge_vectors"].requires_grad
-
+    data = AtomicDataDict.with_edge_vectors(data)
+    assert data[AtomicDataDict.EDGE_VECTORS_KEY].requires_grad
     torch.autograd.grad(
-        AtomicDataDict.with_edge_vectors(data)["edge_vectors"].sum(),
+        data[AtomicDataDict.EDGE_VECTORS_KEY].sum(),
         data["pos"],
         create_graph=True,
     )
+    data.pop(AtomicDataDict.EDGE_VECTORS_KEY)
 
     if periodic:
         # Test grad cell
         data["cell"].requires_grad_(True)
-        assert AtomicDataDict.with_edge_vectors(data)["edge_vectors"].requires_grad
+        data = AtomicDataDict.with_edge_vectors(data)
+        assert data[AtomicDataDict.EDGE_VECTORS_KEY].requires_grad
         torch.autograd.grad(
-            AtomicDataDict.with_edge_vectors(data)["edge_vectors"].sum(),
+            data[AtomicDataDict.EDGE_VECTORS_KEY].sum(),
             data["cell"],
             create_graph=True,
         )
@@ -285,7 +287,7 @@ def edge_index_set_equiv(a, b):
     return set(zip(a[0], a[1])) == set(zip(b[0], b[1]))
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def H2():
     atoms = ase.build.molecule("H2")
     data = AtomicDataDict.compute_neighborlist_(
@@ -296,7 +298,7 @@ def H2():
     return atoms, data
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def CuFcc():
     atoms = ase.build.bulk("Cu", "fcc", a=3.6, cubic=True)
     atoms.calc = SinglePointCalculator(
@@ -310,7 +312,7 @@ def CuFcc():
     return atoms, data
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def Si():
     lattice = torch.tensor(
         [
