@@ -5,6 +5,8 @@ from lightning.pytorch import seed_everything
 import e3nn
 import e3nn.util.jit
 
+from .misc import dtype_to_name
+
 import warnings
 from packaging import version
 import os
@@ -77,7 +79,7 @@ def _set_global_options(
             "optimize_einsums": optimize_einsums,
             "jit_script_fx": jit_script_fx,
             "warn_on_override": warn_on_override,
-            "default_dtype": _GLOBAL_DTYPE,
+            "default_dtype": dtype_to_name(_GLOBAL_DTYPE),
         }
     )
 
