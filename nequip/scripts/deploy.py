@@ -271,7 +271,7 @@ def main(args=None):
             metadata[code + "_version"] = version
 
         # = model metadata =
-        model_cfg = checkpoint["hyper_parameters"]["model_cfg"]
+        model_cfg = checkpoint["hyper_parameters"]["model"]
         metadata[MODEL_DTYPE_KEY] = dtype_to_name(model_cfg["model_dtype"])
         metadata[R_MAX_KEY] = str(model_cfg["r_max"])
         metadata[N_SPECIES_KEY] = str(len(model_cfg["type_names"]))
@@ -299,7 +299,7 @@ def main(args=None):
             and JIT_FUSION_STRATEGY in global_options
         ):
             metadata[JIT_FUSION_STRATEGY] = ";".join(
-                "%s,%i" % e for e in global_options[JIT_FUSION_STRATEGY]
+                "%s,%i" % (e[0], e[1]) for e in global_options[JIT_FUSION_STRATEGY]
             )
         metadata[TF32_KEY] = str(int(global_options["allow_tf32"]))
         metadata[DEFAULT_DTYPE_KEY] = dtype_to_name(global_options["default_dtype"])
@@ -320,7 +320,7 @@ def main(args=None):
 
         # == build model from checkpoint and compile model ==
         training_module = hydra.utils.get_class(
-            checkpoint["hyper_parameters"]["info_dict"]["training_module"]
+            checkpoint["hyper_parameters"]["info_dict"]["training_module"]["_target_"]
         )
         lightning_module = training_module.load_from_checkpoint(args.ckpt_path)
         model = _compile_for_deploy(lightning_module.model)
@@ -333,7 +333,9 @@ def main(args=None):
         model, metadata = load_deployed_model(
             args.model_path, set_global_options=True, freeze=False
         )
-        metadata_str = "\n".join("  %s: %s" % e for e in metadata.items())
+        metadata_str = "\n".join(
+            "  %s: %s" % e if e[0] != CONFIG_KEY else "" for e in metadata.items()
+        )
         print(f"Loaded TorchScript model with metadata:\n{metadata_str}\n")
         print(f"Model has {sum(p.numel() for p in model.parameters())} weights")
         print(
