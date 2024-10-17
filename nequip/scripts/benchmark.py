@@ -13,13 +13,12 @@ from torch.utils.benchmark.utils.common import trim_sigfig, select_unit
 
 from e3nn.util.jit import script
 
+from nequip.utils import get_current_code_versions, RankedLogger
+from nequip.utils._global_options import _set_global_options, _latest_global_config
+from nequip.utils.test import assert_AtomicData_equivariant
 from nequip.data import AtomicDataDict
 from nequip.data.datamodule import NequIPDataModule
 from nequip.scripts.deploy import _compile_for_deploy, load_deployed_model
-from nequip.utils.versions import check_code_version
-from nequip.utils._global_options import _set_global_options, _latest_global_config
-from nequip.utils.test import assert_AtomicData_equivariant
-from nequip.utils.logger import RankedLogger
 
 from omegaconf import OmegaConf
 from hydra.utils import instantiate
@@ -104,7 +103,7 @@ def main(args=None):
     print(f"Using device: {device}")
 
     config = OmegaConf.load(args.config)
-    code_versions, code_commits = check_code_version(config)
+    _ = get_current_code_versions()
     logger.debug("Setting global options ...")
     _set_global_options(**OmegaConf.to_container(config.global_options, resolve=True))
 

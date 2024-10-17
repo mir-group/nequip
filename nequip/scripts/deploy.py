@@ -8,7 +8,6 @@ else:
 from typing import Tuple, Dict, Union
 
 import itertools
-import importlib
 import pathlib
 import yaml
 import packaging.version
@@ -25,7 +24,7 @@ from e3nn.util.jit import script
 from omegaconf import OmegaConf
 import hydra
 
-from nequip.utils.misc import dtype_to_name
+from nequip.utils import dtype_to_name, get_current_code_versions
 from nequip.utils._global_options import _set_global_options, _get_latest_global_options
 
 
@@ -260,15 +259,16 @@ def main(args=None):
 
         # = versions =
         ckpt_versions = checkpoint["hyper_parameters"]["info_dict"]["versions"]
+        deploy_versions = get_current_code_versions()
 
-        for code, ckpt_version in ckpt_versions.items():
-            version = str(importlib.import_module(code).__version__)
+        for code, deploy_version in deploy_versions.items():
+            ckpt_version = ckpt_versions[code]
             # sanity check that versions for deploy matches versions from ckpt
-            if ckpt_version != version:
+            if ckpt_version != deploy_version:
                 warnings.warn(
-                    f"`{code}` versions differ between the checkpoint file ({ckpt_version}) and the current `nequip-deploy` run ({version}) -- metadata will use the version at deploy time (now), check that this is the intended behavior"
+                    f"`{code}` versions differ between the checkpoint file ({ckpt_version}) and the current `nequip-deploy` run ({deploy_version}) -- metadata will use the version at deploy time (now), check that this is the intended behavior"
                 )
-            metadata[code + "_version"] = version
+            metadata[code + "_version"] = deploy_version
 
         # = model metadata =
         model_cfg = checkpoint["hyper_parameters"]["model"]

@@ -5,9 +5,8 @@
 import numpy as np  # noqa: F401
 import torch
 
-from nequip.utils.versions import check_code_version
+from nequip.utils import get_current_code_versions, RankedLogger
 from nequip.utils._global_options import _set_global_options, _get_latest_global_options
-from nequip.utils.logger import RankedLogger
 from nequip.data.datamodule import NequIPDataModule
 from nequip.train import NequIPLightningModule
 
@@ -72,12 +71,13 @@ def main(config: DictConfig) -> None:
             "test_metrics" in config.training_module
         ), "`training_module.test_metrics` must be provided in the config to perform a `test` run."
 
+    versions = get_current_code_versions()
+
     logger.info(f"This `nequip-train` run will perform the following tasks: {runs}")
     logger.info(
         f"and use the output directory provided by Hydra: {hydra.core.hydra_config.HydraConfig.get().runtime.output_dir}"
     )
 
-    versions, commits = check_code_version(config)
     logger.debug("Setting global options ...")
     _set_global_options(**OmegaConf.to_container(config.global_options, resolve=True))
 
