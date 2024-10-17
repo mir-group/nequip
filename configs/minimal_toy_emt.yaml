@@ -46,21 +46,22 @@ data:
           _target_: nequip.data.RootMeanSquare
         name: forces_rms
 
-train:
-  training_module: nequip.train.NequIPLightningModule
-  trainer:
-    _target_: lightning.Trainer
-    max_epochs: 5
-    check_val_every_n_epoch: 1
-    log_every_n_steps: 3
-    callbacks:
-      - _target_: lightning.pytorch.callbacks.ModelCheckpoint
-        dirpath: ${hydra:runtime.output_dir}
-        save_last: true
-      - _target_: nequip.train.callbacks.TestTimeXYZFileWriter
-        out_file: ${hydra:runtime.output_dir}/test
-        output_fields_from_original_dataset: [total_energy, forces, stress]
-        chemical_symbols: ${chemical_symbols}
+trainer:
+  _target_: lightning.Trainer
+  max_epochs: 5
+  check_val_every_n_epoch: 1
+  log_every_n_steps: 3
+  callbacks:
+    - _target_: lightning.pytorch.callbacks.ModelCheckpoint
+      dirpath: ${hydra:runtime.output_dir}
+      save_last: true
+    - _target_: nequip.train.callbacks.TestTimeXYZFileWriter
+      out_file: ${hydra:runtime.output_dir}/test
+      output_fields_from_original_dataset: [total_energy, forces, stress]
+      chemical_symbols: ${chemical_symbols}
+
+training_module:
+  _target_: nequip.train.NequIPLightningModule
   loss:
     _target_: nequip.train.MetricsManager
     metrics:
@@ -98,31 +99,31 @@ train:
         coeff: 1
         metric:
           _target_: nequip.train.MeanAbsoluteError
-  train_metrics: ${train.val_metrics}
-  test_metrics: ${train.val_metrics}
+  train_metrics: ${training_module.val_metrics}
+  test_metrics: ${training_module.val_metrics}
   optimizer:
     _target_: torch.optim.Adam
 
-model:
-  model_builders:
-    - SimpleIrrepsConfig
-    - NequIPGNNEnergyModel
-    - StressForceOutput
-    - RescaleEnergyEtc
-  num_basis: 8
-  r_max: ${cutoff_radius}
-  l_max: 1
-  parity: true
-  num_features: 16
-  num_layers: 4  
+  model:
+    model_builders:
+      - SimpleIrrepsConfig
+      - NequIPGNNEnergyModel
+      - StressForceOutput
+      - RescaleEnergyEtc
+    num_basis: 8
+    r_max: ${cutoff_radius}
+    l_max: 1
+    parity: true
+    num_features: 16
+    num_layers: 4  
 
-  seed: 123
-  type_names: ${model_type_names}
-  model_dtype: float32
+    seed: 123
+    type_names: ${model_type_names}
+    model_dtype: float32
 
-  per_type_energy_scale_shift_shifts: ${training_data_stats:per_atom_energy_mean}
-  global_rescale_scale: ${training_data_stats:forces_rms}
-  avg_num_neighbors: ${training_data_stats:num_neighbors_mean}
+    per_type_energy_scale_shift_shifts: ${training_data_stats:per_atom_energy_mean}
+    global_rescale_scale: ${training_data_stats:forces_rms}
+    avg_num_neighbors: ${training_data_stats:num_neighbors_mean}
 
 global_options:
   seed: 789
