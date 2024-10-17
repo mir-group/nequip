@@ -38,7 +38,7 @@ def get_current_code_versions(config) -> Tuple[dict, dict]:
     for code in _DEFAULT_VERSION_CODES:
         code_versions[code.__name__] = str(code.__version__)
     code_commits = set(_DEFAULT_COMMIT_CODES)
-    for builder in config.model.model_builders:
+    for builder in config.training_module.model.model_builders:
         if not isinstance(builder, str):
             continue
         builder = builder.split(".")
