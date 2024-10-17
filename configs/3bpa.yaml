@@ -36,46 +36,43 @@ data:
           _target_: nequip.data.RootMeanSquare
         name: forces_rms
 
-train:
-  training_module: nequip.train.NequIPLightningModule
-  trainer:
-    _target_: lightning.Trainer
-    accelerator: gpu
-    enable_checkpointing: true
-    max_epochs: 100000
-    max_time: 03:00:00:00
-    check_val_every_n_epoch: 1  
-    log_every_n_steps: 20       
+trainer:
+  _target_: lightning.Trainer
+  accelerator: gpu
+  enable_checkpointing: true
+  max_epochs: 100000
+  max_time: 03:00:00:00
+  check_val_every_n_epoch: 1  
+  log_every_n_steps: 20       
 
-    logger:
-      _target_: lightning.pytorch.loggers.wandb.WandbLogger
-      project: nequip
-      name: 3bpa
-      save_dir: ${hydra:runtime.output_dir}
+  logger:
+    _target_: lightning.pytorch.loggers.wandb.WandbLogger
+    project: nequip
+    name: 3bpa
+    save_dir: ${hydra:runtime.output_dir}
 
-    callbacks:
-      - _target_: lightning.pytorch.callbacks.EarlyStopping
-        monitor: val0_epoch/weighted_sum
-        min_delta: 1e-3                        
-        patience: 150                           
+  callbacks:
 
-      - _target_: lightning.pytorch.callbacks.ModelCheckpoint
-        monitor: val0_epoch/weighted_sum
-        dirpath: ${hydra:runtime.output_dir}   
-        filename: best                         
-        save_last: true                        
-        
-      - _target_: lightning.pytorch.callbacks.LearningRateMonitor
-        logging_interval: epoch
+    - _target_: lightning.pytorch.callbacks.ModelCheckpoint
+      monitor: val0_epoch/weighted_sum
+      dirpath: ${hydra:runtime.output_dir}   
+      filename: best                         
+      save_last: true
 
-      - _target_: nequip.train.callbacks.NeMoExponentialMovingAverage
-        decay: 0.99
-        every_n_steps: 1
+    - _target_: lightning.pytorch.callbacks.EarlyStopping
+      monitor: val0_epoch/weighted_sum
+      min_delta: 5e-4
+      patience: 100
 
-      - _target_: nequip.train.callbacks.TestTimeXYZFileWriter
-        out_file: ${hydra:runtime.output_dir}/test
-        output_fields_from_original_dataset: [total_energy, forces]
-        chemical_symbols: ${chemical_symbols}
+    - _target_: lightning.pytorch.callbacks.LearningRateMonitor
+      logging_interval: epoch
+
+    - _target_: nequip.train.callbacks.NeMoExponentialMovingAverage
+      decay: 0.995
+      every_n_steps: 1
+
+training_module:
+  _target_: nequip.train.NequIPLightningModule
 
   loss:
     _target_: nequip.train.MetricsManager
@@ -88,87 +85,97 @@ train:
           _target_: nequip.train.MeanSquaredError
       - name: force_MSE
         field: forces
-        coeff: 1
+        coeff: 1e5
         metric:
           _target_: nequip.train.MeanSquaredError
+
   val_metrics:
     _target_: nequip.train.MetricsManager
     metrics:
       - name: E_RMSE
+        field: total_energy
         coeff: 1
+        metric:
+          _target_: nequip.train.RootMeanSquaredError
+      - name: F_RMSE
+        field: forces
+        coeff: 1
+        metric:
+          _target_: nequip.train.RootMeanSquaredError
+
+  test_metrics:
+    _target_: nequip.train.MetricsManager
+    metrics:
+      - name: E_RMSE
         field: total_energy
         metric:
           _target_: nequip.train.RootMeanSquaredError
       - name: F_RMSE
-        coeff: 1
         field: forces
         metric:
           _target_: nequip.train.RootMeanSquaredError
-  test_metrics: ${train.val_metrics}
 
   optimizer:
     _target_: torch.optim.Adam
-    lr: 0.005
+    lr: 0.015
     amsgrad: true
 
   lr_scheduler:
     scheduler:
       _target_: torch.optim.lr_scheduler.ReduceLROnPlateau
+      patience: 20
       factor: 0.8
-      patience: 50
-      min_lr: 1e-6
+      threshold: 0.0
     monitor: val0_epoch/weighted_sum
     interval: epoch
     frequency: 1
 
-model:
+  model:
 
-  type_names: ${model_type_names}
-  model_dtype: float32
-  seed: 123
-  r_max: ${cutoff_radius}
-
-  model_builders:
-   - SimpleIrrepsConfig 
-   - NequIPGNNEnergyModel
-   - PerTypeEnergyScaleShift
-   - ForceOutput         
-   - RescaleEnergyEtc    
-
-  num_layers: 5
-
-  l_max: 3
-  parity: true      
-  num_features: 64
-
-  # radial network
-  invariant_layers: 3           
-  invariant_neurons: 64
-  use_sc: true
-  nonlinearity_scalars:
-    e: silu
-    o: tanh
-
-  nonlinearity_type: gate   
-  resnet: false             
-  nonlinearity_gates:
-    e: silu
-    o: silu
-  
-  # radial network basis
-  num_basis: 8                  
-  BesselBasis_trainable: false  
-  PolynomialCutoff_p: 2
-
-  # isolated atom energies from dataset
-  per_type_energy_scale_shift_shifts: [-1029.4889999855063, -13.587222780835477, -1484.9814568572233, -2041.9816003861047]
-  per_type_energy_scale_shift_scales: null
-  global_rescale_scale: ${training_data_stats:forces_rms}
-  avg_num_neighbors: ${training_data_stats:num_neighbors_mean}
-
-  per_type_energy_scale_shifts_trainable: false
-  per_type_energy_scale_scales_trainable: false
-
+    type_names: ${model_type_names}
+    model_dtype: float32
+    seed: 76
+    r_max: ${cutoff_radius}
+   
+    model_builders:
+     - SimpleIrrepsConfig 
+     - NequIPGNNEnergyModel         
+     - PerTypeEnergyScaleShift
+     - ForceOutput         
+     - RescaleEnergyEtc    
+   
+    num_layers: 4
+   
+    l_max: 3
+    parity: true      
+    num_features: 64
+   
+    invariant_layers: 3           
+    invariant_neurons: 32
+    use_sc: true
+    nonlinearity_scalars:
+      e: silu
+      o: tanh
+   
+    nonlinearity_type: gate   
+    resnet: true
+    nonlinearity_gates:
+      e: silu
+      o: silu
+    
+    num_basis: 8                  
+    BesselBasis_trainable: false  
+    PolynomialCutoff_p: 2
+   
+    # isolated atom energies from dataset
+    per_type_energy_scale_shift_shifts: [-1029.4889999855063, -13.587222780835477, -1484.9814568572233, -2041.9816003861047]
+    per_type_energy_scale_shift_scales: null
+    global_rescale_scale: ${training_data_stats:forces_rms}
+    avg_num_neighbors: ${training_data_stats:num_neighbors_mean}
+   
+    per_type_energy_scale_shifts_trainable: false
+    per_type_energy_scale_scales_trainable: false
+   
 
 # global options
 global_options:
