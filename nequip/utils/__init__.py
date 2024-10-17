@@ -18,6 +18,7 @@ from .file_utils import download_url, extract_zip
 from .logger import RankedLogger
 from .scatter import scatter
 from .compile import conditional_torchscript_mode, conditional_torchscript_jit
+from .versions import get_current_code_versions
 
 __all__ = [
     instantiate_from_cls_name,
@@ -41,4 +42,5 @@ __all__ = [
     scatter,
     conditional_torchscript_mode,
     conditional_torchscript_jit,
+    get_current_code_versions,
 ]
