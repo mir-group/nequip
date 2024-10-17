@@ -3,6 +3,7 @@
 # This is a weird hack to avoid Intel MKL issues on the cluster when this is called as a subprocess of a process that has itself initialized PyTorch.
 # Since numpy gets imported later anyway for dataset stuff, this shouldn't affect performance.
 import numpy as np  # noqa: F401
+import torch
 
 from nequip.utils.versions import check_code_version
 from nequip.utils._global_options import _set_global_options, _get_latest_global_options
@@ -13,15 +14,31 @@ from nequip.train import NequIPLightningModule
 from omegaconf import OmegaConf, DictConfig, ListConfig
 from hydra.utils import instantiate
 import hydra
-
 import os
+from typing import Final, List
 
 logger = RankedLogger(__name__, rank_zero_only=True)
+
+_REQUIRED_CONFIG_SECTIONS: Final[List[str]] = [
+    "run",
+    "data",
+    "trainer",
+    "training_module",
+    "global_options",
+]
 
 
 @hydra.main(version_base=None, config_path=os.getcwd(), config_name="config")
 def main(config: DictConfig) -> None:
     # === sanity checks ===
+
+    # check that all base sections are present
+    for section in _REQUIRED_CONFIG_SECTIONS:
+        assert (
+            section in config
+        ), f"the `{section}` was not found in the config -- nequip config files must have the following section keys {_REQUIRED_CONFIG_SECTIONS}"
+
+    assert "model" in config.training_module
 
     # determine run types
     assert (
@@ -38,21 +55,22 @@ def main(config: DictConfig) -> None:
         sum([run_type == "train" for run_type in runs]) == 1
     ), "only a single `train` instance can be present in `run`"
 
+    # ensure that the relevant metrics are present
     if "train" in runs:
         assert (
-            "loss" in config.train
-        ), "`train.loss` must be provided in the config to perform a `train` run."
+            "loss" in config.training_module
+        ), "`training_module.loss` must be provided in the config to perform a `train` run."
         assert (
-            "val_metrics" in config.train
-        ), "`train.val_metrics` must be provided in the config to perform a `train` run."
+            "val_metrics" in config.training_module
+        ), "`training_module.val_metrics` must be provided in the config to perform a `train` run."
     if "val" in runs:
         assert (
-            "val_metrics" in config.train
-        ), "`train.val_metrics` must be provided in the config to perform a `train` run."
+            "val_metrics" in config.training_module
+        ), "`training_module.val_metrics` must be provided in the config to perform a `train` run."
     if "test" in runs:
         assert (
-            "test_metrics" in config.train
-        ), "`train.test_metrics` must be provided in the config to perform a `test` run."
+            "test_metrics" in config.training_module
+        ), "`training_module.test_metrics` must be provided in the config to perform a `test` run."
 
     logger.info(f"This `nequip-train` run will perform the following tasks: {runs}")
     logger.info(
@@ -67,46 +85,33 @@ def main(config: DictConfig) -> None:
     logger.info("Building datamodule ...")
 
     # == silently include type_names in stats_manager if present ==
-    assert "type_names" in config.model
+    assert "type_names" in config.training_module.model
     data = OmegaConf.to_container(config.data, resolve=True)
     if "stats_manager" in data:
-        data["stats_manager"]["type_names"] = config.model.type_names
+        data["stats_manager"]["type_names"] = config.training_module.model.type_names
     datamodule = instantiate(data, _recursive_=False)
     assert isinstance(datamodule, NequIPDataModule)
 
-    # get training module
-    training_module = hydra.utils.get_class(config.train.training_module)
+    # === instantiate Lightning.Trainer ===
+    trainer_cfg = OmegaConf.to_container(config.trainer, resolve=True)
+    # enforce inference_mode=False to enable grad during inference
+    # see https://lightning.ai/docs/pytorch/stable/common/trainer.html#inference-mode
+    if "inference_mode" in trainer_cfg:
+        raise ValueError(
+            "`inference_mode` found in train.trainer in the config -- users shouldn't set this. NequIP will set `inference_mode=False`."
+        )
+    trainer = instantiate(trainer_cfg, inference_mode=False)
+
+    # === instantiate NequIPLightningModule (including model) ===
+    training_module = hydra.utils.get_class(config.training_module._target_)
     assert issubclass(training_module, NequIPLightningModule)
 
-    # get nequip_module config args and convert to pure Python dicts for wandb logging
-    loss_cfg = OmegaConf.to_container(
-        config.train.get("loss", DictConfig(None)), resolve=True
-    )
-    val_metrics_cfg = OmegaConf.to_container(
-        config.train.get("val_metrics", DictConfig(None)), resolve=True
-    )
-    train_metrics_cfg = OmegaConf.to_container(
-        config.train.get("train_metrics", DictConfig(None)), resolve=True
-    )
-    test_metrics_cfg = OmegaConf.to_container(
-        config.train.get("test_metrics", DictConfig(None)), resolve=True
-    )
-    optimizer_cfg = OmegaConf.to_container(
-        config.train.get("optimizer", DictConfig(None)), resolve=True
-    )
-    lr_scheduler_cfg = OmegaConf.to_container(
-        config.train.get("lr_scheduler", DictConfig(None)), resolve=True
-    )
-
-    # the trainer config is not actually used by the nequip_module, but is just used for logging purposes
-    trainer_cfg = OmegaConf.to_container(config.train.trainer, resolve=True)
-
-    # assemble versions, global options and trainer dicts to be saved by the NequIPLightningModule
+    # assemble various dicts to be saved by the NequIPLightningModule
     info_dict = {
         "versions": versions,
+        "data": data,
         "trainer": trainer_cfg,
         "global_options": _get_latest_global_options(),
-        "training_module": str(config.train.training_module),
     }
 
     if "ckpt_path" in config:
@@ -118,17 +123,41 @@ def main(config: DictConfig) -> None:
         # only the original model's config is used (with the dataset statistics already-computed)
         # everything else can be overriden
         # see https://lightning.ai/docs/pytorch/stable/common/checkpointing_basic.html
+
+        # get model info from checkpoint
+        # for options see https://pytorch.org/docs/stable/generated/torch.load.html
+        checkpoint = torch.load(
+            config.ckpt_path,
+            map_location="cpu",
+            weights_only=False,
+        )
+        ckpt_training_module = checkpoint["hyper_parameters"]["info_dict"][
+            "training_module"
+        ]["_target_"]
+        model_cfg = checkpoint["hyper_parameters"]["model"]
+
+        # check if the same LightningModule is used
+        if config.training_module._target_ != ckpt_training_module:
+            logger.info(
+                f"Checkpoint training module ({ckpt_training_module} differs from training module provided in config for restart ({config.training_module._target_}) -- latter will be used"
+            )
+
+        # replace model details in config with the ones from the checkpoint
+        training_module_cfg = config.training_module
+        OmegaConf.update(training_module_cfg, "model", model_cfg)
+        logger.info(
+            f"Model from checkpoint {config.ckpt_path} will be used -- model details from the config used for this restart will be ignored."
+        )
+        nequip_module_cfg = OmegaConf.to_container(training_module_cfg, resolve=True)
+
+        info_dict.update({"training_module": nequip_module_cfg})
+
         nequip_module = training_module.load_from_checkpoint(
             config.ckpt_path,
             strict=False,
-            loss_cfg=loss_cfg,
-            val_metrics_cfg=val_metrics_cfg,
-            train_metrics_cfg=train_metrics_cfg,
-            test_metrics_cfg=test_metrics_cfg,
-            optimizer_cfg=optimizer_cfg,
-            lr_scheduler_cfg=lr_scheduler_cfg,
             num_datasets=datamodule.num_datasets,
             info_dict=info_dict,
+            **nequip_module_cfg,
         )
         # `strict=False` above and the next line required to override metrics, etc
         nequip_module.strict_loading = False
@@ -138,6 +167,7 @@ def main(config: DictConfig) -> None:
 
         def training_data_stats(stat_name: str):
             stat = stats_dict.get(stat_name, None)
+
             if stat is None:
                 raise RuntimeError(
                     f"Data statistics field `{stat_name}` was requested for use in model initialization, but was not computed -- users must explicitly configure its computation with the `stats_manager` DataModule argument."
@@ -149,31 +179,22 @@ def main(config: DictConfig) -> None:
             training_data_stats,
             use_cache=True,
         )
-        # https://omegaconf.readthedocs.io/en/2.1_branch/usage.html#omegaconf-to-container
-        model_config = OmegaConf.to_container(config.model, resolve=True)
+        # resolve dataset statistics among other params
+        nequip_module_cfg = OmegaConf.to_container(config.training_module, resolve=True)
+        info_dict.update({"training_module": nequip_module_cfg})
 
         # === instantiate training module ===
         logger.info("Building model and training_module from scratch ...")
-        nequip_module = training_module(
-            model_cfg=model_config,
-            loss_cfg=loss_cfg,
-            val_metrics_cfg=val_metrics_cfg,
-            train_metrics_cfg=train_metrics_cfg,
-            test_metrics_cfg=test_metrics_cfg,
-            optimizer_cfg=optimizer_cfg,
-            lr_scheduler_cfg=lr_scheduler_cfg,
+
+        nequip_module = instantiate(
+            nequip_module_cfg,
+            # ensure lazy instantiation of lightning module attributes
+            _recursive_=False,
+            # make everything Python primitives (no DictConfig/ListConfig)
+            _convert_="all",
             num_datasets=datamodule.num_datasets,
             info_dict=info_dict,
         )
-
-    # === instantiate Lightning.Trainer ===
-    # enforce inference_mode=False to enable grad during inference
-    # see https://lightning.ai/docs/pytorch/stable/common/trainer.html#inference-mode
-    if "inference_mode" in config.train.trainer:
-        raise ValueError(
-            "`inference_mode` found in train.trainer in the config -- users shouldn't set this. NequIP will set `inference_mode=False`."
-        )
-    trainer = instantiate(trainer_cfg, inference_mode=False)
 
     # === loop of run types ===
     # restart behavior is such that
