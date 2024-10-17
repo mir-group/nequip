@@ -310,7 +310,10 @@ training_module:
     invariant_layers: 2           # number of radial layers, usually 1-3 works best, smaller is faster
     invariant_neurons: 128        # number of hidden neurons in radial function, smaller is faster
     use_sc: true                  # use self-connection or not, usually gives big improvement
-  
+
+    # NOTE that use_sc=True only applies to other convnets except the first one (index 0) to ensure that the NequIPGNNEnergyModel predicts per-atom energies of 0 for isolated atoms (atoms without neighbors). If a per-atom energy shift is provided, this guarantees that isolated atom energies correspond exactly to the per-atom shifts. To alter this default behavior, users can control the first convnet layer's self-connection by explicitly specifying the following parameter (which is `false` by default).
+  # layer0_convnet_convolution_use_sc: true
+
     # to specify different parameters for each convolutional layer, try examples below
     # layer1_use_sc: true                                                             # use "layer{i}_" prefix to specify parameters for only one of the layer,
     # priority for different definitions:
