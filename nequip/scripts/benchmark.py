@@ -15,16 +15,14 @@ from e3nn.util.jit import script
 
 from nequip.data import AtomicDataDict
 from nequip.data.datamodule import NequIPDataModule
-from nequip.train import NequIPLightningModule
 from nequip.scripts.deploy import _compile_for_deploy, load_deployed_model
 from nequip.utils.versions import check_code_version
 from nequip.utils._global_options import _set_global_options, _latest_global_config
 from nequip.utils.test import assert_AtomicData_equivariant
 from nequip.utils.logger import RankedLogger
 
-from omegaconf import OmegaConf, DictConfig
+from omegaconf import OmegaConf
 from hydra.utils import instantiate
-import hydra
 
 # TODO: add model-debug-mode
 
@@ -114,10 +112,10 @@ def main(args=None):
     logger.info("Building datamodule ...")
 
     # == silently include type_names in stats_manager if present ==
-    assert "type_names" in config.model
+    assert "type_names" in config.training_module.model
     data = OmegaConf.to_container(config.data, resolve=True)
     if "stats_manager" in data:
-        data["stats_manager"]["type_names"] = config.model.type_names
+        data["stats_manager"]["type_names"] = config.training_module.model.type_names
     datamodule = instantiate(data, _recursive_=False)
     assert isinstance(datamodule, NequIPDataModule)
 
@@ -144,8 +142,7 @@ def main(args=None):
         training_data_stats,
         use_cache=True,
     )
-    # https://omegaconf.readthedocs.io/en/2.1_branch/usage.html#omegaconf-to-container
-    model_config = OmegaConf.to_container(config.model, resolve=True)
+    nequip_module_cfg = OmegaConf.to_object(config.training_module)
 
     # === get smaller data list for testing ===
     datas_list = []
@@ -172,43 +169,16 @@ def main(args=None):
 
     # === instantiate NequIP Lightning module ===
 
-    # get training module
-    training_module = hydra.utils.get_class(config.train.training_module)
-    assert issubclass(training_module, NequIPLightningModule)
-
-    # get nequip_module config args and convert to pure Python dicts for wandb logging
-    loss_cfg = OmegaConf.to_container(
-        config.train.get("loss", DictConfig(None)), resolve=True
-    )
-    val_metrics_cfg = OmegaConf.to_container(
-        config.train.get("val_metrics", DictConfig(None)), resolve=True
-    )
-    train_metrics_cfg = OmegaConf.to_container(
-        config.train.get("train_metrics", DictConfig(None)), resolve=True
-    )
-    test_metrics_cfg = OmegaConf.to_container(
-        config.train.get("test_metrics", DictConfig(None)), resolve=True
-    )
-    optimizer_cfg = OmegaConf.to_container(
-        config.train.get("optimizer", DictConfig(None)), resolve=True
-    )
-    lr_scheduler_cfg = OmegaConf.to_container(
-        config.train.get("lr_scheduler", DictConfig(None)), resolve=True
-    )
-
-    # Load model:
     if args.model is None:
         print("Building model and training modules ... ")
         model_time = time.time()
         try:
-            nequip_module = training_module(
-                model_cfg=model_config,
-                loss_cfg=loss_cfg,
-                val_metrics_cfg=val_metrics_cfg,
-                train_metrics_cfg=train_metrics_cfg,
-                test_metrics_cfg=test_metrics_cfg,
-                optimizer_cfg=optimizer_cfg,
-                lr_scheduler_cfg=lr_scheduler_cfg,
+            nequip_module = instantiate(
+                nequip_module_cfg,
+                # ensure lazy instantiation of lightning module attributes
+                _recursive_=False,
+                # make everything Python primitives (no DictConfig/ListConfig)
+                _convert_="all",
                 num_datasets=datamodule.num_datasets,
             )
             model = nequip_module.model
@@ -338,7 +308,7 @@ def main(args=None):
 
         # just time
         t = Timer(
-            stmt="model(next(datas).copy())['total_energy'].item()",
+            stmt="model(next(datas).copy())",
             globals={"model": model, "datas": datas},
         )
         perloop: Measurement = t.timeit(args.n)
