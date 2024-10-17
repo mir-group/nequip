@@ -94,7 +94,7 @@ def temp_data(default_dtype):
         yield tmpdirname
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def CH3CHO(CH3CHO_no_typemap) -> Tuple[Atoms, AtomicDataDict.Type]:
     atoms, data = CH3CHO_no_typemap
     tm = ChemicalSpeciesToAtomTypeMapper(
@@ -104,7 +104,7 @@ def CH3CHO(CH3CHO_no_typemap) -> Tuple[Atoms, AtomicDataDict.Type]:
     return atoms, data
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def CH3CHO_no_typemap(default_dtype) -> Tuple[Atoms, AtomicDataDict.Type]:
     atoms = molecule("CH3CHO")
     data = AtomicDataDict.compute_neighborlist_(
