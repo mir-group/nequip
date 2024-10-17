@@ -50,33 +50,34 @@ class NequIPLightningModule(lightning.LightningModule):
 
     def __init__(
         self,
-        model_cfg: Dict,
-        optimizer_cfg: Dict,
-        lr_scheduler_cfg: Optional[Dict] = None,
-        loss_cfg: Optional[Dict] = None,
-        train_metrics_cfg: Optional[Dict] = None,
-        val_metrics_cfg: Optional[Dict] = None,
-        test_metrics_cfg: Optional[Dict] = None,
-        num_datasets: Optional[Dict[str, int]] = {
-            "train": 0,
-            "val": 0,
-            "test": 0,
-            "predict": 0,
-        },
-        # not used by the class, but is here mainly for logging
-        info_dict: Optional[Dict] = {},
+        model: Dict,
+        optimizer: Optional[Dict] = None,
+        lr_scheduler: Optional[Dict] = None,
+        loss: Optional[Dict] = None,
+        train_metrics: Optional[Dict] = None,
+        val_metrics: Optional[Dict] = None,
+        test_metrics: Optional[Dict] = None,
+        **kwargs,
     ):
-
         super().__init__()
         self.save_hyperparameters()
-        self.model = model_from_config(config=model_cfg, initialize=True)
-        self.optimizer_config = optimizer_cfg
-        self.lr_scheduler_config = lr_scheduler_cfg
+        self.model = model_from_config(config=model, initialize=True)
+        self.optimizer_config = optimizer
+        self.lr_scheduler_config = lr_scheduler
 
         # === instantiate MetricsManager objects ===
         # must have separate MetricsManagers for each dataloader
         # num_datasets goes in order [train, val, test, predict]
-        self.num_datasets = num_datasets
+        self.num_datasets = kwargs.get(
+            "num_datasets",
+            {
+                "train": 0,
+                "val": 0,
+                "test": 0,
+                "predict": 0,
+            },
+        )
+
         assert (
             self.num_datasets["train"] == 1
         ), "currently only support one training dataset"
@@ -91,7 +92,7 @@ class NequIPLightningModule(lightning.LightningModule):
         )
 
         # add dist_sync_on_step for loss metrics
-        for metric_dict in loss_cfg["metrics"]:
+        for metric_dict in loss["metrics"]:
             # silently ensure that dist_sync_on_step is true for loss metrics
             metric_dict["metric"]["dist_sync_on_step"] = True
             # TODO: remove following once torchmetrics PR is merged
@@ -99,7 +100,7 @@ class NequIPLightningModule(lightning.LightningModule):
             metric_dict["metric"]["dist_sync_fn"] = gather_all_tensors
 
         # == instantiate loss ==
-        self.loss = instantiate(loss_cfg, type_names=self.model.type_names)
+        self.loss = instantiate(loss, type_names=self.model.type_names)
         if self.loss is not None:
             assert (
                 self.loss.do_weighted_sum
@@ -107,18 +108,18 @@ class NequIPLightningModule(lightning.LightningModule):
 
         # == instantiate other metrics ==
         self.train_metrics = instantiate(
-            train_metrics_cfg, type_names=self.model.type_names
+            train_metrics, type_names=self.model.type_names
         )
         # may need to instantate multiple instances to account for multiple val and test datasets
         self.val_metrics = torch.nn.ModuleList(
             [
-                instantiate(val_metrics_cfg, type_names=self.model.type_names)
+                instantiate(val_metrics, type_names=self.model.type_names)
                 for _ in range(self.num_datasets["val"])
             ]
         )
         self.test_metrics = torch.nn.ModuleList(
             [
-                instantiate(test_metrics_cfg, type_names=self.model.type_names)
+                instantiate(test_metrics, type_names=self.model.type_names)
                 for _ in range(self.num_datasets["test"])
             ]
         )
