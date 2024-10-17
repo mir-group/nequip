@@ -26,7 +26,7 @@ def test_deploy(BENCHMARK_ROOT, fake_model_training_session, device):
     dtype = nequip.utils.dtype_to_name(torch.get_default_dtype())
 
     # atol on MODEL dtype, since a mostly float32 model still has float32 variation
-    atol = {"float32": 1e-5, "float64": 1e-7}[config.model.model_dtype]
+    atol = {"float32": 1e-5, "float64": 1e-7}[config.training_module.model.model_dtype]
 
     # === test mode=build ===
     deployed_path = pathlib.Path(f"deployed_{dtype}.pth")
@@ -71,9 +71,11 @@ def test_deploy(BENCHMARK_ROOT, fake_model_training_session, device):
     )
     # Everything we store right now is ASCII, so decode for printing
     assert metadata[deploy.NEQUIP_VERSION_KEY] == nequip.__version__
-    assert np.allclose(float(metadata[deploy.R_MAX_KEY]), config.model.r_max)
+    assert np.allclose(
+        float(metadata[deploy.R_MAX_KEY]), config.training_module.model.r_max
+    )
     assert len(metadata[deploy.TYPE_NAMES_KEY].split(" ")) == len(
-        config.model.type_names
+        config.training_module.model.type_names
     )
 
     # Two checks are done in one go in the following

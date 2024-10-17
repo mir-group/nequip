@@ -26,7 +26,7 @@ def _training_session(conffile, model_dtype, BENCHMARK_ROOT):
         with tempfile.TemporaryDirectory() as data_tmpdir:
             if "data_source_dir" in config.data:
                 config.data.data_source_dir = data_tmpdir
-            config.model.model_dtype = model_dtype
+            config.training_module.model.model_dtype = model_dtype
             with open_dict(config):
                 config["hydra"] = {"run": {"dir": tmpdir}}
             config = OmegaConf.create(config)

@@ -19,7 +19,7 @@ def test_batch_invariance(fake_model_training_session):
 
     # NOTE: at the time the tests were written, both minimal configs have val dataloader batch sizes of 5, so we only train again with batch_size=1 here
     config, tmpdir, env = fake_model_training_session
-    tol = {"float32": 1e-5, "float64": 1e-8}[config.model.model_dtype]
+    tol = {"float32": 1e-5, "float64": 1e-8}[config.training_module.model.model_dtype]
 
     # == get necessary info from checkpoint ==
     nequip_module = NequIPLightningModule.load_from_checkpoint(f"{tmpdir}/last.ckpt")
@@ -75,14 +75,14 @@ def test_batch_invariance(fake_model_training_session):
 # TODO: will fail if train dataloader has shuffle=True
 def test_restarts(fake_model_training_session):
     config, tmpdir, env = fake_model_training_session
-    tol = {"float32": 1e-5, "float64": 1e-8}[config.model.model_dtype]
-    orig_max_epochs = config.train.trainer.max_epochs
+    tol = {"float32": 1e-5, "float64": 1e-8}[config.training_module.model.model_dtype]
+    orig_max_epochs = config.trainer.max_epochs
     new_max_epochs = orig_max_epochs + 5
 
     # == continue training for a few more epochs ==
     with tempfile.TemporaryDirectory() as new_tmpdir_1:
         new_config = config.copy()
-        new_config.train.trainer.max_epochs = new_max_epochs
+        new_config.trainer.max_epochs = new_max_epochs
         with open_dict(new_config):
             new_config["hydra"] = {"run": {"dir": new_tmpdir_1}}
         new_config = OmegaConf.create(new_config)
@@ -111,7 +111,7 @@ def test_restarts(fake_model_training_session):
         # == retrain from scratch up to new_max_epochs ==
         with tempfile.TemporaryDirectory() as new_tmpdir_2:
             new_config = config.copy()
-            new_config.train.trainer.max_epochs = new_max_epochs
+            new_config.trainer.max_epochs = new_max_epochs
             with open_dict(new_config):
                 new_config["hydra"] = {"run": {"dir": new_tmpdir_2}}
             new_config = OmegaConf.create(new_config)
