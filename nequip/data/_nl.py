@@ -30,8 +30,6 @@ assert _NEQUIP_NL in [
 def neighbor_list_and_relative_vec(
     pos,
     r_max,
-    self_interaction=False,
-    strict_self_interaction=True,
     cell=None,
     pbc=False,
     NL=_NEQUIP_NL,
@@ -60,9 +58,6 @@ def neighbor_list_and_relative_vec(
         r_max (float): Radial cutoff distance for neighbor finding.
         cell (numpy shape [3, 3]): Cell for periodic boundary conditions. Ignored if ``pbc == False``.
         pbc (bool or 3-tuple of bool): Whether the system is periodic in each of the three cell dimensions.
-        self_interaction (bool): Whether or not to include same periodic image self-edges in the neighbor list.
-        strict_self_interaction (bool): Whether to include *any* self interaction edges in the graph, even if the two
-            instances of the atom are in different periodic images. Defaults to True, should be True for most applications.
 
     Returns:
         edge_index (torch.tensor shape [2, num_edges]): List of edges.
@@ -106,7 +101,6 @@ def neighbor_list_and_relative_vec(
     temp_cell = ase.geometry.complete_cell(temp_cell)
 
     if NL == "vesin":
-        assert strict_self_interaction and not self_interaction
         # use same mixed pbc logic as
         # https://github.com/Luthaf/vesin/blob/main/python/vesin/src/vesin/_ase.py
         if pbc[0] and pbc[1] and pbc[2]:
@@ -123,7 +117,6 @@ def neighbor_list_and_relative_vec(
         ).compute(points=temp_pos, box=temp_cell, periodic=periodic, quantities="ijS")
 
     elif NL == "matscipy":
-        assert strict_self_interaction and not self_interaction
         first_idex, second_idex, shifts = matscipy_nl(
             "ijS",
             pbc=pbc,
@@ -138,19 +131,9 @@ def neighbor_list_and_relative_vec(
             temp_cell,
             temp_pos,
             cutoff=float(r_max),
-            self_interaction=strict_self_interaction,  # we want edges from atom to itself in different periodic images!
+            self_interaction=False,
             use_scaled_positions=False,
         )
-
-        # eliminate true self-edges that don't cross periodic boundaries
-        # only relevant in ASE branch since it supports a self_interaction option
-        if not self_interaction:
-            bad_edge = first_idex == second_idex
-            bad_edge &= np.all(shifts == 0, axis=1)
-            keep_edge = ~bad_edge
-            first_idex = first_idex[keep_edge]
-            second_idex = second_idex[keep_edge]
-            shifts = shifts[keep_edge]
 
     # Build output:
     edge_index = torch.vstack(
