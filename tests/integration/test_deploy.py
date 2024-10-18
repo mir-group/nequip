@@ -1,7 +1,6 @@
 import pytest
 import pathlib
 import subprocess
-import sys
 
 import math
 import numpy as np
@@ -46,11 +45,7 @@ def test_deploy(BENCHMARK_ROOT, fake_model_training_session, device):
     assert deployed_path.is_file(), "Deploy didn't create file"
 
     # === test mode=info ===
-    # hack for old version
-    if sys.version_info[1] > 6:
-        text = {"text": True}
-    else:
-        text = {}
+    text = {"text": True}
     retcode = subprocess.run(
         [
             "nequip-deploy",

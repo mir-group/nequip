@@ -3,7 +3,6 @@ utilities that involve file searching and operations (i.e. save/load)
 """
 
 from typing import Union, List, Tuple, Optional, Callable
-import sys
 import logging
 import contextlib
 import contextvars
@@ -21,14 +20,8 @@ _MOVE_SET = contextvars.ContextVar("_move_set", default=None)
 def _delete_files_if_exist(paths):
     # clean up
     # better for python 3.8 >
-    if sys.version_info[1] >= 8:
-        for f in paths:
-            f.unlink(missing_ok=True)
-    else:
-        # race condition?
-        for f in paths:
-            if f.exists():
-                f.unlink()
+    for f in paths:
+        f.unlink(missing_ok=True)
 
 
 def _process_moves(moves: List[Tuple[bool, Path, Path]]):

@@ -4,12 +4,8 @@ This is a seperate module to compensate for a TorchScript bug that can only reco
 """
 
 import sys
-from typing import List
+from typing import List, Final
 
-if sys.version_info[1] >= 8:
-    from typing import Final
-else:
-    from typing_extensions import Final
 
 # == Define allowed keys as constants ==
 # The positions of the atoms in the system
