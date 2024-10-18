@@ -187,22 +187,6 @@ def test_relative_vecs(H2):
     )
 
 
-@pytest.mark.parametrize("interact", [True, False])
-def test_self_interaction(interact, Si):
-    r_max, points, _ = Si
-    data = AtomicDataDict.compute_neighborlist_(
-        AtomicDataDict.from_dict(points),
-        r_max=r_max,
-        self_interaction=interact,
-        NL="ase",
-    )
-    if interact:
-        true = torch.LongTensor([[0, 0, 1, 1], [0, 1, 0, 1]])
-    else:
-        true = torch.LongTensor([[0, 1], [1, 0]])
-    assert edge_index_set_equiv(data["edge_index"], true)
-
-
 def test_silicon_neighbors(Si):
     r_max, points, data = Si
     edge_index, cell_shifts, cell = neighbor_list_and_relative_vec(
@@ -210,7 +194,6 @@ def test_silicon_neighbors(Si):
         pbc=True,
         cell=points["cell"],
         r_max=r_max,
-        self_interaction=False,
     )
     edge_index_true = torch.LongTensor(
         [[0, 0, 0, 0, 1, 1, 1, 1], [1, 1, 1, 1, 0, 0, 0, 0]]
