@@ -10,7 +10,7 @@ from ._key_registry import (
     _CARTESIAN_TENSOR_FIELDS,
     ABBREV,
 )
-
+from .ase import from_ase, to_ase
 from ._sampler import PartialSampler
 from .stats import (
     Count,
@@ -37,6 +37,8 @@ __all__ = [
     _LONG_FIELDS,
     _CARTESIAN_TENSOR_FIELDS,
     ABBREV,
+    from_ase,
+    to_ase,
     DataStatisticsManager,
     Count,
     Mean,

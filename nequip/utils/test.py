@@ -5,6 +5,7 @@ from e3nn.util.test import equivariance_error
 
 from nequip.nn import GraphModuleMixin, GraphModel
 from nequip.data import (
+    from_ase,
     AtomicDataDict,
     _NODE_FIELDS,
     _EDGE_FIELDS,
@@ -433,7 +434,7 @@ def compare_neighborlists(
     assert "r_max" in nl_kwargs
     assert "NL" not in nl_kwargs
     if isinstance(atoms_or_data, ase.Atoms):
-        data = AtomicDataDict.from_ase(atoms_or_data)
+        data = from_ase(atoms_or_data)
     else:
         data = atoms_or_data
     edges1 = edgeset_from_AtomicDataDict(data, NL=nl1, **nl_kwargs)

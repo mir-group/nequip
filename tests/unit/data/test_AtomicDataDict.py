@@ -9,7 +9,7 @@ import ase.geometry
 
 from ase.calculators.singlepoint import SinglePointCalculator
 
-from nequip.data import AtomicDataDict
+from nequip.data import AtomicDataDict, from_ase, to_ase
 from nequip.data._nl import neighbor_list_and_relative_vec
 from nequip.utils.test import compare_neighborlists
 
@@ -22,7 +22,7 @@ def test_from_ase(CuFcc):
 
 def test_to_ase(CH3CHO_no_typemap):
     atoms, data = CH3CHO_no_typemap
-    to_ase_atoms = AtomicDataDict.to_ase(data)[0]
+    to_ase_atoms = to_ase(data)[0]
     assert np.allclose(atoms.get_positions(), to_ase_atoms.get_positions())
     assert np.array_equal(atoms.get_atomic_numbers(), to_ase_atoms.get_atomic_numbers())
     assert np.array_equal(atoms.get_pbc(), to_ase_atoms.get_pbc())
@@ -30,7 +30,7 @@ def test_to_ase(CH3CHO_no_typemap):
 
 
 def test_to_ase_batches(atomic_batch):
-    to_ase_atoms_batch = AtomicDataDict.to_ase(atomic_batch)
+    to_ase_atoms_batch = to_ase(atomic_batch)
     atomic_batch = AtomicDataDict.to_(atomic_batch, device="cpu")
     for batch_idx, atoms in enumerate(to_ase_atoms_batch):
         mask = atomic_batch["batch"] == batch_idx
@@ -55,7 +55,7 @@ def test_to_ase_batches(atomic_batch):
 
 def test_ase_roundtrip(CuFcc):
     atoms, data = CuFcc
-    atoms2 = AtomicDataDict.to_ase(data)[0]
+    atoms2 = to_ase(data)[0]
     assert np.allclose(atoms.get_positions(), atoms2.get_positions())
     assert np.array_equal(atoms.get_atomic_numbers(), atoms2.get_atomic_numbers())
     assert np.array_equal(atoms.get_pbc(), atoms2.get_pbc())
@@ -90,9 +90,7 @@ def test_non_periodic_edge(CH3CHO):
 def test_periodic_edge():
     atoms = ase.build.bulk("Cu", "fcc")
     dist = np.linalg.norm(atoms.cell[0])
-    data = AtomicDataDict.compute_neighborlist_(
-        AtomicDataDict.from_ase(atoms), r_max=1.05 * dist
-    )
+    data = AtomicDataDict.compute_neighborlist_(from_ase(atoms), r_max=1.05 * dist)
     edge_vecs = AtomicDataDict.with_edge_vectors(data)["edge_vectors"]
     assert edge_vecs.shape == (12, 3)  # 12 neighbors in close-packed bulk
     assert torch.allclose(
@@ -153,7 +151,7 @@ def test_some_periodic():
     atoms = ase.build.fcc111("Al", size=(3, 3, 1), vacuum=0.0)
     assert all(atoms.pbc == (True, True, False))
     data = AtomicDataDict.compute_neighborlist_(
-        AtomicDataDict.from_ase(atoms), r_max=2.9
+        from_ase(atoms), r_max=2.9
     )  # first shell dist is 2.864 A
     # Check number of neighbors:
     _, neighbor_count = np.unique(data["edge_index"][0].numpy(), return_counts=True)
@@ -234,13 +232,13 @@ def test_no_neighbors(nl_method):
 
     # isolated atom
     H = Atoms("H", positions=[[0, 0, 0]], cell=20 * np.eye(3))
-    data = AtomicDataDict.compute_neighborlist_(AtomicDataDict.from_ase(H), r_max=2.5)
+    data = AtomicDataDict.compute_neighborlist_(from_ase(H), r_max=2.5)
     assert data[AtomicDataDict.EDGE_INDEX_KEY].numel() == 0
     assert data[AtomicDataDict.EDGE_CELL_SHIFT_KEY].numel() == 0
 
     # cutoff smaller than interatomic distance
     Cu = ase.build.bulk("Cu", "fcc", a=3.6, cubic=True)
-    data = AtomicDataDict.compute_neighborlist_(AtomicDataDict.from_ase(Cu), r_max=2.5)
+    data = AtomicDataDict.compute_neighborlist_(from_ase(Cu), r_max=2.5)
     assert data[AtomicDataDict.EDGE_INDEX_KEY].numel() == 0
     assert data[AtomicDataDict.EDGE_CELL_SHIFT_KEY].numel() == 0
 
@@ -289,7 +287,7 @@ def edge_index_set_equiv(a, b):
 def H2():
     atoms = ase.build.molecule("H2")
     data = AtomicDataDict.compute_neighborlist_(
-        AtomicDataDict.from_ase(atoms),
+        from_ase(atoms),
         r_max=2.0,
         NL="ase",
     )
@@ -303,7 +301,7 @@ def CuFcc():
         atoms, **{"forces": np.random.random((len(atoms), 3))}
     )
     data = AtomicDataDict.compute_neighborlist_(
-        AtomicDataDict.from_ase(atoms),
+        from_ase(atoms),
         r_max=4.0,
         NL="ase",
     )

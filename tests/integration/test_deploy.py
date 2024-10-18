@@ -8,7 +8,7 @@ import torch
 
 import nequip
 from nequip.train import NequIPLightningModule
-from nequip.data import AtomicDataDict
+from nequip.data import AtomicDataDict, to_ase
 import nequip.utils
 from nequip.scripts import deploy
 from nequip.ase import NequIPCalculator
@@ -102,7 +102,7 @@ def test_deploy(BENCHMARK_ROOT, fake_model_training_session, device):
     # == loop over data and do checks ==
     for data in dloader:
         data = AtomicDataDict.to_(data, device)
-        atoms_list = AtomicDataDict.to_ase(data.copy())
+        atoms_list = to_ase(data.copy())
         # run through deployed model
         out_data = deploy_mod(data.copy())
         _ = val_metrics_manager(out_data, data)

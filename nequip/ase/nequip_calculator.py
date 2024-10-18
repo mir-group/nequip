@@ -5,7 +5,7 @@ import torch
 from ase.calculators.calculator import Calculator, all_changes
 from ase.stress import full_3x3_to_voigt_6_stress
 
-from nequip.data import AtomicDataDict
+from nequip.data import AtomicDataDict, from_ase
 from nequip.data.transforms import (
     ChemicalSpeciesToAtomTypeMapper,
     NeighborListTransform,
@@ -111,7 +111,7 @@ class NequIPCalculator(Calculator):
 
         # prepare data
         # TODO handle from_ase kwargs?
-        data = AtomicDataDict.from_ase(atoms)
+        data = from_ase(atoms)
         for t in self.transforms:
             data = t(data)
         data = AtomicDataDict.to_(data, self.device)
