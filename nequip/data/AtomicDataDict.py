@@ -39,7 +39,7 @@ from ._keys import *  # noqa: F403, F401
 # https://github.com/pytorch/pytorch/issues/52312
 from . import _keys
 
-from . import _nl, _key_registry
+from . import _key_registry
 
 # Define a type alias
 Type = Dict[str, torch.Tensor]
@@ -184,40 +184,6 @@ def frame_from_batched(batched_data: Type, index: int) -> Type:
                 raise KeyError(f"Unregistered key {k}")
 
     return out
-
-
-def compute_neighborlist_(data: Type, r_max: float, **kwargs) -> Type:
-    """Add a neighborlist to `data` in-place.
-
-    This can be called on alredy-batched data.
-    """
-    to_batch: List[Type] = []
-    for idx in range(num_frames(data)):
-        data_per_frame = frame_from_batched(data, idx)
-
-        cell = data_per_frame.get(_keys.CELL_KEY, None)
-        if cell is not None:
-            cell = cell.view(3, 3)  # remove batch dimension
-
-        pbc = data_per_frame.get(_keys.PBC_KEY, None)
-        if pbc is not None:
-            pbc = pbc.view(3)  # remove batch dimension
-
-        edge_index, edge_cell_shift, cell = _nl.neighbor_list_and_relative_vec(
-            pos=data_per_frame[_keys.POSITIONS_KEY],
-            r_max=r_max,
-            cell=cell,
-            pbc=pbc,
-            **kwargs,
-        )
-        # add neighborlist information
-        data_per_frame[_keys.EDGE_INDEX_KEY] = edge_index
-        if data.get(_keys.CELL_KEY, None) is not None and edge_cell_shift is not None:
-            data_per_frame[_keys.EDGE_CELL_SHIFT_KEY] = edge_cell_shift
-        to_batch.append(data_per_frame)
-
-    # rebatch to make sure neighborlist information is in a similar batched format
-    return batched_from_list(to_batch)
 
 
 def without_nodes(data: Type, which_nodes: torch.Tensor) -> Type:
@@ -374,7 +340,6 @@ __all__ = [
     to_,
     from_dict,
     without_nodes,
-    compute_neighborlist_,
     num_nodes,
     num_edges,
     with_batch_,

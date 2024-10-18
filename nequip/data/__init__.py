@@ -11,6 +11,7 @@ from ._key_registry import (
     ABBREV,
 )
 from .ase import from_ase, to_ase
+from ._nl import compute_neighborlist_
 from ._sampler import PartialSampler
 from .stats import (
     Count,
@@ -39,6 +40,7 @@ __all__ = [
     ABBREV,
     from_ase,
     to_ase,
+    compute_neighborlist_,
     DataStatisticsManager,
     Count,
     Mean,

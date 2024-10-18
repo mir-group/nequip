@@ -9,7 +9,7 @@ import ase.geometry
 
 from ase.calculators.singlepoint import SinglePointCalculator
 
-from nequip.data import AtomicDataDict, from_ase, to_ase
+from nequip.data import AtomicDataDict, from_ase, to_ase, compute_neighborlist_
 from nequip.data._nl import neighbor_list_and_relative_vec
 from nequip.utils.test import compare_neighborlists
 
@@ -90,7 +90,7 @@ def test_non_periodic_edge(CH3CHO):
 def test_periodic_edge():
     atoms = ase.build.bulk("Cu", "fcc")
     dist = np.linalg.norm(atoms.cell[0])
-    data = AtomicDataDict.compute_neighborlist_(from_ase(atoms), r_max=1.05 * dist)
+    data = compute_neighborlist_(from_ase(atoms), r_max=1.05 * dist)
     edge_vecs = AtomicDataDict.with_edge_vectors(data)["edge_vectors"]
     assert edge_vecs.shape == (12, 3)  # 12 neighbors in close-packed bulk
     assert torch.allclose(
@@ -150,7 +150,7 @@ def test_some_periodic():
     # only periodic in xy
     atoms = ase.build.fcc111("Al", size=(3, 3, 1), vacuum=0.0)
     assert all(atoms.pbc == (True, True, False))
-    data = AtomicDataDict.compute_neighborlist_(
+    data = compute_neighborlist_(
         from_ase(atoms), r_max=2.9
     )  # first shell dist is 2.864 A
     # Check number of neighbors:
@@ -232,13 +232,13 @@ def test_no_neighbors(nl_method):
 
     # isolated atom
     H = Atoms("H", positions=[[0, 0, 0]], cell=20 * np.eye(3))
-    data = AtomicDataDict.compute_neighborlist_(from_ase(H), r_max=2.5)
+    data = compute_neighborlist_(from_ase(H), r_max=2.5)
     assert data[AtomicDataDict.EDGE_INDEX_KEY].numel() == 0
     assert data[AtomicDataDict.EDGE_CELL_SHIFT_KEY].numel() == 0
 
     # cutoff smaller than interatomic distance
     Cu = ase.build.bulk("Cu", "fcc", a=3.6, cubic=True)
-    data = AtomicDataDict.compute_neighborlist_(from_ase(Cu), r_max=2.5)
+    data = compute_neighborlist_(from_ase(Cu), r_max=2.5)
     assert data[AtomicDataDict.EDGE_INDEX_KEY].numel() == 0
     assert data[AtomicDataDict.EDGE_CELL_SHIFT_KEY].numel() == 0
 
@@ -286,7 +286,7 @@ def edge_index_set_equiv(a, b):
 @pytest.fixture(scope="function")
 def H2():
     atoms = ase.build.molecule("H2")
-    data = AtomicDataDict.compute_neighborlist_(
+    data = compute_neighborlist_(
         from_ase(atoms),
         r_max=2.0,
         NL="ase",
@@ -300,7 +300,7 @@ def CuFcc():
     atoms.calc = SinglePointCalculator(
         atoms, **{"forces": np.random.random((len(atoms), 3))}
     )
-    data = AtomicDataDict.compute_neighborlist_(
+    data = compute_neighborlist_(
         from_ase(atoms),
         r_max=4.0,
         NL="ase",
@@ -325,7 +325,7 @@ def Si():
         cell=lattice,
         pbc=True,
     )
-    data = AtomicDataDict.compute_neighborlist_(
+    data = compute_neighborlist_(
         AtomicDataDict.from_dict(points),
         r_max=r_max,
         NL="ase",
