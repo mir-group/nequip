@@ -12,7 +12,7 @@ from ase.io import write
 
 import torch
 
-from nequip.data import AtomicDataDict
+from nequip.data import AtomicDataDict, from_ase
 from nequip.data.dataset import ASEDataset
 from nequip.data.transforms import (
     ChemicalSpeciesToAtomTypeMapper,
@@ -108,7 +108,7 @@ def CH3CHO(CH3CHO_no_typemap) -> Tuple[Atoms, AtomicDataDict.Type]:
 def CH3CHO_no_typemap(default_dtype) -> Tuple[Atoms, AtomicDataDict.Type]:
     atoms = molecule("CH3CHO")
     data = AtomicDataDict.compute_neighborlist_(
-        AtomicDataDict.from_ase(atoms),
+        from_ase(atoms),
         r_max=2.0,
     )
     return atoms, data
@@ -118,9 +118,7 @@ def CH3CHO_no_typemap(default_dtype) -> Tuple[Atoms, AtomicDataDict.Type]:
 def Cu_bulk(default_dtype) -> Tuple[Atoms, AtomicDataDict.Type]:
     atoms = bulk("Cu") * (2, 2, 1)
     atoms.rattle()
-    data = AtomicDataDict.compute_neighborlist_(
-        AtomicDataDict.from_ase(atoms), r_max=3.5, NL="ase"
-    )
+    data = AtomicDataDict.compute_neighborlist_(from_ase(atoms), r_max=3.5, NL="ase")
     tm = ChemicalSpeciesToAtomTypeMapper(
         chemical_symbols=["Cu"],
     )

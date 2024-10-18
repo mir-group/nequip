@@ -4,7 +4,7 @@ from lightning.pytorch.callbacks import Callback
 
 import ase
 
-from nequip.data import AtomicDataDict
+from nequip.data import AtomicDataDict, to_ase
 from nequip.data import (
     _register_field_prefix,
     register_fields,
@@ -97,7 +97,7 @@ class TestTimeXYZFileWriter(Callback):
             # append to the file
             ase.io.write(
                 self.out_file + f"_dataset{dataloader_idx}.xyz",
-                AtomicDataDict.to_ase(
+                to_ase(
                     output_out,
                     chemical_symbols=self.chemical_symbols,
                     extra_fields=self.extra_fields,

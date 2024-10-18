@@ -3,6 +3,7 @@ import ase
 import ase.io
 
 from .. import AtomicDataDict
+from ..ase import from_ase
 from ._base_datasets import AtomicDataset
 
 from typing import Union, Dict, List, Optional, Callable, Any
@@ -44,7 +45,7 @@ class ASEDataset(AtomicDataset):
         self.data_list: List[AtomicDataDict.Type] = []
         for atoms in ase.io.iread(**self.ase_args, parallel=False):
             self.data_list.append(
-                AtomicDataDict.from_ase(
+                from_ase(
                     atoms=atoms,
                     key_mapping=key_mapping,
                     include_keys=include_keys,

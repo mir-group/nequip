@@ -9,6 +9,7 @@ import numpy as np
 from e3nn.util.jit import script
 
 from nequip.data import (
+    from_ase,
     AtomicDataDict,
     _GRAPH_FIELDS,
     _NODE_FIELDS,
@@ -119,7 +120,7 @@ class BaseModelTests:
     def test_wrapped_unwrapped(self, model, device, Cu_bulk):
         atoms, data_orig = Cu_bulk
         instance, out_fields = model
-        data = AtomicDataDict.from_ase(atoms)
+        data = from_ase(atoms)
         data = AtomicDataDict.compute_neighborlist_(data, r_max=3.5)
         data[AtomicDataDict.ATOM_TYPE_KEY] = data_orig[AtomicDataDict.ATOM_TYPE_KEY]
         data = AtomicDataDict.to_(data, device)
@@ -143,7 +144,7 @@ class BaseModelTests:
             atoms2 = atoms.copy()
             atoms2.positions += shifts.detach().cpu().numpy()
             # must recompute the neighborlist for this, since the edge_cell_shifts changed
-            data2 = AtomicDataDict.from_ase(atoms2)
+            data2 = from_ase(atoms2)
             data2 = AtomicDataDict.compute_neighborlist_(data2, r_max=3.5)
             data2[AtomicDataDict.ATOM_TYPE_KEY] = data[AtomicDataDict.ATOM_TYPE_KEY]
             data2 = AtomicDataDict.to_(data2, device)
@@ -328,29 +329,17 @@ class BaseEnergyModelTests(BaseModelTests):
         )
 
         data1 = AtomicDataDict.to_(
-            tm(
-                AtomicDataDict.compute_neighborlist_(
-                    AtomicDataDict.from_ase(atoms1), r_max=r_max
-                )
-            ),
+            tm(AtomicDataDict.compute_neighborlist_(from_ase(atoms1), r_max=r_max)),
             device,
         )
 
         data2 = AtomicDataDict.to_(
-            tm(
-                AtomicDataDict.compute_neighborlist_(
-                    AtomicDataDict.from_ase(atoms2), r_max=r_max
-                )
-            ),
+            tm(AtomicDataDict.compute_neighborlist_(from_ase(atoms2), r_max=r_max)),
             device,
         )
 
         data_both = AtomicDataDict.to_(
-            tm(
-                AtomicDataDict.compute_neighborlist_(
-                    AtomicDataDict.from_ase(atoms_both), r_max=r_max
-                )
-            ),
+            tm(AtomicDataDict.compute_neighborlist_(from_ase(atoms_both), r_max=r_max)),
             device,
         )
         assert (
@@ -387,9 +376,7 @@ class BaseEnergyModelTests(BaseModelTests):
 
         data_both2 = AtomicDataDict.to_(
             tm(
-                AtomicDataDict.compute_neighborlist_(
-                    AtomicDataDict.from_ase(atoms_both2), r_max=r_max
-                )
+                AtomicDataDict.compute_neighborlist_(from_ase(atoms_both2), r_max=r_max)
             ),
             device,
         )
