@@ -1,4 +1,4 @@
-from nequip.data import AtomicDataDict
+from nequip.data import AtomicDataDict, compute_neighborlist_
 
 
 class NeighborListTransform:
@@ -13,4 +13,4 @@ class NeighborListTransform:
         self.kwargs = kwargs
 
     def __call__(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
-        return AtomicDataDict.compute_neighborlist_(data, self.r_max, **self.kwargs)
+        return compute_neighborlist_(data, self.r_max, **self.kwargs)

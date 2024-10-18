@@ -1,4 +1,4 @@
-from typing import Final
+from typing import Final, List
 
 import os
 import warnings
@@ -14,6 +14,7 @@ try:
 except ImportError:
     pass
 
+from . import AtomicDataDict
 
 # use "matscipy" as default
 # NOTE:
@@ -146,3 +147,42 @@ def neighbor_list_and_relative_vec(
         device=out_device,
     )
     return edge_index, shifts, cell_tensor
+
+
+def compute_neighborlist_(
+    data: AtomicDataDict.Type, r_max: float, **kwargs
+) -> AtomicDataDict.Type:
+    """Add a neighborlist to `data` in-place.
+
+    This can be called on alredy-batched data.
+    """
+    to_batch: List[AtomicDataDict.Type] = []
+    for idx in range(AtomicDataDict.num_frames(data)):
+        data_per_frame = AtomicDataDict.frame_from_batched(data, idx)
+
+        cell = data_per_frame.get(AtomicDataDict.CELL_KEY, None)
+        if cell is not None:
+            cell = cell.view(3, 3)  # remove batch dimension
+
+        pbc = data_per_frame.get(AtomicDataDict.PBC_KEY, None)
+        if pbc is not None:
+            pbc = pbc.view(3)  # remove batch dimension
+
+        edge_index, edge_cell_shift, cell = neighbor_list_and_relative_vec(
+            pos=data_per_frame[AtomicDataDict.POSITIONS_KEY],
+            r_max=r_max,
+            cell=cell,
+            pbc=pbc,
+            **kwargs,
+        )
+        # add neighborlist information
+        data_per_frame[AtomicDataDict.EDGE_INDEX_KEY] = edge_index
+        if (
+            data.get(AtomicDataDict.CELL_KEY, None) is not None
+            and edge_cell_shift is not None
+        ):
+            data_per_frame[AtomicDataDict.EDGE_CELL_SHIFT_KEY] = edge_cell_shift
+        to_batch.append(data_per_frame)
+
+    # rebatch to make sure neighborlist information is in a similar batched format
+    return AtomicDataDict.batched_from_list(to_batch)

@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 
 import torch
 
-from nequip.data import AtomicDataDict
+from nequip.data import AtomicDataDict, compute_neighborlist_
 import hydra
 
 # Parse arguments:
@@ -91,9 +91,7 @@ data[AtomicDataDict.PBC_KEY] = torch.full((r.shape[0] // 2, 3), False, dtype=tor
 
 result = model(
     AtomicDataDict.to_(
-        AtomicDataDict.compute_neighborlist_(
-            AtomicDataDict.from_dict(data), r_max=model_r_max
-        ),
+        compute_neighborlist_(AtomicDataDict.from_dict(data), r_max=model_r_max),
         args.device,
     )
 )

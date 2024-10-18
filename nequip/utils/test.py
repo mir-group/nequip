@@ -6,6 +6,7 @@ from e3nn.util.test import equivariance_error
 from nequip.nn import GraphModuleMixin, GraphModel
 from nequip.data import (
     from_ase,
+    compute_neighborlist_,
     AtomicDataDict,
     _NODE_FIELDS,
     _EDGE_FIELDS,
@@ -417,7 +418,7 @@ def set_irreps_debug(enabled: bool = False) -> None:
 
 
 def edgeset_from_AtomicDataDict(data, **nl_kwargs):
-    data = AtomicDataDict.compute_neighborlist_(data, **nl_kwargs)
+    data = compute_neighborlist_(data, **nl_kwargs)
     return set([tuple(edge) for edge in data["edge_index"].numpy().T])
 
 
