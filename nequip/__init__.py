@@ -1,5 +1,3 @@
-import sys
-
 from ._version import __version__  # noqa: F401
 
 import packaging.version
@@ -20,12 +18,18 @@ assert torch_version >= packaging.version.parse(
 # the nequip infrastructure with calls like `register_fields`
 
 # see https://packaging.python.org/en/latest/guides/creating-and-discovering-plugins/#using-package-metadata
-if sys.version_info < (3, 10):
-    from importlib_metadata import entry_points
-else:
+# we use "try ... except ..." to avoid importing sys.version_info
+try:
+    # python >= 3.10
     from importlib.metadata import entry_points
 
-_DISCOVERED_NEQUIP_EXTENSION = entry_points(group="nequip.extension")
+    _DISCOVERED_NEQUIP_EXTENSION = entry_points(group="nequip.extension")
+except (ImportError, TypeError):
+    # python < 3.10
+    from importlib_metadata import entry_points
+
+    _DISCOVERED_NEQUIP_EXTENSION = entry_points(group="nequip.extension")
+
 for ep in _DISCOVERED_NEQUIP_EXTENSION:
     if ep.name == "init_always":
         ep.load()

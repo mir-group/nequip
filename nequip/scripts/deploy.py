@@ -1,11 +1,5 @@
 import argparse
-import sys
-
-if sys.version_info[1] >= 8:
-    from typing import Final, Optional
-else:
-    from typing_extensions import Final, Optional
-from typing import Tuple, Dict, Union
+from typing import Final, Optional, Tuple, Dict, Union
 
 import itertools
 import pathlib
@@ -185,11 +179,7 @@ def main(args=None):
     parser = argparse.ArgumentParser(
         description="Deploy and view information about previously deployed NequIP models."
     )
-    # backward compat for 3.6
-    if sys.version_info[1] > 6:
-        required = {"required": True}
-    else:
-        required = {}
+    required = {"required": True}
     parser.add_argument("--verbose", help="log level", default="INFO", type=str)
     subparsers = parser.add_subparsers(dest="command", title="commands", **required)
     info_parser = subparsers.add_parser(
