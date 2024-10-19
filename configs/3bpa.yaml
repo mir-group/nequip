@@ -138,11 +138,11 @@ training_module:
     r_max: ${cutoff_radius}
    
     model_builders:
-     - SimpleIrrepsConfig 
-     - NequIPGNNEnergyModel         
-     - PerTypeEnergyScaleShift
-     - ForceOutput         
-     - RescaleEnergyEtc    
+     - nequip.model.SimpleIrrepsConfig 
+     - nequip.model.NequIPGNNEnergyModel         
+     - nequip.model.PerTypeEnergyScaleShift
+     - nequip.model.ForceOutput         
+     - nequip.model.RescaleEnergyEtc    
    
     num_layers: 4
    

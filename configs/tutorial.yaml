@@ -259,12 +259,12 @@ training_module:
   # model details
   model:
     model_builders:
-     - SimpleIrrepsConfig        # update the config with all the irreps for the network if using the simplified `l_max` / `num_features` / `parity` syntax
-     - NequIPGNNEnergyModel      # build a full NequIP energy model
-     - PerTypeEnergyScaleShift   # add per-atom / per-species scaling and shifting to the NequIP model before the total energy sum
-     - PairPotentialTerm         # MUST come after PerTypeEnergyScaleShift
-     - StressForceOutput               # wrap the energy model in a module that uses autodifferention to compute the forces
-     - RescaleEnergyEtc          # wrap the entire model in the appropriate global rescaling of the energy, forces, etc.
+     - nequip.model.SimpleIrrepsConfig        # update the config with all the irreps for the network if using the simplified `l_max` / `num_features` / `parity` syntax
+     - nequip.model.NequIPGNNEnergyModel      # build a full NequIP energy model
+     - nequip.model.PerTypeEnergyScaleShift   # add per-atom / per-species scaling and shifting to the NequIP model before the total energy sum
+     - nequip.model.PairPotentialTerm         # MUST come after PerTypeEnergyScaleShift
+     - nequip.model.StressForceOutput               # wrap the energy model in a module that uses autodifferention to compute the forces
+     - nequip.model.RescaleEnergyEtc          # wrap the entire model in the appropriate global rescaling of the energy, forces, etc.
     #   ^ global rescaling blocks must always go last!
   
     # network

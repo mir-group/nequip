@@ -106,10 +106,10 @@ training_module:
 
   model:
     model_builders:
-      - SimpleIrrepsConfig
-      - NequIPGNNEnergyModel
-      - StressForceOutput
-      - RescaleEnergyEtc
+      - nequip.model.SimpleIrrepsConfig
+      - nequip.model.NequIPGNNEnergyModel
+      - nequip.model.StressForceOutput
+      - nequip.model.RescaleEnergyEtc
     num_basis: 8
     r_max: ${cutoff_radius}
     l_max: 1
