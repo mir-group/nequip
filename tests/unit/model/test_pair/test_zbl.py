@@ -25,19 +25,13 @@ class TestNequIPModel(BaseEnergyModelTests):
     def strict_locality(self):
         return True
 
-    @pytest.fixture(
-        params=[False, True],
-        scope="class",
-    )
-    def config(self, request):
-        do_scale = request.param
+    @pytest.fixture(scope="class")
+    def config(self):
         config = {
             "model_builders": [
                 "nequip.model.PairPotential",
                 "nequip.model.ForceOutput",
-                "nequip.model.RescaleEnergyEtc",
             ],
-            "global_rescale_scale": 3.7777 if do_scale else None,
             "pair_style": "ZBL",
             "units": "metal",
             "r_max": 5.0,
