@@ -8,7 +8,7 @@ import ase.data
 
 from nequip.utils import scatter, conditional_torchscript_jit
 from nequip.data import AtomicDataDict
-from nequip.nn import GraphModuleMixin, RescaleOutput
+from nequip.nn import GraphModuleMixin
 
 
 class _LJParam(torch.nn.Module):
@@ -152,15 +152,6 @@ class LennardJones(GraphModuleMixin, torch.nn.Module):
 
         return f"PairPotential(lj_style={self.lj_style} | σ={_f(self.sigma)} δ={_f(self.delta)} ε={_f(self.epsilon)} exp={self.exponent:.1f})"
 
-    def update_for_rescale(self, rescale_module: RescaleOutput):
-        if AtomicDataDict.PER_ATOM_ENERGY_KEY not in rescale_module.scale_keys:
-            return
-        if not rescale_module.has_scale:
-            return
-        with torch.no_grad():
-            # Our energy will be scaled by scale_by later, so we have to divide here to cancel out:
-            self.epsilon.copy_(self.epsilon / rescale_module.scale_by.item())
-
 
 @compile_mode("script")
 class SimpleLennardJones(GraphModuleMixin, torch.nn.Module):
@@ -211,14 +202,6 @@ class SimpleLennardJones(GraphModuleMixin, torch.nn.Module):
             atomic_eng = atomic_eng + data[AtomicDataDict.PER_ATOM_ENERGY_KEY]
         data[AtomicDataDict.PER_ATOM_ENERGY_KEY] = atomic_eng
         return data
-
-    def update_for_rescale(self, rescale_module: RescaleOutput):
-        if AtomicDataDict.PER_ATOM_ENERGY_KEY not in rescale_module.scale_keys:
-            return
-        if not rescale_module.has_scale:
-            return
-        # Our energy will be scaled by scale_by later, so we have to divide here to cancel out:
-        self.lj_epsilon /= rescale_module.scale_by.item()
 
 
 class _ZBL(torch.nn.Module):
@@ -346,14 +329,6 @@ class ZBL(GraphModuleMixin, torch.nn.Module):
             atomic_eng = atomic_eng + data[AtomicDataDict.PER_ATOM_ENERGY_KEY]
         data[AtomicDataDict.PER_ATOM_ENERGY_KEY] = atomic_eng
         return data
-
-    def update_for_rescale(self, rescale_module: RescaleOutput):
-        if AtomicDataDict.PER_ATOM_ENERGY_KEY not in rescale_module.scale_keys:
-            return
-        if not rescale_module.has_scale:
-            return
-        # Our energy will be scaled by scale_by later, so we have to divide here to cancel out:
-        self._qqr2exesquare /= rescale_module.scale_by.item()
 
 
 __all__ = [LennardJones, ZBL]

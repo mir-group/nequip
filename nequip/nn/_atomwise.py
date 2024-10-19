@@ -5,10 +5,9 @@ from e3nn.o3 import Linear
 
 from nequip.data import AtomicDataDict
 from nequip.utils.scatter import scatter
-from nequip.utils.misc import dtype_from_name, format_type_vals
+from nequip.utils.misc import dtype_from_name
 from nequip.utils.logger import RankedLogger
 from ._graph_mixin import GraphModuleMixin
-from ._rescale import RescaleOutput
 
 from typing import Optional, List
 
@@ -250,52 +249,3 @@ class PerTypeScaleShift(GraphModuleMixin, torch.nn.Module):
                 )
         data[self.out_field] = in_field
         return data
-
-    def update_for_rescale(self, rescale_module: RescaleOutput):
-        if not self.arguments_in_dataset_units:
-            # nothing to rescale, arguments are in normalized units already / unitless
-            return
-        # are we scaling something related to the global rescaling?
-        if self.field not in rescale_module.scale_keys:
-            return
-        # now check that we have the right rescaling in the specific energy case
-        if self.field == AtomicDataDict.PER_ATOM_ENERGY_KEY and not (
-            set(rescale_module.scale_keys) <= set(AtomicDataDict.ALL_ENERGY_KEYS)
-        ):
-            raise AssertionError("Some unsupported energy scaling arangement...")
-        if self.arguments_in_dataset_units and rescale_module.has_scale:
-            orig_scale_str = (
-                format_type_vals(self.scales, self.type_names)
-                if self.has_scales
-                else "n/a"
-            )
-            orig_shift_str = (
-                format_type_vals(self.shifts, self.type_names)
-                if self.has_shifts
-                else "n/a"
-            )
-
-            with torch.no_grad():
-                if self.has_scales:
-                    self.scales.div_(rescale_module.scale_by)
-                if self.has_shifts:
-                    self.shifts.div_(rescale_module.scale_by)
-
-            new_scale_str = (
-                format_type_vals(self.scales, self.type_names)
-                if self.has_scales
-                else "n/a"
-            )
-            new_shift_str = (
-                format_type_vals(self.shifts, self.type_names)
-                if self.has_shifts
-                else "n/a"
-            )
-
-            logger.info(
-                f"PerSpeciesScaleShift's arguments were in dataset units; rescaling:\n"
-                f"Original scales: {orig_scale_str}\n"
-                f"Original shifts: {orig_shift_str}\n"
-                f"Updated scales : {new_scale_str}\n"
-                f"Updated shifts : {new_shift_str}"
-            )
