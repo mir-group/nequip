@@ -23,9 +23,7 @@ default_config = dict(
         "nequip.model.NequIPGNNEnergyModel",
         "nequip.model.PerTypeEnergyScaleShift",
         "nequip.model.StressForceOutput",
-        "nequip.model.RescaleEnergyEtc",
     ],
-    default_dtype="float64",
     model_dtype="float32",
 )
 # All default_config keys are valid / requested

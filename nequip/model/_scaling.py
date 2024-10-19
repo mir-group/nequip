@@ -6,7 +6,6 @@ from nequip.nn import GraphModuleMixin
 from nequip.data import AtomicDataDict
 from nequip.utils import format_type_vals
 
-from omegaconf import ListConfig
 import warnings
 from typing import Union
 
@@ -16,21 +15,6 @@ logger = RankedLogger(__name__, rank_zero_only=True)
 
 
 RESCALE_THRESHOLD = 1e-6
-
-
-def RescaleEnergyEtc(
-    model: GraphModuleMixin,
-    config,
-    initialize: bool,
-):
-    return GlobalRescale(
-        model=model,
-        config=config,
-        initialize=initialize,
-        module_prefix="global_rescale",
-        default_scale=None,
-        default_scale_keys=AtomicDataDict.ALL_ENERGY_KEYS,
-    )
 
 
 def GlobalRescale(
@@ -66,10 +50,7 @@ def GlobalRescale(
         if global_scale is not None:
             global_scale = 1.0
 
-    error_string = "keys need to be a list"
-    assert isinstance(default_scale_keys, list) or isinstance(
-        default_scale_keys, ListConfig
-    ), error_string
+    assert isinstance(default_scale_keys, list), "keys need to be a list"
 
     # == Build the model ==
     return RescaleOutputModule(
@@ -126,7 +107,7 @@ def _PerTypeScaleShift(
             or any(
                 [
                     isinstance(value, val_type)
-                    for val_type in [float, list, torch.Tensor, ListConfig]
+                    for val_type in [float, list, torch.Tensor]
                 ]
             )
         ):
