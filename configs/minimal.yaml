@@ -74,10 +74,10 @@ training_module:
 
   model:
     model_builders:
-     - SimpleIrrepsConfig 
-     - NequIPGNNEnergyModel
-     - PerTypeEnergyScaleShift  
-     - ForceOutput         
+     - nequip.model.SimpleIrrepsConfig 
+     - nequip.model.NequIPGNNEnergyModel
+     - nequip.model.PerTypeEnergyScaleShift  
+     - nequip.model.ForceOutput         
   
     seed: 456
     type_names: ${model_type_names}

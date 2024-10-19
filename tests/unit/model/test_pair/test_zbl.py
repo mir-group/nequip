@@ -33,9 +33,9 @@ class TestNequIPModel(BaseEnergyModelTests):
         do_scale = request.param
         config = {
             "model_builders": [
-                "PairPotential",
-                "ForceOutput",
-                "RescaleEnergyEtc",
+                "nequip.model.PairPotential",
+                "nequip.model.ForceOutput",
+                "nequip.model.RescaleEnergyEtc",
             ],
             "global_rescale_scale": 3.7777 if do_scale else None,
             "pair_style": "ZBL",

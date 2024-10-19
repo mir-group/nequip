@@ -5,25 +5,25 @@ from lightning.pytorch.utilities.seed import isolate_rng
 
 from nequip.nn import GraphModuleMixin, GraphModel
 from nequip.utils import (
-    load_callable,
     dtype_from_name,
     torch_default_dtype,
     Config,
 )
 from nequip.utils.config import _GLOBAL_ALL_ASKED_FOR_KEYS
-
 from nequip.utils.logger import RankedLogger
+
+import hydra
 
 logger = RankedLogger(__name__, rank_zero_only=True)
 
 
 default_config = dict(
     model_builders=[
-        "SimpleIrrepsConfig",
-        "NequIPGNNEnergyModel",
-        "PerTypeEnergyScaleShift",
-        "StressForceOutput",
-        "RescaleEnergyEtc",
+        "nequip.model.SimpleIrrepsConfig",
+        "nequip.model.NequIPGNNEnergyModel",
+        "nequip.model.PerTypeEnergyScaleShift",
+        "nequip.model.StressForceOutput",
+        "nequip.model.RescaleEnergyEtc",
     ],
     default_dtype="float64",
     model_dtype="float32",
@@ -91,8 +91,7 @@ def model_from_config(
 
             # Build
             builders = [
-                load_callable(b, prefix="nequip.model")
-                for b in config.get("model_builders", [])
+                hydra.utils.get_method(b) for b in config.get("model_builders", [])
             ]
 
             model = None
