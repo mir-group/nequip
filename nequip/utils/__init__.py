@@ -4,8 +4,6 @@ from .auto_init import (
     get_w_prefix,
 )
 from .savenload import (
-    save_file,
-    load_file,
     load_callable,
     atomic_write,
     finish_all_writes,
@@ -24,8 +22,6 @@ __all__ = [
     instantiate_from_cls_name,
     instantiate,
     get_w_prefix,
-    save_file,
-    load_file,
     load_callable,
     atomic_write,
     finish_all_writes,

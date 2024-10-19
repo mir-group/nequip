@@ -3,9 +3,6 @@ Config tests
 """
 
 import pytest
-
-from os import remove
-
 from nequip.utils import Config
 
 # set up two config to test
@@ -62,16 +59,6 @@ class TestConfigIO:
     def test_repr(self, config):
         s = repr(config)
         print(s)
-
-    @one_test
-    def test_save_yaml(self, config):
-        config.save(filename=f"{self.filename}.yaml")
-
-    @one_test
-    def test_load_yaml(self, config):
-        config2 = config.load(filename=f"{self.filename}.yaml")
-        assert Config.as_dict(config) == dict(config2)
-        remove(f"{self.filename}.yaml")
 
 
 class TestConfigUpdate:
