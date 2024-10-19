@@ -8,7 +8,6 @@ import e3nn.util.jit
 from .misc import dtype_to_name
 
 import warnings
-from packaging import version
 import os
 from typing import List, Tuple, Union, Final, Optional
 
@@ -40,7 +39,6 @@ def _get_latest_global_options() -> dict:
 
 def _set_global_options(
     seed: Optional[int] = None,
-    _jit_bailout_depth: int = 2,
     # avoid 20 iters of pain, see https://github.com/pytorch/pytorch/issues/52286
     # Quote from eelison in PyTorch slack:
     # https://pytorch.slack.com/archives/CDZD1FANA/p1644259272007529?thread_ts=1644064449.039479&cid=CDZD1FANA
@@ -72,7 +70,6 @@ def _set_global_options(
     _latest_global_config.update(
         {
             "seed": seed,
-            "_jit_bailout_depth": _jit_bailout_depth,
             "_jit_fusion_strategy": _jit_fusion_strategy,
             "allow_tf32": allow_tf32,
             "specialized_code": specialized_code,
@@ -99,26 +96,13 @@ def _set_global_options(
             torch.backends.cuda.matmul.allow_tf32 = allow_tf32
             torch.backends.cudnn.allow_tf32 = allow_tf32
 
-    # Temporary warning due to unresolved upstream issue
-    torch_version = version.parse(torch.__version__)
-
-    if torch_version >= version.parse("1.11"):
-        # PyTorch >= 1.11
-        new_strat = _jit_fusion_strategy
-        old_strat = torch.jit.set_fusion_strategy(new_strat)
-        if warn_on_override and old_strat != new_strat:
-            warnings.warn(
-                f"Setting the GLOBAL value for jit fusion strategy to `{new_strat}` which is different than the previous value of `{old_strat}`"
-            )
-    else:
-        # For avoiding 20 steps of painfully slow JIT recompilation
-        # See https://github.com/pytorch/pytorch/issues/52286
-        new_depth = _jit_bailout_depth
-        old_depth = torch._C._jit_set_bailout_depth(new_depth)
-        if warn_on_override and old_depth != new_depth:
-            warnings.warn(
-                f"Setting the GLOBAL value for jit bailout depth to `{new_depth}` which is different than the previous value of `{old_depth}`"
-            )
+    # this applies for torch >= 1.11 (our minimum torch version satisfies this)
+    new_strat = _jit_fusion_strategy
+    old_strat = torch.jit.set_fusion_strategy(new_strat)
+    if warn_on_override and old_strat != new_strat:
+        warnings.warn(
+            f"Setting the GLOBAL value for jit fusion strategy to `{new_strat}` which is different than the previous value of `{old_strat}`"
+        )
 
     # Deal with fusers
     # The default PyTorch fuser changed to nvFuser in 1.12

@@ -1,19 +1,13 @@
-import packaging.version
-
 import torch
 import e3nn
 import nequip
 
 from ..__init__ import _DISCOVERED_NEQUIP_EXTENSION
 from .logger import RankedLogger
-from typing import Tuple, Final
+from typing import Tuple
 import importlib
 
 logger = RankedLogger(__name__, rank_zero_only=True)
-
-_TORCH_IS_GE_1_13: Final[bool] = packaging.version.parse(
-    torch.__version__
-) >= packaging.version.parse("1.13.0")
 
 # get versions of torch, e3nn, nequip and all extension packages
 _DEFAULT_VERSION_CODES = [torch, e3nn, nequip]

@@ -30,7 +30,6 @@ R_MAX_KEY: Final[str] = "r_max"
 PER_EDGE_TYPE_CUTOFF_KEY: Final[str] = "per_edge_type_cutoff"
 N_SPECIES_KEY: Final[str] = "n_species"
 TYPE_NAMES_KEY: Final[str] = "type_names"
-JIT_BAILOUT_KEY: Final[str] = "_jit_bailout_depth"
 JIT_FUSION_STRATEGY: Final[str] = "_jit_fusion_strategy"
 TF32_KEY: Final[str] = "allow_tf32"
 DEFAULT_DTYPE_KEY: Final[str] = "default_dtype"
@@ -45,7 +44,6 @@ _ALL_METADATA_KEYS = [
     PER_EDGE_TYPE_CUTOFF_KEY,
     N_SPECIES_KEY,
     TYPE_NAMES_KEY,
-    JIT_BAILOUT_KEY,
     JIT_FUSION_STRATEGY,
     TF32_KEY,
     DEFAULT_DTYPE_KEY,
@@ -104,23 +102,9 @@ def load_deployed_model(
             f"{model_path} does not seem to be a deployed NequIP model file. Did you forget to deploy it using `nequip-deploy`? \n\n(Underlying error: {e})"
         )
     # Confirm nequip made it
-    if len(metadata[NEQUIP_VERSION_KEY]) == 0:
-        if len(metadata[JIT_BAILOUT_KEY]) != 0:
-            # In versions <0.6.0, there may have been a bug leading to empty "*_version"
-            # metadata keys.  We can be pretty confident this is a NequIP model from
-            # those versions, though, if it stored "_jit_bailout_depth"
-            # https://github.com/mir-group/nequip/commit/2f43aa84542df733bbe38cb9d6cca176b0e98054
-            # Likely addresses https://github.com/mir-group/nequip/issues/431
-            warnings.warn(
-                f"{model_path} appears to be from a older (0.5.* or earlier) version of `nequip` "
-                "that pre-dates a variety of breaking changes. Please carefully check the "
-                "correctness of your results for unexpected behaviour, and consider re-deploying "
-                "your model using this current `nequip` installation."
-            )
-        else:
-            raise ValueError(
-                f"{model_path} does not seem to be a deployed NequIP model file"
-            )
+    assert (
+        len(metadata[NEQUIP_VERSION_KEY]) != 0
+    ), f"{model_path} does not seem to be a deployed NequIP model file"
     # Confirm its TorchScript
     assert isinstance(model, torch.jit.ScriptModule)
     # Make sure we're in eval mode
@@ -162,11 +146,6 @@ def load_deployed_model(
             strategy = [e.split(",") for e in strategy.split(";")]
             strategy = [(e[0], int(e[1])) for e in strategy]
             global_config_dict["_jit_fusion_strategy"] = strategy
-        # JIT bailout
-        # _set_global_options will check torch version
-        jit_bailout: int = metadata.get(JIT_BAILOUT_KEY, "")
-        if jit_bailout != "":
-            global_config_dict["_jit_bailout_depth"] = int(jit_bailout)
         # call to actually set the global options
         _set_global_options(
             **global_config_dict,
@@ -282,12 +261,7 @@ def main(args=None):
         # == global metadata ==
         global_options = _get_latest_global_options()
 
-        metadata[JIT_BAILOUT_KEY] = str(global_options[JIT_BAILOUT_KEY])
-        if (
-            packaging.version.parse(torch.__version__)
-            >= packaging.version.parse("1.11")
-            and JIT_FUSION_STRATEGY in global_options
-        ):
+        if JIT_FUSION_STRATEGY in global_options:
             metadata[JIT_FUSION_STRATEGY] = ";".join(
                 "%s,%i" % (e[0], e[1]) for e in global_options[JIT_FUSION_STRATEGY]
             )
