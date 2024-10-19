@@ -42,8 +42,6 @@ import inspect
 from copy import deepcopy
 from typing import Optional
 
-from nequip.utils.savenload import save_file, load_file
-
 
 _GLOBAL_ALL_ASKED_FOR_KEYS: Set[str] = set()
 
@@ -260,56 +258,6 @@ class Config(object):
         """mock wandb.config function"""
         pass
 
-    def save(self, filename: str, format: Optional[str] = None):
-        """Print config to file."""
-
-        supported_formats = {"yaml": ("yml", "yaml"), "json": "json"}
-        return save_file(
-            item=dict(self),
-            supported_formats=supported_formats,
-            filename=filename,
-            enforced_format=format,
-        )
-
-    @staticmethod
-    def from_file(filename: str, format: Optional[str] = None, defaults: dict = {}):
-        """Load arguments from file
-
-        Has support for including another config file as a baseline with:
-        ```
-        # example of using another config as a baseline and overriding only selected options
-        # this option will read in configs/minimal.yaml and take ALL keys from that file
-        include_file_as_baseline_config: configs/minimal.yaml
-        # keys specified in this file WILL OVERRIDE keys from the `include_file_as_baseline_config` file
-        l_max: 1  # overrides l_max: 2 in minimal.yaml
-        ```
-        """
-
-        supported_formats = {"yaml": ("yml", "yaml"), "json": "json"}
-        dictionary = load_file(
-            supported_formats=supported_formats,
-            filename=filename,
-            enforced_format=format,
-        )
-        k: str = "include_file_as_baseline_config"
-        if k in dictionary:
-            # allow one level of subloading
-            baseline_fname = dictionary.pop(k)
-            dictionary_baseline = load_file(
-                supported_formats=supported_formats,
-                filename=baseline_fname,
-                enforced_format=format,
-            )
-            if k in dictionary_baseline:
-                raise NotImplementedError(
-                    f"Multiple levels of `{k}` are not allowed, but {baseline_fname} contained `{k}`"
-                )
-            # override baseline options with the main config
-            dictionary_baseline.update(dictionary)
-            dictionary = dictionary_baseline
-            del dictionary_baseline, baseline_fname
-        return Config.from_dict(dictionary, defaults)
-
     @staticmethod
     def from_dict(dictionary: dict, defaults: dict = {}):
         c = Config(defaults)
@@ -382,8 +330,6 @@ class Config(object):
             return Config(config=default_params, allow_list=param_keys)
         else:
             return Config(config=default_params, allow_list=param_keys)
-
-    load = from_file
 
     def _get_nomark(self, key: str) -> Any:
         return self._items.get(key)
