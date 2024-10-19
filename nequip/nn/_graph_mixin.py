@@ -7,7 +7,7 @@ import torch
 from e3nn import o3
 
 from nequip.data import AtomicDataDict
-from nequip.utils import instantiate
+from nequip.utils.auto_init import instantiate
 
 
 class GraphModuleMixin:
