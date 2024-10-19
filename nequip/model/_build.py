@@ -21,7 +21,7 @@ default_config = dict(
     model_builders=[
         "SimpleIrrepsConfig",
         "NequIPGNNEnergyModel",
-        "PerSpeciesRescale",
+        "PerTypeEnergyScaleShift",
         "StressForceOutput",
         "RescaleEnergyEtc",
     ],
