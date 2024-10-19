@@ -142,8 +142,7 @@ training_module:
      - nequip.model.NequIPGNNEnergyModel         
      - nequip.model.PerTypeEnergyScaleShift
      - nequip.model.ForceOutput         
-     - nequip.model.RescaleEnergyEtc    
-   
+
     num_layers: 4
    
     l_max: 3
@@ -169,8 +168,7 @@ training_module:
    
     # isolated atom energies from dataset
     per_type_energy_scale_shift_shifts: [-1029.4889999855063, -13.587222780835477, -1484.9814568572233, -2041.9816003861047]
-    per_type_energy_scale_shift_scales: null
-    global_rescale_scale: ${training_data_stats:forces_rms}
+    per_type_energy_scale_shift_scales: ${training_data_stats:forces_rms}
     avg_num_neighbors: ${training_data_stats:num_neighbors_mean}
    
     per_type_energy_scale_shifts_trainable: false

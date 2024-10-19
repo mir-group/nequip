@@ -74,11 +74,11 @@ training_module:
 
   model:
     model_builders:
-     - nequip.model.SimpleIrrepsConfig 
+     - nequip.model.SimpleIrrepsConfig
      - nequip.model.NequIPGNNEnergyModel
-     - nequip.model.PerTypeEnergyScaleShift  
-     - nequip.model.ForceOutput         
-  
+     - nequip.model.PerTypeEnergyScaleShift
+     - nequip.model.ForceOutput
+
     seed: 456
     type_names: ${model_type_names}
     model_dtype: float32
@@ -90,7 +90,6 @@ training_module:
   
     per_type_energy_scale_shift_shifts: ${training_data_stats:per_atom_energy_mean}
     per_type_energy_scale_shift_scales: ${training_data_stats:per_type_forces_rms}
-    global_rescale_scale: null
     avg_num_neighbors: ${training_data_stats:num_neighbors_mean}
 
 global_options:
