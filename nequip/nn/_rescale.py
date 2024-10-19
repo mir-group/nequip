@@ -6,7 +6,7 @@ from e3nn.util.jit import compile_mode
 
 from nequip.data import AtomicDataDict
 from nequip.nn import GraphModuleMixin
-from nequip.utils import dtype_from_name
+from nequip.utils.misc import dtype_from_name
 
 # TODO: merge this into GraphModel
 

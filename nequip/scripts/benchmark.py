@@ -14,7 +14,7 @@ from torch.utils.benchmark.utils.common import trim_sigfig, select_unit
 from e3nn.util.jit import script
 
 from nequip.utils import get_current_code_versions, RankedLogger
-from nequip.utils._global_options import _set_global_options, _latest_global_config
+from nequip.utils._global_options import _set_global_options
 from nequip.utils.test import assert_AtomicData_equivariant
 from nequip.data import AtomicDataDict
 from nequip.data.datamodule import NequIPDataModule
@@ -234,7 +234,7 @@ def main(args=None):
             model = torch.jit.load(f.name, map_location=device)
 
     # Make sure we're warm past compilation
-    warmup = _latest_global_config["_jit_bailout_depth"] + 4  # just to be safe...
+    warmup = 6
 
     if args.profile is not None:
 

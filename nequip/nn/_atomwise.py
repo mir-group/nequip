@@ -4,14 +4,14 @@ import torch.nn.functional
 from e3nn.o3 import Linear
 
 from nequip.data import AtomicDataDict
-from nequip.utils import scatter, dtype_from_name, format_type_vals
-from nequip.utils.versions import _TORCH_IS_GE_1_13
+from nequip.utils.scatter import scatter
+from nequip.utils.misc import dtype_from_name, format_type_vals
+from nequip.utils.logger import RankedLogger
 from ._graph_mixin import GraphModuleMixin
 from ._rescale import RescaleOutput
 
 from typing import Optional, List
 
-from nequip.utils.logger import RankedLogger
 
 logger = RankedLogger(__name__, rank_zero_only=True)
 
@@ -213,9 +213,6 @@ class PerTypeScaleShift(GraphModuleMixin, torch.nn.Module):
         assert isinstance(arguments_in_dataset_units, bool)
         self.arguments_in_dataset_units = arguments_in_dataset_units
 
-        # we can use FMA for performance but its type promotion is broken until 1.13
-        self._use_fma = _TORCH_IS_GE_1_13
-
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
         if not (self.has_scales or self.has_shifts):
             return data
@@ -226,7 +223,7 @@ class PerTypeScaleShift(GraphModuleMixin, torch.nn.Module):
             species_idx
         ), "in_field doesnt seem to have correct per-atom shape"
 
-        if self._use_fma and self.has_scales and self.has_shifts:
+        if self.has_scales and self.has_shifts:
             # we can used an FMA for performance
             # addcmul computes
             # input + tensor1 * tensor2 elementwise
@@ -237,7 +234,7 @@ class PerTypeScaleShift(GraphModuleMixin, torch.nn.Module):
                 in_field,
             )
         else:
-            # fallback path for torch<1.13 OR mix of enabled shifts and scales
+            # fallback path for mix of enabled shifts and scales
             # multiplication / addition promotes dtypes already, so no cast is needed
             # this is specifically because self.*[species_idx].view(-1, 1)
             # is never a scalar (ndim == 0), since it is always [n_atom, 1]
