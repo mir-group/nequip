@@ -108,8 +108,9 @@ training_module:
     model_builders:
       - nequip.model.SimpleIrrepsConfig
       - nequip.model.NequIPGNNEnergyModel
+      - nequip.model.PerTypeEnergyScaleShift
       - nequip.model.StressForceOutput
-      - nequip.model.RescaleEnergyEtc
+
     num_basis: 8
     r_max: ${cutoff_radius}
     l_max: 1
@@ -122,7 +123,7 @@ training_module:
     model_dtype: float32
 
     per_type_energy_scale_shift_shifts: ${training_data_stats:per_atom_energy_mean}
-    global_rescale_scale: ${training_data_stats:forces_rms}
+    per_type_energy_scale_shift_scales: ${training_data_stats:forces_rms}
     avg_num_neighbors: ${training_data_stats:num_neighbors_mean}
 
 global_options:

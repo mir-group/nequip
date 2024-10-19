@@ -263,9 +263,8 @@ training_module:
      - nequip.model.NequIPGNNEnergyModel      # build a full NequIP energy model
      - nequip.model.PerTypeEnergyScaleShift   # add per-atom / per-species scaling and shifting to the NequIP model before the total energy sum
      - nequip.model.PairPotentialTerm         # MUST come after PerTypeEnergyScaleShift
-     - nequip.model.StressForceOutput               # wrap the energy model in a module that uses autodifferention to compute the forces
-     - nequip.model.RescaleEnergyEtc          # wrap the entire model in the appropriate global rescaling of the energy, forces, etc.
-    #   ^ global rescaling blocks must always go last!
+     - nequip.model.StressForceOutput         # wrap the energy model in a module that uses autodifferention to compute the forces
+
   
     # network
     seed: 123
@@ -327,8 +326,7 @@ training_module:
     # we use omegaconf's resolvers (https://omegaconf.readthedocs.io/en/2.3_branch/usage.html#resolvers)
     # to facilitate getting the dataset statistics from the DataStatisticsManager
     per_type_energy_scale_shift_shifts: ${training_data_stats:per_atom_energy_mean}
-    per_type_energy_scale_shift_scales: ${training_data_stats:per_type_forces_rms} #null
-    global_rescale_scale: null #${training_data_stats:forces_rms}
+    per_type_energy_scale_shift_scales: ${training_data_stats:per_type_forces_rms} #${training_data_stats:forces_rms}
     avg_num_neighbors: ${training_data_stats:num_neighbors_mean}
   
     per_type_energy_scale_shift_scales_trainable: false
