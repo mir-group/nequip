@@ -3,7 +3,6 @@
 This is a seperate module to compensate for a TorchScript bug that can only recognize constants when they are accessed as attributes of an imported module.
 """
 
-import sys
 from typing import List, Final
 
 
@@ -89,8 +88,4 @@ NUM_NODES_KEY: Final[str] = "num_atoms"
 MODEL_DTYPE_KEY: Final[str] = "_model_dtype_indicator"
 
 # Make a list of allowed keys
-ALLOWED_KEYS: List[str] = [
-    getattr(sys.modules[__name__], k)
-    for k in sys.modules[__name__].__dict__.keys()
-    if k.endswith("_KEY")
-]
+ALLOWED_KEYS: List[str] = [v for k, v in globals().items() if k.endswith("_KEY")]
