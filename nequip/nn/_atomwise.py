@@ -4,15 +4,12 @@ import torch.nn.functional
 from e3nn.o3 import Linear
 
 from nequip.data import AtomicDataDict
+from nequip.data._key_registry import get_field_type
 from nequip.utils.scatter import scatter
-from nequip.utils.misc import dtype_from_name
-from nequip.utils.logger import RankedLogger
+from nequip.utils._global_options import _GLOBAL_DTYPE
 from ._graph_mixin import GraphModuleMixin
 
-from typing import Optional, List
-
-
-logger = RankedLogger(__name__, rank_zero_only=True)
+from typing import Optional, List, Union
 
 
 class AtomwiseOperation(GraphModuleMixin, torch.nn.Module):
@@ -117,135 +114,129 @@ class AtomwiseReduce(GraphModuleMixin, torch.nn.Module):
 class PerTypeScaleShift(GraphModuleMixin, torch.nn.Module):
     """Scale and/or shift a predicted per-atom property based on (learnable) per-species/type parameters.
 
-    Note that scaling/shifting is always done (casting into) ``default_dtype``, even if ``model_dtype`` is lower precision.
+    Note that scaling/shifting is always done casting into the global dtype (``float64``), even if ``model_dtype`` is a lower precision.
 
-    Args:
-        field: the per-atom field to scale/shift.
-        num_types: the number of types in the model.
-        shifts: the initial shifts to use, one per atom type.
-        scales: the initial scales to use, one per atom type.
-        arguments_in_dataset_units: if ``True``, says that the provided shifts/scales are in dataset
-            units (in which case they will be rescaled appropriately by any global rescaling later
-            applied to the model); if ``False``, the provided shifts/scales will be used without modification.
+    If a single scalar is provided for scales/shifts, a shortcut implementation is used. Otherwise, a more expensive implementation that assigns separate scales/shifts to each atom type is used.
 
-            For example, if identity shifts/scales of zeros and ones are provided, this should be ``False``.
-            But if scales/shifts computed from the training data are used, and are thus in dataset units,
-            this should be ``True``.
-        out_field: the output field; defaults to ``field``.
+    If scales/shifts are trainable, the more expensive implementation that assigns separate scales/shifts to each atom type is used, even if a single scalar was provided for the initialization.
     """
 
     field: str
     out_field: str
-    scales_trainble: bool
-    shifts_trainable: bool
     has_scales: bool
     has_shifts: bool
-    default_dtype: torch.dtype
-    _use_fma: bool
+    scales_trainble: bool
+    shifts_trainable: bool
 
     def __init__(
         self,
-        field: str,
         type_names: List[str],
-        shifts: Optional[List[float]],
-        scales: Optional[List[float]],
-        arguments_in_dataset_units: bool,
+        field: str,
         out_field: Optional[str] = None,
+        scales: Optional[Union[float, List[float]]] = None,
+        shifts: Optional[Union[float, List[float]]] = None,
         scales_trainable: bool = False,
         shifts_trainable: bool = False,
-        default_dtype: Optional[str] = None,
         irreps_in={},
     ):
         super().__init__()
         self.num_types = len(type_names)
-        self.type_names = type_names
+
+        # === fields and irreps ===
         self.field = field
-        self.out_field = f"shifted_{field}" if out_field is None else out_field
+        self.out_field = field if out_field is None else out_field
+        assert get_field_type(self.field) == "node"
+        assert get_field_type(self.out_field) == "node"
+
         self._init_irreps(
             irreps_in=irreps_in,
             my_irreps_in={self.field: "0e"},  # input to shift must be a single scalar
             irreps_out={self.out_field: irreps_in[self.field]},
         )
 
-        self.default_dtype = dtype_from_name(
-            torch.get_default_dtype() if default_dtype is None else default_dtype
-        )
+        # === dtype ===
+        self.out_dtype = _GLOBAL_DTYPE
 
-        self.has_shifts = shifts is not None
-        if shifts is not None:
-            shifts = torch.as_tensor(shifts, dtype=self.default_dtype)
-            if len(shifts.reshape([-1])) == 1:
-                shifts = (
-                    torch.ones(self.num_types, dtype=shifts.dtype, device=shifts.device)
-                    * shifts
-                )
-            assert shifts.shape == (
-                self.num_types,
-            ), f"Invalid shape of shifts {shifts}"
-            self.shifts_trainable = shifts_trainable
-            if shifts_trainable:
-                self.shifts = torch.nn.Parameter(shifts)
-            else:
-                self.register_buffer("shifts", shifts)
-        else:
-            self.register_buffer("shifts", torch.Tensor())
-
+        # === scales ===
         self.has_scales = scales is not None
-        if scales is not None:
-            scales = torch.as_tensor(scales, dtype=self.default_dtype)
-            if len(scales.reshape([-1])) == 1:
+        self.scales_trainable = scales_trainable
+        if self.has_scales:
+            scales = torch.as_tensor(scales, dtype=self.out_dtype)
+            if self.scales_trainable and scales.numel() == 1:
+                # effective no-op if self.num_types == 1
                 scales = (
                     torch.ones(self.num_types, dtype=scales.dtype, device=scales.device)
                     * scales
                 )
-            assert scales.shape == (
-                self.num_types,
-            ), f"Invalid shape of scales {scales}"
-            self.scales_trainable = scales_trainable
-            if scales_trainable:
+            assert scales.shape == (self.num_types,) or scales.numel() == 1
+            if self.scales_trainable:
                 self.scales = torch.nn.Parameter(scales)
             else:
                 self.register_buffer("scales", scales)
         else:
             self.register_buffer("scales", torch.Tensor())
+        self.scales_shortcut = self.scales.numel() == 1
 
-        assert isinstance(arguments_in_dataset_units, bool)
-        self.arguments_in_dataset_units = arguments_in_dataset_units
+        # === shifts ===
+        self.has_shifts = shifts is not None
+        self.shifts_trainable = shifts_trainable
+        if self.has_shifts:
+            shifts = torch.as_tensor(shifts, dtype=self.out_dtype)
+            if self.shifts_trainable and shifts.numel() == 1:
+                # effective no-op if self.num_types == 1
+                shifts = (
+                    torch.ones(self.num_types, dtype=shifts.dtype, device=shifts.device)
+                    * shifts
+                )
+            assert shifts.shape == (self.num_types,) or shifts.numel() == 1
+            if self.shifts_trainable:
+                self.shifts = torch.nn.Parameter(shifts)
+            else:
+                self.register_buffer("shifts", shifts)
+        else:
+            self.register_buffer("shifts", torch.Tensor())
+        self.shifts_shortcut = self.shifts.numel() == 1
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
+        # shortcut if no scales or shifts found (only dtype promotion performed)
         if not (self.has_scales or self.has_shifts):
+            data[self.out_field] = data[self.field].to(self.out_dtype)
             return data
 
-        species_idx = data[AtomicDataDict.ATOM_TYPE_KEY].view(-1)
+        # === set up ===
         in_field = data[self.field]
-        assert len(in_field) == len(
-            species_idx
-        ), "in_field doesnt seem to have correct per-atom shape"
+        types = data[AtomicDataDict.ATOM_TYPE_KEY].view(-1)
 
+        if self.has_scales:
+            if self.scales_shortcut:
+                scales = self.scales
+            else:
+                scales = torch.index_select(self.scales, 0, types).view(-1, 1)
+        else:
+            scales = self.scales  # dummy for torchscript
+
+        if self.has_shifts:
+            if self.shifts_shortcut:
+                shifts = self.shifts
+            else:
+                shifts = torch.index_select(self.shifts, 0, types).view(-1, 1)
+        else:
+            shifts = self.shifts  # dummy for torchscript
+
+        # === scale/shift ===
         if self.has_scales and self.has_shifts:
             # we can used an FMA for performance
             # addcmul computes
             # input + tensor1 * tensor2 elementwise
             # it will promote to widest dtype, which comes from shifts/scales
-            in_field = torch.addcmul(
-                torch.index_select(self.shifts, 0, species_idx).view(-1, 1),
-                torch.index_select(self.scales, 0, species_idx).view(-1, 1),
-                in_field,
-            )
+            in_field = torch.addcmul(shifts, scales, in_field)
         else:
             # fallback path for mix of enabled shifts and scales
             # multiplication / addition promotes dtypes already, so no cast is needed
-            # this is specifically because self.*[species_idx].view(-1, 1)
-            # is never a scalar (ndim == 0), since it is always [n_atom, 1]
             if self.has_scales:
-                in_field = (
-                    torch.index_select(self.scales, 0, species_idx).view(-1, 1)
-                    * in_field
-                )
+                in_field = scales * in_field
             if self.has_shifts:
-                in_field = (
-                    torch.index_select(self.shifts, 0, species_idx).view(-1, 1)
-                    + in_field
-                )
+                in_field = shifts + in_field
+
         data[self.out_field] = in_field
         return data
