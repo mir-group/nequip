@@ -13,10 +13,6 @@ from nequip.utils.tp_utils import tp_path_exists
 
 from typing import Dict, Callable
 
-from nequip.utils.logger import RankedLogger
-
-logger = RankedLogger(__name__, rank_zero_only=True)
-
 
 acts = {
     "abs": torch.abs,
@@ -136,9 +132,6 @@ class ConvNetLayer(GraphModuleMixin, torch.nn.Module):
             self.resnet = False
 
         # TODO: last convolution should go to explicit irreps out
-        logger.debug(
-            f" parameters used to initialize {convolution.__name__}={convolution_kwargs}"
-        )
 
         # override defaults for irreps:
         convolution_kwargs.pop("irreps_in", None)
