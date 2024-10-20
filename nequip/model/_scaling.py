@@ -1,5 +1,3 @@
-import torch
-
 from nequip.nn import PerTypeScaleShift as PerTypeScaleShiftModule
 from nequip.nn import RescaleOutput as RescaleOutputModule
 from nequip.nn import GraphModuleMixin
@@ -89,10 +87,7 @@ def _PerTypeScaleShift(
     model: GraphModuleMixin,
     config,
 ):
-    """Add per-atom rescaling and shifting for a field
-
-    If ``initialize`` is false, doesn't compute statistics.
-    """
+    """Add per-atom rescaling and shifting for a field."""
     scales = config.get(module_prefix + "_scales", scales_default)
     shifts = config.get(module_prefix + "_shifts", shifts_default)
 
@@ -101,33 +96,19 @@ def _PerTypeScaleShift(
             f"Module `{module_prefix}` added but both scales and shifts are `None`. Please check to ensure this is intended. To set scales and/or shifts, `{module_prefix}_scales` and/or `{module_prefix}_shifts` must be provided in the config."
         )
 
+    if isinstance(scales, float):
+        scales = [scales]
+    if isinstance(shifts, float):
+        shifts = [shifts]
     for value in [scales, shifts]:
-        if not (
-            value is None
-            or any(
-                [
-                    isinstance(value, val_type)
-                    for val_type in [float, list, torch.Tensor]
-                ]
-            )
-        ):
-            raise ValueError(f"Invalid value `{value}` of type {type(value)}")
-
-    scales = 1.0 if scales is None else scales
-    scales = torch.as_tensor(scales)
-    shifts = 0.0 if shifts is None else shifts
-    shifts = torch.as_tensor(shifts)
-
-    # TODO kind of weird error to check for here
-    if scales is not None and torch.min(scales) < RESCALE_THRESHOLD:
-        raise ValueError(
-            f"Per species scaling was very low: {scales}. Maybe try setting {module_prefix}_scales = 1."
-        )
+        assert value is None or isinstance(
+            value, list
+        ), f"`scales`/`shifts` must only be `float`, `List[float]` or `None`, but found value `{value}` of type {type(value)}"
 
     scale_str = format_type_vals(scales, config["type_names"])
     shift_str = format_type_vals(shifts, config["type_names"])
     logger.info(
-        "Atomic outputs are \n" f"scaled by : {scale_str}\n" f"shifted by: {shift_str}"
+        f"\n ========== Per-Type Scale-Shift ========== \n  scales: {scale_str}\n  shifts: {shift_str}"
     )
 
     # insert in per species shift
@@ -136,7 +117,6 @@ def _PerTypeScaleShift(
         out_field=out_field,
         shifts=shifts,
         scales=scales,
-        arguments_in_dataset_units=True,
     )
     model.insert_from_parameters(
         before=insert_before,

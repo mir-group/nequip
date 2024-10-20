@@ -35,26 +35,23 @@ def torch_default_dtype(dtype):
 
 
 def format_type_vals(
-    data: list, type_names: List[str], element_formatter: str = ".6f"
+    vals: List[float], type_names: List[str], element_formatter: str = ".6f"
 ) -> str:
-    data = torch.as_tensor(data) if data is not None else None
 
-    if data.numel() == 1:
-        data = torch.tensor(data.item())
-
-    if data is None:
+    if vals is None:
         return f"[{', '.join(type_names)}: None]"
-    elif data.ndim == 0:
-        return (f"[{', '.join(type_names)}: {{:{element_formatter}}}]").format(data)
-    elif data.ndim == 1 and len(data) == len(type_names):
+
+    if len(vals) == 1:
+        return (f"[{', '.join(type_names)}: {{:{element_formatter}}}]").format(vals[0])
+    elif len(vals) == len(type_names):
         return (
             "["
             + ", ".join(
-                f"{{{i}[0]}}: {{{i}[1]:{element_formatter}}}" for i in range(len(data))
+                f"{{{i}[0]}}: {{{i}[1]:{element_formatter}}}" for i in range(len(vals))
             )
             + "]"
-        ).format(*zip(type_names, data))
+        ).format(*zip(type_names, vals))
     else:
         raise ValueError(
-            f"Don't know how to format data=`{data}` for types {type_names} with element_formatter=`{element_formatter}`"
+            f"Don't know how to format vals=`{vals}` for types {type_names} with element_formatter=`{element_formatter}`"
         )
