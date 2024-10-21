@@ -3,7 +3,7 @@ import torch
 from e3nn import o3
 from e3nn.util.jit import compile_mode
 
-from nequip.utils._global_options import _GLOBAL_DTYPE
+from nequip.utils.global_dtype import _GLOBAL_DTYPE
 from nequip.utils.compile import conditional_torchscript_jit
 from nequip.data import AtomicDataDict
 from .._graph_mixin import GraphModuleMixin
