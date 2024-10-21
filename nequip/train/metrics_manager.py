@@ -124,8 +124,7 @@ class MetricsManager(torch.nn.ModuleList):
             weighted_sum = 0.0
         metric_dict = {}
         for idx in range(self.num_metrics):
-            preds_field = self.fields[idx](preds)
-            target_field = self.fields[idx](target)
+            preds_field, target_field = self.fields[idx](preds, target)
 
             if self.per_type[idx]:
                 metric = 0
