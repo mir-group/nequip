@@ -10,11 +10,9 @@ from nequip.utils import (
     Config,
 )
 from nequip.utils.config import _GLOBAL_ALL_ASKED_FOR_KEYS
-from nequip.utils.logger import RankedLogger
 
 import hydra
-
-logger = RankedLogger(__name__, rank_zero_only=True)
+import warnings
 
 
 default_config = dict(
@@ -71,12 +69,8 @@ def model_from_config(
     # average number of neighbors normalization check
     avg_num_neighbors = config.get("avg_num_neighbors", None)
     if avg_num_neighbors is None:
-        logger.info(
-            "Found `avg_num_neighbors`=None -- it is recommended to set `avg_num_neighbors` for normalization and better numerics during training."
-        )
-    else:
-        logger.info(
-            f"Normalization of `avg_num_neighbors`={avg_num_neighbors} will be used to build the network."
+        warnings.warn(
+            "Found `avg_num_neighbors=None` -- it is recommended to set `avg_num_neighbors` for normalization and better numerics during training."
         )
 
     model_dtype: torch.dtype = dtype_from_name(config["model_dtype"])
