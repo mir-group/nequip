@@ -2,14 +2,9 @@ from nequip.nn import PerTypeScaleShift as PerTypeScaleShiftModule
 from nequip.nn import RescaleOutput as RescaleOutputModule
 from nequip.nn import GraphModuleMixin
 from nequip.data import AtomicDataDict
-from nequip.utils import format_type_vals
 
 import warnings
 from typing import Union
-
-from nequip.utils.logger import RankedLogger
-
-logger = RankedLogger(__name__, rank_zero_only=True)
 
 
 RESCALE_THRESHOLD = 1e-6
@@ -40,9 +35,6 @@ def GlobalRescale(
             raise ValueError(
                 f"Global energy scaling was very low: {global_scale}. If dataset values were used, does the dataset contain insufficient variation? Maybe try disabling global scaling with global_scale=None."
             )
-
-        logger.info(f"Outputs are globally scaled by: {global_scale}.")
-
     else:
         # Put dummy values
         if global_scale is not None:
@@ -104,12 +96,6 @@ def _PerTypeScaleShift(
         assert value is None or isinstance(
             value, list
         ), f"`scales`/`shifts` must only be `float`, `List[float]` or `None`, but found value `{value}` of type {type(value)}"
-
-    scale_str = format_type_vals(scales, config["type_names"])
-    shift_str = format_type_vals(shifts, config["type_names"])
-    logger.info(
-        f"\n ========== Per-Type Scale-Shift ========== \n  scales: {scale_str}\n  shifts: {shift_str}"
-    )
 
     # insert in per species shift
     params = dict(
