@@ -1,5 +1,6 @@
 """From https://github.com/ashleve/lightning-hydra-template"""
 
+import os
 import logging
 from typing import Mapping, Optional
 
@@ -25,6 +26,11 @@ class RankedLogger(logging.LoggerAdapter):
         logger = logging.getLogger(name)
         super().__init__(logger=logger, extra=extra)
         self.rank_zero_only = rank_zero_only
+
+        # get log level from the environment variable, default to 'INFO'
+        log_level = os.getenv("_NEQUIP_LOG_LEVEL", "INFO").upper()
+        log_level = getattr(logging, log_level, logging.INFO)
+        self.logger.setLevel(log_level)
 
     def log(
         self, level: int, msg: str, rank: Optional[int] = None, *args, **kwargs

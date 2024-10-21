@@ -4,9 +4,13 @@ from lightning.pytorch.utilities.warnings import PossibleUserWarning
 from hydra.utils import instantiate
 from nequip.model import model_from_config
 from nequip.data import AtomicDataDict
+from nequip.utils import RankedLogger
 from ._metrics_utils import gather_all_tensors
 import warnings
 from typing import Optional, Dict
+
+
+logger = RankedLogger(__name__, rank_zero_only=True)
 
 
 # metrics are already synced before logging, but Lightning still sends a PossibleUserWarning about setting sync_dist=True in self.logdict()
@@ -62,6 +66,7 @@ class NequIPLightningModule(lightning.LightningModule):
         super().__init__()
         self.save_hyperparameters()
         self.model = model_from_config(config=model, initialize=True)
+        logger.debug(f"Built Model Details:\n{str(self.model)}")
         self.optimizer_config = optimizer
         self.lr_scheduler_config = lr_scheduler
 
