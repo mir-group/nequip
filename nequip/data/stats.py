@@ -1,11 +1,7 @@
 import torch
 from torchmetrics import Metric
-
+from nequip.utils.global_dtype import _GLOBAL_DTYPE
 from typing import Callable
-
-from nequip.utils._global_options import _GLOBAL_DTYPE
-
-# TODO: online histograms
 
 
 class _MeanX(Metric):

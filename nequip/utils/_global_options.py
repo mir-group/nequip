@@ -5,6 +5,7 @@ from lightning.pytorch import seed_everything
 import e3nn
 import e3nn.util.jit
 
+from .global_dtype import _GLOBAL_DTYPE
 from .misc import dtype_to_name
 
 import warnings
@@ -17,10 +18,6 @@ from typing import List, Tuple, Union, Final, Optional
 # to keep only relevant keys, configs should have only small values (no big objects)
 # and those should have references elsewhere anyway, so keeping references here is fine.
 _latest_global_config = {}
-
-# singular source of global dtype that dictates the dtype of the data
-# which is always float64
-_GLOBAL_DTYPE = torch.float64
 
 
 _MULTIPROCESSING_SHARING_STRATEGY: Final[str] = os.environ.get(
