@@ -5,7 +5,7 @@ from .auto_init import (
 )
 from .config import Config
 from .modules import find_first_of_type
-from .misc import dtype_to_name, dtype_from_name, torch_default_dtype, format_type_vals
+from .misc import dtype_to_name, dtype_from_name, torch_default_dtype
 from .file_utils import download_url, extract_zip
 from .logger import RankedLogger
 from .scatter import scatter
@@ -21,7 +21,6 @@ __all__ = [
     dtype_to_name,
     dtype_from_name,
     torch_default_dtype,
-    format_type_vals,
     download_url,
     extract_zip,
     RankedLogger,
