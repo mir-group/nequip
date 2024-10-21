@@ -8,7 +8,7 @@ import torch
 from e3nn.io import CartesianTensor
 
 from . import _keys
-from .AtomicDataDict import num_frames, num_nodes, num_edges
+from . import AtomicDataDict
 
 
 # === Key Registration ===
@@ -256,12 +256,12 @@ def _process_dict(data):
 
     # == get useful data properties ==
     if _keys.NUM_NODES_KEY in data:
-        N_frames = num_frames(data)
+        N_frames = AtomicDataDict.num_frames(data)
     else:
         N_frames = 1
-    N_nodes = num_nodes(data)
+    N_nodes = AtomicDataDict.num_nodes(data)
     if _keys.EDGE_INDEX_KEY in data:
-        N_edges = num_edges(data)
+        N_edges = AtomicDataDict.num_edges(data)
     else:
         N_edges = None
 
