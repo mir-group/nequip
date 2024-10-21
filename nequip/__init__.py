@@ -8,7 +8,7 @@ import torch
 import warnings
 
 # torch version checks
-torch_version = packaging.version.parse(torch.__version__)
+torch_version = packaging.version.parse(torch.__version__.split("+")[0])
 
 # only allow 1.11*, 1.13* or higher (no 1.12.*)
 assert (torch_version == packaging.version.parse("1.11")) or (
