@@ -10,7 +10,7 @@ from ._interaction_block import InteractionBlock
 from ._grad_output import GradientOutput, PartialForceOutput, StressOutput
 from ._rescale import RescaleOutput
 from ._convnetlayer import ConvNetLayer
-from ._util import SaveForOutput
+from ._util import SaveForOutput, scatter
 from ._concat import Concat
 
 __all__ = [
@@ -29,4 +29,5 @@ __all__ = [
     ConvNetLayer,
     SaveForOutput,
     Concat,
+    scatter,
 ]

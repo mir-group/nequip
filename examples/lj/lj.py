@@ -7,7 +7,7 @@ from typing import Union
 
 import torch
 
-from nequip.utils import scatter
+from nequip.nn import scatter
 from nequip.data import AtomicDataDict
 from nequip.nn import GraphModuleMixin, SequentialGraphNetwork, AtomwiseReduce
 

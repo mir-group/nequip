@@ -8,10 +8,10 @@ from e3nn import o3
 from e3nn.nn import FullyConnectedNet
 from e3nn.o3 import TensorProduct, Linear, FullyConnectedTensorProduct
 
-from nequip.utils import scatter
 from nequip.data import AtomicDataDict
-from nequip.nn.nonlinearities import ShiftedSoftPlus
+from ._util import scatter
 from ._graph_mixin import GraphModuleMixin
+from nequip.nn.nonlinearities import ShiftedSoftPlus
 
 
 class InteractionBlock(GraphModuleMixin, torch.nn.Module):
