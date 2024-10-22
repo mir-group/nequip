@@ -4,9 +4,8 @@ import torch
 
 from e3nn.util.jit import compile_mode
 
-import ase.data
-
 from nequip.data import AtomicDataDict
+from nequip.data.misc import chemical_symbols_to_atomic_numbers_dict
 from ._util import scatter
 from ._graph_mixin import GraphModuleMixin
 from nequip.utils import conditional_torchscript_jit
@@ -269,7 +268,7 @@ class ZBL(GraphModuleMixin, torch.nn.Module):
         )
         assert len(chemical_species) == num_types
         atomic_numbers: List[int] = [
-            ase.data.atomic_numbers[chemical_species[type_i]]
+            chemical_symbols_to_atomic_numbers_dict[chemical_species[type_i]]
             for type_i in range(num_types)
         ]
         if min(atomic_numbers) < 1:
