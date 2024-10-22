@@ -6,9 +6,10 @@ from e3nn.util.jit import compile_mode
 
 import ase.data
 
-from nequip.utils import scatter, conditional_torchscript_jit
 from nequip.data import AtomicDataDict
-from nequip.nn import GraphModuleMixin
+from ._util import scatter
+from ._graph_mixin import GraphModuleMixin
+from nequip.utils import conditional_torchscript_jit
 
 
 class _LJParam(torch.nn.Module):
