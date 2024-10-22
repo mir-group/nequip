@@ -9,7 +9,7 @@ from nequip.nn import (
     InteractionBlock,
 )
 from nequip.nn.nonlinearities import ShiftedSoftPlus
-from nequip.utils.tp_utils import tp_path_exists
+from ._util import tp_path_exists
 
 from typing import Dict, Callable
 
