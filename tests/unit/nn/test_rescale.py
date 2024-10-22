@@ -11,12 +11,10 @@ from nequip.utils import dtype_from_name, torch_default_dtype
 from nequip.utils.test import assert_AtomicData_equivariant
 
 
-@pytest.mark.parametrize("scale_by", [0.77, 1.0, None])
-@pytest.mark.parametrize("shift_trainable", [True, False])
+@pytest.mark.parametrize("scale_by", [0.77, 1.0, 2.6])
 def test_rescale(
     CH3CHO,
     scale_by,
-    shift_trainable,
     model_dtype,
 ):
     _, data = CH3CHO
@@ -54,8 +52,5 @@ def test_rescale(
     oh_out = oh_out.to(dtype=rescale_out.dtype)
 
     # node attrs are a one hot, so we know orig then are zeros and ones
-    if scale_by is None:
-        assert torch.all(oh_out == rescale_out)
-    else:
-        ratio = torch.nan_to_num(rescale_out / oh_out)
-        assert torch.allclose(ratio[oh_out != 0.0], torch.as_tensor(scale_by))
+    ratio = torch.nan_to_num(rescale_out / oh_out)
+    assert torch.allclose(ratio[oh_out != 0.0], torch.as_tensor(scale_by))

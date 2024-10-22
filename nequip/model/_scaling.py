@@ -4,7 +4,7 @@ from nequip.nn import GraphModuleMixin
 from nequip.data import AtomicDataDict
 
 import warnings
-from typing import Union
+from typing import List
 
 
 RESCALE_THRESHOLD = 1e-6
@@ -15,30 +15,21 @@ def GlobalRescale(
     config,
     initialize: bool,
     module_prefix: str,
-    default_scale: Union[str, float, list],
-    default_scale_keys: list,
+    default_scale: float,
+    default_scale_keys: List[str],
 ):
-    """Add global rescaling for energy(-based quantities).
+    """Rescales a set of fields."""
+    scale = config.get(f"{module_prefix}_scale", default_scale)
 
-    If ``initialize`` is false, doesn't compute statistics.
-    """
-    global_scale = config.get(f"{module_prefix}_scale", default_scale)
-
-    if global_scale is None:
+    if scale is None:
         warnings.warn(
-            f"Module `{module_prefix}` added but global_scale is `None`. Please check to ensure this is intended. To set global_scale, `{module_prefix}_global_scale` must be provided in the config."
+            f"Module `{module_prefix}` added but scale is `None`. Please check to ensure this is intended. To set scale, `{module_prefix}_scale` must be provided in the config."
         )
 
-    # = Get statistics of training dataset =
-    if initialize:
-        if global_scale is not None and global_scale < RESCALE_THRESHOLD:
-            raise ValueError(
-                f"Global energy scaling was very low: {global_scale}. If dataset values were used, does the dataset contain insufficient variation? Maybe try disabling global scaling with global_scale=None."
-            )
-    else:
-        # Put dummy values
-        if global_scale is not None:
-            global_scale = 1.0
+    if scale is not None and scale < RESCALE_THRESHOLD:
+        raise ValueError(
+            f"Global energy scaling was very low: {scale}. If dataset values were used, does the dataset contain insufficient variation? Maybe try disabling global scaling with scale=None."
+        )
 
     assert isinstance(default_scale_keys, list), "keys need to be a list"
 
@@ -46,8 +37,7 @@ def GlobalRescale(
     return RescaleOutputModule(
         model=model,
         scale_keys=[k for k in default_scale_keys if k in model.irreps_out],
-        scale_by=global_scale,
-        default_dtype=config.get("default_dtype", None),
+        scale_by=scale,
     )
 
 

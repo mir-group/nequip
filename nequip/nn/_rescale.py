@@ -1,47 +1,36 @@
-from typing import Sequence, List, Union, Optional
-
 import torch
 
 from e3nn.util.jit import compile_mode
 
 from nequip.data import AtomicDataDict
 from nequip.nn import GraphModuleMixin
-from nequip.utils.misc import dtype_from_name
+from nequip.utils.global_dtype import _GLOBAL_DTYPE
 
-# TODO: merge this into GraphModel
+from typing import Sequence, List, Dict, Union
 
 
 @compile_mode("script")
 class RescaleOutput(GraphModuleMixin, torch.nn.Module):
     """Wrap a model and rescale its outputs.
 
-    Note that scaling is always done (casting into) ``default_dtype``, even if ``model_dtype`` is lower precision.
+    Note that scaling is always done (casting into) ``_GLOBAL_DTYPE=torch.float64``, even if ``model_dtype`` is of lower precision.
 
     Args:
-        model : GraphModuleMixin
-            The model whose outputs are to be rescaled.
-        scale_keys : list of keys, default []
-            Which fields to rescale.
-        scale_by : floating or Tensor, default 1.
-            The scaling factor by which to multiply fields in ``scale``.
-        irreps_in : dict, optional
-            Extra inputs expected by this beyond those of `model`; this is only present for compatibility.
+        model (GraphModuleMixin): model whose outputs are to be rescaled
+        scale_keys (List[str])  : fields to rescale
+        scale_by (float): scaling factor by which to multiply fields in ``scale_keys``
     """
 
     scale_keys: List[str]
     _all_keys: List[str]
-
     has_scale: bool
-
-    default_dtype: torch.dtype
 
     def __init__(
         self,
         model: GraphModuleMixin,
-        scale_keys: Union[Sequence[str], str] = [],
-        scale_by=None,
-        default_dtype: Optional[str] = None,
-        irreps_in: dict = {},
+        scale_keys: Union[Sequence[str], str],
+        scale_by: float,
+        irreps_in: Dict = {},
     ):
         super().__init__()
 
@@ -67,17 +56,8 @@ class RescaleOutput(GraphModuleMixin, torch.nn.Module):
         self.scale_keys = list(scale_keys)
         self._all_keys = list(all_keys)
 
-        self.default_dtype = dtype_from_name(
-            torch.get_default_dtype() if default_dtype is None else default_dtype
-        )
-
-        self.has_scale = scale_by is not None
-        if self.has_scale:
-            scale_by = torch.as_tensor(scale_by, dtype=self.default_dtype)
-            self.register_buffer("scale_by", scale_by)
-        else:
-            # register dummy for TorchScript
-            self.register_buffer("scale_by", torch.Tensor())
+        scale_by = torch.as_tensor(scale_by, dtype=_GLOBAL_DTYPE)
+        self.register_buffer("scale_by", scale_by)
 
         # Finally, we tell all the modules in the model that there is rescaling
         # This allows them to update parameters, like physical constants with units,
@@ -109,8 +89,7 @@ class RescaleOutput(GraphModuleMixin, torch.nn.Module):
         # https://pytorch.org/docs/stable/generated/torch.Tensor.expand.html#torch.Tensor.expand
         # confirmed in PyTorch slack
         # https://pytorch.slack.com/archives/C3PDTEV8E/p1671652283801129
-        if self.has_scale:
-            for field in self.scale_keys:
-                v = data[field]
-                data[field] = v * self.scale_by.expand(v.shape)
+        for field in self.scale_keys:
+            v = data[field]
+            data[field] = v * self.scale_by.expand(v.shape)
         return data
