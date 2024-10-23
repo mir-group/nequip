@@ -59,11 +59,7 @@ def _irreps_compatible(ir1: Dict[str, o3.Irreps], ir2: Dict[str, o3.Irreps]):
     return all(ir1[k] == ir2[k] for k in ir1 if k in ir2)
 
 
-# == JIT-unsafe "methods" for general data processing ==
-
-
-def from_dict(data: dict) -> Type:
-    return _key_registry._process_dict(data)
+# == general data processing ==
 
 
 def to_(
@@ -338,7 +334,6 @@ def with_batch_(data: Type) -> Type:
 # For autocomplete in IDEs, don't expose our various imports
 __all__ = [
     to_,
-    from_dict,
     without_nodes,
     num_nodes,
     num_edges,

@@ -9,6 +9,7 @@ from ase.calculators.calculator import all_properties as ase_all_properties
 from ase.stress import full_3x3_to_voigt_6_stress
 
 from . import AtomicDataDict, _key_registry
+from .dict import from_dict
 
 from typing import Dict, Union, List, Optional
 
@@ -94,7 +95,7 @@ def from_ase(
         AtomicDataDict.ATOMIC_NUMBERS_KEY: atoms.get_atomic_numbers(),
     }
     data.update(**add_fields)
-    return AtomicDataDict.from_dict(data)
+    return from_dict(data)
 
 
 def to_ase(

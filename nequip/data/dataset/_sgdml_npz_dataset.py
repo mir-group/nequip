@@ -2,6 +2,7 @@ import numpy as np
 import torch
 
 from .. import AtomicDataDict
+from ..dict import from_dict
 from ._base_datasets import AtomicDataset
 
 from typing import Union, Dict, List, Callable
@@ -66,5 +67,5 @@ class sGDMLNPZDataset(AtomicDataset):
                         data_dict[v] = npz_data[k]
                     else:
                         data_dict[v] = npz_data[k][idx]
-                data_list.append(AtomicDataDict.from_dict(data_dict))
+                data_list.append(from_dict(data_dict))
             return data_list
