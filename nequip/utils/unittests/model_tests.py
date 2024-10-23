@@ -9,6 +9,7 @@ import numpy as np
 from e3nn.util.jit import script
 
 from nequip.data import (
+    from_dict,
     from_ase,
     compute_neighborlist_,
     AtomicDataDict,
@@ -162,7 +163,7 @@ class BaseModelTests:
                 tmp,
                 data2[AtomicDataDict.EDGE_CELL_SHIFT_KEY],
             )
-            out_unwrapped = instance(AtomicDataDict.from_dict(data2))
+            out_unwrapped = instance(from_dict(data2))
             tolerance = FLOAT_TOLERANCE[dtype_to_name(instance.model_dtype)]
             for out_field in out_fields:
                 assert torch.allclose(
@@ -258,7 +259,7 @@ class BaseModelTests:
             "pos": np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]),
             "edge_index": np.array([[0, 1, 0, 2], [1, 0, 2, 0]]),
         }
-        data = AtomicDataDict.to_(AtomicDataDict.from_dict(data), device)
+        data = AtomicDataDict.to_(from_dict(data), device)
         edge_embed = instance(data)
         if AtomicDataDict.EDGE_FEATURES_KEY in edge_embed:
             key = AtomicDataDict.EDGE_FEATURES_KEY
@@ -268,7 +269,7 @@ class BaseModelTests:
             pytest.skip()
         edge_embed = edge_embed[key]
         data[AtomicDataDict.POSITIONS_KEY][2, 1] = r_max  # put it past the cutoff
-        edge_embed2 = instance(AtomicDataDict.from_dict(data))[key]
+        edge_embed2 = instance(from_dict(data))[key]
 
         if key == AtomicDataDict.EDGE_EMBEDDING_KEY:
             # we can only check that other edges are unaffected if we know it's an embedding
@@ -280,7 +281,7 @@ class BaseModelTests:
         )
 
         # test gradients
-        in_dict = AtomicDataDict.from_dict(data)
+        in_dict = from_dict(data)
         in_dict[AtomicDataDict.POSITIONS_KEY].requires_grad_(True)
 
         with torch.autograd.set_detect_anomaly(True):
@@ -349,9 +350,9 @@ class BaseEnergyModelTests(BaseModelTests):
             + data2[AtomicDataDict.EDGE_INDEX_KEY].shape[1]
         )
 
-        out1 = instance(AtomicDataDict.from_dict(data1))
-        out2 = instance(AtomicDataDict.from_dict(data2))
-        out_both = instance(AtomicDataDict.from_dict(data_both))
+        out1 = instance(from_dict(data1))
+        out2 = instance(from_dict(data2))
+        out_both = instance(from_dict(data_both))
 
         assert torch.allclose(
             out1[AtomicDataDict.TOTAL_ENERGY_KEY]
@@ -472,7 +473,7 @@ class BaseEnergyModelTests(BaseModelTests):
         partial_model.load_state_dict(model.state_dict())
         data = AtomicDataDict.to_(atomic_batch, device)
         output = model(data)
-        output_partial = partial_model(AtomicDataDict.from_dict(data))
+        output_partial = partial_model(from_dict(data))
         # everything should be the same
         # including the
         for k in output:
@@ -531,7 +532,7 @@ class BaseEnergyModelTests(BaseModelTests):
             "pos": np.array([[0.0, 0.0, 0.0], [0.0, 1.0, 0.0], [r_max, 0.0, 0.0]]),
             "edge_index": np.array([[0, 1, 0, 2], [1, 0, 2, 0]]),
         }
-        out = instance(AtomicDataDict.to_(AtomicDataDict.from_dict(data), device))
+        out = instance(AtomicDataDict.to_(from_dict(data), device))
         forces = out[AtomicDataDict.FORCE_KEY]
         assert (
             forces[:2].abs().sum() > 1e-4
@@ -565,7 +566,7 @@ class BaseEnergyModelTests(BaseModelTests):
                 "atom_types": np.array([type_idx]),
                 "pos": np.array([[0.0, 0.0, 0.0]]),
             }
-            data_list.append(AtomicDataDict.from_dict(data))
+            data_list.append(from_dict(data))
         data = AtomicDataDict.to_(
             compute_neighborlist_(
                 AtomicDataDict.batched_from_list(data_list), r_max=config["r_max"]

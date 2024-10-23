@@ -5,6 +5,7 @@ from e3nn.util.test import equivariance_error
 
 from nequip.nn import GraphModuleMixin, GraphModel
 from nequip.data import (
+    from_dict,
     from_ase,
     compute_neighborlist_,
     AtomicDataDict,
@@ -184,7 +185,7 @@ def assert_AtomicData_equivariant(
 
     if not isinstance(data_in, list):
         data_in = [data_in]
-    data_in = [AtomicDataDict.from_dict(d) for d in data_in]
+    data_in = [from_dict(d) for d in data_in]
     device, dtype = (
         data_in[0][AtomicDataDict.POSITIONS_KEY].device,
         data_in[0][AtomicDataDict.POSITIONS_KEY].dtype,

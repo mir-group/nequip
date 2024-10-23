@@ -3,6 +3,7 @@ from typing import Union, Dict, List, Callable
 import torch
 
 from .. import AtomicDataDict
+from ..dict import from_dict
 from ._base_datasets import AtomicDataset
 
 
@@ -93,4 +94,4 @@ class HDF5Dataset(AtomicDataset):
         for j, value in enumerate(self.key_mapping.values()):
             if data[j] is not None:
                 data_dict[value] = data[j][i]
-        return AtomicDataDict.from_dict(data_dict)
+        return from_dict(data_dict)

@@ -9,7 +9,13 @@ import ase.geometry
 
 from ase.calculators.singlepoint import SinglePointCalculator
 
-from nequip.data import AtomicDataDict, from_ase, to_ase, compute_neighborlist_
+from nequip.data import (
+    AtomicDataDict,
+    from_dict,
+    from_ase,
+    to_ase,
+    compute_neighborlist_,
+)
 from nequip.data._nl import neighbor_list_and_relative_vec
 from nequip.utils.test import compare_neighborlists
 
@@ -67,8 +73,8 @@ def test_process_dict_invariance(H2, CuFcc, CH3CHO):
 
     for system in [H2, CuFcc, CH3CHO]:
         atoms, data = system
-        data1 = AtomicDataDict.from_dict(data.copy())
-        data2 = AtomicDataDict.from_dict(data1.copy())
+        data1 = from_dict(data.copy())
+        data2 = from_dict(data1.copy())
     for k in data.keys():
         assert torch.allclose(data1[k], data2[k])
 
@@ -215,7 +221,7 @@ def test_neighborlist_consistency(alt_nl_method, CH3CHO, CuFcc, Si):
     _, Si_points, _ = Si
     r_max = 4.0
 
-    Si_data = AtomicDataDict.from_dict(Si_points)
+    Si_data = from_dict(Si_points)
     for atoms_or_data in [CH3CHO_atoms, CuFcc_atoms, Si_data]:
         compare_neighborlists(atoms_or_data, nl1="ase", nl2=alt_nl_method, r_max=r_max)
 
@@ -326,7 +332,7 @@ def Si():
         pbc=True,
     )
     data = compute_neighborlist_(
-        AtomicDataDict.from_dict(points),
+        from_dict(points),
         r_max=r_max,
         NL="ase",
     )

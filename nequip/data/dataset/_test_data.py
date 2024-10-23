@@ -9,6 +9,7 @@ import ase.build
 from ase.calculators.emt import EMT
 
 from .. import AtomicDataDict
+from ..dict import from_dict
 from ._base_datasets import AtomicDataset
 
 
@@ -59,7 +60,7 @@ class EMTTestDataset(AtomicDataset):
                 loc=0.0, scale=self.sigma, size=base_atoms.positions.shape
             )
             self.data_list.append(
-                AtomicDataDict.from_dict(
+                from_dict(
                     {
                         "pos": base_atoms.positions,
                         "cell": np.array(base_atoms.get_cell()),

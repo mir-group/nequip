@@ -10,6 +10,7 @@ from ._key_registry import (
     _CARTESIAN_TENSOR_FIELDS,
     ABBREV,
 )
+from .dict import from_dict
 from .ase import from_ase, to_ase
 from ._nl import compute_neighborlist_
 from ._sampler import PartialSampler
@@ -38,6 +39,7 @@ __all__ = [
     _LONG_FIELDS,
     _CARTESIAN_TENSOR_FIELDS,
     ABBREV,
+    from_dict,
     from_ase,
     to_ase,
     compute_neighborlist_,
