@@ -4,12 +4,10 @@ from e3nn import o3
 from e3nn.nn import Gate, NormActivation
 
 from nequip.data import AtomicDataDict
-from nequip.nn import (
-    GraphModuleMixin,
-    InteractionBlock,
-)
-from nequip.nn.nonlinearities import ShiftedSoftPlus
-from ._util import tp_path_exists
+from ._graph_mixin import GraphModuleMixin
+from ._interaction_block import InteractionBlock
+from .nonlinearities import ShiftedSoftPlus
+from .utils import tp_path_exists
 
 from typing import Dict, Callable
 

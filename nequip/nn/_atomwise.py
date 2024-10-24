@@ -5,8 +5,8 @@ from e3nn.o3 import Linear
 
 from nequip.data import AtomicDataDict
 from nequip.data._key_registry import get_field_type
-from ._util import scatter
 from ._graph_mixin import GraphModuleMixin
+from .utils import scatter
 from nequip.utils.global_dtype import _GLOBAL_DTYPE
 
 from typing import Optional, List, Union
