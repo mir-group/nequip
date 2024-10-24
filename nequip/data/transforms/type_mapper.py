@@ -7,10 +7,9 @@ from typing import List
 
 
 class ChemicalSpeciesToAtomTypeMapper:
-    """Based on a configuration, map atomic numbers to types.
+    """Maps atomic numbers to atom types and adds the atom types to the ``AtomicDataDict``.
 
-    This transform accounts for how the atom types seen by the model can be different from the atomic species that one obtains from a conventional dataset.
-    There could be cases where a single chemical species corresponds to multiple atom types, e.g. different charge states.
+    This transform accounts for how the atom types seen by the model can be different from the atomic species that one obtains from a conventional dataset. There could be cases where the same chemical species corresponds to multiple atom types, e.g. different charge states.
 
     The order of the ``chemical_symbols`` list must match the order of the list of ``type_names`` known by the model.
 

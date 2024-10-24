@@ -2,7 +2,11 @@ from nequip.data import AtomicDataDict, compute_neighborlist_
 
 
 class NeighborListTransform:
-    """Constructs or retrieves a neighborlist  for an AtomicDataDict."""
+    """Constructs a neighborlist and adds it to the ``AtomicDataDict``.
+
+    Args:
+        r_max (float): cutoff radius used for nearest neighbors
+    """
 
     def __init__(
         self,
