@@ -457,13 +457,13 @@ class BaseEnergyModelTests(BaseModelTests):
         self, config, atomic_batch, device, strict_locality, model_dtype
     ):
         config, out_fields = config
-        if "ForceOutput" not in config["model_builders"]:
+        if "StressForceOutput" not in config["model_builders"]:
             pytest.skip()
         config.update({"model_dtype": model_dtype})
         config = config.copy()
         partial_config = config.copy()
         partial_config["model_builders"] = [
-            "PartialForceOutput" if b == "ForceOutput" else b
+            "PartialForceOutput" if b == "StressForceOutput" else b
             for b in partial_config["model_builders"]
         ]
         model = model_from_config(config=config, initialize=True)

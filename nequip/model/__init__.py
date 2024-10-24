@@ -1,5 +1,5 @@
 from ._eng import NequIPGNNEnergyModel, SimpleIrrepsConfig
-from ._grads import ForceOutput, PartialForceOutput, StressForceOutput
+from ._grads import PartialForceOutput, StressForceOutput
 from ._scaling import PerTypeEnergyScaleShift
 from ._weight_init import (
     uniform_initialize_FCs,
@@ -14,7 +14,6 @@ from ._build import model_from_config
 __all__ = [
     SimpleIrrepsConfig,
     NequIPGNNEnergyModel,
-    ForceOutput,
     PartialForceOutput,
     StressForceOutput,
     PerTypeEnergyScaleShift,

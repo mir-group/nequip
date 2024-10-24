@@ -30,7 +30,7 @@ class TestNequIPModel(BaseEnergyModelTests):
         config = {
             "model_builders": [
                 "nequip.model.PairPotential",
-                "nequip.model.ForceOutput",
+                "nequip.model.StressForceOutput",
             ],
             "pair_style": "ZBL",
             "units": "metal",

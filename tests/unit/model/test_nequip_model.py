@@ -76,14 +76,6 @@ class TestNequIPModel(BaseEnergyModelTests):
 
     @pytest.fixture(
         params=[
-            (
-                ["nequip.model.NequIPGNNEnergyModel", "nequip.model.ForceOutput"],
-                [
-                    AtomicDataDict.TOTAL_ENERGY_KEY,
-                    AtomicDataDict.PER_ATOM_ENERGY_KEY,
-                    AtomicDataDict.FORCE_KEY,
-                ],
-            ),
             # # Save some time in the tests
             # (
             #     ["NequIPGNNEnergyModel"],

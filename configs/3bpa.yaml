@@ -141,7 +141,7 @@ training_module:
      - nequip.model.SimpleIrrepsConfig 
      - nequip.model.NequIPGNNEnergyModel         
      - nequip.model.PerTypeEnergyScaleShift
-     - nequip.model.ForceOutput         
+     - nequip.model.StressForceOutput         
 
     num_layers: 4
    

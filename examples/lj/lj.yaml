@@ -4,7 +4,7 @@ model_builders:
  # LennardJonesPotential gives an energy model
  # ForceOutput takes an energy model and wraps it with an
  # autodifferentiation call to get forces too:
- - ForceOutput
+ - StressForceOutput
 
 initial_epsilon: 1
 initial_sigma: 1

@@ -77,7 +77,7 @@ training_module:
      - nequip.model.SimpleIrrepsConfig
      - nequip.model.NequIPGNNEnergyModel
      - nequip.model.PerTypeEnergyScaleShift
-     - nequip.model.ForceOutput
+     - nequip.model.StressForceOutput
 
     seed: 456
     type_names: ${model_type_names}
