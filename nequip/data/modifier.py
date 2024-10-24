@@ -12,6 +12,7 @@ It should implement
 
 import torch
 from . import AtomicDataDict, _key_registry
+from nequip.nn.utils import with_edge_vectors_
 from typing import Optional, Union, List
 
 
@@ -67,7 +68,7 @@ class EdgeLengths(BaseModifier):
         super().__init__(AtomicDataDict.EDGE_INDEX_KEY)
 
     def _func(self, data: AtomicDataDict.Type) -> torch.Tensor:
-        data = AtomicDataDict.with_edge_vectors(data, with_lengths=True)
+        data = with_edge_vectors_(data, with_lengths=True)
         return data[AtomicDataDict.EDGE_LENGTH_KEY]
 
     def __str__(self) -> str:

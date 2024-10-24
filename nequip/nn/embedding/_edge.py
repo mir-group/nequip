@@ -9,6 +9,7 @@ from nequip.data import AtomicDataDict
 from .._graph_mixin import GraphModuleMixin
 from ..radial_basis import BesselBasis
 from ..cutoffs import PolynomialCutoff
+from ..utils import with_edge_vectors_
 
 from typing import Optional, List, Dict, Union
 
@@ -80,7 +81,7 @@ class EdgeLengthNormalizer(GraphModuleMixin, torch.nn.Module):
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
         # == get lengths with shape (num_edges, 1) ==
-        data = AtomicDataDict.with_edge_vectors(data, with_lengths=True)
+        data = with_edge_vectors_(data, with_lengths=True)
         r = data[AtomicDataDict.EDGE_LENGTH_KEY].view(-1, 1)
         # == get norm ==
         rmax_recip = self._rmax_recip
@@ -142,7 +143,7 @@ class SphericalHarmonicEdgeAttrs(GraphModuleMixin, torch.nn.Module):
         model_dtype = data.get(
             AtomicDataDict.MODEL_DTYPE_KEY, data[AtomicDataDict.POSITIONS_KEY]
         ).dtype
-        data = AtomicDataDict.with_edge_vectors(data, with_lengths=False)
+        data = with_edge_vectors_(data, with_lengths=False)
         edge_vec = data[AtomicDataDict.EDGE_VECTORS_KEY]
         edge_sh = self.sh(edge_vec)
         data[self.out_field] = edge_sh.to(model_dtype)
@@ -178,7 +179,7 @@ class RadialBasisEdgeEncoding(GraphModuleMixin, torch.nn.Module):
         model_dtype = data.get(
             AtomicDataDict.MODEL_DTYPE_KEY, data[AtomicDataDict.POSITIONS_KEY]
         ).dtype
-        data = AtomicDataDict.with_edge_vectors(data, with_lengths=True)
+        data = with_edge_vectors_(data, with_lengths=True)
         edge_length = data[AtomicDataDict.EDGE_LENGTH_KEY]
         cutoff = self.cutoff(edge_length).unsqueeze(-1)
         edge_length_embedded = self.basis(edge_length) * cutoff
@@ -206,7 +207,7 @@ class AddRadialCutoffToData(GraphModuleMixin, torch.nn.Module):
             model_dtype = data.get(
                 AtomicDataDict.MODEL_DTYPE_KEY, data[AtomicDataDict.POSITIONS_KEY]
             ).dtype
-            data = AtomicDataDict.with_edge_vectors(data, with_lengths=True)
+            data = with_edge_vectors_(data, with_lengths=True)
             edge_length = data[AtomicDataDict.EDGE_LENGTH_KEY]
             cutoff = self.cutoff(edge_length).unsqueeze(-1)
             data[AtomicDataDict.EDGE_CUTOFF_KEY] = cutoff.to(model_dtype)

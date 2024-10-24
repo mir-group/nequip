@@ -9,7 +9,12 @@ import torch
 
 from nequip.nn import scatter
 from nequip.data import AtomicDataDict
-from nequip.nn import GraphModuleMixin, SequentialGraphNetwork, AtomwiseReduce
+from nequip.nn import (
+    GraphModuleMixin,
+    SequentialGraphNetwork,
+    AtomwiseReduce,
+    with_edge_vectors_,
+)
 
 
 # First, we define a model module to do the actual computation:
@@ -58,7 +63,7 @@ class LennardJonesModule(GraphModuleMixin, torch.nn.Module):
         Keys that the module does not modify/add are expected to be propagated to the output unchanged.
         """
         # If they are not already present, compute and add the edge vectors and lengths to `data`:
-        data = AtomicDataDict.with_edge_vectors(data, with_lengths=True)
+        data = with_edge_vectors_(data, with_lengths=True)
         # compute the LJ energy:
         lj_eng = (self.sigma / data[AtomicDataDict.EDGE_LENGTH_KEY]) ** 6.0
         lj_eng = torch.neg(lj_eng)
