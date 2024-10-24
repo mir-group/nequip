@@ -10,8 +10,9 @@ from ._interaction_block import InteractionBlock
 from ._grad_output import GradientOutput, PartialForceOutput, StressOutput
 from ._rescale import RescaleOutput
 from ._convnetlayer import ConvNetLayer
-from ._util import SaveForOutput, scatter, tp_path_exists
-from ._concat import Concat
+from .misc import Concat, SaveForOutput
+from .utils import scatter, tp_path_exists
+
 
 __all__ = [
     GraphModel,
@@ -27,8 +28,8 @@ __all__ = [
     StressOutput,
     RescaleOutput,
     ConvNetLayer,
-    SaveForOutput,
     Concat,
+    SaveForOutput,
     scatter,
     tp_path_exists,
 ]
