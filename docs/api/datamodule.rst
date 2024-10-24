@@ -1,8 +1,5 @@
-nequip.data (DataModules, Datasets, and Transforms)
-===================================================
-
-Data Modules
-############
+nequip.data.datamodule
+######################
 
 ``nequip`` provides a general base ``DataModule`` class, ``NequIPDataModule``,
 
@@ -30,39 +27,3 @@ All data modules should (and would) share the following features
 
  .. autoclass:: nequip.data.datamodule.NequIP3BPADataModule
      :members:
-
-
-Datasets
-########
-
- .. autoclass:: nequip.data.dataset.AtomicDataset
-    :members:
-
- .. autoclass:: nequip.data.dataset.ASEDataset
-    :members:
-
- .. autoclass:: nequip.data.dataset.HDF5Dataset
-    :members:
-
- .. autoclass:: nequip.data.dataset.EMTTestDataset
-    :members:
-
- .. autoclass:: nequip.data.dataset.SubsetByRandomSlice
-    :members:
-
- .. autofunction:: nequip.data.dataset.RandomSplitAndIndexDataset
-
-
-Transforms
-##########
-
-Data transforms convert the raw data from the ``Dataset`` to include information necessary for the model to make predictions and perform training. For example, datasets do not usually come with neighborlists, so the ``NeighborListTransform`` is required to convert raw data that only contains positions and energy (and force) labels to additionally include a neighborlist necessary for the model to make predictions.
-
- .. autoclass:: nequip.data.transforms.ChemicalSpeciesToAtomTypeMapper
-    :members:
-
- .. autoclass:: nequip.data.transforms.NeighborListTransform
-    :members:
-
- .. autoclass:: nequip.data.transforms.VirialToStressTransform
-    :members:

@@ -1,0 +1,17 @@
+nequip.train.callbacks
+######################
+
+ .. autoclass:: nequip.train.callbacks.NeMoExponentialMovingAverage
+    :members:
+
+ .. autoclass:: nequip.train.callbacks.SoftAdapt
+    :members:
+
+ .. autoclass:: nequip.train.callbacks.LossCoefficientScheduler
+    :members:
+
+ .. autoclass:: nequip.train.callbacks.LossCoefficientMonitor
+    :members:
+
+ .. autoclass:: nequip.train.callbacks.TestTimeXYZFileWriter
+    :members:

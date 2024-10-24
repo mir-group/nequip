@@ -64,5 +64,12 @@ html_theme_options = {
 }
 
 
+def process_docstring(app, what, name, obj, options, lines):
+    """For pretty printing sets and dictionaries of data fields."""
+    if isinstance(obj, set) or isinstance(obj, dict):
+        lines.clear()  # Clear existing lines to prevent repetition
+
+
 def setup(app):
     app.add_css_file("custom.css")
+    app.connect("autodoc-process-docstring", process_docstring)
