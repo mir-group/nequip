@@ -18,7 +18,7 @@ Note that the flags `-cp` and `-cn` refer to the "config path" and "config name"
 Under the hood, the [Hydra](https://hydra.cc/) config utilities and the [PyTorch Lightning](https://lightning.ai/docs/pytorch/stable/) framework are used to facilitate training and testing in the NequIP infrastructure. One can think of the config as consisting of a set of classes to be instantiated with user-given parameters to construct objects required for training and testing to be performed. Hence, the API of these classes form the central source of truth in terms of what configurable parameters there are. These classes could come from 
  - `torch` in the case of [optimizers and learning rate scheduler](https://pytorch.org/docs/stable/optim.html), or 
  - `Lightning` such as Lightning's [trainer](https://lightning.ai/docs/pytorch/stable/common/trainer.html) or Lightning's native [callbacks](https://lightning.ai/docs/pytorch/stable/api_references.html#callbacks), or 
- - `nequip` itself such as the various [DataModules](../api/datamodule.rst), custom [callbacks](../api/train.rst), etc
+ - `nequip` itself such as the various [DataModules](../api/datamodule.rst), custom [callbacks](../api/callbacks.rst), etc
 
 Users are advised to look at `configs/tutorial.yaml` to understand how the config file is structured, and then to look up what each of the classes do and what parameters they can take (be they on `torch`, `Lightning` or `nequip`'s docs). The documentation for `nequip` native classes can be found under [Python API](../api/nequip.rst).
 
@@ -44,7 +44,7 @@ There are two main ways users can use `test`.
   nequip-train -cp full/path/to/config/directory -cn config_name.yaml ++ckpt_path='path/to/ckpt_file'
   ```
 
-One can use `nequip.train.callbacks.TestTimeXYZFileWriter` ([see API](../api/train.rst)) as a callback to have `.xyz` files written with the predictions of the model on the test dataset(s). (This is the replacement for the role `nequip-evaluate` served before `nequip` version `0.7.0`)
+One can use `nequip.train.callbacks.TestTimeXYZFileWriter` ([see API](../api/callbacks.rst)) as a callback to have `.xyz` files written with the predictions of the model on the test dataset(s). (This is the replacement for the role `nequip-evaluate` served before `nequip` version `0.7.0`)
 
 
 ## Deploying
