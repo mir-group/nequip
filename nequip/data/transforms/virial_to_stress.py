@@ -3,7 +3,15 @@ from nequip.data import AtomicDataDict
 
 
 class VirialToStressTransform:
-    """Converts virials to stress, where stress is negative virial over volume."""
+    r"""Converts virials to stress and adds the stress to the ``AtomicDataDict``.
+
+    Specifically implements
+
+    .. math::
+        \tau_{ij} = - \frac{\sigma_{ij}}{\Omega}
+
+    where :math:`\tau_{ij}` is a virial component, :math:`\sigma_{ij}` is a stress component, and :math:`\Omega` is the volume of the cell.
+    """
 
     def __init__(self):
         pass
