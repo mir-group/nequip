@@ -6,6 +6,5 @@ User Guide
     install
     workflow
     conventions
-    dataset
-    loss
+    config
     faq_errors
