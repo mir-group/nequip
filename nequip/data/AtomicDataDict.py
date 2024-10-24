@@ -161,6 +161,9 @@ def frame_from_batched(batched_data: Type, index: int) -> Type:
 
     out = {}
     for k, v in batched_data.items():
+        # short circuit tensor is empty
+        if v.numel() == 0:
+            continue
         if k == _keys.EDGE_INDEX_KEY:
             # special case since shape is (2, num_edges), and to remove edge index offset
             mask = torch.eq(batches[edge_center_idx], index).unsqueeze(0)
