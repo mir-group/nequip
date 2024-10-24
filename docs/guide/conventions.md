@@ -34,3 +34,5 @@ Stress also includes an arbitrary sign convention, for which we adopt the choice
 ```{warning}
 Training labels for stress in the original dataset must be pre-processed by the user to be in **this sign convention**, which they may or may not already be depending on their origin.
 ```
+
+Users that have data with virials but seek to train on stress can use the data transform `nequip.data.transforms.VirialToStressTransform`.
