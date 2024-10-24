@@ -23,6 +23,8 @@ data:
   test_dataloader_kwargs: ${data.val_dataloader_kwargs}
   stats_manager:
     _target_: nequip.data.DataStatisticsManager
+    dataloader_kwargs:
+      batch_size: 10
     metrics:
       - field:
           _target_: nequip.data.NumNeighbors

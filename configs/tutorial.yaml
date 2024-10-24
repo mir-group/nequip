@@ -81,6 +81,10 @@ data:
   stats_manager:
     # dataset statistics is handled by the DataStatisticsManager
     _target_: nequip.data.DataStatisticsManager
+    # dataloader kwargs for data statistics computation
+    # `batch_size` should ideally be as large as possible without trigerring OOM
+    dataloader_kwargs:
+      batch_size: 10
     metrics:
       - field:
           _target_: nequip.data.NumNeighbors
