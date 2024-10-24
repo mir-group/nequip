@@ -112,7 +112,7 @@ class sGDML_CCSD_DataModule(NequIPDataModule):
         self.test_file_path = test_file_path
 
     def prepare_data(self):
-        """Downloads and unzips data"""
+        """"""
         if not (
             os.path.isfile(self.train_file_path) and os.path.isfile(self.test_file_path)
         ):
