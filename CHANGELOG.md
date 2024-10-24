@@ -30,6 +30,7 @@ Most recent change on the bottom.
  - [Breaking] `NpzDataset`
  - [Breaking] NequIP's `Trainer`, `Loss`, `Metrics`
  - [Breaking] most remaining `torch.geometric` code, except for some utility functions 
+ - [Breaking] removed `ForceOutput` (use `StressForceOutput` instead)
 
 ## Unreleased - 0.7.0
 ### Added
