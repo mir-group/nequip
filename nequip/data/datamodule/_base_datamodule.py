@@ -276,14 +276,17 @@ class NequIPDataModule(lightning.LightningDataModule):
         try:
             self.prepare_data()
             self.setup(stage=task_map[dataset])
-            if dataset == "train":
-                dloader = self.train_dataloader()
-            elif dataset == "val":
-                dloader = self.val_dataloader()[dataset_idx]
-            elif dataset == "test":
-                dloader = self.test_dataloader()[dataset_idx]
-            elif dataset == "predict":
-                dloader = self.predict_dataloader()[dataset_idx]
+
+            # get dataloader, using dataloader_kwargs from stats manager if available else use that of the datamodule
+            if not stats_manager.dataloader_kwargs:
+                dloader_kwargs = getattr(self, dataset + "_dataloader_kwargs")
+            else:
+                dloader_kwargs = stats_manager.dataloader_kwargs
+            dloader = self._get_dloader(
+                getattr(self, dataset + "_dataset"), self.generator, dloader_kwargs
+            )
+            dloader = dloader[dataset_idx]
+
             stats_dict = stats_manager.get_statistics(dloader)
         finally:
             self.teardown(stage=task_map[dataset])

@@ -37,6 +37,7 @@ class DataStatisticsManager(torch.nn.ModuleList):
 
     Args:
         metrics (list): list of dictionaries with keys ``field``, ``metric``, ``per_type``, ``ignore_nan``, and ``name``
+        dataloader_kwargs (dict): arguments of `torch.utils.data.DataLoader <https://pytorch.org/docs/stable/data.html#torch.utils.data.DataLoader>`_ for dataset statitstics computation (ideally, the ``batch_size`` should be as large as possible without triggering OOM)
         type_names (list): required for ``per_type`` metrics (if this class is used in ``nequip-train``, this is automatically handled such that users need not explicitly fill in this field in the config)
     """
 
@@ -45,10 +46,17 @@ class DataStatisticsManager(torch.nn.ModuleList):
         metrics: List[
             Dict[str, Union[float, str, Dict[str, Union[str, Callable]], Metric]]
         ],
+        dataloader_kwargs: Dict = {},
         type_names: List[str] = None,
     ):
         super().__init__()
         assert len(metrics) != 0
+
+        assert all(
+            key not in dataloader_kwargs
+            for key in ["dataset", "generator", "collate_fn"]
+        )
+        self.dataloader_kwargs = dataloader_kwargs
 
         self.num_metrics = len(metrics)
         # === MANDATORY dict keys ===
