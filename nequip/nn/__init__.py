@@ -11,7 +11,7 @@ from ._grad_output import GradientOutput, PartialForceOutput, StressOutput
 from ._rescale import RescaleOutput
 from ._convnetlayer import ConvNetLayer
 from .misc import Concat, SaveForOutput
-from .utils import scatter, tp_path_exists
+from .utils import scatter, tp_path_exists, with_edge_vectors_
 
 
 __all__ = [
@@ -32,4 +32,5 @@ __all__ = [
     SaveForOutput,
     scatter,
     tp_path_exists,
+    with_edge_vectors_,
 ]

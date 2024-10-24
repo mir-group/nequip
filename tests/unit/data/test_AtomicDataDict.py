@@ -17,6 +17,7 @@ from nequip.data import (
     compute_neighborlist_,
 )
 from nequip.data._nl import neighbor_list_and_relative_vec
+from nequip.nn import with_edge_vectors_
 from nequip.utils.test import compare_neighborlists
 
 
@@ -88,7 +89,7 @@ def test_non_periodic_edge(CH3CHO):
             - atoms.positions[data["edge_index"][0, edge]]
         )
         assert torch.allclose(
-            AtomicDataDict.with_edge_vectors(data)["edge_vectors"][edge],
+            with_edge_vectors_(data)["edge_vectors"][edge],
             torch.as_tensor(real_displacement, dtype=torch.get_default_dtype()),
         )
 
@@ -97,7 +98,7 @@ def test_periodic_edge():
     atoms = ase.build.bulk("Cu", "fcc")
     dist = np.linalg.norm(atoms.cell[0])
     data = compute_neighborlist_(from_ase(atoms), r_max=1.05 * dist)
-    edge_vecs = AtomicDataDict.with_edge_vectors(data)["edge_vectors"]
+    edge_vecs = with_edge_vectors_(data)["edge_vectors"]
     assert edge_vecs.shape == (12, 3)  # 12 neighbors in close-packed bulk
     assert torch.allclose(
         edge_vecs.norm(dim=-1), torch.as_tensor(dist, dtype=torch.get_default_dtype())
@@ -130,7 +131,7 @@ def test_positions_grad(periodic, H2, CuFcc):
         atoms, data = H2
 
     data["pos"].requires_grad_(True)
-    data = AtomicDataDict.with_edge_vectors(data)
+    data = with_edge_vectors_(data)
     assert data[AtomicDataDict.EDGE_VECTORS_KEY].requires_grad
     torch.autograd.grad(
         data[AtomicDataDict.EDGE_VECTORS_KEY].sum(),
@@ -142,7 +143,7 @@ def test_positions_grad(periodic, H2, CuFcc):
     if periodic:
         # Test grad cell
         data["cell"].requires_grad_(True)
-        data = AtomicDataDict.with_edge_vectors(data)
+        data = with_edge_vectors_(data)
         assert data[AtomicDataDict.EDGE_VECTORS_KEY].requires_grad
         torch.autograd.grad(
             data[AtomicDataDict.EDGE_VECTORS_KEY].sum(),
@@ -164,10 +165,10 @@ def test_some_periodic():
     assert (neighbor_count == 6).all()  # 6 neighbors
     # Check not periodic in z
     assert torch.allclose(
-        AtomicDataDict.with_edge_vectors(data)["edge_vectors"][:, 2],
+        with_edge_vectors_(data)["edge_vectors"][:, 2],
         torch.zeros(
             AtomicDataDict.num_edges(data),
-            dtype=AtomicDataDict.with_edge_vectors(data)["edge_vectors"].dtype,
+            dtype=with_edge_vectors_(data)["edge_vectors"].dtype,
         ),
     )
 
@@ -179,13 +180,13 @@ def test_relative_vecs(H2):
     assert edge_index_set_equiv(data["edge_index"], edge_index_true)
     assert torch.allclose(
         coords[1] - coords[0],
-        AtomicDataDict.with_edge_vectors(data)["edge_vectors"][
+        with_edge_vectors_(data)["edge_vectors"][
             (data["edge_index"][0] == 0) & (data["edge_index"][1] == 1)
         ][0],
     )
     assert torch.allclose(
         coords[0] - coords[1],
-        AtomicDataDict.with_edge_vectors(data)["edge_vectors"][
+        with_edge_vectors_(data)["edge_vectors"][
             (data["edge_index"][0] == 1) & (data["edge_index"][1] == 0)
         ][0],
     )

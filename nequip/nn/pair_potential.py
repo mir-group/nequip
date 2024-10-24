@@ -7,7 +7,7 @@ from e3nn.util.jit import compile_mode
 from nequip.data import AtomicDataDict
 from nequip.data.misc import chemical_symbols_to_atomic_numbers_dict
 from ._graph_mixin import GraphModuleMixin
-from .utils import scatter
+from .utils import scatter, with_edge_vectors_
 from nequip.utils import conditional_torchscript_jit
 
 
@@ -93,7 +93,7 @@ class LennardJones(GraphModuleMixin, torch.nn.Module):
         self._param = conditional_torchscript_jit(_LJParam())
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
-        data = AtomicDataDict.with_edge_vectors(data, with_lengths=True)
+        data = with_edge_vectors_(data, with_lengths=True)
         edge_center = data[AtomicDataDict.EDGE_INDEX_KEY][0]
         atom_types = data[AtomicDataDict.ATOM_TYPE_KEY]
         edge_len = data[AtomicDataDict.EDGE_LENGTH_KEY].unsqueeze(-1)
@@ -179,7 +179,7 @@ class SimpleLennardJones(GraphModuleMixin, torch.nn.Module):
         )
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
-        data = AtomicDataDict.with_edge_vectors(data, with_lengths=True)
+        data = with_edge_vectors_(data, with_lengths=True)
         edge_center = data[AtomicDataDict.EDGE_INDEX_KEY][0]
         edge_len = data[AtomicDataDict.EDGE_LENGTH_KEY].unsqueeze(-1)
 
@@ -307,7 +307,7 @@ class ZBL(GraphModuleMixin, torch.nn.Module):
         self._zbl = conditional_torchscript_jit(_ZBL())
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
-        data = AtomicDataDict.with_edge_vectors(data, with_lengths=True)
+        data = with_edge_vectors_(data, with_lengths=True)
         edge_center = data[AtomicDataDict.EDGE_INDEX_KEY][0]
 
         zbl_edge_eng = self._zbl(

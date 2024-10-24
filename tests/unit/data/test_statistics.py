@@ -15,6 +15,7 @@ from nequip.data import (
     Max,
     Min,
 )
+from nequip.nn import with_edge_vectors_
 import pytest
 
 
@@ -119,7 +120,7 @@ class TestStatistics:
             stats_dict["num_neighbors_mean"], expected_ave_num_neighbors.item()
         )
 
-        data = AtomicDataDict.with_edge_vectors(batch, with_lengths=True)
+        data = with_edge_vectors_(batch, with_lengths=True)
         lengths = data[AtomicDataDict.EDGE_LENGTH_KEY]
         assert np.allclose(stats_dict["edge_lengths_mean"], torch.mean(lengths).item())
         assert np.allclose(stats_dict["edge_lengths_std"], torch.std(lengths).item())
@@ -179,7 +180,7 @@ class TestStatistics:
             stats_dict["atom_types_count_C"] == count[0]
             and stats_dict["atom_types_count_H"] == count[1]
         )
-        data = AtomicDataDict.with_edge_vectors(batch, with_lengths=True)
+        data = with_edge_vectors_(batch, with_lengths=True)
         edge_type = torch.index_select(
             data[AtomicDataDict.ATOM_TYPE_KEY].reshape(-1),
             0,
