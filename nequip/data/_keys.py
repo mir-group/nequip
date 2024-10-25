@@ -59,16 +59,6 @@ PARTIAL_FORCE_KEY: Final[str] = "partial_forces"
 STRESS_KEY: Final[str] = "stress"
 VIRIAL_KEY: Final[str] = "virial"
 
-ALL_ENERGY_KEYS: Final[List[str]] = [
-    EDGE_ENERGY_KEY,
-    PER_ATOM_ENERGY_KEY,
-    TOTAL_ENERGY_KEY,
-    FORCE_KEY,
-    PARTIAL_FORCE_KEY,
-    STRESS_KEY,
-    VIRIAL_KEY,
-]
-
 # misc ase property keys
 # except for "energy", "energies" (handled with key_mapping)
 FREE_ENERGY_KEY: Final[str] = "free_energy"
