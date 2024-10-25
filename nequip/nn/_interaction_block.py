@@ -174,7 +174,7 @@ class InteractionBlock(GraphModuleMixin, torch.nn.Module):
         if avg_num_neigh is not None:
             edge_features = edge_features.div(avg_num_neigh**0.5)
         # now scatter down
-        x = scatter(edge_features, edge_dst, dim=0, dim_size=len(x))
+        x = scatter(edge_features, edge_dst, dim=0, dim_size=x.size(0))
 
         x = self.linear_2(x)
 
