@@ -236,16 +236,16 @@ def num_frames(data: Type) -> int:
     if _keys.NUM_NODES_KEY not in data:
         return 1
     else:
-        return len(data[_keys.NUM_NODES_KEY])
+        return data[_keys.NUM_NODES_KEY].size(0)
 
 
 def num_nodes(data: Type) -> int:
-    return len(data[_keys.POSITIONS_KEY])
+    return data[_keys.POSITIONS_KEY].size(0)
 
 
 def num_edges(data: Type) -> int:
     # will not check if neighborlist is present
-    return data[_keys.EDGE_INDEX_KEY].shape[1]
+    return data[_keys.EDGE_INDEX_KEY].size(1)
 
 
 def with_batch_(data: Type) -> Type:
