@@ -135,7 +135,7 @@ class LennardJones(GraphModuleMixin, torch.nn.Module):
             lj_eng,
             edge_center,
             dim=0,
-            dim_size=len(data[AtomicDataDict.POSITIONS_KEY]),
+            dim_size=AtomicDataDict.num_nodes(data),
         )
         if AtomicDataDict.PER_ATOM_ENERGY_KEY in data:
             atomic_eng = atomic_eng + data[AtomicDataDict.PER_ATOM_ENERGY_KEY]
@@ -196,7 +196,7 @@ class SimpleLennardJones(GraphModuleMixin, torch.nn.Module):
             lj_eng,
             edge_center,
             dim=0,
-            dim_size=len(data[AtomicDataDict.POSITIONS_KEY]),
+            dim_size=AtomicDataDict.num_nodes(data),
         )
         if AtomicDataDict.PER_ATOM_ENERGY_KEY in data:
             atomic_eng = atomic_eng + data[AtomicDataDict.PER_ATOM_ENERGY_KEY]
@@ -323,7 +323,7 @@ class ZBL(GraphModuleMixin, torch.nn.Module):
             zbl_edge_eng,
             edge_center,
             dim=0,
-            dim_size=len(data[AtomicDataDict.POSITIONS_KEY]),
+            dim_size=AtomicDataDict.num_nodes(data),
         )
         if AtomicDataDict.PER_ATOM_ENERGY_KEY in data:
             atomic_eng = atomic_eng + data[AtomicDataDict.PER_ATOM_ENERGY_KEY]
