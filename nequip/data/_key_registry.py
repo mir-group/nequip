@@ -70,13 +70,21 @@ _CARTESIAN_TENSOR_FIELDS: Dict[str, str] = dict(_DEFAULT_CARTESIAN_TENSOR_FIELDS
 
 
 def register_fields(
+    graph_fields: Sequence[str] = [],
     node_fields: Sequence[str] = [],
     edge_fields: Sequence[str] = [],
-    graph_fields: Sequence[str] = [],
     long_fields: Sequence[str] = [],
     cartesian_tensor_fields: Dict[str, str] = {},
 ) -> None:
-    r"""Register fields as being per-frame, per-atom, per-edge, long dtype and/or Cartesian tensors."""
+    """Register custom fields as being per-frame, per-atom, per-edge, long dtype and/or Cartesian tensors.
+
+    Args:
+        graph_fields (Sequence[str]): per-frame fields
+        node_fields (Sequence[str]): per-atom fields
+        edge_fields (Sequence[str]): per-edge fields
+        long_fields (Sequence[str]): long ``dtype`` fields
+        cartesian_tensor_fields (Dict[str, str]): Cartesian tensor fields (both the name, and the ``formula`` must be provided, e.g. ``"ij=ji"``, see `e3nn docs <https://docs.e3nn.org/en/stable/api/io/cartesian_tensor.html>`_)
+    """
     node_fields: set = set(node_fields)
     edge_fields: set = set(edge_fields)
     graph_fields: set = set(graph_fields)
@@ -119,7 +127,7 @@ def deregister_fields(*fields: Sequence[str]) -> None:
     Silently ignores fields that were never registered to begin with.
 
     Args:
-        *fields: fields to deregister.
+        ``*fields`` (Sequence[str]): fields to deregister.
     """
     for f in fields:
         assert f not in _DEFAULT_NODE_FIELDS, "Cannot deregister built-in field"
