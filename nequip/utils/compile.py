@@ -4,7 +4,7 @@ import contextvars
 
 import torch
 
-import e3nn
+from e3nn import set_optimization_defaults, get_optimization_defaults
 
 _CONDITIONAL_TORCHSCRIPT_MODE = contextvars.ContextVar(
     "_CONDITIONAL_TORCHSCRIPT_MODE", default=True
@@ -15,14 +15,14 @@ _CONDITIONAL_TORCHSCRIPT_MODE = contextvars.ContextVar(
 def conditional_torchscript_mode(enabled: bool):
     global _CONDITIONAL_TORCHSCRIPT_MODE
     # save previous state
-    init_val_e3nn = e3nn.get_optimization_defaults()["jit_script_fx"]
+    init_val_e3nn = get_optimization_defaults()["jit_script_fx"]
     init_val_here = _CONDITIONAL_TORCHSCRIPT_MODE.get()
     # set mode variables
-    e3nn.set_optimization_defaults(jit_script_fx=enabled)
+    set_optimization_defaults(jit_script_fx=enabled)
     _CONDITIONAL_TORCHSCRIPT_MODE.set(enabled)
     yield
     # restore state
-    e3nn.set_optimization_defaults(jit_script_fx=init_val_e3nn)
+    set_optimization_defaults(jit_script_fx=init_val_e3nn)
     _CONDITIONAL_TORCHSCRIPT_MODE.set(init_val_here)
 
 
