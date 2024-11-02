@@ -6,12 +6,10 @@ import e3nn
 import e3nn.util.jit
 
 from .global_dtype import _GLOBAL_DTYPE
-from .misc import dtype_to_name
 
 import warnings
 import os
-from typing import List, Tuple, Union, Final, Optional
-
+from typing import List, Dict, Tuple, Union, Final
 
 # for multiprocessing, we need to keep track of our latest global options so
 # that we can reload/reset them in worker processes. While we could be more careful here,
@@ -24,18 +22,37 @@ _MULTIPROCESSING_SHARING_STRATEGY: Final[str] = os.environ.get(
     "NEQUIP_MULTIPROCESSING_SHARING_STRATEGY", "file_system"
 )
 
+# hardcode jit fusion strategy
+_JIT_FUSION_STRATEGY: Final[List[Tuple[Union[str, int]]]] = [("DYNAMIC", 10)]
 
-def _get_latest_global_options() -> dict:
+# === global options metadata ===
+# the global options that we want to track in a packaged model
+TF32_KEY: Final[str] = "allow_tf32"
+
+# only TF32 for now, but future-proofs for "singular source of truth" wrt metadata keys related to global options
+GLOBAL_OPTIONS_METADATA_KEYS: Final[List[str]] = [TF32_KEY]
+
+
+def _get_latest_global_options(only_metadata_related=False) -> Dict:
     """Get the config used latest to ``_set_global_options``.
 
     This is useful for getting worker processes into the same state as the parent.
     """
     global _latest_global_config
-    return _latest_global_config
+    if only_metadata_related:
+        return {
+            k: v
+            for k, v in _latest_global_config.items()
+            if k in GLOBAL_OPTIONS_METADATA_KEYS
+        }
+    else:
+        return _latest_global_config
 
 
 def _set_global_options(
-    seed: Optional[int] = None,
+    # global seed is mandatory
+    seed: int,
+    # TODO: clean the following up eventually
     # avoid 20 iters of pain, see https://github.com/pytorch/pytorch/issues/52286
     # Quote from eelison in PyTorch slack:
     # https://pytorch.slack.com/archives/CDZD1FANA/p1644259272007529?thread_ts=1644064449.039479&cid=CDZD1FANA
@@ -45,7 +62,7 @@ def _set_global_options(
     # > provided broadcasting patterns remain fixed
     # We default to DYNAMIC alone because the number of edges is always dynamic,
     # even if the number of atoms is fixed:
-    _jit_fusion_strategy: List[Tuple[Union[str, int]]] = [("DYNAMIC", 3)],
+    # _jit_fusion_strategy: List[Tuple[Union[str, int]]] = [("DYNAMIC", 3)],
     # Due to what appear to be ongoing bugs with nvFuser, we default to NNC (fuser1) for now:
     # TODO: still default to NNC on CPU regardless even if change this for GPU
     # TODO: default for ROCm?
@@ -59,27 +76,29 @@ def _set_global_options(
 ) -> None:
     """Configure global options of libraries like `torch` and `e3nn` based on `config`.
 
+    The following fields are fixed and cannot be configured by this function:
+      - ``input_dtype``
+      - ``_jit_fusion_strategy``
+
     Args:
         warn_on_override: if True, will try to warn if new options are inconsistant with previously set ones.
     """
-    # update these options into the latest global config.
+    # === update global config ===
+    # NOTE: fixed fields are not reflected in the global config
     global _latest_global_config
     _latest_global_config.update(
         {
             "seed": seed,
-            "_jit_fusion_strategy": _jit_fusion_strategy,
-            "allow_tf32": allow_tf32,
+            TF32_KEY: allow_tf32,
             "specialized_code": specialized_code,
             "optimize_einsums": optimize_einsums,
             "jit_script_fx": jit_script_fx,
             "warn_on_override": warn_on_override,
-            "default_dtype": dtype_to_name(_GLOBAL_DTYPE),
         }
     )
 
-    # set global seed
-    if seed is not None:
-        seed_everything(seed, workers=True)
+    # === set global seed ===
+    seed_everything(seed, workers=True, verbose=False)
 
     # Set TF32 support
     # See https://pytorch.org/docs/stable/notes/cuda.html#tensorfloat-32-tf32-on-ampere-devices
@@ -94,7 +113,7 @@ def _set_global_options(
             torch.backends.cudnn.allow_tf32 = allow_tf32
 
     # this applies for torch >= 1.11 (our minimum torch version satisfies this)
-    new_strat = _jit_fusion_strategy
+    new_strat = _JIT_FUSION_STRATEGY
     old_strat = torch.jit.set_fusion_strategy(new_strat)
     if warn_on_override and old_strat != new_strat:
         warnings.warn(
