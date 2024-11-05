@@ -4,6 +4,9 @@ nequip.data.dataset
  .. autoclass:: nequip.data.dataset.AtomicDataset
     :members:
 
+ .. autoclass:: nequip.data.dataset.NequIPLMDBDataset
+    :members:
+
  .. autoclass:: nequip.data.dataset.ASEDataset
     :members:
 
