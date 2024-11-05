@@ -1,0 +1,35 @@
+# must specify file path where the LMDB data are saved
+file_path: toy_emt_data
+# must specify run type, which determines which datasets are saved
+run: [train, test]
+
+# interpolation variables (not fundamental)
+data_seed: 123
+cutoff_radius: 5.0
+chemical_symbols: [Cu]
+
+# the same datamodule that you'd normally use (with less stuff)
+data:
+  _target_: nequip.data.datamodule.NequIPDataModule
+  seed: ${data_seed}
+  split_dataset:
+    dataset:
+      _target_: nequip.data.dataset.EMTTestDataset
+      # transforms are optional, depending on whether you want the transformations to be pre-applied
+      #transforms:
+      #  - _target_: nequip.data.transforms.NeighborListTransform
+      #    r_max: ${cutoff_radius}
+      #  - _target_: nequip.data.transforms.ChemicalSpeciesToAtomTypeMapper
+      #    chemical_symbols: ${chemical_symbols}
+      supercell: [4, 4, 4]
+      seed: ${data_seed}
+      num_frames: 50
+    train: 30
+    val: 10
+    test: 10
+
+lmdb_kwargs:
+  write_frequency: 3
+
+global_options:
+  seed: 123
