@@ -16,3 +16,6 @@ Error Metrics
 
  .. autoclass:: nequip.train.MeanAbsoluteError
     :members:
+
+ .. autoclass:: nequip.train.HuberLoss
+    :members:
