@@ -1,4 +1,9 @@
-from .metrics import MeanAbsoluteError, MeanSquaredError, RootMeanSquaredError
+from .metrics import (
+    MeanAbsoluteError,
+    MeanSquaredError,
+    RootMeanSquaredError,
+    HuberLoss,
+)
 from .metrics_manager import MetricsManager
 from .lightning import NequIPLightningModule
 
@@ -8,4 +13,5 @@ __all__ = [
     MeanAbsoluteError,
     MeanSquaredError,
     RootMeanSquaredError,
+    HuberLoss,
 ]
