@@ -6,9 +6,10 @@ import os.path as osp
 import urllib
 import zipfile
 from typing import Optional
-from .logger import RankedLogger
 
-logger = RankedLogger(__name__, rank_zero_only=True)
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def download_url(url: str, folder: str, filename: Optional[str] = None) -> None:
