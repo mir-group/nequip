@@ -9,6 +9,7 @@ from nequip.data.ase import from_ase
 from nequip.utils import download_url
 
 import os
+from tqdm import tqdm
 
 
 lmdb_file_path = "fcu.lmdb"
@@ -24,12 +25,19 @@ url = "https://archive.materialscloud.org/record/file?record_id=1302&filename=fc
 _ = download_url(url, os.getcwd(), filename=xyz_file_path)
 
 # === ase.Atoms -> AtomicDataDict ===
-atoms_list = list(ase.io.iread(filename=xyz_file_path, parallel=False))
-atomic_data_dicts = (from_ase(atoms) for atoms in atoms_list)
+atoms_list = list(
+    tqdm(
+        ase.io.iread(filename=xyz_file_path, parallel=False),
+        desc="Reading dataset with ASE...",
+    )
+)
+atomic_data_dicts = (
+    from_ase(atoms) for atoms in tqdm(atoms_list, desc="Saving to LMDB...")
+)
 
 # === convert to LMDB ===
 NequIPLMDBDataset.save_from_iterator(
     file_path=lmdb_file_path,
     iterator=atomic_data_dicts,
-    # write_frequency=1000,  # can increase this from default 1000 to speed up writing of very large datasets
+    write_frequency=5000,  # increase this from default 1000 to speed up writing of very large datasets
 )

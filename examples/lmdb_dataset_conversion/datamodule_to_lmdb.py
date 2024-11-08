@@ -2,6 +2,7 @@ from nequip.data.dataset import NequIPLMDBDataset
 from nequip.utils._global_options import _set_global_options
 from nequip.utils import RankedLogger
 import os
+from tqdm import tqdm
 import hydra
 from omegaconf import OmegaConf, DictConfig, ListConfig
 
@@ -58,7 +59,10 @@ def main(config: DictConfig):
                 )
                 NequIPLMDBDataset.save_from_iterator(
                     file_path=f"{config.file_path}_{run}_{data_idx}",
-                    iterator=dloader[data_idx],
+                    iterator=tqdm(
+                        dloader[data_idx],
+                        total=len(getattr(datamodule, run + "_dataset")[data_idx]),
+                    ),
                     **conversion_kwargs,
                 )
         finally:
