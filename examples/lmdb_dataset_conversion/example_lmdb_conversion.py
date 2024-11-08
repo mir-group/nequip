@@ -23,7 +23,6 @@ torch.set_default_dtype(torch.float64)
 url = "https://archive.materialscloud.org/record/file?record_id=1302&filename=fcu.xyz"
 _ = download_url(url, os.getcwd(), filename=xyz_file_path)
 
-
 # === ase.Atoms -> AtomicDataDict ===
 atoms_list = list(ase.io.iread(filename=xyz_file_path, parallel=False))
 atomic_data_dicts = (from_ase(atoms) for atoms in atoms_list)
@@ -32,4 +31,5 @@ atomic_data_dicts = (from_ase(atoms) for atoms in atoms_list)
 NequIPLMDBDataset.save_from_iterator(
     file_path=lmdb_file_path,
     iterator=atomic_data_dicts,
+    # write_frequency=1000,  # can increase this from default 1000 to speed up writing of very large datasets
 )
