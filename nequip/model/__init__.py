@@ -9,7 +9,8 @@ from ._weight_init import (
 from ._pair_potential import PairPotential, PairPotentialTerm
 
 from ._build import model_from_config
-
+from .utils import model_builder
+from .nequip_models import NequIPGNNModel, FullNequIPGNNModel
 
 __all__ = [
     SimpleIrrepsConfig,
@@ -23,4 +24,7 @@ __all__ = [
     model_from_config,
     PairPotential,
     PairPotentialTerm,
+    model_builder,
+    NequIPGNNModel,
+    FullNequIPGNNModel,
 ]
