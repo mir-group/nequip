@@ -347,6 +347,7 @@ class StressOutput(GraphModuleMixin, torch.nn.Module):
         data[AtomicDataDict.STRESS_KEY] = stress
 
         # see discussion in https://github.com/libAtoms/QUIP/issues/227 about sign convention
+        # (and conventions docs page)
         # they say the standard convention is virial = -stress x volume
         # looking above this means that we need to pick up another negative sign for the virial
         # to fit this equation with the stress computed above
