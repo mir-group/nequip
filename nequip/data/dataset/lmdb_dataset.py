@@ -64,7 +64,7 @@ class NequIPLMDBDataset(AtomicDataset):
         file_path: str,
         iterator: Iterable[AtomicDataDict.Type],
         map_size: int = 53687091200,  # 50 Gb
-        write_frequency: int = 1,
+        write_frequency: int = 1000,
     ) -> None:
         """Uses an iterator of ``AtomicDataDict`` objects to construct an LMDB dataset.
 
@@ -72,7 +72,7 @@ class NequIPLMDBDataset(AtomicDataset):
             file_path (str): path to save the LMDB data
             iterator (Iterable): iterator of atomic data dicts
             map_size (int): maximum size the database may grow to in bytes (defaults to 50 Gb); note that an exception will be raised if database grows larger than map_size
-            write_frequency (int): frequency of writing (defaults to 1)
+            write_frequency (int): frequency of writing (defaults to 1000). Larger is faster.
         """
         db = lmdb.open(
             file_path,
