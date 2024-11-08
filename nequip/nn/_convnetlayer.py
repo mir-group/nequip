@@ -34,7 +34,6 @@ class ConvNetLayer(GraphModuleMixin, torch.nn.Module):
         feature_irreps_hidden,
         convolution=InteractionBlock,
         convolution_kwargs: dict = {},
-        num_layers: int = 3,
         resnet: bool = False,
         nonlinearity_type: str = "gate",
         nonlinearity_scalars: Dict[int, Callable] = {"e": "silu", "o": "tanh"},
@@ -55,7 +54,6 @@ class ConvNetLayer(GraphModuleMixin, torch.nn.Module):
 
         self.feature_irreps_hidden = o3.Irreps(feature_irreps_hidden)
         self.resnet = resnet
-        self.num_layers = num_layers
 
         # We'll set irreps_out later when we know them
         self._init_irreps(
