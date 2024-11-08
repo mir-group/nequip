@@ -2,7 +2,6 @@ import torch
 import lightning
 from lightning.pytorch.utilities.warnings import PossibleUserWarning
 from hydra.utils import instantiate
-from nequip.model import model_from_config
 from nequip.data import AtomicDataDict
 from nequip.utils import RankedLogger
 from ._metrics_utils import gather_all_tensors
@@ -65,7 +64,7 @@ class NequIPLightningModule(lightning.LightningModule):
     ):
         super().__init__()
         self.save_hyperparameters()
-        self.model = model_from_config(config=model, initialize=True)
+        self.model = instantiate(model, _recursive_=False)
         logger.debug(f"Built Model Details:\n{str(self.model)}")
         self.optimizer_config = optimizer
         self.lr_scheduler_config = lr_scheduler
