@@ -75,24 +75,28 @@ training_module:
     _target_: torch.optim.Adam
 
   model:
-    model_builders:
-     - nequip.model.SimpleIrrepsConfig
-     - nequip.model.NequIPGNNEnergyModel
-     - nequip.model.PerTypeEnergyScaleShift
-     - nequip.model.StressForceOutput
-
+    _target_: nequip.model.NequIPGNNModel
+    # basic model params
     seed: 456
-    type_names: ${model_type_names}
     model_dtype: float32
-    num_basis: 8
+    type_names: ${model_type_names}
     r_max: ${cutoff_radius}
+    # general model params
+    num_layers: 3
+    num_features: 16
+    invariant_layers: 1
+    invariant_neurons: 8
     l_max: 2
     parity: true
-    num_features: 16
-  
-    per_type_energy_scale_shift_shifts: ${training_data_stats:per_atom_energy_mean}
-    per_type_energy_scale_shift_scales: ${training_data_stats:per_type_forces_rms}
+    # data-dependent model params
     avg_num_neighbors: ${training_data_stats:num_neighbors_mean}
+    per_type_energy_shifts: ${training_data_stats:per_atom_energy_mean}
+    per_type_energy_scales: ${training_data_stats:per_type_forces_rms}
+    # pair potential
+    pair_potential:
+      _target_: nequip.nn.pair_potential.ZBL
+      chemical_species: ${chemical_symbols}
+      units: real
 
 global_options:
   seed: 789
