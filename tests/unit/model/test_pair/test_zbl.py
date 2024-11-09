@@ -7,20 +7,17 @@ import ase
 import ase.io
 import ase.data
 
-import torch
-
 from nequip.data.transforms import (
     ChemicalSpeciesToAtomTypeMapper,
     NeighborListTransform,
 )
-from nequip.data import AtomicDataDict
 from nequip.ase import NequIPCalculator
 from nequip.utils.unittests.model_tests import BaseEnergyModelTests
 
 from hydra.utils import instantiate
 
 
-class TestNequIPModel(BaseEnergyModelTests):
+class TestZBLModel(BaseEnergyModelTests):
     @pytest.fixture
     def strict_locality(self):
         return True
@@ -28,41 +25,30 @@ class TestNequIPModel(BaseEnergyModelTests):
     @pytest.fixture(scope="class")
     def config(self):
         config = {
-            "model_builders": [
-                "nequip.model.PairPotential",
-                "nequip.model.StressForceOutput",
-            ],
-            "pair_style": "ZBL",
-            "units": "metal",
-            "r_max": 5.0,
-            "type_names": ["H", "C", "O"],
-            "ZBL_chemical_species": ["H", "C", "O"],
+            "_target_": "nequip.model.ZBLPairPotential",
             "seed": 123,
+            "model_dtype": "float64",
+            "r_max": 5.0,
+            "type_names": ["H", "O", "C", "N", "Cu", "Au"],
+            "chemical_species": ["H", "O", "C", "N", "Cu", "Au"],
+            "units": "metal",
         }
-        return config, [
-            AtomicDataDict.TOTAL_ENERGY_KEY,
-            AtomicDataDict.FORCE_KEY,
-            AtomicDataDict.PER_ATOM_ENERGY_KEY,
-        ]
+        return config
 
     def test_lammps_repro(self, config):
-        if torch.get_default_dtype() != torch.float64:
+        if config["model_dtype"] != "float64":
             pytest.skip()
-        config, _ = config
         config = config.copy()
         r_max: float = 8.0  # see zbl_data.lmps
         config.update(
             {
-                "model_dtype": "float64",
                 "r_max": r_max + 1,  # To make cutoff envelope irrelevant
-                "PolynomialCutoff_p": 80,  # almost a step function
+                "polynomial_cutoff_p": 80,  # almost a step function
             }
         )
-        config["type_names"] = ["H", "O", "C", "N", "Cu", "Au"]
-        config["ZBL_chemical_species"] = ["H", "O", "C", "N", "Cu", "Au"]
         transforms = [
             ChemicalSpeciesToAtomTypeMapper(
-                chemical_symbols=config["ZBL_chemical_species"],
+                chemical_symbols=config["chemical_species"],
             ),
             NeighborListTransform(r_max=r_max),
         ]

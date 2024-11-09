@@ -248,10 +248,12 @@ class _ZBL(torch.nn.Module):
 
 @compile_mode("script")
 class ZBL(GraphModuleMixin, torch.nn.Module):
-    """Add a ZBL pair potential to the edge energy.
+    """`ZBL <https://docs.lammps.org/pair_zbl.html>`_ pair potential energy term.
 
     Args:
-        units (str): what units the model/data are in using LAMMPS names.
+        type_names (List[str]): list of type names known by the model, ``[atom1, atom2, atom3]``
+        chemical_species (List[str]): list of chemical symbols, e.g. ``[C, H, O]``
+        units (str): `LAMMPS units <https://docs.lammps.org/units.html>`_ that the data is in; ``metal`` and ``real`` are presently supported -- raise a GitHub issue if more is desired
     """
 
     def __init__(
@@ -307,6 +309,7 @@ class ZBL(GraphModuleMixin, torch.nn.Module):
         self._zbl = conditional_torchscript_jit(_ZBL())
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
+        """"""
         data = with_edge_vectors_(data, with_lengths=True)
         edge_center = data[AtomicDataDict.EDGE_INDEX_KEY][0]
 
