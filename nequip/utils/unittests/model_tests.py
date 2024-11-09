@@ -18,11 +18,11 @@ from nequip.data import (
     _EDGE_FIELDS,
 )
 from nequip.data.transforms import ChemicalSpeciesToAtomTypeMapper
-from nequip.model import model_from_config
 from nequip.nn import GraphModuleMixin
 from nequip.utils import dtype_to_name
-from nequip.utils import Config
 from nequip.utils.test import assert_AtomicData_equivariant, FLOAT_TOLERANCE
+
+from hydra.utils import instantiate
 
 
 # see https://github.com/pytest-dev/pytest/issues/421#issuecomment-943386533
@@ -48,11 +48,9 @@ class BaseModelTests:
         return request.param
 
     @staticmethod
-    def make_model(config, device, initialize: bool = True, deploy: bool = False):
+    def make_model(config, device):
         config = config.copy()
-        model = model_from_config(
-            Config.from_dict(config), initialize=initialize, deploy=deploy
-        )
+        model = instantiate(config)
         model = model.to(device)
         return model
 
@@ -466,8 +464,8 @@ class BaseEnergyModelTests(BaseModelTests):
             "PartialForceOutput" if b == "StressForceOutput" else b
             for b in partial_config["model_builders"]
         ]
-        model = model_from_config(config=config, initialize=True)
-        partial_model = model_from_config(config=partial_config, initialize=True)
+        model = instantiate(config)
+        partial_model = instantiate(partial_config)
         model.to(device)
         partial_model.to(device)
         partial_model.load_state_dict(model.state_dict())

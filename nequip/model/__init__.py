@@ -6,7 +6,6 @@ from ._weight_init import (
 )
 from ._pair_potential import PairPotential, PairPotentialTerm
 
-from ._build import model_from_config
 from .utils import model_builder
 from .nequip_models import NequIPGNNModel, FullNequIPGNNModel
 
@@ -15,7 +14,6 @@ __all__ = [
     uniform_initialize_FCs,
     initialize_from_state,
     load_model_state,
-    model_from_config,
     PairPotential,
     PairPotentialTerm,
     model_builder,
