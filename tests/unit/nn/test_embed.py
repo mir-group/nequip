@@ -1,12 +1,12 @@
 from e3nn.util.test import assert_auto_jitable
 
 from nequip.utils.test import assert_AtomicData_equivariant
-from nequip.nn.radial_basis import BesselBasis
-from nequip.nn.cutoffs import PolynomialCutoff
+from nequip.nn import SequentialGraphNetwork
 from nequip.nn.embedding import (
     OneHotAtomEncoding,
     SphericalHarmonicEdgeAttrs,
-    RadialBasisEdgeEncoding,
+    EdgeLengthNormalizer,
+    BesselEdgeLengthEncoding,
 )
 from nequip.utils import dtype_from_name, torch_default_dtype
 
@@ -33,13 +33,10 @@ def test_radial_basis(model_dtype, CH3CHO):
     _, data = CH3CHO
 
     with torch_default_dtype(dtype_from_name(model_dtype)):
-        basis = BesselBasis
-        cutoff = PolynomialCutoff
-        rad = RadialBasisEdgeEncoding(
-            basis,
-            cutoff,
-            basis_kwargs={"r_max": 5.0},
-            cutoff_kwargs={"r_max": 5.0},
+        rad = SequentialGraphNetwork(
+            {
+                "edge_norm": EdgeLengthNormalizer(r_max=5.0, type_names=[0, 1, 2]),
+                "bessel": BesselEdgeLengthEncoding(),
+            }
         )
-    assert_auto_jitable(rad)
     assert_AtomicData_equivariant(rad, data)
