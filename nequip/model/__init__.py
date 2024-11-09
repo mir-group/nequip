@@ -1,4 +1,3 @@
-from ._grads import PartialForceOutput, StressForceOutput
 from ._scaling import PerTypeEnergyScaleShift
 from ._weight_init import (
     uniform_initialize_FCs,
@@ -12,8 +11,6 @@ from .utils import model_builder
 from .nequip_models import NequIPGNNModel, FullNequIPGNNModel
 
 __all__ = [
-    PartialForceOutput,
-    StressForceOutput,
     PerTypeEnergyScaleShift,
     uniform_initialize_FCs,
     initialize_from_state,
