@@ -158,6 +158,12 @@ class PerTypeScaleShift(GraphModuleMixin, torch.nn.Module):
         # === dtype ===
         self.out_dtype = _GLOBAL_DTYPE
 
+        # === preprocess scales and shifts ===
+        if isinstance(scales, float):
+            scales = [scales]
+        if isinstance(shifts, float):
+            shifts = [shifts]
+
         # === scales ===
         self.has_scales = scales is not None
         self.scales_trainable = scales_trainable
