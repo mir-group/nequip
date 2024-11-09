@@ -549,12 +549,12 @@ class BaseEnergyModelTests(BaseModelTests):
         """Checks that isolated atom energies provided for the per-atom shifts are restored for isolated atoms."""
         instance, out_fields = model
         config, out_fields = config
-        if "PerTypeEnergyScaleShift" not in config["model_builders"]:
+        if "per_type_energy_shifts" not in config:
             pytest.skip()
 
         # get the isolated atom energies
         isolated_energies = torch.tensor(
-            config["per_type_energy_scale_shift_shifts"], device=device
+            config["per_type_energy_shifts"], device=device
         )
 
         # make a synthetic data consisting of three isolated atom frames
