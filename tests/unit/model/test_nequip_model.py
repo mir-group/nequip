@@ -3,9 +3,11 @@ import pytest
 from e3nn import o3
 
 from nequip.data import AtomicDataDict
-from nequip.model import model_from_config
 from nequip.nn import AtomwiseLinear
 from nequip.utils.unittests.model_tests import BaseEnergyModelTests
+
+from hydra.utils import instantiate
+
 
 COMMON_CONFIG = {
     "avg_num_neighbors": None,
@@ -131,7 +133,7 @@ class TestNequIPModel(BaseEnergyModelTests):
     def test_submods(self):
         config = minimal_config2.copy()
         config["model_builders"] = ["nequip.model.NequIPGNNEnergyModel"]
-        model = model_from_config(config=config, initialize=True)
+        model = instantiate(config)
         chemical_embedding = model.model.chemical_embedding
         assert isinstance(chemical_embedding, AtomwiseLinear)
         true_irreps = o3.Irreps(minimal_config2["chemical_embedding_irreps_out"])

@@ -14,10 +14,10 @@ from nequip.data.transforms import (
     NeighborListTransform,
 )
 from nequip.data import AtomicDataDict
-from nequip.model import model_from_config
 from nequip.ase import NequIPCalculator
-from nequip.utils import Config
 from nequip.utils.unittests.model_tests import BaseEnergyModelTests
+
+from hydra.utils import instantiate
 
 
 class TestNequIPModel(BaseEnergyModelTests):
@@ -66,7 +66,7 @@ class TestNequIPModel(BaseEnergyModelTests):
             ),
             NeighborListTransform(r_max=r_max),
         ]
-        ZBL_model = model_from_config(Config.from_dict(config), initialize=True)
+        ZBL_model = instantiate(config)
         ZBL_model.eval()
         # make test system of two atoms:
         atoms = ase.Atoms(positions=np.zeros((2, 3)), symbols=["H", "H"])
