@@ -3,6 +3,7 @@ from e3nn.util.test import assert_auto_jitable
 from nequip.utils.test import assert_AtomicData_equivariant
 from nequip.nn import SequentialGraphNetwork
 from nequip.nn.embedding import (
+    PolynomialCutoff,
     OneHotAtomEncoding,
     SphericalHarmonicEdgeAttrs,
     EdgeLengthNormalizer,
@@ -36,7 +37,9 @@ def test_radial_basis(model_dtype, CH3CHO):
         rad = SequentialGraphNetwork(
             {
                 "edge_norm": EdgeLengthNormalizer(r_max=5.0, type_names=[0, 1, 2]),
-                "bessel": BesselEdgeLengthEncoding(),
+                "bessel": BesselEdgeLengthEncoding(cutoff=PolynomialCutoff(6)),
             }
         )
+    assert_auto_jitable(rad.edge_norm)
+    assert_auto_jitable(rad.bessel)
     assert_AtomicData_equivariant(rad, data)
