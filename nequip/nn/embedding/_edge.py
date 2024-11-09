@@ -7,8 +7,6 @@ from nequip.utils.global_dtype import _GLOBAL_DTYPE
 from nequip.utils.compile import conditional_torchscript_jit
 from nequip.data import AtomicDataDict
 from .._graph_mixin import GraphModuleMixin
-from ..radial_basis import BesselBasis
-from ..cutoffs import PolynomialCutoff
 from ..utils import with_edge_vectors_
 
 from typing import Optional, List, Dict, Union
@@ -18,7 +16,7 @@ def _process_per_edge_type_cutoff(type_names, per_edge_type_cutoff, r_max):
     num_types = len(type_names)
     # map dicts from type name to thing into lists
     per_edge_type_cutoff = {
-        k: ([e[t] for t in type_names] if isinstance(e, dict) else [e] * num_types)
+        k: ([e[t] for t in type_names] if not isinstance(e, float) else [e] * num_types)
         for k, e in per_edge_type_cutoff.items()
     }
     per_edge_type_cutoff = [per_edge_type_cutoff[k] for k in type_names]
@@ -102,6 +100,81 @@ class EdgeLengthNormalizer(GraphModuleMixin, torch.nn.Module):
 
 
 @compile_mode("script")
+class BesselEdgeLengthEncoding(GraphModuleMixin, torch.nn.Module):
+    r"""Bessel edge length encoding.
+
+    Args:
+        num_bessels (int): number of Bessel basis functions
+        trainable (bool): whether the :math:`n \pi` coefficients are trainable
+        cutoff (torch.nn.Module): ``torch.nn.Module`` to apply a cutoff function that smoothly goes to zero at the cutoff radius
+    """
+
+    def __init__(
+        self,
+        cutoff: torch.nn.Module,
+        num_bessels: int = 8,
+        trainable: bool = False,
+        # bookkeeping
+        edge_invariant_field: str = AtomicDataDict.EDGE_EMBEDDING_KEY,
+        edge_type_field: str = AtomicDataDict.EDGE_TYPE_KEY,
+        norm_length_field: str = AtomicDataDict.NORM_LENGTH_KEY,
+        irreps_in=None,
+    ):
+        super().__init__()
+        # === process inputs ===
+        self.num_bessels = num_bessels
+        self.trainable = trainable
+        self.cutoff = conditional_torchscript_jit(cutoff)
+        self.edge_invariant_field = edge_invariant_field
+        self.edge_type_field = edge_type_field
+        self.norm_length_field = norm_length_field
+
+        # === bessel weights ===
+        bessel_weights = torch.linspace(
+            start=1.0,
+            end=self.num_bessels,
+            steps=self.num_bessels,
+        ).unsqueeze(
+            0
+        )  # (1, num_bessel)
+        if self.trainable:
+            self.bessel_weights = torch.nn.Parameter(bessel_weights)
+        else:
+            self.register_buffer("bessel_weights", bessel_weights)
+
+        self._init_irreps(
+            irreps_in=irreps_in,
+            irreps_out={
+                self.edge_invariant_field: o3.Irreps([(self.num_bessels, (0, 1))]),
+                AtomicDataDict.EDGE_CUTOFF_KEY: "0e",
+            },
+        )
+
+    def extra_repr(self) -> str:
+        return f"num_bessels={self.num_bessels}"
+
+    def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
+        model_dtype = data.get(
+            AtomicDataDict.MODEL_DTYPE_KEY, data[AtomicDataDict.POSITIONS_KEY]
+        ).dtype
+
+        # == Bessel basis ==
+        x = data[self.norm_length_field]  # (num_edges, 1)
+        # (num_edges, 1), (1, num_bessel) -> (num_edges, num_bessel)
+        bessel = (torch.sinc(x * self.bessel_weights) * self.bessel_weights).to(
+            model_dtype
+        )
+
+        # == polynomial cutoff ==
+        cutoff = self.cutoff(x).to(model_dtype)
+        data[AtomicDataDict.EDGE_CUTOFF_KEY] = cutoff
+
+        # == save product ==
+        data[self.edge_invariant_field] = bessel * cutoff
+        return data
+
+
+@compile_mode("script")
 class SphericalHarmonicEdgeAttrs(GraphModuleMixin, torch.nn.Module):
     """Construct edge attrs as spherical harmonic projections of edge vectors.
 
@@ -151,53 +224,16 @@ class SphericalHarmonicEdgeAttrs(GraphModuleMixin, torch.nn.Module):
 
 
 @compile_mode("script")
-class RadialBasisEdgeEncoding(GraphModuleMixin, torch.nn.Module):
-    out_field: str
-
-    def __init__(
-        self,
-        basis=BesselBasis,
-        cutoff=PolynomialCutoff,
-        basis_kwargs={},
-        cutoff_kwargs={},
-        out_field: str = AtomicDataDict.EDGE_EMBEDDING_KEY,
-        irreps_in=None,
-    ):
-        super().__init__()
-        self.basis = basis(**basis_kwargs)
-        self.cutoff = conditional_torchscript_jit(cutoff(**cutoff_kwargs))
-        self.out_field = out_field
-        self._init_irreps(
-            irreps_in=irreps_in,
-            irreps_out={
-                self.out_field: o3.Irreps([(self.basis.num_basis, (0, 1))]),
-                AtomicDataDict.EDGE_CUTOFF_KEY: "0e",
-            },
-        )
-
-    def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
-        model_dtype = data.get(
-            AtomicDataDict.MODEL_DTYPE_KEY, data[AtomicDataDict.POSITIONS_KEY]
-        ).dtype
-        data = with_edge_vectors_(data, with_lengths=True)
-        edge_length = data[AtomicDataDict.EDGE_LENGTH_KEY]
-        cutoff = self.cutoff(edge_length).unsqueeze(-1)
-        edge_length_embedded = self.basis(edge_length) * cutoff
-        data[self.out_field] = edge_length_embedded.to(model_dtype)
-        data[AtomicDataDict.EDGE_CUTOFF_KEY] = cutoff.to(model_dtype)
-        return data
-
-
-@compile_mode("script")
 class AddRadialCutoffToData(GraphModuleMixin, torch.nn.Module):
     def __init__(
         self,
-        cutoff=PolynomialCutoff,
-        cutoff_kwargs={},
+        cutoff: torch.nn.Module,
+        norm_length_field: str = AtomicDataDict.NORM_LENGTH_KEY,
         irreps_in=None,
     ):
         super().__init__()
-        self.cutoff = conditional_torchscript_jit(cutoff(**cutoff_kwargs))
+        self.cutoff = conditional_torchscript_jit(cutoff)
+        self.norm_length_field = norm_length_field
         self._init_irreps(
             irreps_in=irreps_in, irreps_out={AtomicDataDict.EDGE_CUTOFF_KEY: "0e"}
         )

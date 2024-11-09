@@ -1,15 +1,17 @@
 from ._one_hot import OneHotAtomEncoding
 from ._edge import (
     EdgeLengthNormalizer,
+    BesselEdgeLengthEncoding,
     SphericalHarmonicEdgeAttrs,
-    RadialBasisEdgeEncoding,
     AddRadialCutoffToData,
 )
+from .cutoffs import PolynomialCutoff
 
 __all__ = [
     OneHotAtomEncoding,
     EdgeLengthNormalizer,
+    BesselEdgeLengthEncoding,
     SphericalHarmonicEdgeAttrs,
-    RadialBasisEdgeEncoding,
     AddRadialCutoffToData,
+    PolynomialCutoff,
 ]
