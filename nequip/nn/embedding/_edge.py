@@ -243,8 +243,7 @@ class AddRadialCutoffToData(GraphModuleMixin, torch.nn.Module):
             model_dtype = data.get(
                 AtomicDataDict.MODEL_DTYPE_KEY, data[AtomicDataDict.POSITIONS_KEY]
             ).dtype
-            data = with_edge_vectors_(data, with_lengths=True)
-            edge_length = data[AtomicDataDict.EDGE_LENGTH_KEY]
-            cutoff = self.cutoff(edge_length).unsqueeze(-1)
-            data[AtomicDataDict.EDGE_CUTOFF_KEY] = cutoff.to(model_dtype)
+            x = data[self.norm_length_field]
+            cutoff = self.cutoff(x).to(model_dtype)
+            data[AtomicDataDict.EDGE_CUTOFF_KEY] = cutoff
         return data
