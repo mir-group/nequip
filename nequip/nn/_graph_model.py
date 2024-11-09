@@ -44,7 +44,6 @@ class GraphModel(GraphModuleMixin, torch.nn.Module):
             AtomicDataDict.ATOM_TYPE_KEY: None,
         }
         model_input_fields = AtomicDataDict._fix_irreps_dict(model_input_fields)
-        assert len(set(irreps_in.keys()).intersection(model_input_fields.keys())) == 0
         irreps_in.update(model_input_fields)
         self._init_irreps(irreps_in=irreps_in, irreps_out=model.irreps_out)
         for k, irreps in model.irreps_in.items():
