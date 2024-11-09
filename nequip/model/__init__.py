@@ -1,4 +1,3 @@
-from ._scaling import PerTypeEnergyScaleShift
 from ._weight_init import (
     uniform_initialize_FCs,
     initialize_from_state,
@@ -10,7 +9,6 @@ from .utils import model_builder
 from .nequip_models import NequIPGNNModel, FullNequIPGNNModel
 
 __all__ = [
-    PerTypeEnergyScaleShift,
     uniform_initialize_FCs,
     initialize_from_state,
     load_model_state,
