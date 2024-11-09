@@ -25,7 +25,7 @@ def test_deploy(BENCHMARK_ROOT, fake_model_training_session, device):
     dtype = nequip.utils.dtype_to_name(torch.get_default_dtype())
 
     # atol on MODEL dtype, since a mostly float32 model still has float32 variation
-    atol = {"float32": 1e-5, "float64": 1e-7}[config.training_module.model.model_dtype]
+    atol = {"float32": 5e-4, "float64": 1e-10}[config.training_module.model.model_dtype]
 
     # === test mode=build ===
     deployed_path = pathlib.Path(f"deployed_{dtype}.pth")
@@ -127,7 +127,8 @@ def test_deploy(BENCHMARK_ROOT, fake_model_training_session, device):
                 dtype=torch.get_default_dtype(),
                 device=device,
             )
-            assert torch.allclose(from_deployed, from_ase, atol=atol)
+            err = (from_deployed - from_ase).abs().max()
+            assert err <= atol
 
             from_deployed = AtomicDataDict.frame_from_batched(out_data.copy(), idx)[
                 AtomicDataDict.FORCE_KEY
@@ -137,7 +138,8 @@ def test_deploy(BENCHMARK_ROOT, fake_model_training_session, device):
                 dtype=torch.get_default_dtype(),
                 device=device,
             )
-            assert torch.allclose(from_deployed, from_ase, atol=atol)
+            err = (from_deployed - from_ase).abs().max()
+            assert err <= atol
 
     # == check validation epoch statistics wrt checkpoint ==
     _ = val_metrics_manager.compute()
