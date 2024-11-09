@@ -5,14 +5,17 @@ from nequip.data import AtomicDataDict
 from nequip.nn.embedding import OneHotAtomEncoding
 from nequip.nn import SequentialGraphNetwork, AtomwiseLinear
 
-# TODO: make these tests use the model_dtype fixture
-# not too urgent/essential because of nature of these tests
-
 
 def test_basic():
-    sgn = SequentialGraphNetwork.from_parameters(
-        shared_params={"type_names": ["A", "B", "C"]},
-        layers={"one_hot": OneHotAtomEncoding, "linear": AtomwiseLinear},
+    type_names = ["A", "B", "C"]
+    one_hot = OneHotAtomEncoding(type_names=type_names)
+    linear = AtomwiseLinear(irreps_in=one_hot.irreps_out)
+
+    sgn = SequentialGraphNetwork(
+        {
+            "one_hot": one_hot,
+            "linear": linear,
+        }
     )
     sgn(
         {
@@ -24,15 +27,13 @@ def test_basic():
 
 
 def test_append():
-    sgn = SequentialGraphNetwork.from_parameters(
-        shared_params={"type_names": ["A", "B", "C"]},
-        layers={"one_hot": OneHotAtomEncoding},
+    one_hot = OneHotAtomEncoding(type_names=["A", "B", "C"])
+    sgn = SequentialGraphNetwork(
+        modules={"one_hot": one_hot},
     )
-    sgn.append_from_parameters(
-        shared_params={"out_field": AtomicDataDict.NODE_FEATURES_KEY},
+    sgn.append(
         name="linear",
-        builder=AtomwiseLinear,
-        params={"out_field": "thing"},
+        module=AtomwiseLinear(out_field="thing", irreps_in=one_hot.irreps_out),
     )
     assert isinstance(sgn.linear, AtomwiseLinear)
     out = sgn(
@@ -47,17 +48,16 @@ def test_append():
 
 @pytest.mark.parametrize("mode", {"before", "after"})
 def test_insert(mode):
-    sgn = SequentialGraphNetwork.from_parameters(
-        shared_params={"type_names": ["A", "B", "C"]},
-        layers={"one_hot": OneHotAtomEncoding, "lin2": AtomwiseLinear},
-    )
+    one_hot = OneHotAtomEncoding(type_names=["A", "B", "C"])
+    linear = AtomwiseLinear(irreps_in=one_hot.irreps_out)
+    sgn = SequentialGraphNetwork({"one_hot": one_hot, "lin2": linear})
     keys = {"before": "lin2", "after": "one_hot"}
-    sgn.insert_from_parameters(
-        **{mode: keys[mode]},
-        shared_params={"out_field": "thing"},
+    sgn.insert(
         name="lin1",
-        builder=AtomwiseLinear,
-        params={"out_field": AtomicDataDict.NODE_FEATURES_KEY},
+        module=AtomwiseLinear(
+            out_field=AtomicDataDict.NODE_FEATURES_KEY, irreps_in=one_hot.irreps_out
+        ),
+        **{mode: keys[mode]},
     )
     assert isinstance(sgn.lin1, AtomwiseLinear)
     assert len(sgn) == 3
