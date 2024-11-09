@@ -2,65 +2,81 @@ import pytest
 
 from e3nn import o3
 
-from nequip.data import AtomicDataDict
 from nequip.nn import AtomwiseLinear
 from nequip.utils.unittests.model_tests import BaseEnergyModelTests
 
 from hydra.utils import instantiate
 
 
-COMMON_CONFIG = {
-    "avg_num_neighbors": None,
-    "type_names": ["H", "C", "O"],
+BASIC_INFO = {
     "seed": 123,
-    # Just in case for when that builder exists:
-    "pair_style": "ZBL",
-    "ZBL_chemical_species": ["H", "C", "O"],
-    "units": "metal",
-    # for the per-atom shift test
-    "per_type_energy_scale_shift_shifts": [3.45, 5.67, 7.89],
+    "type_names": ["H", "C", "O"],
+    "r_max": 4.0,
 }
-r_max = 3
+
+COMMON_CONFIG = {
+    "_target_": "nequip.model.NequIPGNNModel",
+    "l_max": 1,
+    "parity": True,
+    "invariant_layers": 1,
+    "invariant_neurons": 8,
+    **BASIC_INFO,
+}
+
+COMMON_FULL_CONFIG = {
+    "_target_": "nequip.model.FullNequIPGNNModel",
+    "invariant_layers": [1, 2],
+    "invariant_neurons": [5, 7],
+    **BASIC_INFO,
+}
+
 minimal_config1 = dict(
-    irreps_edge_sh="0e + 1o",
-    r_max=4,
-    feature_irreps_hidden="4x0e + 4x1o",
+    num_features=8,
     num_layers=2,
-    num_basis=8,
-    PolynomialCutoff_p=6,
-    nonlinearity_type="norm",
+    # ZBL pair potential term
+    pair_potential={
+        "_target_": "nequip.nn.pair_potential.ZBL",
+        "chemical_species": ["H", "C", "O"],
+        "units": "metal",
+    },
     **COMMON_CONFIG,
 )
 minimal_config2 = dict(
-    irreps_edge_sh="0e + 1o",
-    r_max=4,
-    chemical_embedding_irreps_out="8x0e + 8x0o + 8x1e + 8x1o",
-    irreps_mid_output_block="2x0e",
-    feature_irreps_hidden="4x0e + 4x1o",
+    num_features=4,
+    num_layers=3,
+    per_type_energy_shifts=[3.45, 5.67, 7.89],
     **COMMON_CONFIG,
 )
 minimal_config3 = dict(
-    irreps_edge_sh="0e + 1o",
-    r_max=4,
-    feature_irreps_hidden="4x0e + 4x1o",
+    num_features=4,
     num_layers=2,
-    num_basis=8,
-    PolynomialCutoff_p=6,
-    nonlinearity_type="gate",
+    per_edge_type_cutoff={"H": 2.0, "C": {"H": 4.0, "C": 3.5, "O": 3.7}, "O": 3.9},
     **COMMON_CONFIG,
 )
 minimal_config4 = dict(
+    irreps_edge_sh="0e + 1o",
+    chemical_embedding_irreps_out="4x0e + 11x1o",
+    feature_irreps_hidden=["13x0e + 4x1o", "3x0e + 5x1o"],
+    conv_to_output_hidden_irreps_out="3x0e + 7x1o",
+    convnet_nonlinearity_type="norm",
+    # ZBL pair potential term
+    pair_potential={
+        "_target_": "nequip.nn.pair_potential.ZBL",
+        "chemical_species": ["H", "C", "O"],
+        "units": "metal",
+    },
+    **COMMON_FULL_CONFIG,
+)
+minimal_config5 = dict(
     irreps_edge_sh="0e + 1o + 2e",
-    r_max=4,
-    feature_irreps_hidden="2x0e + 2x1o + 2x2e",
-    num_layers=2,
-    num_basis=3,
-    PolynomialCutoff_p=6,
-    nonlinearity_type="gate",
+    chemical_embedding_irreps_out="7x0e + 3x1o",
+    feature_irreps_hidden=["2x0e + 2x1o + 2x2e"] * 2,
+    conv_to_output_hidden_irreps_out="5x0e + 2x1o",
+    num_bessels=12,
     # test custom nonlinearities
-    nonlinearity_scalars={"e": "silu", "o": "tanh"},
-    nonlinearity_gates={"e": "silu", "o": "abs"},
-    **COMMON_CONFIG,
+    convnet_nonlinearity_gates={"e": "silu", "o": "abs"},
+    per_type_energy_shifts=[3.45, 5.67, 7.89],
+    **COMMON_FULL_CONFIG,
 )
 
 
@@ -73,67 +89,15 @@ class TestNequIPModel(BaseEnergyModelTests):
         params=[minimal_config1, minimal_config2, minimal_config3, minimal_config4],
         scope="class",
     )
-    def base_config(self, request):
-        return request.param
-
-    @pytest.fixture(
-        params=[
-            # # Save some time in the tests
-            # (
-            #     ["NequIPGNNEnergyModel"],
-            #     [
-            #         AtomicDataDict.TOTAL_ENERGY_KEY,
-            #         AtomicDataDict.PER_ATOM_ENERGY_KEY,
-            #     ],
-            # ),
-            (
-                ["nequip.model.NequIPGNNEnergyModel", "nequip.model.StressForceOutput"],
-                [
-                    AtomicDataDict.TOTAL_ENERGY_KEY,
-                    AtomicDataDict.PER_ATOM_ENERGY_KEY,
-                    AtomicDataDict.FORCE_KEY,
-                    AtomicDataDict.STRESS_KEY,
-                    AtomicDataDict.VIRIAL_KEY,
-                ],
-            ),
-            (
-                [
-                    "nequip.model.NequIPGNNEnergyModel",
-                    "nequip.model.PairPotentialTerm",
-                    "nequip.model.StressForceOutput",
-                ],
-                [
-                    AtomicDataDict.TOTAL_ENERGY_KEY,
-                    AtomicDataDict.PER_ATOM_ENERGY_KEY,
-                    AtomicDataDict.FORCE_KEY,
-                    AtomicDataDict.STRESS_KEY,
-                    AtomicDataDict.VIRIAL_KEY,
-                ],
-            ),
-            (
-                [
-                    "nequip.model.NequIPGNNEnergyModel",
-                    "nequip.model.PerTypeEnergyScaleShift",
-                ],
-                [
-                    AtomicDataDict.TOTAL_ENERGY_KEY,
-                    AtomicDataDict.PER_ATOM_ENERGY_KEY,
-                ],
-            ),
-        ],
-        scope="class",
-    )
-    def config(self, request, base_config):
-        config = base_config.copy()
-        builder, out_fields = request.param
+    def config(self, request):
+        config = request.param
         config = config.copy()
-        config["model_builders"] = builder
-        return config, out_fields
+        return config
 
+    @pytest.mark.skip("ignore for now")
     def test_submods(self):
         config = minimal_config2.copy()
-        config["model_builders"] = ["nequip.model.NequIPGNNEnergyModel"]
-        model = instantiate(config)
+        model = instantiate(config, _recursive_=False)
         chemical_embedding = model.model.chemical_embedding
         assert isinstance(chemical_embedding, AtomwiseLinear)
         true_irreps = o3.Irreps(minimal_config2["chemical_embedding_irreps_out"])

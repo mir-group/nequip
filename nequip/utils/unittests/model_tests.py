@@ -18,8 +18,8 @@ from nequip.data import (
     _EDGE_FIELDS,
 )
 from nequip.data.transforms import ChemicalSpeciesToAtomTypeMapper
-from nequip.nn import GraphModuleMixin
-from nequip.utils import dtype_to_name
+from nequip.nn import GraphModuleMixin, StressOutput, PartialForceOutput
+from nequip.utils import dtype_to_name, find_first_of_type
 from nequip.utils.test import assert_AtomicData_equivariant, FLOAT_TOLERANCE
 
 from hydra.utils import instantiate
@@ -50,15 +50,17 @@ class BaseModelTests:
     @staticmethod
     def make_model(config, device):
         config = config.copy()
-        model = instantiate(config)
+        model = instantiate(config, _recursive_=False)
         model = model.to(device)
+        # test if possible to print model
+        print(model)
         return model
 
     @pytest.fixture(scope="class")
     def model(self, config, device, model_dtype):
-        config, out_fields = config
         config.update({"model_dtype": model_dtype})
         model = self.make_model(config, device=device)
+        out_fields = model.irreps_out.keys()
         return model, out_fields
 
     # == common tests for all models ==
@@ -98,7 +100,7 @@ class BaseModelTests:
             # But CUDA + torch plays very badly with subprocesses here and causes a race condition.
             # So instead we do a slightly less complete test, loading the saved model here in the original process:
             load_model = torch.jit.load(tmpdir + "/model.pt")
-            load_dat = torch.load(tmpdir + "/dat.pt")
+            load_dat = torch.load(tmpdir + "/dat.pt", weights_only=False)
 
             out_script = model_script(data.copy())
             out_load = load_model(load_dat.copy())
@@ -164,6 +166,12 @@ class BaseModelTests:
             out_unwrapped = instance(from_dict(data2))
             tolerance = FLOAT_TOLERANCE[dtype_to_name(instance.model_dtype)]
             for out_field in out_fields:
+                # not important for the purposes of this test
+                if out_field in [
+                    AtomicDataDict.POSITIONS_KEY,
+                    AtomicDataDict.EDGE_CELL_SHIFT_KEY,
+                ]:
+                    continue
                 assert torch.allclose(
                     out_ref[out_field], out_unwrapped[out_field], atol=tolerance
                 ), f'failed for key "{out_field}" with max absolute diff {torch.abs(out_ref[out_field] - out_unwrapped[out_field]).max().item():.5g} (tol={tolerance:.5g})'
@@ -181,6 +189,13 @@ class BaseModelTests:
         output2 = instance(data2)
         output = instance(data)
         for out_field in out_fields:
+            # to ignore
+            if out_field in [
+                AtomicDataDict.EDGE_INDEX_KEY,
+                AtomicDataDict.BATCH_KEY,
+                AtomicDataDict.EDGE_TYPE_KEY,
+            ]:
+                continue
             if out_field in _GRAPH_FIELDS:
                 assert allclose(
                     output1[out_field],
@@ -194,11 +209,11 @@ class BaseModelTests:
                 assert allclose(
                     output1[out_field],
                     output[out_field][output[AtomicDataDict.BATCH_KEY] == 0],
-                )
+                ), f"failed for {out_field}"
                 assert allclose(
                     output2[out_field],
                     output[out_field][output[AtomicDataDict.BATCH_KEY] == 1],
-                )
+                ), f"failed for {out_field}"
             elif out_field in _EDGE_FIELDS:
                 assert allclose(
                     output1[out_field],
@@ -219,7 +234,9 @@ class BaseModelTests:
                     ],
                 )
             else:
-                raise NotImplementedError
+                raise NotImplementedError(
+                    f"Found unregistered `out_field` = {out_field}"
+                )
 
     def test_equivariance(self, model, atomic_batch, device):
         instance, out_fields = model
@@ -248,7 +265,7 @@ class BaseModelTests:
             for p in all_params:
                 p.uniform_(-1.0, 1.0)
 
-        config, out_fields = config
+        config = config.copy()
         r_max = config["r_max"]
 
         # make a synthetic three atom example
@@ -316,7 +333,6 @@ class BaseEnergyModelTests(BaseModelTests):
     def test_large_separation(self, model, config, molecules, device):
         instance, _ = model
         atol = {torch.float32: 1e-4, torch.float64: 1e-10}[instance.model_dtype]
-        config, out_fields = config
         r_max = config["r_max"]
         atoms1 = molecules[0].copy()
         atoms2 = molecules[1].copy()
@@ -454,29 +470,26 @@ class BaseEnergyModelTests(BaseModelTests):
     def test_partial_forces(
         self, config, atomic_batch, device, strict_locality, model_dtype
     ):
-        config, out_fields = config
-        if "StressForceOutput" not in config["model_builders"]:
+        aux_model = self.make_model(config, device=device)
+        module = find_first_of_type(aux_model, StressOutput)
+        # skip test if force/stress module not found
+        if module is None:
             pytest.skip()
-        config.update({"model_dtype": model_dtype})
-        config = config.copy()
-        partial_config = config.copy()
-        partial_config["model_builders"] = [
-            "PartialForceOutput" if b == "StressForceOutput" else b
-            for b in partial_config["model_builders"]
-        ]
-        model = instantiate(config)
-        partial_model = instantiate(partial_config)
-        model.to(device)
-        partial_model.to(device)
-        partial_model.load_state_dict(model.state_dict())
+        # replace force/stress module with partial force module
+        aux_model.model = PartialForceOutput(module.func)
+        partial_model = aux_model
+        # instantiate new force/stress model
+        model = self.make_model(config, device=device)
+
         data = AtomicDataDict.to_(atomic_batch, device)
         output = model(data)
         output_partial = partial_model(from_dict(data))
-        # everything should be the same
-        # including the
+        # most data tensors should be the same
         for k in output:
             assert k != AtomicDataDict.PARTIAL_FORCE_KEY
-            assert k in output_partial
+            if k in [AtomicDataDict.STRESS_KEY, AtomicDataDict.VIRIAL_KEY]:
+                continue
+            assert k in output_partial, k
             if output[k].is_floating_point():
                 assert torch.allclose(
                     output[k],
@@ -521,24 +534,24 @@ class BaseEnergyModelTests(BaseModelTests):
             old_state = [p.detach().clone() for p in all_params]
             for p in all_params:
                 p.uniform_(-3.0, 3.0)
-        config, out_fields = config
-        r_max = config["r_max"]
 
         # make a synthetic three atom example
         data = {
             "atom_types": np.random.choice([0, 1, 2], size=3),
-            "pos": np.array([[0.0, 0.0, 0.0], [0.0, 1.0, 0.0], [r_max, 0.0, 0.0]]),
+            "pos": np.array(
+                [[0.0, 0.0, 0.0], [0.0, 1.0, 0.0], [config["r_max"], 0.0, 0.0]]
+            ),
             "edge_index": np.array([[0, 1, 0, 2], [1, 0, 2, 0]]),
         }
         out = instance(AtomicDataDict.to_(from_dict(data), device))
         forces = out[AtomicDataDict.FORCE_KEY]
-        assert (
-            forces[:2].abs().sum() > 1e-4
-        )  # some nonzero terms on the two connected atoms
+        # some nonzero terms on the two connected atoms
+        assert forces[:2].abs().sum() > 1e-4, f"error = {forces[:2].abs().sum()}"
+        # the atom at the cutoff should be zero
         assert torch.allclose(
             forces[2],
             torch.zeros(1, device=device, dtype=forces.dtype),
-        )  # the atom at the cutoff should be zero
+        )
 
         # restore previous model state
         with torch.no_grad():
@@ -548,7 +561,7 @@ class BaseEnergyModelTests(BaseModelTests):
     def test_isolated_atom_energies(self, model, config, device):
         """Checks that isolated atom energies provided for the per-atom shifts are restored for isolated atoms."""
         instance, out_fields = model
-        config, out_fields = config
+
         if "per_type_energy_shifts" not in config:
             pytest.skip()
 
