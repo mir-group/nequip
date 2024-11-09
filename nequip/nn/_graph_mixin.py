@@ -1,5 +1,5 @@
 import random
-from typing import Dict, Tuple, Callable, Any, Sequence, Union, Mapping, Optional
+from typing import Dict, Any, Sequence, Union, Optional
 from collections import OrderedDict
 
 import torch
@@ -7,7 +7,6 @@ import torch
 from e3nn import o3
 
 from nequip.data import AtomicDataDict
-from nequip.utils.auto_init import instantiate
 
 
 class GraphModuleMixin:
@@ -151,72 +150,6 @@ class SequentialGraphNetwork(GraphModuleMixin, torch.nn.Sequential):
             modules = OrderedDict((f"module{i}", m) for i, m in enumerate(module_list))
         super().__init__(modules)
 
-    @classmethod
-    def from_parameters(
-        cls,
-        shared_params: Mapping,
-        layers: Dict[str, Union[Callable, Tuple[Callable, Dict[str, Any]]]],
-        irreps_in: Optional[dict] = None,
-    ):
-        r"""Construct a ``SequentialGraphModule`` of modules built from a shared set of parameters.
-
-        For some layer, a parameter with name ``param`` will be taken, in order of priority, from:
-          1. The specific value in the parameter dictionary for that layer, if provided
-          2. ``name_param`` in ``shared_params`` where ``name`` is the name of the layer
-          3. ``param`` in ``shared_params``
-
-        Args:
-            shared_params (dict-like): shared parameters from which to pull when instantiating the module
-            layers (dict): dictionary mapping unique names of layers to either:
-                  1. A callable (such as a class or function) that can be used to ``instantiate`` a module for that layer
-                  2. A tuple of such a callable and a dictionary mapping parameter names to values. The given dictionary of parameters will override for this layer values found in ``shared_params``.
-                Options 1. and 2. can be mixed.
-            irreps_in (optional dict): ``irreps_in`` for the first module in the sequence.
-
-        Returns:
-            The constructed SequentialGraphNetwork.
-        """
-        # note that dictionary ordered guaranteed in >=3.7, so it's fine to do an ordered sequential as a dict.
-        built_modules = []
-        for name, builder in layers.items():
-            if not isinstance(name, str):
-                raise ValueError(f"`'name'` must be a str; got `{name}`")
-            if isinstance(builder, tuple):
-                builder, params = builder
-            else:
-                params = {}
-            if not callable(builder):
-                raise TypeError(
-                    f"The builder has to be a class or a function. got {type(builder)}"
-                )
-
-            instance, _ = instantiate(
-                builder=builder,
-                prefix=name,
-                positional_args=(
-                    dict(
-                        irreps_in=(
-                            built_modules[-1].irreps_out
-                            if len(built_modules) > 0
-                            else irreps_in
-                        )
-                    )
-                ),
-                optional_args=params,
-                all_args=shared_params,
-            )
-
-            if not isinstance(instance, GraphModuleMixin):
-                raise TypeError(
-                    f"Builder `{builder}` for layer with name `{name}` did not return a GraphModuleMixin, instead got a {type(instance).__name__}"
-                )
-
-            built_modules.append(instance)
-
-        return cls(
-            OrderedDict(zip(layers.keys(), built_modules)),
-        )
-
     @torch.jit.unused
     def append(self, name: str, module: GraphModuleMixin) -> None:
         r"""Append a module to the SequentialGraphNetwork.
@@ -229,35 +162,6 @@ class SequentialGraphNetwork(GraphModuleMixin, torch.nn.Sequential):
         self.add_module(name, module)
         self.irreps_out = dict(module.irreps_out)
         return
-
-    @torch.jit.unused
-    def append_from_parameters(
-        self,
-        shared_params: Mapping,
-        name: str,
-        builder: Callable,
-        params: Dict[str, Any] = {},
-    ) -> GraphModuleMixin:
-        r"""Build a module from parameters and append it.
-
-        Args:
-            shared_params (dict-like): shared parameters from which to pull when instantiating the module
-            name (str): the name for the module
-            builder (callable): a class or function to build a module
-            params (dict, optional): extra specific parameters for this module that take priority over those in ``shared_params``
-
-        Returns:
-            the build module
-        """
-        instance, _ = instantiate(
-            builder=builder,
-            prefix=name,
-            positional_args=(dict(irreps_in=self[-1].irreps_out)),
-            optional_args=params,
-            all_args=shared_params,
-        )
-        self.append(name, instance)
-        return instance
 
     @torch.jit.unused
     def insert(
@@ -316,48 +220,6 @@ class SequentialGraphNetwork(GraphModuleMixin, torch.nn.Sequential):
         self.irreps_out = dict(module_list[-1].irreps_out)
 
         return
-
-    @torch.jit.unused
-    def insert_from_parameters(
-        self,
-        shared_params: Mapping,
-        name: str,
-        builder: Callable,
-        params: Dict[str, Any] = {},
-        after: Optional[str] = None,
-        before: Optional[str] = None,
-    ) -> GraphModuleMixin:
-        r"""Build a module from parameters and insert it after ``after``.
-
-        Args:
-            shared_params (dict-like): shared parameters from which to pull when instantiating the module
-            name (str): the name for the module
-            builder (callable): a class or function to build a module
-            params (dict, optional): extra specific parameters for this module that take priority over those in ``shared_params``
-            after: the name of the module to insert after
-            before: the name of the module to insert before
-
-        Returns:
-            the inserted module
-        """
-        if (before is None) is (after is None):
-            raise ValueError("Only one of before or after argument needs to be defined")
-        elif before is None:
-            insert_location = after
-        else:
-            insert_location = before
-        idx = list(self._modules.keys()).index(insert_location) - 1
-        if before is None:
-            idx += 1
-        instance, _ = instantiate(
-            builder=builder,
-            prefix=name,
-            positional_args=(dict(irreps_in=self[idx].irreps_out)),
-            optional_args=params,
-            all_args=shared_params,
-        )
-        self.insert(after=after, before=before, name=name, module=instance)
-        return instance
 
     # Copied from https://pytorch.org/docs/stable/_modules/torch/nn/modules/container.html#Sequential
     # with type annotations added

@@ -26,44 +26,40 @@ from nequip.utils import dtype_from_name, torch_default_dtype
 )
 def model(model_dtype, request):
     scales, shifts = request.param
-    params = dict(
-        type_names=["A", "B", "C"],
-    )
-
+    type_names = ["A", "B", "C"]
     with torch_default_dtype(dtype_from_name(model_dtype)):
+        oh = OneHotAtomEncoding(type_names=type_names)
+        linear = AtomwiseLinear(
+            irreps_out="1x0e",
+            out_field=AtomicDataDict.PER_ATOM_ENERGY_KEY,
+            irreps_in=oh.irreps_out,
+        )
+        shift = PerTypeScaleShift(
+            type_names=type_names,
+            field=AtomicDataDict.PER_ATOM_ENERGY_KEY,
+            out_field=AtomicDataDict.PER_ATOM_ENERGY_KEY,
+            scales=scales,
+            shifts=shifts,
+            irreps_in=linear.irreps_out,
+        )
+        sum_reduce = AtomwiseReduce(
+            reduce="sum",
+            field=AtomicDataDict.PER_ATOM_ENERGY_KEY,
+            out_field="sum",
+            irreps_in=shift.irreps_out,
+        )
+
         model = GraphModel(
-            SequentialGraphNetwork.from_parameters(
-                shared_params=params,
-                layers={
-                    "one_hot": OneHotAtomEncoding,
-                    "linear": (
-                        AtomwiseLinear,
-                        dict(
-                            irreps_out="1x0e",
-                            out_field=AtomicDataDict.PER_ATOM_ENERGY_KEY,
-                        ),
-                    ),
-                    "shift": (
-                        PerTypeScaleShift,
-                        dict(
-                            field=AtomicDataDict.PER_ATOM_ENERGY_KEY,
-                            out_field=AtomicDataDict.PER_ATOM_ENERGY_KEY,
-                            scales=scales,
-                            shifts=shifts,
-                        ),
-                    ),
-                    "sum": (
-                        AtomwiseReduce,
-                        dict(
-                            reduce="sum",
-                            field=AtomicDataDict.PER_ATOM_ENERGY_KEY,
-                            out_field="sum",
-                        ),
-                    ),
+            SequentialGraphNetwork(
+                {
+                    "one_hot": oh,
+                    "linear": linear,
+                    "shift": shift,
+                    "sum": sum_reduce,
                 },
             ),
             model_dtype=dtype_from_name(model_dtype),
-            type_names=["A", "B", "C"],
+            type_names=type_names,
         )
     return model
 

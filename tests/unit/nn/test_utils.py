@@ -7,18 +7,23 @@ from nequip.utils import dtype_from_name, torch_default_dtype
 
 
 def test_basic(model_dtype):
+    type_names = ["A", "B", "C", "D"]
     with torch_default_dtype(dtype_from_name(model_dtype)):
+
+        one_hot = OneHotAtomEncoding(type_names=type_names)
+        save = SaveForOutput(
+            field=AtomicDataDict.NODE_FEATURES_KEY,
+            out_field="saved",
+            irreps_in=one_hot.irreps_out,
+        )
+        linear = AtomwiseLinear(irreps_in=save.irreps_out)
         model = GraphModel(
-            SequentialGraphNetwork.from_parameters(
-                shared_params={"type_names": ["A", "B", "C", "D"]},
-                layers={
-                    "one_hot": OneHotAtomEncoding,
-                    "save": (
-                        SaveForOutput,
-                        dict(field=AtomicDataDict.NODE_FEATURES_KEY, out_field="saved"),
-                    ),
-                    "linear": AtomwiseLinear,
-                },
+            SequentialGraphNetwork(
+                {
+                    "one_hot": one_hot,
+                    "save": save,
+                    "linear": linear,
+                }
             ),
             model_dtype=dtype_from_name(model_dtype),
             type_names=["A", "B", "C", "D"],
