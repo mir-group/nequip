@@ -131,48 +131,28 @@ training_module:
     frequency: 1
 
   model:
-
-    type_names: ${model_type_names}
-    model_dtype: float32
+    _target_: nequip.model.NequIPGNNModel
+    # == basic model params ==
     seed: 76
+    model_dtype: float32
+    type_names: ${model_type_names}
     r_max: ${cutoff_radius}
-   
-    model_builders:
-     - nequip.model.SimpleIrrepsConfig 
-     - nequip.model.NequIPGNNEnergyModel         
-     - nequip.model.PerTypeEnergyScaleShift
-     - nequip.model.StressForceOutput         
-
+    # == bessel encoding ==
+    polynomial_cutoff_p: 2
+    # == general params ==
     num_layers: 4
-   
     l_max: 3
-    parity: true      
+    parity: true
     num_features: 64
-   
     invariant_layers: 3           
-    invariant_neurons: 32
-    use_sc: true
-    nonlinearity_scalars:
-      e: silu
-      o: tanh
-   
-    nonlinearity_type: gate   
-    resnet: true
-    nonlinearity_gates:
-      e: silu
-      o: silu
-    
-    num_basis: 8                  
-    BesselBasis_trainable: false  
-    PolynomialCutoff_p: 2
-   
-    # isolated atom energies from dataset
-    per_type_energy_scale_shift_shifts: [-1029.4889999855063, -13.587222780835477, -1484.9814568572233, -2041.9816003861047]
-    per_type_energy_scale_shift_scales: ${training_data_stats:forces_rms}
+    invariant_neurons: 32    
     avg_num_neighbors: ${training_data_stats:num_neighbors_mean}
-   
-    per_type_energy_scale_shifts_trainable: false
-    per_type_energy_scale_scales_trainable: false
+    # == scale shifts ==
+    # isolated atom energies from dataset
+    per_type_energy_shifts: [-1029.4889999855063, -13.587222780835477, -1484.9814568572233, -2041.9816003861047]
+    per_type_energy_scales: ${training_data_stats:forces_rms}
+    per_type_energy_shifts_trainable: false
+    per_type_energy_scales_trainable: false
    
 
 # global options
