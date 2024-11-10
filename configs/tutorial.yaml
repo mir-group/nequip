@@ -31,7 +31,7 @@ cutoff_radius: 5.0
 # Because of this distinction, these variables show up as arguments across different categories, including, data, model, metrics and even callbacks.
 # In this case, we fix both to be the same, so we define a single set of each here and use variable interpolation to retrieve them below.
 # This ensures a single location where the values are set to reduce the chances of mis-configuring runs.
-chemical_symbols: [C, H, O, N] 
+chemical_symbols: [C, H, O, Cu] 
 model_type_names: ${chemical_symbols}
 
 
@@ -44,7 +44,7 @@ data:
   
   # here we take an ASE-readable file (in extxyz format) and split it into train:val:test = 80:10:10
   split_dataset:
-    file_path: path/to/ase/dataset.xyz
+    file_path: fcu.xyz
     train: 0.8
     val: 0.1
     test: 0.1
@@ -262,85 +262,47 @@ training_module:
 
   # model details
   model:
-    model_builders:
-     - nequip.model.SimpleIrrepsConfig        # update the config with all the irreps for the network if using the simplified `l_max` / `num_features` / `parity` syntax
-     - nequip.model.NequIPGNNEnergyModel      # build a full NequIP energy model
-     - nequip.model.PerTypeEnergyScaleShift   # add per-atom / per-species scaling and shifting to the NequIP model before the total energy sum
-     - nequip.model.PairPotentialTerm         # MUST come after PerTypeEnergyScaleShift
-     - nequip.model.StressForceOutput         # wrap the energy model in a module that uses autodifferention to compute the forces
+    _target_: nequip.model.NequIPGNNModel
 
-  
-    # network
-    seed: 123
-    r_max: ${cutoff_radius}
-    num_layers: 2
-  
-    l_max: 2            # the maximum irrep order (rotation order) for the network's features, l=1 is a good default, l=2 is more accurate but slower
-    parity: true        # whether to include features with odd mirror parityy; often turning parity off gives equally good results but faster networks, so do consider this
-    num_features: 128   # the multiplicity of the features, 32 is a good default for accurate network, if you want to be more accurate, go larger, if you want to be faster, go lower
-    
-    # alternatively, the irreps of the features in various parts of the network can be specified directly:
-    # the following options use e3nn irreps notation
-    # either these four options, or the above three options, should be provided--- they cannot be mixed.
-    # chemical_embedding_irreps_out: 32x0e                                              # irreps for the chemical embedding of species
-    # feature_irreps_hidden: 32x0o + 32x0e + 32x1o + 32x1e                              # irreps used for hidden features, here we go up to lmax=1, with even and odd parities; for more accurate but slower networks, use l=2 or higher, smaller number of features is faster
-    # irreps_edge_sh: 0e + 1o                                                           # irreps of the spherical harmonics used for edges. If a single integer, indicates the full SH up to L_max=that_integer
-    # conv_to_output_hidden_irreps_out: 16x0e                                           # irreps used in hidden layer of output block
-    
-    
-    nonlinearity_type: gate    # may be 'gate' or 'norm', 'gate' is recommended
-    resnet: false              # set true to make interaction block a resnet-style update
-                               # the resnet update will only be applied when the input and output irreps of the layer are the same
-  
-    # scalar nonlinearities to use — available options are silu, ssp (shifted softplus), tanh, and abs.
-    # Different nonlinearities are specified for e (even) and o (odd) parity;
-    # note that only tanh and abs are correct for o (odd parity).
-    # silu typically works best for even 
-    nonlinearity_scalars:
-      e: silu
-      o: tanh
-    
-    nonlinearity_gates:
-      e: silu
-      o: tanh
-    
-    # radial network basis
-    num_basis: 8                  # number of basis functions used in the radial basis, 8 usually works best
-    BesselBasis_trainable: false  # set true to train the bessel weights
-    PolynomialCutoff_p: 6         # p-exponent used in polynomial cutoff function, smaller p corresponds to stronger decay with distance
-    
-    # radial network
-    invariant_layers: 2           # number of radial layers, usually 1-3 works best, smaller is faster
-    invariant_neurons: 128        # number of hidden neurons in radial function, smaller is faster
-    use_sc: true                  # use self-connection or not, usually gives big improvement
-
-    # NOTE that use_sc=True only applies to other convnets except the first one (index 0) to ensure that the NequIPGNNEnergyModel predicts per-atom energies of 0 for isolated atoms (atoms without neighbors). If a per-atom energy shift is provided, this guarantees that isolated atom energies correspond exactly to the per-atom shifts. To alter this default behavior, users can control the first convnet layer's self-connection by explicitly specifying the following parameter (which is `false` by default).
-  # layer0_convnet_convolution_use_sc: true
-
-    # to specify different parameters for each convolutional layer, try examples below
-    # layer1_use_sc: true                                                             # use "layer{i}_" prefix to specify parameters for only one of the layer,
-    # priority for different definitions:
-    #   invariant_neurons < InteractionBlock_invariant_neurons < layer{i}_invariant_neurons
-  
-    # bookkeeping
-    type_names: ${model_type_names}
+    # == basic model params ==
+    seed: 456
     model_dtype: float32
-  
+    type_names: ${model_type_names}
+    r_max: ${cutoff_radius}
+
+    # == bessel encoding ==
+    num_bessels: 8                # number of basis functions used in the radial Bessel basis, the default of 8 usually works well
+    bessel_trainable: false       # set true to train the bessel weights (default false)
+    polynomial_cutoff_p: 6        # p-exponent used in polynomial cutoff function, smaller p corresponds to stronger decay with distance
+
+    # == convnet layers ==
+    num_layers: 4       # number of interaction blocks, we find 3-5 to work best
+    l_max: 1            # the maximum irrep order (rotation order) for the network's features, l=1 is a good default, l=2 is more accurate but slower
+    parity: true        # whether to include features with odd mirror parity; often turning parity off gives equally good results but faster networks, so do consider this
+    num_features: 32    # the multiplicity of the features, 32 is a good default for accurate network, if you want to be more accurate, go larger, if you want to be faster, go lower
+
+    # == radial network ==
+    invariant_layers: 2           # number of radial layers, usually 1-3 works best, smaller is faster
+    invariant_neurons: 64        # number of hidden neurons in radial function, smaller is faster
+
     # dataset statistics used to inform the model's initial parameters for normalization, shifting and rescaling
     # we use omegaconf's resolvers (https://omegaconf.readthedocs.io/en/2.3_branch/usage.html#resolvers)
     # to facilitate getting the dataset statistics from the DataStatisticsManager
-    per_type_energy_scale_shift_shifts: ${training_data_stats:per_atom_energy_mean}
-    per_type_energy_scale_shift_scales: ${training_data_stats:per_type_forces_rms} #${training_data_stats:forces_rms}
+    
+    # average number of neighbors for edge sum normalization
     avg_num_neighbors: ${training_data_stats:num_neighbors_mean}
-  
-    per_type_energy_scale_shift_scales_trainable: false
-    per_type_energy_scale_shift_shifts_trainable: false
-  
-    # for pair potential
-    pair_style: ZBL  # useful for more stable MD
-    units: metal     # Ang and kcal/mol, LAMMPS unit names;  allowed values "metal" and "real"
-    ZBL_chemical_species: ${chemical_symbols}   # must tell ZBL the chemical species of the various model atom types
-   
+    
+    # == per-type per-atom scales and shifts ==
+    per_type_energy_scales: ${training_data_stats:per_type_forces_rms}
+    per_type_energy_shifts: ${training_data_stats:per_atom_energy_mean}
+    per_type_energy_scales_trainable: false
+    per_type_energy_shifts_trainable: false
+
+    # == ZBL pair potential ==
+    pair_potential:
+      _target_: nequip.nn.pair_potential.ZBL
+      units: metal     # Ang and kcal/mol, LAMMPS unit names;  allowed values "metal" and "real"
+      chemical_species: ${chemical_symbols}   # must tell ZBL the chemical species of the various model atom types
 
 # global options
 global_options:
