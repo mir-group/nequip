@@ -5,3 +5,4 @@ Developer Guide
 
     extending
     contributing
+    tools

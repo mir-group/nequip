@@ -5,3 +5,5 @@ Python API
 
   data
   train
+  nn
+  model
