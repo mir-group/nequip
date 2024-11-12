@@ -18,15 +18,15 @@ COMMON_CONFIG = {
     "_target_": "nequip.model.NequIPGNNModel",
     "l_max": 1,
     "parity": True,
-    "invariant_layers": 1,
-    "invariant_neurons": 8,
+    "radial_mlp_depth": 1,
+    "radial_mlp_width": 8,
     **BASIC_INFO,
 }
 
 COMMON_FULL_CONFIG = {
     "_target_": "nequip.model.FullNequIPGNNModel",
-    "invariant_layers": [1, 2],
-    "invariant_neurons": [5, 7],
+    "radial_mlp_depth": [1, 2],
+    "radial_mlp_width": [5, 7],
     **BASIC_INFO,
 }
 

@@ -144,8 +144,8 @@ training_module:
     l_max: 3
     parity: true
     num_features: 64
-    invariant_layers: 3           
-    invariant_neurons: 32    
+    radial_mlp_depth: 3           
+    radial_mlp_width: 32    
     avg_num_neighbors: ${training_data_stats:num_neighbors_mean}
     # == scale shifts ==
     # isolated atom energies from dataset

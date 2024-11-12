@@ -116,8 +116,8 @@ training_module:
     parity: true
     num_layers: 4
     num_features: 16
-    invariant_layers: 1
-    invariant_neurons: 8
+    radial_mlp_depth: 1
+    radial_mlp_width: 8
     # data-dependent model params
     per_type_energy_shifts: ${training_data_stats:per_atom_energy_mean}
     per_type_energy_scales: ${training_data_stats:forces_rms}

@@ -31,8 +31,8 @@ def NequIPGNNEnergyModel(
     l_max: int = 1,
     parity: bool = True,
     num_features: int = 32,
-    invariant_layers: int = 2,
-    invariant_neurons: int = 64,
+    radial_mlp_depth: int = 2,
+    radial_mlp_width: int = 64,
     **kwargs,
 ) -> GraphModel:
     """NequIP GNN model that predicts energies."""
@@ -61,8 +61,8 @@ def NequIPGNNEnergyModel(
         )
     )
     feature_irreps_hidden_list = [feature_irreps_hidden] * num_layers
-    invariant_layers_list = [invariant_layers] * num_layers
-    invariant_neurons_list = [invariant_neurons] * num_layers
+    radial_mlp_depth_list = [radial_mlp_depth] * num_layers
+    radial_mlp_width_list = [radial_mlp_width] * num_layers
 
     # === post convnets ===
     conv_to_output_hidden_irreps_out = repr(
@@ -75,8 +75,8 @@ def NequIPGNNEnergyModel(
         irreps_edge_sh=irreps_edge_sh,
         chemical_embedding_irreps_out=chemical_embedding_irreps_out,
         feature_irreps_hidden=feature_irreps_hidden_list,
-        invariant_layers=invariant_layers_list,
-        invariant_neurons=invariant_neurons_list,
+        radial_mlp_depth=radial_mlp_depth_list,
+        radial_mlp_width=radial_mlp_width_list,
         conv_to_output_hidden_irreps_out=conv_to_output_hidden_irreps_out,
         **kwargs,
     )
@@ -97,8 +97,8 @@ def NequIPGNNModel(**kwargs) -> GraphModel:
         l_max (int): the maximum rotation order for the network's features, ``1`` is a good default, ``2`` is more accurate but slower (default ``1``)
         parity (bool): whether to include features with odd mirror parity -- often turning parity off gives equally good results but faster networks, so it's worth testing (default ``True``)
         num_features (int): multiplicity of the features, smaller is faster (default ``32``)
-        invariant_layers (int): number of radial layers, usually 1-3 works best, smaller is faster (default ``2``)
-        invariant_neurons (int): number of hidden neurons in radial function, smaller is faster (default ``64``)
+        radial_mlp_depth (int): number of radial layers, usually 1-3 works best, smaller is faster (default ``2``)
+        radial_mlp_width (int): number of hidden neurons in radial function, smaller is faster (default ``64``)
         num_bessels (int): number of Bessel basis functions (default ``8``)
         bessel_trainable (bool): whether the Bessel roots are trainable (default ``False``)
         polynomial_cutoff_p (int): p-exponent used in polynomial cutoff function, smaller p corresponds to stronger decay with distance (default ``6``)
@@ -117,8 +117,8 @@ def FullNequIPGNNEnergyModel(
     r_max: float,
     type_names: Sequence[str],
     # convnet params
-    invariant_layers: Sequence[int],
-    invariant_neurons: Sequence[int],
+    radial_mlp_depth: Sequence[int],
+    radial_mlp_width: Sequence[int],
     feature_irreps_hidden: Sequence[Union[str, o3.Irreps]],
     # irreps
     irreps_edge_sh: Union[int, str, o3.Irreps],
@@ -154,8 +154,8 @@ def FullNequIPGNNEnergyModel(
 
     # require every convnet layer to be specified explicitly in a list
     # infer num_layers from the list size
-    assert len(invariant_layers) == len(invariant_neurons) == len(feature_irreps_hidden)
-    num_layers = len(invariant_layers)
+    assert len(radial_mlp_depth) == len(radial_mlp_width) == len(feature_irreps_hidden)
+    num_layers = len(radial_mlp_depth)
 
     if avg_num_neighbors is None:
         warnings.warn(
@@ -207,8 +207,8 @@ def FullNequIPGNNEnergyModel(
             irreps_in=prev_irreps_out,
             feature_irreps_hidden=feature_irreps_hidden[layer_i],
             convolution_kwargs={
-                "invariant_layers": invariant_layers[layer_i],
-                "invariant_neurons": invariant_neurons[layer_i],
+                "radial_mlp_depth": radial_mlp_depth[layer_i],
+                "radial_mlp_width": radial_mlp_width[layer_i],
                 "avg_num_neighbors": avg_num_neighbors,
                 # to ensure isolated atom limit
                 "use_sc": layer_i != 0,

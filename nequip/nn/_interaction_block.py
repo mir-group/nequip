@@ -22,24 +22,21 @@ class InteractionBlock(GraphModuleMixin, torch.nn.Module):
         self,
         irreps_in,
         irreps_out,
-        invariant_layers=1,
-        invariant_neurons=8,
+        radial_mlp_depth=1,
+        radial_mlp_width=8,
         avg_num_neighbors=None,
         use_sc=True,
         nonlinearity_scalars: Dict[int, Callable] = {"e": "silu"},
     ) -> None:
-        """
-        InteractionBlock.
+        """InteractionBlock.
 
-        :param irreps_node_attr: Nodes attribute irreps
-        :param irreps_edge_attr: Edge attribute irreps
-        :param irreps_out: Output irreps, in our case typically a single scalar
-        :param radial_layers: Number of radial layers, default = 1
-        :param radial_neurons: Number of hidden neurons in radial function, default = 8
-        :param avg_num_neighbors: Number of neighbors to divide by, default None => no normalization.
-        :param number_of_basis: Number or Basis function, default = 8
-        :param irreps_in: Input Features, default = None
-        :param use_sc: bool, use self-connection or not
+        Args:
+            irreps_in: input irreps
+            irreps_out: output irreps
+            radial_mlp_depth (int): number of radial layers
+            radial_mlp_width (int): number of hidden neurons in radial function
+            avg_num_neighbors (float) : number of neighbors to divide by (default ``None``, i.e. no normalization)
+            use_sc (bool): use self-connection or not
         """
         super().__init__()
 
@@ -113,7 +110,7 @@ class InteractionBlock(GraphModuleMixin, torch.nn.Module):
         # init_irreps already confirmed that the edge embeddding is all invariant scalars
         self.fc = FullyConnectedNet(
             [self.irreps_in[AtomicDataDict.EDGE_EMBEDDING_KEY].num_irreps]
-            + invariant_layers * [invariant_neurons]
+            + radial_mlp_depth * [radial_mlp_width]
             + [tp.weight_numel],
             {
                 "ssp": ShiftedSoftPlus,
@@ -143,18 +140,6 @@ class InteractionBlock(GraphModuleMixin, torch.nn.Module):
             )
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
-        """
-        Evaluate interaction Block with ResNet (self-connection).
-
-        :param node_input:
-        :param node_attr:
-        :param edge_src:
-        :param edge_dst:
-        :param edge_attr:
-        :param edge_length_embedded:
-
-        :return:
-        """
         weight = self.fc(data[AtomicDataDict.EDGE_EMBEDDING_KEY])
 
         x = data[AtomicDataDict.NODE_FEATURES_KEY]
