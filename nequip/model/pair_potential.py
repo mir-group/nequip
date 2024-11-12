@@ -1,4 +1,4 @@
-from nequip.nn import SequentialGraphNetwork, AtomwiseReduce, StressOutput
+from nequip.nn import SequentialGraphNetwork, AtomwiseReduce, ForceStressOutput
 from nequip.nn.embedding import (
     EdgeLengthNormalizer,
     AddRadialCutoffToData,
@@ -52,6 +52,6 @@ def ZBLPairPotential(
             "total_energy_sum": energy_sum,
         }
     )
-    model = StressOutput(func=energy_model)
+    model = ForceStressOutput(func=energy_model)
 
     return model
