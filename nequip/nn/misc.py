@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 
 import torch
 
@@ -22,6 +22,28 @@ class Concat(GraphModuleMixin, torch.nn.Module):
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
         data[self.out_field] = torch.cat([data[k] for k in self.in_fields], dim=-1)
+        return data
+
+
+class ApplyFactor(GraphModuleMixin, torch.nn.Module):
+    """Applies factor to field."""
+
+    def __init__(
+        self,
+        in_field: str,
+        factor: float,
+        out_field: Optional[str] = None,
+        irreps_in={},
+    ):
+        super().__init__()
+        self.in_field = in_field
+        self.out_field = in_field if out_field is None else out_field
+        self.factor = factor
+        self._init_irreps(irreps_in=irreps_in)
+        self.irreps_out[self.out_field] = self.irreps_in[self.in_field]
+
+    def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
+        data[self.out_field] = self.factor * data[self.in_field]
         return data
 
 
