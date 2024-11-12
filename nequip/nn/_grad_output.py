@@ -174,8 +174,8 @@ class PartialForceOutput(GraphModuleMixin, torch.nn.Module):
 
 
 @compile_mode("script")
-class StressOutput(GraphModuleMixin, torch.nn.Module):
-    r"""Compute stress (and forces) using autograd of an energy model.
+class ForceStressOutput(GraphModuleMixin, torch.nn.Module):
+    r"""Compute forces (and stress if cell is provided) using autograd of an energy model.
 
     See:
         Knuth et. al. Comput. Phys. Commun 190, 33-50, 2015
@@ -183,22 +183,10 @@ class StressOutput(GraphModuleMixin, torch.nn.Module):
 
     Args:
         func: the energy model to wrap
-        do_forces: whether to compute forces as well
     """
 
-    do_forces: bool
-
-    def __init__(
-        self,
-        func: GraphModuleMixin,
-        do_forces: bool = True,
-    ):
+    def __init__(self, func: GraphModuleMixin):
         super().__init__()
-
-        if not do_forces:
-            raise NotImplementedError
-        self.do_forces = do_forces
-
         self.func = func
 
         # check and init irreps

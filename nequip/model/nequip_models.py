@@ -9,7 +9,7 @@ from nequip.nn import (
     AtomwiseReduce,
     PerTypeScaleShift,
     ConvNetLayer,
-    StressOutput,
+    ForceStressOutput,
 )
 from nequip.nn.embedding import (
     PolynomialCutoff,
@@ -109,7 +109,7 @@ def NequIPGNNModel(**kwargs) -> GraphModel:
         per_type_energy_shifts_trainable (bool): whether the per-atom energy shifts are trainable (default ``False``)
         pair_potential (torch.nn.Module): additional pair potential term, e.g. ``nequip.nn.pair_potential.ZBL`` (default ``None``)
     """
-    return StressOutput(func=NequIPGNNEnergyModel(**kwargs))
+    return ForceStressOutput(func=NequIPGNNEnergyModel(**kwargs))
 
 
 @model_builder
@@ -280,4 +280,4 @@ def FullNequIPGNNEnergyModel(
 @model_builder
 def FullNequIPGNNModel(**kwargs) -> GraphModel:
     """NequIP GNN model that predicts energies and forces (and stresses if cell is provided), based on a more extensive set of arguments."""
-    return StressOutput(func=FullNequIPGNNEnergyModel(**kwargs))
+    return ForceStressOutput(func=FullNequIPGNNEnergyModel(**kwargs))

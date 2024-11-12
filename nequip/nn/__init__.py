@@ -7,7 +7,7 @@ from ._atomwise import (
     PerTypeScaleShift,
 )
 from ._interaction_block import InteractionBlock
-from ._grad_output import GradientOutput, PartialForceOutput, StressOutput
+from ._grad_output import GradientOutput, PartialForceOutput, ForceStressOutput
 from ._rescale import RescaleOutput
 from ._convnetlayer import ConvNetLayer
 from .misc import Concat, SaveForOutput
@@ -25,7 +25,7 @@ __all__ = [
     InteractionBlock,
     GradientOutput,
     PartialForceOutput,
-    StressOutput,
+    ForceStressOutput,
     RescaleOutput,
     ConvNetLayer,
     Concat,

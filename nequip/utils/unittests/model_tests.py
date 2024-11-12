@@ -18,7 +18,7 @@ from nequip.data import (
     _EDGE_FIELDS,
 )
 from nequip.data.transforms import ChemicalSpeciesToAtomTypeMapper
-from nequip.nn import GraphModuleMixin, StressOutput, PartialForceOutput
+from nequip.nn import GraphModuleMixin, ForceStressOutput, PartialForceOutput
 from nequip.utils import dtype_to_name, find_first_of_type
 from nequip.utils.test import assert_AtomicData_equivariant, FLOAT_TOLERANCE
 
@@ -471,7 +471,7 @@ class BaseEnergyModelTests(BaseModelTests):
         self, config, atomic_batch, device, strict_locality, model_dtype
     ):
         aux_model = self.make_model(config, device=device)
-        module = find_first_of_type(aux_model, StressOutput)
+        module = find_first_of_type(aux_model, ForceStressOutput)
         # skip test if force/stress module not found
         if module is None:
             pytest.skip()
