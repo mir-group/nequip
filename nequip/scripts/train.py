@@ -16,6 +16,8 @@ import hydra
 import os
 from typing import Final, List
 
+# pre-emptively set this env var to get the full stack trace for convenience
+os.environ["HYDRA_FULL_ERROR"] = "1"
 logger = RankedLogger(__name__, rank_zero_only=True)
 
 _REQUIRED_CONFIG_SECTIONS: Final[List[str]] = [
