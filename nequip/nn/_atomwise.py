@@ -256,7 +256,7 @@ def _format_type_vals(
     vals: List[float], type_names: List[str], element_formatter: str = ".6f"
 ) -> str:
 
-    if vals is None:
+    if vals is None or not vals:
         return f"[{', '.join(type_names)}: None]"
 
     if len(vals) == 1:
