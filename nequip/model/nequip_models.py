@@ -1,3 +1,4 @@
+import math
 from e3nn import o3
 
 from nequip.data import AtomicDataDict
@@ -10,6 +11,7 @@ from nequip.nn import (
     PerTypeScaleShift,
     ConvNetLayer,
     ForceStressOutput,
+    ApplyFactor,
 )
 from nequip.nn.embedding import (
     PolynomialCutoff,
@@ -186,10 +188,17 @@ def FullNequIPGNNEnergyModel(
         num_bessels=num_bessels,
         trainable=bessel_trainable,
         cutoff=PolynomialCutoff(polynomial_cutoff_p),
+        edge_invariant_field=AtomicDataDict.EDGE_EMBEDDING_KEY,
         irreps_in=edge_norm.irreps_out,
     )
-    chemical_embedding = AtomwiseLinear(
+    # for backwards compatibility of NequIP's bessel encoding
+    factor = ApplyFactor(
+        in_field=AtomicDataDict.EDGE_EMBEDDING_KEY,
+        factor=(2 * math.pi) / (r_max * r_max),
         irreps_in=bessel_encode.irreps_out,
+    )
+    chemical_embedding = AtomwiseLinear(
+        irreps_in=factor.irreps_out,
         irreps_out=chemical_embedding_irreps_out,
     )
     modules = {
@@ -197,6 +206,7 @@ def FullNequIPGNNEnergyModel(
         "spharm": spharm,
         "edge_norm": edge_norm,
         "bessel_encode": bessel_encode,
+        "factor": factor,
         "chemical_embedding": chemical_embedding,
     }
     prev_irreps_out = chemical_embedding.irreps_out

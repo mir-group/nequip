@@ -10,7 +10,7 @@ from ._interaction_block import InteractionBlock
 from ._grad_output import GradientOutput, PartialForceOutput, ForceStressOutput
 from ._rescale import RescaleOutput
 from ._convnetlayer import ConvNetLayer
-from .misc import Concat, SaveForOutput
+from .misc import Concat, ApplyFactor, SaveForOutput
 from .utils import scatter, tp_path_exists, with_edge_vectors_
 
 
@@ -29,6 +29,7 @@ __all__ = [
     RescaleOutput,
     ConvNetLayer,
     Concat,
+    ApplyFactor,
     SaveForOutput,
     scatter,
     tp_path_exists,
