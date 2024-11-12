@@ -84,8 +84,8 @@ training_module:
     # general model params
     num_layers: 3
     num_features: 16
-    invariant_layers: 1
-    invariant_neurons: 8
+    radial_mlp_depth: 1
+    radial_mlp_width: 8
     l_max: 2
     parity: true
     # data-dependent model params
