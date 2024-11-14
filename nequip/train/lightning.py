@@ -88,11 +88,8 @@ class NequIPLightningModule(lightning.LightningModule):
         # == DDP concerns for loss ==
 
         # to account for loss contributions from multiple ranks later on
-        self.world_size = (
-            torch.distributed.get_world_size(torch.distributed.group.WORLD)
-            if torch.distributed.is_initialized()
-            else 1
-        )
+        # NOTE: this must be updated externally by the script that sets up the training run
+        self.world_size = 1
 
         # add dist_sync_on_step for loss metrics
         for metric_dict in loss["metrics"]:
@@ -171,9 +168,9 @@ class NequIPLightningModule(lightning.LightningModule):
         )
         self.log_dict(loss_dict)
         # In DDP training, because gradients are averaged rather than summed over nodes,
-        # we get an effective factor of 1/n_rank applied to the loss.  Because our loss already
+        # we get an effective factor of 1/n_rank applied to the loss. Because our loss already
         # manages correct accumulation of the metric over ranks, we want to cancel out this
-        # unnecessary 1/n_rank term.   If DDP is disabled, this is 1 and has no effect.
+        # unnecessary 1/n_rank term. If DDP is disabled, this is 1 and has no effect.
         loss = (
             loss_dict[f"train_loss_step{self.logging_delimiter}weighted_sum"]
             * self.world_size

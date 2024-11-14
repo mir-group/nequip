@@ -198,6 +198,9 @@ def main(config: DictConfig) -> None:
             info_dict=info_dict,
         )
 
+    # pass world size from trainer to NequIPLightningModule
+    nequip_module.world_size = trainer.world_size
+
     # === loop of run types ===
     # restart behavior is such that
     # - train from ckpt uses the correct ckpt file to restore training state (so it is given a specific `ckpt_path`)
