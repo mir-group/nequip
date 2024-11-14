@@ -28,7 +28,7 @@ dependencies = [
     "importlib_metadata; python_version<'3.10'",
     "hydra-core",
     "lightning",
-    "torchmetrics",
+    "torchmetrics>=1.6.0",
 ]
 
 [project.urls]
