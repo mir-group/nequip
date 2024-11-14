@@ -2,6 +2,7 @@ import torch
 import lightning
 from lightning.pytorch.utilities.warnings import PossibleUserWarning
 from hydra.utils import instantiate
+from hydra.utils import get_method
 from nequip.data import AtomicDataDict
 from nequip.utils import RankedLogger
 import warnings
@@ -63,7 +64,13 @@ class NequIPLightningModule(lightning.LightningModule):
     ):
         super().__init__()
         self.save_hyperparameters()
-        self.model = instantiate(model, _recursive_=False)
+
+        # === instantiate model ===
+        # reason for following implementation instead of just `hydra.utils.instantiate(model)` is to prevent omegaconf from being a model dependency
+        model = model.copy()  # make a copy because of `pop`
+        model_builder = get_method(model.pop("_target_"))
+        self.model = model_builder(**model)
+
         logger.debug(f"Built Model Details:\n{str(self.model)}")
         self.optimizer_config = optimizer
         self.lr_scheduler_config = lr_scheduler
