@@ -2,6 +2,8 @@
 
 NequIP is an open-source code for building E(3)-equivariant interatomic potentials.
 
+**:red_circle: PLEASE NOTE :red_circle:**:  Please note that a major update to this code is in the final stages of development and as a result support for the current release is a lower priority.
+
 [![Documentation Status](https://readthedocs.org/projects/nequip/badge/?version=latest)](https://nequip.readthedocs.io/en/latest/?badge=latest)
 
 ![nequip](./logo.png)
@@ -167,4 +169,4 @@ If you have a question, topic, or issue that isn't obviously one of those, try o
 
 If you want to contribute to the code, please read [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
-We can also be reached at albym[dot]seas[dt]harvard[dot].edu.
+We can also be reached by email at allegro-nequip@g.harvard.edu.
