@@ -3,6 +3,7 @@ from ._version import __version__  # noqa: F401
 import packaging.version
 
 import torch
+import torchmetrics
 
 # torch version checks
 torch_version = packaging.version.parse(torch.__version__)
@@ -12,6 +13,12 @@ assert torch_version >= packaging.version.parse(
     "1.13"
 ), f"NequIP supports 1.13.* or later, but {torch_version} found"
 
+# torchmetrics >= 1.6.0 for ddp autograd
+# https://github.com/Lightning-AI/torchmetrics/releases/tag/v1.6.0
+torchmetrics_version = packaging.version.parse(torchmetrics.__version__)
+assert torchmetrics_version >= packaging.version.parse(
+    "1.6.0"
+), f"NequIP requires torchmetrics>=1.6.0 for ddp training but {torchmetrics_version} found"
 
 # Load all installed nequip extension packages
 # This allows installed extensions to register themselves in

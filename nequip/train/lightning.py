@@ -4,7 +4,6 @@ from lightning.pytorch.utilities.warnings import PossibleUserWarning
 from hydra.utils import instantiate
 from nequip.data import AtomicDataDict
 from nequip.utils import RankedLogger
-from ._metrics_utils import gather_all_tensors
 import warnings
 from typing import Optional, Dict
 
@@ -99,9 +98,6 @@ class NequIPLightningModule(lightning.LightningModule):
         for metric_dict in loss["metrics"]:
             # silently ensure that dist_sync_on_step is true for loss metrics
             metric_dict["metric"]["dist_sync_on_step"] = True
-            # TODO: remove following once torchmetrics PR is merged
-            # https://github.com/Lightning-AI/torchmetrics/pull/2754
-            metric_dict["metric"]["dist_sync_fn"] = gather_all_tensors
 
         # == instantiate loss ==
         self.loss = instantiate(loss, type_names=self.model.type_names)
