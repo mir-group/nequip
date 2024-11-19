@@ -14,8 +14,8 @@ from nequip.nn import (
     ApplyFactor,
 )
 from nequip.nn.embedding import (
+    NodeTypeEmbed,
     PolynomialCutoff,
-    OneHotAtomEncoding,
     EdgeLengthNormalizer,
     BesselEdgeLengthEncoding,
     SphericalHarmonicEdgeAttrs,
@@ -48,9 +48,6 @@ def NequIPGNNEnergyModel(
         o3.Irreps.spherical_harmonics(lmax=l_max, p=-1 if parity else 1)
     )
 
-    # === chemical embedding ===
-    chemical_embedding_irreps_out = repr(o3.Irreps([(num_features, (0, 1))]))
-
     # === convnet ===
     # convert a single set of parameters uniformly for every layer
     feature_irreps_hidden = repr(
@@ -75,7 +72,7 @@ def NequIPGNNEnergyModel(
     # === build model ===
     model = FullNequIPGNNEnergyModel(
         irreps_edge_sh=irreps_edge_sh,
-        chemical_embedding_irreps_out=chemical_embedding_irreps_out,
+        type_embed_num_features=num_features,
         feature_irreps_hidden=feature_irreps_hidden_list,
         radial_mlp_depth=radial_mlp_depth_list,
         radial_mlp_width=radial_mlp_width_list,
@@ -122,9 +119,9 @@ def FullNequIPGNNEnergyModel(
     radial_mlp_depth: Sequence[int],
     radial_mlp_width: Sequence[int],
     feature_irreps_hidden: Sequence[Union[str, o3.Irreps]],
-    # irreps
+    # irreps and dims
     irreps_edge_sh: Union[int, str, o3.Irreps],
-    chemical_embedding_irreps_out: Union[str, o3.Irreps],
+    type_embed_num_features: int,
     conv_to_output_hidden_irreps_out: Union[str, o3.Irreps],
     # edge length encoding
     per_edge_type_cutoff: Optional[Dict[str, Union[float, Dict[str, float]]]] = None,
@@ -173,11 +170,11 @@ def FullNequIPGNNEnergyModel(
         )
 
     # === encode and embed features ===
-    one_hot = OneHotAtomEncoding(type_names=type_names)
+    # == edge tensor embedding ==
     spharm = SphericalHarmonicEdgeAttrs(
         irreps_edge_sh=irreps_edge_sh,
-        irreps_in=one_hot.irreps_out,
     )
+    # == edge scalar embedding ==
     edge_norm = EdgeLengthNormalizer(
         r_max=r_max,
         type_names=type_names,
@@ -197,19 +194,20 @@ def FullNequIPGNNEnergyModel(
         factor=(2 * math.pi) / (r_max * r_max),
         irreps_in=bessel_encode.irreps_out,
     )
-    chemical_embedding = AtomwiseLinear(
+    # == node scalar embedding ==
+    type_embed = NodeTypeEmbed(
+        type_names=type_names,
+        num_features=type_embed_num_features,
         irreps_in=factor.irreps_out,
-        irreps_out=chemical_embedding_irreps_out,
     )
     modules = {
-        "one_hot": one_hot,
         "spharm": spharm,
         "edge_norm": edge_norm,
         "bessel_encode": bessel_encode,
         "factor": factor,
-        "chemical_embedding": chemical_embedding,
+        "type_embed": type_embed,
     }
-    prev_irreps_out = chemical_embedding.irreps_out
+    prev_irreps_out = type_embed.irreps_out
 
     # === convnet layers ===
     for layer_i in range(num_layers):

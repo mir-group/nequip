@@ -55,7 +55,7 @@ minimal_config3 = dict(
 )
 minimal_config4 = dict(
     irreps_edge_sh="0e + 1o",
-    chemical_embedding_irreps_out="4x0e + 11x1o",
+    type_embed_num_features=11,
     feature_irreps_hidden=["13x0e + 4x1o", "3x0e + 5x1o"],
     conv_to_output_hidden_irreps_out="3x0e + 7x1o",
     convnet_nonlinearity_type="norm",
@@ -69,7 +69,7 @@ minimal_config4 = dict(
 )
 minimal_config5 = dict(
     irreps_edge_sh="0e + 1o + 2e",
-    chemical_embedding_irreps_out="7x0e + 3x1o",
+    type_embed_num_features=3,
     feature_irreps_hidden=["2x0e + 2x1o + 2x2e"] * 2,
     conv_to_output_hidden_irreps_out="5x0e + 2x1o",
     num_bessels=12,
@@ -94,6 +94,7 @@ class TestNequIPModel(BaseEnergyModelTests):
         config = config.copy()
         return config
 
+    # TODO: fix this test at some point (annoying because it's model specific)
     @pytest.mark.skip("ignore for now")
     def test_submods(self):
         config = minimal_config2.copy()
