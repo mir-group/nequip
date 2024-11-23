@@ -186,32 +186,33 @@ def frame_from_batched(batched_data: Type, index: int) -> Type:
 
 
 def without_nodes(data: Type, which_nodes: torch.Tensor) -> Type:
-    """Return a copy of ``data`` with ``which_nodes`` removed.
+    """Returns a copy of ``data`` with ``which_nodes`` removed.
+
     The returned object may share references to some underlying data tensors with ``data``.
 
     Args:
-        data (AtomicDataDict)     : atomic data dict
-        which_nodes (torch.Tensor): index tensor or boolean mask
-
-    Returns:
-        A new data object.
+        data (Dict[str, torch.Tensor]): ``AtomicDataDict``
+        which_nodes (torch.Tensor)    : index tensor or boolean mask
     """
+    device = data[_keys.POSITIONS_KEY].device
     N_nodes = num_nodes(data)
+
     which_nodes = torch.as_tensor(which_nodes)
     if which_nodes.dtype == torch.bool:
         node_mask = ~which_nodes
     else:
-        node_mask = torch.ones(N_nodes, dtype=torch.bool)
+        node_mask = torch.ones(N_nodes, dtype=torch.bool, device=device)
         node_mask[which_nodes] = False
     assert node_mask.shape == (N_nodes,)
-    n_keeping = node_mask.sum()
 
-    # Only keep edges where both from and to are kept
+    # only keep edges where both from and to are kept
     edge_idx = data[_keys.EDGE_INDEX_KEY]
     edge_mask = node_mask[edge_idx[0]] & node_mask[edge_idx[1]]
-    # Create an index mapping:
-    new_index = torch.full((N_nodes,), -1, dtype=torch.long)
-    new_index[node_mask] = torch.arange(n_keeping, dtype=torch.long)
+    # create an index mapping
+    new_index = torch.full((N_nodes,), -1, dtype=torch.long, device=device)
+    new_index[node_mask] = torch.arange(
+        node_mask.sum(), dtype=torch.long, device=device
+    )
 
     new_dict = {}
     for k, v in data.items():
@@ -225,6 +226,15 @@ def without_nodes(data: Type, which_nodes: torch.Tensor) -> Type:
             new_dict[k] = v[edge_mask]
         else:
             raise KeyError(f"Unregistered key {k}")
+
+    # specially handle NUM_NODES_KEY
+    # it's a graph field, so should just be copied over if present
+    if _keys.NUM_NODES_KEY in new_dict:
+        # if NUM_NODES_KEY is present, BATCH KEY should also be present
+        assert _keys.BATCH_KEY in new_dict
+        new_dict[_keys.NUM_NODES_KEY] = torch.bincount(
+            new_dict[_keys.BATCH_KEY], minlength=num_frames(data)
+        )
 
     return new_dict
 
@@ -251,8 +261,7 @@ def num_edges(data: Type) -> int:
 def with_batch_(data: Type) -> Type:
     """Get batch Tensor.
 
-    If this AtomicDataPrimitive has no ``batch``, one of all zeros will be
-    allocated and returned.
+    If this AtomicDataPrimitive has no ``batch``, one of all zeros will be allocated and returned.
     """
     if _keys.BATCH_KEY in data:
         assert _keys.NUM_NODES_KEY in data

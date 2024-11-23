@@ -108,18 +108,34 @@ def test_periodic_edge():
 def test_without_nodes(CH3CHO):
     # Non-periodic
     atoms, data = CH3CHO
+
+    # add batches
+    data = AtomicDataDict.with_batch_(data.copy())
+
+    # === test with node indices ===
     which_nodes = [0, 5, 6]
     new_data = AtomicDataDict.without_nodes(data, which_nodes=which_nodes)
     assert AtomicDataDict.num_nodes(new_data) == len(atoms) - len(which_nodes)
-    assert new_data["edge_index"].min() >= 0
-    assert new_data["edge_index"].max() == AtomicDataDict.num_nodes(new_data) - 1
+    assert len(new_data[AtomicDataDict.BATCH_KEY]) == len(atoms) - len(which_nodes)
+    assert new_data[AtomicDataDict.EDGE_INDEX_KEY].min() >= 0
+    assert (
+        new_data[AtomicDataDict.EDGE_INDEX_KEY].max()
+        == AtomicDataDict.num_nodes(new_data) - 1
+    )
 
+    # === test with node mask ===
     which_nodes_mask = np.zeros(len(atoms), dtype=bool)
     which_nodes_mask[[0, 1, 2, 4]] = True
     new_data = AtomicDataDict.without_nodes(data, which_nodes=which_nodes_mask)
     assert AtomicDataDict.num_nodes(new_data) == len(atoms) - np.sum(which_nodes_mask)
-    assert new_data["edge_index"].min() >= 0
-    assert new_data["edge_index"].max() == AtomicDataDict.num_nodes(new_data) - 1
+    assert len(new_data[AtomicDataDict.BATCH_KEY]) == len(atoms) - np.sum(
+        which_nodes_mask
+    )
+    assert new_data[AtomicDataDict.EDGE_INDEX_KEY].min() >= 0
+    assert (
+        new_data[AtomicDataDict.EDGE_INDEX_KEY].max()
+        == AtomicDataDict.num_nodes(new_data) - 1
+    )
 
 
 @pytest.mark.parametrize("periodic", [True, False])
