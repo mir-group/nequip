@@ -134,6 +134,7 @@ class BesselEdgeLengthEncoding(GraphModuleMixin, torch.nn.Module):
             start=1.0,
             end=self.num_bessels,
             steps=self.num_bessels,
+            dtype=_GLOBAL_DTYPE,
         ).unsqueeze(
             0
         )  # (1, num_bessel)
@@ -149,24 +150,22 @@ class BesselEdgeLengthEncoding(GraphModuleMixin, torch.nn.Module):
                 AtomicDataDict.EDGE_CUTOFF_KEY: "0e",
             },
         )
+        # i.e. `model_dtype`
+        self._output_dtype = torch.get_default_dtype()
 
     def extra_repr(self) -> str:
         return f"num_bessels={self.num_bessels}"
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
-        model_dtype = data.get(
-            AtomicDataDict.MODEL_DTYPE_KEY, data[AtomicDataDict.POSITIONS_KEY]
-        ).dtype
-
         # == Bessel basis ==
         x = data[self.norm_length_field]  # (num_edges, 1)
         # (num_edges, 1), (1, num_bessel) -> (num_edges, num_bessel)
         bessel = (torch.sinc(x * self.bessel_weights) * self.bessel_weights).to(
-            model_dtype
+            self._output_dtype
         )
 
         # == polynomial cutoff ==
-        cutoff = self.cutoff(x).to(model_dtype)
+        cutoff = self.cutoff(x).to(self._output_dtype)
         data[AtomicDataDict.EDGE_CUTOFF_KEY] = cutoff
 
         # == save product ==
@@ -211,15 +210,14 @@ class SphericalHarmonicEdgeAttrs(GraphModuleMixin, torch.nn.Module):
         self.sh = o3.SphericalHarmonics(
             self.irreps_edge_sh, edge_sh_normalize, edge_sh_normalization
         )
+        # i.e. `model_dtype`
+        self._output_dtype = torch.get_default_dtype()
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
-        model_dtype = data.get(
-            AtomicDataDict.MODEL_DTYPE_KEY, data[AtomicDataDict.POSITIONS_KEY]
-        ).dtype
         data = with_edge_vectors_(data, with_lengths=False)
         edge_vec = data[AtomicDataDict.EDGE_VECTORS_KEY]
         edge_sh = self.sh(edge_vec)
-        data[self.out_field] = edge_sh.to(model_dtype)
+        data[self.out_field] = edge_sh.to(self._output_dtype)
         return data
 
 
@@ -237,13 +235,12 @@ class AddRadialCutoffToData(GraphModuleMixin, torch.nn.Module):
         self._init_irreps(
             irreps_in=irreps_in, irreps_out={AtomicDataDict.EDGE_CUTOFF_KEY: "0e"}
         )
+        # i.e. `model_dtype`
+        self._output_dtype = torch.get_default_dtype()
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
         if AtomicDataDict.EDGE_CUTOFF_KEY not in data:
-            model_dtype = data.get(
-                AtomicDataDict.MODEL_DTYPE_KEY, data[AtomicDataDict.POSITIONS_KEY]
-            ).dtype
             x = data[self.norm_length_field]
-            cutoff = self.cutoff(x).to(model_dtype)
+            cutoff = self.cutoff(x).to(self._output_dtype)
             data[AtomicDataDict.EDGE_CUTOFF_KEY] = cutoff
         return data

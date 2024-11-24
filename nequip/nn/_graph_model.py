@@ -21,9 +21,9 @@ class GraphModel(GraphModuleMixin, torch.nn.Module):
         model_input_fields (Dict[str, Any]): input fields and their irreps
     """
 
+    type_names: List[str]
     model_dtype: torch.dtype
     model_input_fields: List[str]
-    type_names: List[str]
 
     def __init__(
         self,
@@ -52,14 +52,12 @@ class GraphModel(GraphModuleMixin, torch.nn.Module):
                     f"Model has `{k}` in its irreps_in with irreps `{irreps}`, but `{k}` is missing from/has inconsistent irreps in model_input_fields of `{self.irreps_in.get(k, 'missing')}`"
                 )
         self.model = model
+        # type names and model_dtype aren't actually used -- they're here for recording purposes
+        self.type_names = type_names
         self.model_dtype = (
             model_dtype if model_dtype is not None else torch.get_default_dtype()
         )
         self.model_input_fields = list(self.irreps_in.keys())
-        self.register_buffer(
-            "_model_dtype_example", torch.as_tensor(0.0, dtype=model_dtype)
-        )
-        self.type_names = type_names
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
         # restrict the input data to allowed keys to prevent the model from directly using the dict from the outside,
@@ -68,8 +66,6 @@ class GraphModel(GraphModuleMixin, torch.nn.Module):
         for k in self.model_input_fields:
             if k in data:
                 new_data[k] = data[k]
-        # Store the model dtype indicator tensor in all input data dicts
-        new_data[AtomicDataDict.MODEL_DTYPE_KEY] = self._model_dtype_example
         return self.model(new_data)
 
     @torch.jit.unused
