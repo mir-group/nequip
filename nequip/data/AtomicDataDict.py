@@ -179,8 +179,7 @@ def frame_from_batched(batched_data: Type, index: int) -> Type:
         elif k in _key_registry._EDGE_FIELDS:  # excluding edge indices
             out[k] = v[torch.eq(torch.index_select(batches, 0, edge_center_idx), index)]
         else:
-            if k != _keys.MODEL_DTYPE_KEY:
-                raise KeyError(f"Unregistered key {k}")
+            raise KeyError(f"Unregistered key {k}")
 
     return out
 

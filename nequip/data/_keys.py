@@ -75,7 +75,5 @@ POLARIZATION_KEY: Final[str] = "polarization"
 BATCH_KEY: Final[str] = "batch"
 NUM_NODES_KEY: Final[str] = "num_atoms"
 
-MODEL_DTYPE_KEY: Final[str] = "_model_dtype_indicator"
-
 # Make a list of allowed keys
 ALLOWED_KEYS: List[str] = [v for k, v in globals().items() if k.endswith("_KEY")]
