@@ -1,14 +1,45 @@
 import torch
 from lightning.pytorch.utilities.seed import isolate_rng
 
-from nequip.nn import GraphModel
-from nequip.utils import dtype_from_name, torch_default_dtype
+from nequip.nn import GraphModel, CompileGraphModel
+from nequip.utils import (
+    dtype_from_name,
+    torch_default_dtype,
+    conditional_torchscript_mode,
+)
 from nequip.utils._global_options import _get_latest_global_options
 
 import functools
 import contextvars
+import contextlib
+
+from typing import Optional
 
 _IS_BUILDING_MODEL = contextvars.ContextVar("_IS_BUILDING_MODEL", default=False)
+
+_OVERRIDE_COMPILE_MODE = contextvars.ContextVar("_OVERRIDE_COMPILE_MODE", default=False)
+_DEFAULT_COMPILE_MODE = contextvars.ContextVar(
+    "_DEFAULT_COMPILE_MODE", default="script"
+)
+
+_COMPILE_MODE_OPTIONS = {"compile", "script", None}
+
+
+@contextlib.contextmanager
+def override_model_compile_mode(compile_mode: Optional[str] = None):
+    assert compile_mode in _COMPILE_MODE_OPTIONS
+    global _OVERRIDE_COMPILE_MODE
+    global _DEFAULT_COMPILE_MODE
+    init_state = _OVERRIDE_COMPILE_MODE.get()
+    assert (
+        not init_state
+    ), "`_OVERRIDE_COMPILE_MODE` is already `True` -- something is wrong"
+    init_mode = _DEFAULT_COMPILE_MODE.get()
+    _OVERRIDE_COMPILE_MODE.set(True)
+    _DEFAULT_COMPILE_MODE.set(compile_mode)
+    yield
+    _OVERRIDE_COMPILE_MODE.set(init_state)
+    _DEFAULT_COMPILE_MODE.set(init_mode)
 
 
 def model_builder(func):
@@ -20,7 +51,12 @@ def model_builder(func):
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
 
+        # to handle nested model building
         global _IS_BUILDING_MODEL
+
+        # to handle compile modes
+        global _OVERRIDE_COMPILE_MODE
+        global _DEFAULT_COMPILE_MODE
 
         # this means we're in an inner model, so we shouldn't apply the model builder operations, and just pass the function
         if _IS_BUILDING_MODEL.get():
@@ -32,7 +68,7 @@ def model_builder(func):
             # === sanity checks ===
             assert all(
                 key in kwargs for key in ["seed", "model_dtype", "type_names"]
-            ), "`seed`, `model_dtype`, and `type_names` are mandatory arguments."
+            ), "`seed`, `model_dtype`, and `type_names` are mandatory model arguments."
 
             if _get_latest_global_options().get("allow_tf32", False):
                 assert (
@@ -43,18 +79,36 @@ def model_builder(func):
             seed = kwargs.pop("seed")
             model_dtype = kwargs.pop("model_dtype")
             dtype = dtype_from_name(model_dtype)
-            # set dtype and seed
-            with torch_default_dtype(dtype):
-                with isolate_rng():
-                    torch.manual_seed(seed)
-                    model = func(*args, **kwargs)
-                    # wrap with GraphModel
-                    graph_model = GraphModel(
-                        model=model,
-                        type_names=kwargs["type_names"],
-                        model_dtype=dtype,
-                        model_input_fields=model.irreps_in,
-                    )
+
+            # === compilation options ===
+            # `compile_mode` dictates the optimization path chosen, either `None`, `script`, or `compile`
+            # users can set this with the `compile_mode` arg to the model builder
+            # devs can override it with `override_model_compile_mode`
+
+            # always pop because inner models won't need `compile_mode` arg
+            compile_mode = kwargs.pop("compile_mode", _DEFAULT_COMPILE_MODE.get())
+            # compile mode overriding logic
+            if _OVERRIDE_COMPILE_MODE.get():
+                compile_mode = _DEFAULT_COMPILE_MODE.get()
+            assert compile_mode in _COMPILE_MODE_OPTIONS
+            graph_model_module = (
+                CompileGraphModel if compile_mode == "compile" else GraphModel
+            )
+
+            # set torchscript mode -- True if "jit" mode
+            with conditional_torchscript_mode(compile_mode == "script"):
+                # set dtype and seed
+                with torch_default_dtype(dtype):
+                    with isolate_rng():
+                        torch.manual_seed(seed)
+                        model = func(*args, **kwargs)
+                        # wrap with GraphModel
+                        graph_model = graph_model_module(
+                            model=model,
+                            type_names=kwargs["type_names"],
+                            model_dtype=dtype,
+                            model_input_fields=model.irreps_in,
+                        )
             return graph_model
         finally:
             # reset to default in case of failure
