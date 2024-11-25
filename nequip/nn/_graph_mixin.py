@@ -39,6 +39,7 @@ class GraphModuleMixin:
         # Coerce
         irreps_in = {} if irreps_in is None else irreps_in
         irreps_in = AtomicDataDict._fix_irreps_dict(irreps_in)
+
         # positions are *always* 1o, and always present
         if AtomicDataDict.POSITIONS_KEY in irreps_in:
             if irreps_in[AtomicDataDict.POSITIONS_KEY] != o3.Irreps("1x1o"):
@@ -46,6 +47,7 @@ class GraphModuleMixin:
                     f"Positions must have irreps 1o, got instead `{irreps_in[AtomicDataDict.POSITIONS_KEY]}`"
                 )
         irreps_in[AtomicDataDict.POSITIONS_KEY] = o3.Irreps("1o")
+
         # edges are also always present
         if AtomicDataDict.EDGE_INDEX_KEY in irreps_in:
             if irreps_in[AtomicDataDict.EDGE_INDEX_KEY] is not None:
@@ -53,6 +55,14 @@ class GraphModuleMixin:
                     f"Edge indexes must have irreps None, got instead `{irreps_in[AtomicDataDict.EDGE_INDEX_KEY]}`"
                 )
         irreps_in[AtomicDataDict.EDGE_INDEX_KEY] = None
+
+        # atom types are also always present
+        if AtomicDataDict.ATOM_TYPE_KEY in irreps_in:
+            if irreps_in[AtomicDataDict.ATOM_TYPE_KEY] is not None:
+                raise ValueError(
+                    f"atom types must have irreps None, got instead `{irreps_in[AtomicDataDict.ATOM_TYPE_KEY]}`"
+                )
+        irreps_in[AtomicDataDict.ATOM_TYPE_KEY] = None
 
         my_irreps_in = AtomicDataDict._fix_irreps_dict(my_irreps_in)
 
