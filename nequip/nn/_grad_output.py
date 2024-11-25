@@ -6,7 +6,7 @@ from e3nn.o3 import Irreps
 from e3nn.util.jit import compile_mode
 
 from nequip.data import AtomicDataDict
-from nequip.nn import GraphModuleMixin
+from ._graph_mixin import GraphModuleMixin
 
 
 @compile_mode("script")

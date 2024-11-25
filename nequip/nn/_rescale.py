@@ -3,7 +3,7 @@ import torch
 from e3nn.util.jit import compile_mode
 
 from nequip.data import AtomicDataDict
-from nequip.nn import GraphModuleMixin
+from ._graph_mixin import GraphModuleMixin
 from nequip.utils.global_dtype import _GLOBAL_DTYPE
 
 from typing import Sequence, List, Dict, Union
