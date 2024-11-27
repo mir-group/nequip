@@ -5,17 +5,13 @@ import torch
 from ase.calculators.calculator import Calculator, all_changes
 from ase.stress import full_3x3_to_voigt_6_stress
 
+from nequip.model.from_save import ModelFromCheckpoint, ModelFromPackage
+from nequip.model import model_metadata
 from nequip.data import AtomicDataDict, from_ase
 from nequip.data.transforms import (
     ChemicalSpeciesToAtomTypeMapper,
     NeighborListTransform,
 )
-import nequip.scripts.deploy
-
-
-def nequip_calculator(model, **kwargs):
-    """Build ASE Calculator directly from deployed model."""
-    return NequIPCalculator.from_deployed_model(model, **kwargs)
 
 
 class NequIPCalculator(Calculator):
@@ -31,7 +27,7 @@ class NequIPCalculator(Calculator):
 
     def __init__(
         self,
-        model: torch.jit.ScriptModule,
+        model: torch.nn.Module,
         device: Union[str, torch.device],
         energy_units_to_eV: float = 1.0,
         length_units_to_A: float = 1.0,
@@ -43,16 +39,16 @@ class NequIPCalculator(Calculator):
         self.model = model
         assert isinstance(
             model, torch.nn.Module
-        ), "To build a NequIPCalculator from a deployed model, use NequIPCalculator.from_deployed_model"
+        ), "To build a NequIPCalculator from a packaged model, use NequIPCalculator.from_packaged_model"
         self.device = device
         self.energy_units_to_eV = energy_units_to_eV
         self.length_units_to_A = length_units_to_A
         self.transforms = transforms
 
     @classmethod
-    def from_deployed_model(
+    def from_checkpoint_model(
         cls,
-        model_path: str,
+        ckpt_path: str,
         device: Union[str, torch.device] = "cpu",
         chemical_symbols: Optional[Union[List[str], Dict[str, str]]] = None,
         set_global_options: Union[str, bool] = "warn",
@@ -60,21 +56,66 @@ class NequIPCalculator(Calculator):
     ):
         """
         Args:
-            model_path (str): path to deployed model
+            ckpt_path (str): path to checkpoint file
             device (torch.device): the device to use
             chemical_symbols (List[str] or Dict[str, str]): mapping between chemical symbols and model type names
             set_global_options (str or bool): whether to set global options
         """
-        # load model
-        model, metadata = nequip.scripts.deploy.load_deployed_model(
-            model_path=model_path,
+        return cls._from_save(
+            save_path=ckpt_path,
+            model_getter=ModelFromCheckpoint,
+            metadata_getter=model_metadata.model_metadata_from_checkpoint,
             device=device,
+            chemical_symbols=chemical_symbols,
             set_global_options=set_global_options,
+            **kwargs,
         )
-        r_max = float(metadata[nequip.scripts.deploy.R_MAX_KEY])
+
+    @classmethod
+    def from_packaged_model(
+        cls,
+        package_path: str,
+        device: Union[str, torch.device] = "cpu",
+        chemical_symbols: Optional[Union[List[str], Dict[str, str]]] = None,
+        set_global_options: Union[str, bool] = "warn",
+        **kwargs,
+    ):
+        """
+        Args:
+            package_path (str): path to packaged model
+            device (torch.device): the device to use
+            chemical_symbols (List[str] or Dict[str, str]): mapping between chemical symbols and model type names
+            set_global_options (str or bool): whether to set global options
+        """
+        return cls._from_save(
+            save_path=package_path,
+            model_getter=ModelFromPackage,
+            metadata_getter=model_metadata.model_metadata_from_package,
+            device=device,
+            chemical_symbols=chemical_symbols,
+            set_global_options=set_global_options,
+            **kwargs,
+        )
+
+    @classmethod
+    def _from_save(
+        cls,
+        save_path: str,
+        model_getter: Callable,
+        metadata_getter: Callable,
+        device: Union[str, torch.device] = "cpu",
+        chemical_symbols: Optional[Union[List[str], Dict[str, str]]] = None,
+        set_global_options: Union[str, bool] = "warn",
+        **kwargs,
+    ):
+        model = model_getter(save_path)
+        model.to(device)
+        model.eval()
+        metadata = metadata_getter(save_path)
+        r_max = float(metadata[model_metadata.R_MAX_KEY])
 
         # build typemapper
-        type_names = metadata[nequip.scripts.deploy.TYPE_NAMES_KEY].split(" ")
+        type_names = metadata[model_metadata.TYPE_NAMES_KEY].split(" ")
         if chemical_symbols is None:
             # Default to species names
             warnings.warn(
