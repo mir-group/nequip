@@ -2,32 +2,32 @@
 
 ## FAQs
 
-Examples of frequently asked questions
+  - **Q**: How does logging work? How do I use Tensorboard or Weights and Biases?
+
+    **A**: Logging is configured under the `trainer` section of the config file by specifying the `logger` argument of the `lightning.Trainer` (see [API](https://lightning.ai/docs/pytorch/stable/common/trainer.html#trainer-class-api)). Compatible loggers are found [here](https://lightning.ai/docs/pytorch/stable/api_references.html#loggers). Read the [Config](config.md) docs for a more complete description.
+
+
+  - **Q**: What units do `nequip` framework models use?
+
+    **A**: `nequip` has no prefered system of units and uses the units of the data provided. Model inputs, outputs, error metrics, and all other quantities follow the units of the dataset. Users **must** use consistent input and output units. For example, if the length unit is Å and the energy labels are in eV, the force predictions from the model will be in eV/Å. The provided force labels should hence also be in eV/Å. 
+
+	```{warning}
+	`nequip` cannot and does not check the consistency of units in inputs you provide, and it is your responsibility to ensure consistent treatment of input and output units
+	```
+
 
 ## Commons Errors
 
-  - Problem: Trying to run `nequip-train` as follows fails.
+  - **Problem**: Trying to run `nequip-train` as follows fails.
     ```bash
 	nequip-train config.yaml
 	```
-	Solution: Read the [workflow docs](workflow.md) and follow hydra's command line options, e.g.
+	**Solution**: Read the [workflow docs](workflow.md) and follow hydra's command line options, e.g.
 	```bash
 	nequip-train -cn config.yaml
 	```
 
-  - Various shape errors
-
-    Check the sanity of the shapes in your dataset.
-
-
 ## Common Warnings
-
-### Unused keys
-
-  - ```txt
-    KeyError: 'The following keys in the config file were not used, did you make a typo?: optimizer_params.
-    ```
-    Since >=0.6.0, using `prefix_params` style subdictionaries of options is no longer supported.  Only `_kwargs` is supported, i.e. `optimizer_kwargs`. Please update your YAML configs.
 
 
 ### Other

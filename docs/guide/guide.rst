@@ -5,6 +5,6 @@ User Guide
 
     install
     workflow
-    conventions
     config
     faq_errors
+    conventions
