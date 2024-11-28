@@ -33,6 +33,11 @@ extensions = [
     "sphinx_rtd_theme",
     "myst_parser",
 ]
+myst_enable_extensions = [
+    "html_admonition",
+    "dollarmath",  # "amsmath", # to parse Latex-style math
+]
+
 autodoc_member_order = "bysource"
 autosummary_generate = True
 source_suffix = [".rst", ".md"]
