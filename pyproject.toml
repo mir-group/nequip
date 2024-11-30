@@ -39,6 +39,7 @@ Repository = "https://github.com/mir-group/nequip.git"
 nequip-train = "nequip.scripts.train:main"
 nequip-benchmark = "nequip.scripts.benchmark:main"
 nequip-package = "nequip.scripts.package:main"
+nequip-compile = "nequip.scripts.compile:main"
 
 [tool.setuptools]
 packages = {find = {include = ["nequip", "nequip.*"]}}
