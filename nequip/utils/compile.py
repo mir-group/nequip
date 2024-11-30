@@ -35,3 +35,11 @@ def conditional_torchscript_jit(
         return torch.jit.script(module)
     else:
         return module
+
+
+def prepare_model_for_compile(model, device):
+    for param in model.parameters():
+        param.requires_grad_(False)
+    model.eval()
+    model.to(device)
+    return model
