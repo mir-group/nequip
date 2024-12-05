@@ -39,7 +39,7 @@ def main(args=None):
     )
     parser.add_argument(
         "--output-path",
-        help="output path to save the packaged model",
+        help="output path to save the packaged model. NOTE: a `.nequip.zip` extension is mandatory",
         type=pathlib.Path,
         default=os.getcwd() + "/packaged_model.nequip.zip",
     )
@@ -65,6 +65,10 @@ def main(args=None):
     )
 
     args = parser.parse_args(args=args)
+
+    assert str(args.output_path).endswith(
+        ".nequip.zip"
+    ), "`output-path` must end with the `.nequip.zip` extension"
 
     # === handle internal and external modules ===
     # internal and external modules that we know of
