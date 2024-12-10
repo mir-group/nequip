@@ -15,6 +15,9 @@
 	`nequip` cannot and does not check the consistency of units in inputs you provide, and it is your responsibility to ensure consistent treatment of input and output units
 	```
 
+  - **Q**: What floating point precision (`torch.dtype`) is used in the `nequip` framework?
+  
+    **A**: `float64` precision is used for data (inputs to model and reference labels). Either `float32` or `float64` precision can be used as the `model_dtype` (which is a mandatory hyperparameter of models in the `nequip` framework). If `float32` precision is used for `model_dtype`, the model will cast down from the `float64` inputs (e.g. positions) and cast up the outputs (e.g. energy) to `float64`. A major change in the post-revamp `nequip` framework is that NequIP or Allegro models keep the initial embeddings in `float64` before casting down if `model_dtype=float32` for better numerics.
 
 ## Commons Errors
 
