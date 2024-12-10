@@ -13,12 +13,13 @@ from torch.utils.benchmark.utils.common import trim_sigfig, select_unit
 
 from e3nn.util.jit import script
 
+from nequip.model import ModelFromCheckpoint
+from nequip.model.model_metadata import model_metadata_from_checkpoint
 from nequip.utils import get_current_code_versions, RankedLogger
 from nequip.utils._global_options import _set_global_options
 from nequip.utils.test import assert_AtomicData_equivariant
 from nequip.data import AtomicDataDict
 from nequip.data.datamodule import NequIPDataModule
-from nequip.scripts.deploy import _compile_for_deploy, load_deployed_model
 
 from omegaconf import OmegaConf
 from hydra.utils import instantiate
@@ -37,8 +38,8 @@ def main(args=None):
     )
     parser.add_argument("config", help="configuration file")
     parser.add_argument(
-        "--model",
-        help="A deployed model to load instead of building a new one from `config`. ",
+        "--ckpt-path",
+        help="Path to a checkpoint file for benchmarking a pre-trained model.",
         type=str,
         default=None,
     )
@@ -168,7 +169,7 @@ def main(args=None):
 
     # === instantiate NequIP Lightning module ===
 
-    if args.model is None:
+    if args.ckpt_path is None:
         print("Building model and training modules ... ")
         model_time = time.time()
         try:
@@ -191,8 +192,9 @@ def main(args=None):
         print(f"    building model and training modules took {model_time:.4f}s")
     else:
         print("Loading model...")
-        model, metadata = load_deployed_model(args.model, device=device, freeze=False)
-        print("    deployed model has metadata:")
+        model = ModelFromCheckpoint(args.ckpt_path)
+        metadata = model_metadata_from_checkpoint(args.ckpt_path)
+        print("    model has metadata:")
         print(
             "\n".join(
                 "        %s: %s" % e for e in metadata.items() if e[0] != "config"
@@ -209,8 +211,6 @@ def main(args=None):
     model.eval()
     if args.equivariance_test:
         args.no_compile = True
-        if args.model is not None:
-            raise RuntimeError("Can't equivariance test a deployed model.")
 
     if args.no_compile:
         model = model.to(device)
@@ -219,7 +219,8 @@ def main(args=None):
         # "Deploy" it
         compile_time = time.time()
         model = script(model)
-        model = _compile_for_deploy(model)
+        # TODO: replace with `nequip-compile` utility functions eventually
+        # model = _compile_for_deploy(model)
         compile_time = time.time() - compile_time
         print(f"    compilation took {compile_time:.4f}s")
 
