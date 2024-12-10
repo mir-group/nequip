@@ -3,6 +3,6 @@ Developer Guide
 
  .. toctree::
 
-    extending
     contributing
-    tools
+    under_the_hood
+    extending
