@@ -4,6 +4,7 @@ from .loss_coeff_monitor import LossCoefficientMonitor
 from .nemo_ema import NeMoExponentialMovingAverage
 from .write_xyz import TestTimeXYZFileWriter
 from .wandb_watch import WandbWatch
+from .profiler import Profiler
 
 __all__ = [
     SoftAdapt,
@@ -12,4 +13,5 @@ __all__ = [
     NeMoExponentialMovingAverage,
     TestTimeXYZFileWriter,
     WandbWatch,
+    Profiler,
 ]
