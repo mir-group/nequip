@@ -4,10 +4,8 @@
 # - omegaconf's variable interpolation (https://omegaconf.readthedocs.io/en/2.3_branch/usage.html#variable-interpolation)
 # - omegaconf's resolvers (https://omegaconf.readthedocs.io/en/2.3_branch/usage.html#resolvers)
 # - hydra's instantiate (https://hydra.cc/docs/advanced/instantiate_objects/overview/)
-# With hydra's instantiation (notice the "_target_"s everywhere), the config file (almost) directly corresponds
-# to instantiating objects as one would normally do in Python.
-# Much of the infrastructure is based on PyTorch Lightning (https://lightning.ai/docs/pytorch/stable/),
-# such as the use of Lightning's Trainer, DataModule, LightningModule, Callback objects.
+# With hydra's instantiation (notice the `_target_`s everywhere), the config file (almost) directly corresponds to instantiating objects as one would normally do in Python.
+# Much of the infrastructure is based on PyTorch Lightning (https://lightning.ai/docs/pytorch/stable/), such as the use of Lightning's Trainer, DataModule, LightningModule, Callback objects.
 
 
 # the run types will be completed in sequence
@@ -155,33 +153,6 @@ trainer:
       decay: 0.99
       every_n_steps: 1
 
-    # or use Lightning's SWA
-    #- _target_: lightning.pytorch.callbacks.StochasticWeightAveraging
-    #  swa_lrs: 1e-4
-    #  swa_epoch_start: 50
-    #  annealing_epochs: 20
-
-    # Callbacks to handle loss coefficients to balance different objectives (energy, forces, etc)
-
-    # SoftAdapt scheme (https://arxiv.org/abs/2403.18122) to adaptively change loss coefficients
-    - _target_: nequip.train.callbacks.SoftAdapt
-      beta: 1.1         # controls strength of SoftAdapt loss coefficient updates
-      interval: epoch   # update on "epoch" or "batch" basis
-      frequency: 5      # number of intervals (epoch or batches) between SoftAdapt loss coefficient updates
-
-    # or manually schedule changing of loss coefficients at the start of each training epoch
-    #- _target_: nequip.train.callbacks.LossCoefficientScheduler
-    #  schedule:
-    #    - epoch: 2
-    #      coeffs: [3, 1]
-    #    - epoch: 5
-    #      coeffs: [10, 1]
-
-    # to log the loss coefficients
-    - _target_: nequip.train.callbacks.LossCoefficientMonitor
-      interval: epoch
-      frequency: 5
-
 # training_module refers to a NequIPLightningModule
 training_module:
   _target_: nequip.train.NequIPLightningModule
@@ -244,7 +215,6 @@ training_module:
   optimizer:
     _target_: torch.optim.Adam
     lr: 0.01
-    amsgrad: true
 
   # see options for lr_scheduler_config
   # https://lightning.ai/docs/pytorch/stable/api/lightning.pytorch.core.LightningModule.html#lightning.pytorch.core.LightningModule.configure_optimizers
@@ -282,7 +252,7 @@ training_module:
     num_features: 32    # the multiplicity of the features, 32 is a good default for accurate network, if you want to be more accurate, go larger, if you want to be faster, go lower
 
     # == radial network ==
-    radial_mlp_depth: 2           # number of radial layers, usually 1-3 works best, smaller is faster
+    radial_mlp_depth: 2         # number of radial layers, usually 1-3 works best, smaller is faster
     radial_mlp_width: 64        # number of hidden neurons in radial function, smaller is faster
 
     # dataset statistics used to inform the model's initial parameters for normalization, shifting and rescaling
