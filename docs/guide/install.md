@@ -4,6 +4,8 @@
 * Python >= 3.9
 * PyTorch >= 1.13. PyTorch can be installed following the [instructions from their documentation](https://pytorch.org/get-started/locally/). Note that neither `torchvision` nor `torchaudio`, included in the default install command, are needed for NequIP.
 
+> **_NOTE:_** It is recommended to use the latest stable PyTorch to use `torch.compile` for training. AOT Inductor compilation for use in LAMMPS requires at least PyTorch >= 2.6.
+
 **You must install PyTorch before installing NequIP, however it is not marked as a dependency of `nequip` to prevent `pip` from trying to overwrite your PyTorch installation.**
 
 ## Instructions
