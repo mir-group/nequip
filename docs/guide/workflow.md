@@ -1,10 +1,11 @@
 # The `nequip` workflow
 
-The `nequip` workflow has three steps:
- 1. **Training**:  `nequip-train`
- 2. **Testing**: `nequip-train`
- 3. **Deploying**: `nequip-deploy`
- 4. **Using deployed models**: [Integrations](../integrations/all.rst)
+The `nequip` workflow is made up of the following components:
+ 1. **Train**:  `nequip-train`
+ 2. **Test**: `nequip-train`
+ 3. **Package**: `nequip-package`
+ 4. **Compile**: `nequip-compile`
+ 5. **Production**: [Integrations](../integrations/all.rst)
 
 
 ## Training
@@ -47,20 +48,28 @@ There are two main ways users can use `test`.
 One can use `nequip.train.callbacks.TestTimeXYZFileWriter` ([see API](../api/callbacks.rst)) as a callback to have `.xyz` files written with the predictions of the model on the test dataset(s). (This is the replacement for the role `nequip-evaluate` served before `nequip` version `0.7.0`)
 
 
-## Deploying
+## Packaging
 
-Once you have trained a model, you must deploy it to create an archive of its trained parameters and metadata that can be used for simulations and other calculations:
+The recommended way to distribute a trained model is to `package` it.
 ```bash
-nequip-deploy build -ckpt_path path/to/ckpt_file -out_file path/to/deployed_model
+nequip-package --ckpt-path path/to/ckpt_file --output-path path/to/packaged_model.nequip.zip
+```
+```{warning}
+The output path MUST have the extension `.nequip.zip`.
 ```
 
-One can inspect the deployed model with the following command
+To see command line options, one can use
 ```bash
-nequip-deploy info path/to/deployed_model
+nequip-package -h
 ```
 
+`nequip-package` will save not only the model and its weights, but also the very code that the model depends on (besides config file parameters). The packaged model can thus be loaded and used independently from the model code in the Python environment's NequIP (and extensions such as Allegro).
 
-## Using deployed models
+## Compilation
+
+`nequip-compile` is the command used to compile a model (from a checkpoint file or a package file) for use in C++ environments, chiefly in our LAMMPS integration. There are two modes that users can use for compilation, `torchscript` and `aotinductor`.
+
+## Production Simulations
 
 ### ...to run simulations and other calculations
 
