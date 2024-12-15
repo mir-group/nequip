@@ -12,6 +12,7 @@ BASIC_INFO = {
     "seed": 123,
     "type_names": ["H", "C", "O"],
     "r_max": 4.0,
+    "avg_num_neighbors": 3.0,
 }
 
 COMMON_CONFIG = {
@@ -42,13 +43,13 @@ minimal_config1 = dict(
     **COMMON_CONFIG,
 )
 minimal_config2 = dict(
-    num_features=4,
+    num_features=8,
     num_layers=3,
     per_type_energy_shifts=[3.45, 5.67, 7.89],
     **COMMON_CONFIG,
 )
 minimal_config3 = dict(
-    num_features=4,
+    num_features=8,
     num_layers=2,
     per_edge_type_cutoff={"H": 2.0, "C": {"H": 4.0, "C": 3.5, "O": 3.7}, "O": 3.9},
     **COMMON_CONFIG,
@@ -56,8 +57,7 @@ minimal_config3 = dict(
 minimal_config4 = dict(
     irreps_edge_sh="0e + 1o",
     type_embed_num_features=11,
-    feature_irreps_hidden=["13x0e + 4x1o", "3x0e + 5x1o"],
-    conv_to_output_hidden_irreps_out="3x0e + 7x1o",
+    feature_irreps_hidden=["13x0e + 4x1o", "7x0e"],
     convnet_nonlinearity_type="norm",
     # ZBL pair potential term
     pair_potential={
@@ -70,8 +70,7 @@ minimal_config4 = dict(
 minimal_config5 = dict(
     irreps_edge_sh="0e + 1o + 2e",
     type_embed_num_features=3,
-    feature_irreps_hidden=["2x0e + 2x1o + 2x2e"] * 2,
-    conv_to_output_hidden_irreps_out="5x0e + 2x1o",
+    feature_irreps_hidden=["2x0e + 2x1o + 2x2e", "5x0e"],
     num_bessels=12,
     # test custom nonlinearities
     convnet_nonlinearity_gates={"e": "silu", "o": "abs"},
@@ -86,7 +85,13 @@ class TestNequIPModel(BaseEnergyModelTests):
         return False
 
     @pytest.fixture(
-        params=[minimal_config1, minimal_config2, minimal_config3, minimal_config4],
+        params=[
+            minimal_config1,
+            minimal_config2,
+            minimal_config3,
+            minimal_config4,
+            minimal_config5,
+        ],
         scope="class",
     )
     def config(self, request):
