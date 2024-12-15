@@ -59,15 +59,12 @@ def NequIPGNNEnergyModel(
             ]
         )
     )
-    feature_irreps_hidden_list = [feature_irreps_hidden] * num_layers
+    feature_irreps_hidden_list = [feature_irreps_hidden] * (num_layers - 1)
     radial_mlp_depth_list = [radial_mlp_depth] * num_layers
     radial_mlp_width_list = [radial_mlp_width] * num_layers
 
     # === post convnets ===
-    conv_to_output_hidden_irreps_out = repr(
-        # num_features // 2  scalars
-        o3.Irreps([(max(1, num_features // 2), (0, 1))])
-    )
+    feature_irreps_hidden_list += [repr(o3.Irreps([(num_features, (0, 1))]))]
 
     # === build model ===
     model = FullNequIPGNNEnergyModel(
@@ -76,7 +73,6 @@ def NequIPGNNEnergyModel(
         feature_irreps_hidden=feature_irreps_hidden_list,
         radial_mlp_depth=radial_mlp_depth_list,
         radial_mlp_width=radial_mlp_width_list,
-        conv_to_output_hidden_irreps_out=conv_to_output_hidden_irreps_out,
         **kwargs,
     )
     return model
@@ -122,7 +118,6 @@ def FullNequIPGNNEnergyModel(
     # irreps and dims
     irreps_edge_sh: Union[int, str, o3.Irreps],
     type_embed_num_features: int,
-    conv_to_output_hidden_irreps_out: Union[str, o3.Irreps],
     # edge length encoding
     per_edge_type_cutoff: Optional[Dict[str, Union[float, Dict[str, float]]]] = None,
     num_bessels: int = 8,
@@ -153,8 +148,15 @@ def FullNequIPGNNEnergyModel(
 
     # require every convnet layer to be specified explicitly in a list
     # infer num_layers from the list size
-    assert len(radial_mlp_depth) == len(radial_mlp_width) == len(feature_irreps_hidden)
+    assert (
+        len(radial_mlp_depth) == len(radial_mlp_width) == len(feature_irreps_hidden)
+    ), f"radial_mlp_depth: {radial_mlp_depth}, radial_mlp_width: {radial_mlp_width}, feature_irreps_hidden: {feature_irreps_hidden} should all have the same length"
     num_layers = len(radial_mlp_depth)
+
+    # assert that last convnet produces only scalars
+    assert all(
+        [l == 0 for l in o3.Irreps(feature_irreps_hidden[-1]).ls]
+    ), f"last convnet layer output must only contain scalars but found {feature_irreps_hidden[-1]}"
 
     if avg_num_neighbors is None:
         warnings.warn(
@@ -231,15 +233,9 @@ def FullNequIPGNNEnergyModel(
         modules.update({f"layer{layer_i}_convnet": current_convnet})
 
     # === readout ===
-
-    # TODO: the next linear throws out all L > 0, don't create them in the last layer of convnet
-    conv_to_output_hidden = AtomwiseLinear(
+    # linear readout
+    per_atom_energy_readout = AtomwiseLinear(
         irreps_in=prev_irreps_out,
-        irreps_out=conv_to_output_hidden_irreps_out,
-    )
-
-    output_hidden_to_scalar = AtomwiseLinear(
-        irreps_in=conv_to_output_hidden.irreps_out,
         irreps_out="1x0e",
         out_field=AtomicDataDict.PER_ATOM_ENERGY_KEY,
     )
@@ -252,13 +248,12 @@ def FullNequIPGNNEnergyModel(
         shifts=per_type_energy_shifts,
         scales_trainable=per_type_energy_scales_trainable,
         shifts_trainable=per_type_energy_shifts_trainable,
-        irreps_in=output_hidden_to_scalar.irreps_out,
+        irreps_in=per_atom_energy_readout.irreps_out,
     )
 
     modules.update(
         {
-            "conv_to_output_hidden": conv_to_output_hidden,
-            "output_hidden_to_scalar": output_hidden_to_scalar,
+            "per_atom_energy_readout": per_atom_energy_readout,
             "per_type_energy_scale_shift": per_type_energy_scale_shift,
         }
     )
