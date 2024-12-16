@@ -16,6 +16,10 @@ class ConFIGLightningModule(NequIPLightningModule):
     Set ``cpu_lsqr=True`` to perform least squares solve on CPU, as certain devices may not be able to do the (underdetermined) least squares solve.
 
     Note:
+        Only ``ReduceLROnPlateau`` works with this class. The following warning may be safely ignored.
+        ``The lr scheduler dict contains the key(s) ['monitor'], but the keys will be ignored. You need to call `lr_scheduler.step()` manually in manual optimization.``
+
+    Note:
       LR schedulers won't be able to monitor training metrics using this class -- which should not be a problem since LR schedulers should usually be monitoring validation metrics.
     """
 
@@ -78,6 +82,21 @@ class ConFIGLightningModule(NequIPLightningModule):
         # TODO: should this be a user-controlled hyperparameter?
         self.ConFIG_eps = 1e-8  # hardcode for now
         self.ConFIG_cpu_lsqr = cpu_lsqr
+
+        # temporary narrow solution to accommodate only ReduceLROnPlateau LR scheduling
+        if self.lr_scheduler_config is not None:
+            scheduler = self.lr_scheduler_config["scheduler"]["_target_"]
+            assert (
+                "ReduceLROnPlateau" in scheduler
+            ), f"only `ReduceLROnPlateau` LR scheduler is usable with `ConFIGLightningModule` but found `{scheduler}`"
+            monitor = self.lr_scheduler_config["monitor"]
+            assert (
+                "val" in monitor
+            ), f"Only validation metrics can be monitored for LR scheduling with `ConFIGLightningModule`, but found {monitor}"
+            assert (
+                self.lr_scheduler_config["interval"] == "epoch"
+            ), "only `interval=epoch` allowed for LR scheduling with `ConFIGLightningModule`"
+            self.ConFIG_monitor = monitor
 
     def training_step(
         self, batch: AtomicDataDict.Type, batch_idx: int, dataloader_idx: int = 0
@@ -183,3 +202,15 @@ class ConFIGLightningModule(NequIPLightningModule):
             * self.world_size
         )
         return loss
+
+    def on_validation_epoch_end(self):
+        """"""
+        for idx, metrics in enumerate(self.val_metrics):
+            metric_dict = metrics.compute(
+                prefix=f"val{idx}_epoch{self.logging_delimiter}"
+            )
+            self.log_dict(metric_dict)
+            metrics.reset()
+        sch = self.lr_schedulers()
+        if sch is not None:
+            sch.step(metric_dict[self.ConFIG_monitor])
