@@ -13,6 +13,8 @@ class ConFIGLightningModule(NequIPLightningModule):
 
     The arguments for this class are exactly the same as ``NequIPLightningModule``, but the loss coefficients take on a different meaning -- they are now the "b" in the "Ax=b" linear solve (see paper).
 
+    Set ``cpu_lsqr=True`` to perform least squares solve on CPU, as certain devices may not be able to do the (underdetermined) least squares solve.
+
     Note:
       LR schedulers won't be able to monitor training metrics using this class -- which should not be a problem since LR schedulers should usually be monitoring validation metrics.
     """
@@ -26,6 +28,7 @@ class ConFIGLightningModule(NequIPLightningModule):
         train_metrics: Optional[Dict] = None,
         val_metrics: Optional[Dict] = None,
         test_metrics: Optional[Dict] = None,
+        cpu_lsqr: bool = False,
         **kwargs,
     ):
         super().__init__(
@@ -74,6 +77,7 @@ class ConFIGLightningModule(NequIPLightningModule):
         # TODO: does eps need a model_dtype dependence?
         # TODO: should this be a user-controlled hyperparameter?
         self.ConFIG_eps = 1e-8  # hardcode for now
+        self.ConFIG_cpu_lsqr = cpu_lsqr
 
     def training_step(
         self, batch: AtomicDataDict.Type, batch_idx: int, dataloader_idx: int = 0
@@ -139,7 +143,7 @@ class ConFIGLightningModule(NequIPLightningModule):
             torch.tensor(
                 [self.loss.coeffs[idx] for idx in self.ConFIG_loss_idxs],
                 dtype=A.dtype,
-                device=A.device,
+                device="cpu" if self.ConFIG_cpu_lsqr else A.device,
             ),
             dim=0,
             eps=self.ConFIG_eps,
@@ -147,7 +151,12 @@ class ConFIGLightningModule(NequIPLightningModule):
         # ^ do it here to futureproof for possibility of changing the coeffs over training
 
         # linear solve and normalize
+        # move to CPU for least squares solve if needed
+        if self.ConFIG_cpu_lsqr:
+            A = A.cpu()
         x = torch.linalg.lstsq(A, b).solution
+        if self.ConFIG_cpu_lsqr:
+            x = x.to(A_raw.device)
         x = torch.nn.functional.normalize(x, dim=0, eps=self.ConFIG_eps)
 
         # construct the gradient vector
