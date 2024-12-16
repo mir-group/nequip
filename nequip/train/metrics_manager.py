@@ -2,7 +2,16 @@ import torch
 from torchmetrics import Metric
 from nequip.data import AtomicDataDict, BaseModifier
 
-from typing import List, Dict, Union, Callable
+from typing import List, Dict, Union, Callable, Final
+
+_METRICS_MANAGER_INPUT_KEYS: Final[str] = [
+    "field",
+    "metric",
+    "name",
+    "coeff",
+    "per_type",
+    "ignore_nan",
+]
 
 
 class MetricsManager(torch.nn.ModuleList):
@@ -42,6 +51,13 @@ class MetricsManager(torch.nn.ModuleList):
         type_names: List[str] = None,
     ):
         super().__init__()
+
+        # === sanity checks ===
+        for metric_dict in metrics:
+            for key in metric_dict.keys():
+                assert (
+                    key in _METRICS_MANAGER_INPUT_KEYS
+                ), f"unrecognized key `{key}` found as input in `MetricsManager`"
 
         self.num_metrics = len(metrics)
         # === MANDATORY dict keys ===
