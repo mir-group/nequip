@@ -140,6 +140,7 @@ class ConFIGLightningModule(NequIPLightningModule):
             # ^ don't retain graph for the last term
 
             # collect gradients and assemble
+            # note that grads will be in the highest dtype, i.e. float64 if there are any float64 grad components
             grads = torch.cat(
                 [param_dict[k].grad.flatten() for k in self.ConFIG_model_param_names]
             )
@@ -191,7 +192,10 @@ class ConFIGLightningModule(NequIPLightningModule):
                 self.ConFIG_param_batch_list[idx],
                 self.ConFIG_param_numel_list[idx],
             )
-            param_dict[name].grad = grad_entry.view(self.ConFIG_param_shape_list[idx])
+            # set to correct dtype before assigning
+            param_dict[name].grad = grad_entry.to(dtype=param_dict[name].dtype).view(
+                self.ConFIG_param_shape_list[idx]
+            )
 
         # === finally take step ===
         opt.step()
