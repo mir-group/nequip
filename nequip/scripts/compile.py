@@ -237,6 +237,8 @@ def main(args=None):
             seed=_COMPILE_SEED,
             **{key: metadata[key] for key in GLOBAL_OPTIONS_METADATA_KEYS},
         )
+    # ensure bool -> int for metadata
+    metadata = {k: int(v) if isinstance(v, bool) else v for k, v in metadata.items()}
 
     # === load model ===
     logger.debug("Loading model ...")
