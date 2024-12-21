@@ -19,6 +19,7 @@ data:
       supercell: [4, 4, 4]
       seed: ${data_seed}
       num_frames: 50
+      element: Cu
     train: 30
     val: 10
     test: 10
