@@ -8,3 +8,4 @@ User Guide
     config
     faq_errors
     conventions
+    upgrading
