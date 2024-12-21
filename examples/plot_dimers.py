@@ -60,7 +60,7 @@ type_combos = [
     list(e) for e in itertools.combinations_with_replacement(range(num_types), 2)
 ]
 N_combos = len(type_combos)
-r = torch.zeros(N_sample * N_combos, 2, 3)
+r = torch.zeros(N_sample * N_combos, 2, 3, dtype=torch.float64)
 
 if args.r_max is not None:
     max_range = args.r_max
