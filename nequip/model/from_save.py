@@ -6,15 +6,18 @@ import warnings
 
 
 def ModelFromCheckpoint(checkpoint_path: str):
-    """Builds model from a ``nequip`` framework checkpoint file.
+    """Builds model from a NequIP framework checkpoint file.
 
-    This model builder is intended for training a pre-trained model from a checkpoint file.
+    There are two common use modes of this model builder.
 
-    The behavior of this model builder is such that it
-    - will ignore the global options from the checkpoint file.
-    - will use the compile mode from the checkpoint (unless whoever calls this uses the compile_mode overriding context manager)
+      1. In ``nequip-train``, ``ModelFromCheckpoint`` can be used to train, validate and/or test a pre-trained model from a checkpoint file.
+      2. In a Python script, ``ModelFromCheckpoint`` can be used to load a model from a checkpoint file for custom evaluation tasks.
 
-    The entity calling this model builder is responsible for setting up the global options and potentially overriding the compile mode.
+    For use in custom Python scripts, note that this model builder
+
+      - will ignore the global options from the checkpoint file, and
+      - will use the ``compile_mode`` from the checkpoint (unless whoever calls this uses the ``compile_mode`` overriding context manager)
+    The script using this model builder is responsible for setting up the global options and potentially overriding the compile mode.
 
     Args:
         checkpoint_path (str): path to a ``nequip`` framework checkpoint file
@@ -48,11 +51,14 @@ def ModelFromCheckpoint(checkpoint_path: str):
 
 
 def ModelFromPackage(package_path: str):
-    """Builds model from a packaged zip file (with ``nequip-package``).
+    """Builds model from a NequIP framework packaged zip file constructed with ``nequip-package``.
 
     Args:
-        package_path (str): path to packaged model (a zip file)
+        package_path (str): path to NequIP framework packaged model with the ``.nequip.zip`` extension (an error will be thrown if the file has a different extension)
     """
+    assert str(package_path).endswith(
+        ".nequip.zip"
+    ), f"NequIP framework packaged files must have the `.nequip.zip` extension but found {str(package_path)}"
     with warnings.catch_warnings():
         # suppress torch.package TypedStorage warning
         warnings.filterwarnings(
