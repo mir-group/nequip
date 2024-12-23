@@ -49,10 +49,14 @@ The full set of options are found in the documentation of the [underlying object
 
 ## `training_module`
 
-`training_module` defines the `NequIPLightningModule` (or its subclasses). Users are directed to its [API page](../api/lightning_module.rst) to learn how to configure it. It is here that the following parameters are defined
- - the `model`
- - the `loss` and `metrics`
- - the `optimizer` and `lr_scheduler`
+`training_module` defines the `NequIPLightningModule` (or its subclasses). Users are directed to its [API page](../api/lightning_module.rst) to learn how to configure it. It is here that the following parameters are defined.
+ 
+ ### `model`
+
+ ### `loss` and `metrics`
+  All loss components and metrics are in the physcial units associated with the dataset. Note that this behavior of the loss is different from ``nequip < 0.7.0``, where the loss would have a different scale. In ``nequip >= 0.7.0``, the loss components are all in physical units. For example, if the dataset uses force units of eV/Å, a force mean-squared error (MSE) would have units of (eV/Å)²
+
+ ### `optimizer` and `lr_scheduler`
 
 ## `global_options`
 
