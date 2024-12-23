@@ -81,7 +81,7 @@ def _set_global_options(
       - ``_jit_fusion_strategy``
 
     Args:
-        warn_on_override: if True, will try to warn if new options are inconsistant with previously set ones.
+        warn_on_override: whether to warn if new options are inconsistent with previously set ones
     """
     # === update global config ===
     # NOTE: fixed fields are not reflected in the global config
@@ -93,7 +93,6 @@ def _set_global_options(
             "specialized_code": specialized_code,
             "optimize_einsums": optimize_einsums,
             "jit_script_fx": jit_script_fx,
-            "warn_on_override": warn_on_override,
         }
     )
 
