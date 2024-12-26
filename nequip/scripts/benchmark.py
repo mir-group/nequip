@@ -51,7 +51,7 @@ def main(args=None):
     )
     parser.add_argument(
         "--equivariance-test",
-        help="test the model's equivariance on `--n-data` frames.",
+        help="test the model's equivariance on `--num-batch` batches of frames.",
         action="store_true",
     )
     parser.add_argument(
