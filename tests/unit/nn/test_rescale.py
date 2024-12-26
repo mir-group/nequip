@@ -46,7 +46,6 @@ def test_rescale(
     # rescale_out is in default_dtype
     rescale_out = rescale(data)[AtomicDataDict.NODE_ATTRS_KEY]
 
-    # only default_dtype=float64 will be tested (see above pytest.skip check)
     # model_dtype can be float32 or float64
     # so we cast oh_out (model_dtype) to rescale_out (model_dtype) for testing
     oh_out = oh_out.to(dtype=rescale_out.dtype)
