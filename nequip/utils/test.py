@@ -140,6 +140,8 @@ def assert_permutation_equivariant(
             # Assume invariant
             if out_orig[k].dtype == torch.bool:
                 err = (out_orig[k] != out_perm[k]).max()
+            elif (out_orig[k].numel() == 0) and (out_perm[k].numel() == 0):
+                err = 0.0
             else:
                 err = (out_orig[k] - out_perm[k]).abs().max()
             fail = not torch.allclose(out_orig[k], out_perm[k], atol=atol)
@@ -208,6 +210,14 @@ def assert_AtomicData_equivariant(
         for k, v in irreps_out.items()
         if not (k in ("batch", "ptr") and "batch" not in data_in)
     }
+    # Assume that all data in `data_in` have the same keys
+    # remove empty outputs from irreps out by running one set of data through
+    data_in_0_copy = data_in[0].copy()
+    ref_out = func(data_in_0_copy)
+    for k, v in ref_out.items():
+        if v.numel() == 0 and k in irreps_out.keys():
+            _ = irreps_out.pop(k, None)
+
     # for certain things, we don't care what the given irreps are...
     # make sure that we test correctly for equivariance:
     for irps in (irreps_in, irreps_out):
@@ -255,6 +265,8 @@ def assert_AtomicData_equivariant(
                 assert val.shape[-1] == 9
                 arg_dict[key] = val.reshape(val.shape[:-1] + (3, 3))
         output = func(arg_dict)
+        # irreps_out has been purged of numel=0 fields by now
+        output = {k: output[k] for k, v in irreps_out.items() if k in output}
         # cell is a special case
         for key in (AtomicDataDict.CELL_KEY,):
             if key in output:
