@@ -39,7 +39,7 @@ def ModelFromCheckpoint(checkpoint_path: str):
         # TODO: or should we just throw an error
         if ckpt_version != session_version:
             warnings.warn(
-                f"`{code}` versions differ between the checkpoint file ({ckpt_version}) and the current run ({session_version}) -- current model will be built with the versions, check that this is the intended behavior"
+                f"`{code}` versions differ between the checkpoint file ({ckpt_version}) and the current run ({session_version}) -- `ModelFromCheckpoint` will be built with the current run's versions, but please check that this decision is as intended."
             )
 
     # === load model via lightning module ===
