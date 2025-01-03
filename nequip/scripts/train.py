@@ -53,7 +53,7 @@ def main(config: DictConfig) -> None:
 
     # ensure only single train at most, to protect restart and checkpointing logic later
     assert (
-        sum([run_type == "train" for run_type in runs]) == 1
+        sum([run_type == "train" for run_type in runs]) <= 1
     ), "only a single `train` instance can be present in `run`"
 
     # ensure that the relevant metrics are present
