@@ -21,6 +21,11 @@ class ConFIGLightningModule(NequIPLightningModule):
 
     Note:
       LR schedulers won't be able to monitor training metrics using this class -- which should not be a problem since LR schedulers should usually be monitoring validation metrics.
+
+
+    Args:
+        gradient_clip_val (Union[int, float, None]): gradient clipping value (default: ``None``, which disables gradient clipping)
+        gradient_clip_algorithm (Optional[str]): ``value`` to clip by value, or ``norm`` to clip by norm (default: ``norm``)
     """
 
     def __init__(
@@ -32,6 +37,8 @@ class ConFIGLightningModule(NequIPLightningModule):
         train_metrics: Optional[Dict] = None,
         val_metrics: Optional[Dict] = None,
         test_metrics: Optional[Dict] = None,
+        gradient_clip_val: Optional[float] = None,
+        gradient_clip_algorithm: Optional[str] = None,
         cpu_lsqr: bool = False,
         **kwargs,
     ):
@@ -97,6 +104,10 @@ class ConFIGLightningModule(NequIPLightningModule):
                 self.lr_scheduler_config["interval"] == "epoch"
             ), "only `interval=epoch` allowed for LR scheduling with `ConFIGLightningModule`"
             self.ConFIG_monitor = monitor
+
+        # gradient clipping
+        self.gradient_clip_val = gradient_clip_val
+        self.gradient_clip_algorithm = gradient_clip_algorithm
 
     def training_step(
         self, batch: AtomicDataDict.Type, batch_idx: int, dataloader_idx: int = 0
@@ -196,6 +207,13 @@ class ConFIGLightningModule(NequIPLightningModule):
             param_dict[name].grad = grad_entry.to(dtype=param_dict[name].dtype).view(
                 self.ConFIG_param_shape_list[idx]
             )
+
+        # === gradient clipping ===
+        self.clip_gradients(
+            opt,
+            gradient_clip_val=self.gradient_clip_val,
+            gradient_clip_algorithm=self.gradient_clip_algorithm,
+        )
 
         # === finally take step ===
         opt.step()
