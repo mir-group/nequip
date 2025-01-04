@@ -5,6 +5,7 @@ import os
 import os.path as osp
 import urllib
 import zipfile
+import tarfile
 from typing import Optional
 
 import logging
@@ -43,4 +44,20 @@ def extract_zip(path: str, folder: str) -> None:
         folder (str): the folder
     """
     with zipfile.ZipFile(path, "r") as f:
+        f.extractall(folder)
+
+
+def extract_tar(
+    path: str,
+    folder: str,
+    mode: str = "r:gz",
+) -> None:
+    r"""Extracts a tar archive to a specific folder.
+
+    Args:
+        path (str): the path to the tar archive
+        folder (str): the folder
+        mode (str): compression mode
+    """
+    with tarfile.open(path, mode) as f:
         f.extractall(folder)
