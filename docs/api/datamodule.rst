@@ -27,3 +27,6 @@ All data modules should (and would) share the following features
 
  .. autoclass:: nequip.data.datamodule.NequIP3BPADataModule
      :members:
+
+ .. autoclass:: nequip.data.datamodule.TM23DataModule
+     :members:
