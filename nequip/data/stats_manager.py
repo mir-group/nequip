@@ -10,9 +10,6 @@ from nequip.utils.logger import RankedLogger
 logger = RankedLogger(__name__, rank_zero_only=True)
 
 
-# TODO: add stride support
-
-
 class DataStatisticsManager(torch.nn.ModuleList):
     """Manages ``nequip`` metrics that can be applied to ``AtomicDataDict`` s to compute dataset statistics.
 
