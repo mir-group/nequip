@@ -16,7 +16,7 @@ jobs:
     strategy:
       matrix:
         python-version: [3.9]
-        torch-version: [1.13.1, 2.5]
+        torch-version: [2.2.0, "2.*"]
 
     steps:
     - uses: actions/checkout@v2
@@ -31,10 +31,9 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install setuptools wheel
-        if [ ${TORCH} = "1.13.1" ]; then pip install numpy==1.*; fi  # older torch versions fail with numpy 2
         pip install torch==${TORCH} -f https://download.pytorch.org/whl/cpu/torch_stable.html
         pip install h5py scikit-learn  # install packages that aren't required dependencies but that the tests do need
-        pip install  --upgrade-strategy only-if-needed .
+        pip install --upgrade-strategy only-if-needed .
     - name: Install pytest
       run: |
         pip install pytest
