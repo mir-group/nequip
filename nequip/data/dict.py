@@ -161,7 +161,7 @@ def from_dict(data: Dict) -> AtomicDataDict.Type:
                 v.shape[0] == N_frames
             ), f"Leading dimension of registered graph field {k} should be {N_frames}, but found shape {v.shape}."
 
-            # TODO: consider removing -- why not?
+            # NOTE: special tensors that we keep as (num_frames,)
             if v.dim() == 1 and k not in [AtomicDataDict.NUM_NODES_KEY]:
                 data[k] = v.reshape((N_frames, 1))
 
@@ -170,7 +170,7 @@ def from_dict(data: Dict) -> AtomicDataDict.Type:
                 v.shape[0] == N_nodes
             ), f"Leading dimension of registered node field {k} should be {N_nodes}, but found shape {v.shape}."
 
-            # TODO: consider removing -- why not?
+            # NOTE: special tensors that we keep as (num_nodes,)
             if v.dim() == 1 and k not in [
                 AtomicDataDict.BATCH_KEY,
                 AtomicDataDict.ATOMIC_NUMBERS_KEY,
