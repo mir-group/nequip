@@ -8,10 +8,10 @@ import torchmetrics
 # torch version checks
 torch_version = packaging.version.parse(torch.__version__.split("+")[0])
 
-# only allow 1.13* or higher
+# only allow 2.2.* or higher, required for `lightning` and `torchmetrics` compatibility
 assert torch_version >= packaging.version.parse(
-    "1.13"
-), f"NequIP supports 1.13.* or later, but {torch_version} found"
+    "2.2"
+), f"NequIP supports 2.2.* or later, but {torch_version} found"
 
 # torchmetrics >= 1.6.0 for ddp autograd
 # https://github.com/Lightning-AI/torchmetrics/releases/tag/v1.6.0
