@@ -6,7 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Most recent change on the bottom.
 
-## Unreleased - next major
+## Unreleased - 0.7.0
 
 ### Added
  - migrate to `Lightning`, `torchmetrics` and `hydra` (and `omegaconf`) based infrastructure
@@ -32,8 +32,9 @@ Most recent change on the bottom.
  - [Breaking] NequIP's `Trainer`, `Loss`, `Metrics`
  - [Breaking] most remaining `torch.geometric` code, except for some utility functions 
  - [Breaking] removed `ForceOutput` (use `StressForceOutput` instead)
+ - [Breaking] minimum `torch` version bumped to `2.2.0`
 
-## Unreleased - 0.7.0
+## Unreleased - Stale
 ### Added
 - `--override` now supported as a `nequip-train` flag (similar to its use in `nequip-deploy`)
 - add SoftAdapt (https://arxiv.org/abs/2403.18122) callback option
