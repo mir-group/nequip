@@ -1,11 +1,5 @@
 import pytest
-
-from e3nn import o3
-
-from nequip.nn import AtomwiseLinear
 from nequip.utils.unittests.model_tests import BaseEnergyModelTests
-
-from hydra.utils import instantiate
 
 
 BASIC_INFO = {
@@ -98,20 +92,3 @@ class TestNequIPModel(BaseEnergyModelTests):
         config = request.param
         config = config.copy()
         return config
-
-    # TODO: fix this test at some point (annoying because it's model specific)
-    @pytest.mark.skip("ignore for now")
-    def test_submods(self):
-        config = minimal_config2.copy()
-        model = instantiate(config, _recursive_=False)
-        chemical_embedding = model.model.chemical_embedding
-        assert isinstance(chemical_embedding, AtomwiseLinear)
-        true_irreps = o3.Irreps(minimal_config2["chemical_embedding_irreps_out"])
-        assert (
-            chemical_embedding.irreps_out[chemical_embedding.out_field] == true_irreps
-        )
-        # Make sure it propagates
-        assert (
-            model.model.layer0_convnet.irreps_in[chemical_embedding.out_field]
-            == true_irreps
-        )
