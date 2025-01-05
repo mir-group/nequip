@@ -79,28 +79,26 @@ def with_edge_vectors_(
         )
         if AtomicDataDict.CELL_KEY in data:
             # ^ note that to save time we don't check that the edge_cell_shifts are trivial if no cell is provided; we just assume they are either not present or all zero.
-            # -1 gives a batch dim no matter what
+            # NOTE: ASE cell vectors as rows convention
             cell = data[AtomicDataDict.CELL_KEY]
             edge_cell_shift = data[edge_cell_shift_field]
             if AtomicDataDict.BATCH_KEY in data:
-                batch = data[AtomicDataDict.BATCH_KEY]
-                # Cell has a batch dimension
-                # note the ASE cell vectors as rows convention
-                edge_vec = edge_vec + torch.einsum(
-                    "ni,nij->nj",
-                    edge_cell_shift,
-                    cell[batch[edge_index[0]]],
+                # treat batched cell case
+                edge_indexed_batches = torch.index_select(
+                    data[AtomicDataDict.BATCH_KEY], 0, edge_index[0]
                 )
-                # TODO: is there a more efficient way to do the above without
-                # creating an [n_edge] and [n_edge, 3, 3] tensor?
+                # nj <- n1j <- n1j + n1i @ nij
+                edge_vec = torch.baddbmm(
+                    edge_vec.view(-1, 1, 3),
+                    edge_cell_shift.view(-1, 1, 3),
+                    torch.index_select(cell, 0, edge_indexed_batches),
+                ).view(-1, 3)
+                # TODO: is there a more efficient way to do the above without creating an [n_edge] and [n_edge, 3, 3] tensor?
             else:
                 # if batch key absent, we assume that cell has batch dims 1,
-                # so we can avoid creating the large intermediate cell tensor.
-                # ni, ij -> nj
-                edge_vec = edge_vec + torch.matmul(
-                    edge_cell_shift,
-                    cell.squeeze(0),  # remove batch dimension
-                )
+                # so we can avoid creating the large intermediate cell tensor
+                # nj <- nj + ni @ ij
+                edge_vec = torch.addmm(edge_vec, edge_cell_shift, cell.view(3, 3))
         data[edge_vec_field] = edge_vec
         if with_lengths:
             data[edge_len_field] = torch.linalg.norm(edge_vec, dim=-1)
