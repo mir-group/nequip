@@ -22,10 +22,11 @@ class ConFIGLightningModule(NequIPLightningModule):
     Note:
       LR schedulers won't be able to monitor training metrics using this class -- which should not be a problem since LR schedulers should usually be monitoring validation metrics.
 
-
     Args:
         gradient_clip_val (Union[int, float, None]): gradient clipping value (default: ``None``, which disables gradient clipping)
         gradient_clip_algorithm (Optional[str]): ``value`` to clip by value, or ``norm`` to clip by norm (default: ``norm``)
+        cpu_lsqr (bool): whether to perform least squares solve on CPU (default: ``False``)
+        norm_eps (float): small value to avoid division by zero during normalization (default: ``1e-8``)
     """
 
     def __init__(
@@ -40,6 +41,7 @@ class ConFIGLightningModule(NequIPLightningModule):
         gradient_clip_val: Optional[float] = None,
         gradient_clip_algorithm: Optional[str] = None,
         cpu_lsqr: bool = False,
+        norm_eps: float = 1e-8,
         **kwargs,
     ):
         super().__init__(
@@ -85,9 +87,7 @@ class ConFIGLightningModule(NequIPLightningModule):
         ]
 
         # === method specific hyperparameters ===
-        # TODO: does eps need a model_dtype dependence?
-        # TODO: should this be a user-controlled hyperparameter?
-        self.ConFIG_eps = 1e-8  # hardcode for now
+        self.ConFIG_eps = norm_eps
         self.ConFIG_cpu_lsqr = cpu_lsqr
 
         # temporary narrow solution to accommodate only ReduceLROnPlateau LR scheduling
