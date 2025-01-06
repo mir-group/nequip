@@ -131,6 +131,9 @@ class NequIPLightningModule(lightning.LightningModule):
         # use "/" as delimiter for loggers to automatically categorize logged metrics
         self.logging_delimiter = "/"
 
+        # for statefulness of the run stage
+        self.register_buffer("run_stage", torch.zeros((1), dtype=torch.long))
+
     def configure_optimizers(self):
         """"""
         # currently support 1 optimizer and 1 scheduler

@@ -46,7 +46,7 @@ def main(config: DictConfig) -> None:
         "run" in config
     ), "`run` must provided in the config -- it is a list that could include `train`, `val`, `test`, and/or `predict`."
     if isinstance(config.run, ListConfig) or isinstance(config.run, list):
-        runs = config.run
+        runs = list(config.run)
     else:
         runs = [config.run]
     assert all([run_type in ["train", "val", "test", "predict"] for run_type in runs])
@@ -114,8 +114,11 @@ def main(config: DictConfig) -> None:
         "data": data,
         "trainer": trainer_cfg,
         "global_options": _get_latest_global_options(),
+        "runs": runs,
     }
 
+    # `run_index` is used to restore the run stage from a checkpoint if restarting from one
+    run_index = 0
     if "ckpt_path" in config:
         # === instantiate from checkpoint file ===
         # dataset statistics need not be recalculated
@@ -126,13 +129,26 @@ def main(config: DictConfig) -> None:
         # everything else can be overriden
         # see https://lightning.ai/docs/pytorch/stable/common/checkpointing_basic.html
 
-        # get model info from checkpoint
+        # === load checkpoint ===
         # for options see https://pytorch.org/docs/stable/generated/torch.load.html
         checkpoint = torch.load(
             config.ckpt_path,
             map_location="cpu",
             weights_only=False,
         )
+
+        # check that runs from checkpoint match runs from config
+        ckpt_runs = checkpoint["hyper_parameters"]["info_dict"]["runs"]
+        # only check up to `len(ckpt_runs)` to allow for additional run stages added after
+        assert all(
+            [runs[idx] == ckpt_runs[idx] for idx in range(len(ckpt_runs))]
+        ), f"`run` from checkpoint  must match the `run` from the config up to the length of the checkpoint `run` list, but mismatch found -- checkpoint: `{ckpt_runs}`, config: `{runs}`"
+
+        # get run index
+        # "run_stage" is registered as a buffer in NequIPLightningModule to preserve run state
+        run_index = checkpoint["state_dict"]["run_stage"].item()
+
+        # get model info from checkpoint
         ckpt_training_module = checkpoint["hyper_parameters"]["info_dict"][
             "training_module"
         ]["_target_"]
@@ -207,7 +223,8 @@ def main(config: DictConfig) -> None:
     # - val/test/predict from ckpt would use the `nequip_module` from the ckpt (and so uses `ckpt_path=None`)
     # - if we train, then val/test/predict, we set `ckpt_path="best"` after training so val/test/predict tasks after that will use the "best" model
     ckpt_path = None
-    for run_type in runs:
+    while run_index < len(runs):
+        run_type = runs[run_index]
         if run_type == "train":
             ckpt_path = config.get("ckpt_path", None)
             logger.info("TRAIN RUN START")
@@ -226,6 +243,9 @@ def main(config: DictConfig) -> None:
             logger.info("PREDICT RUN START")
             trainer.predict(nequip_module, datamodule=datamodule, ckpt_path=ckpt_path)
             logger.info("PREDICT RUN END")
+        # update `run_index` and update it in `nequip_module`'s state dict
+        run_index += 1
+        nequip_module.run_stage[0] = run_index
     return
 
 
