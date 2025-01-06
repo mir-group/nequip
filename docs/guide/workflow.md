@@ -25,14 +25,23 @@ Users are advised to look at `configs/tutorial.yaml` to understand how the confi
 
 Checkpointing behavior is controlled by `Lightning` and configuring it is the onus of the user. Checkpointing can be controlled by flags in Lightning's [trainer](https://lightning.ai/docs/pytorch/stable/common/trainer.html) and can be specified even further with Lightning's [ModelCheckpoint callback](https://lightning.ai/docs/pytorch/stable/api/lightning.pytorch.callbacks.ModelCheckpoint.html#lightning.pytorch.callbacks.ModelCheckpoint).
 
-One can continue training from a checkpoint file with the following command
+
+### Restarts
+If a run is interrupted, one can continue training from a checkpoint file with the following command
 ```bash
 nequip-train -cp full/path/to/config/directory -cn config_name.yaml ++ckpt_path='path/to/ckpt_file'
 ```
-where we have used Hydra's [override syntax](https://hydra.cc/docs/advanced/override_grammar/basic/) (`++`). Note how one must still specify the config file used. Training from a checkpoint will always use the model from the checkpoint file, but other training hyperparameters (dataset, loss, metrics, callbacks, etc) is determined by the config file passed in the restart `nequip-train` (and can therefore be different from that of the original config used to generate the checkpoint).
+where we have used Hydra's [override syntax](https://hydra.cc/docs/advanced/override_grammar/basic/) (`++`). Note how one must still specify the config file used. Training from a checkpoint will always use the model from the checkpoint file, but other training hyperparameters (dataset, loss, metrics, callbacks, etc) is determined by the config file passed in the restart `nequip-train` (and can therefore be different from that of the original config used to generate the checkpoint). The restart will also resume from the last `run` stage (i.e. `train`, `val`, `test`, etc) that was running before the interruption.
 
-Note that the working directories are managed by Hydra, and users can configure how these directories behave, as well as pass these directories to `Lightning` objects (e.g. so that model checkpoints are saved in the Hydra generated directories). Visit Hydra's [output/working directory page](https://hydra.cc/docs/tutorials/basic/running_your_app/working_directory/) to learn more.
+```{warning}
+In general, the config should not be modified between restarts.  There are no safety checks to guard against nonsensical changes to the config used for restarts. It is the user's responsibility to ensure that any changes made are intended and reasonable. Users are advised to have a working understanding of how [checkpointing](https://lightning.ai/docs/pytorch/stable/common/checkpointing_basic.html) works under the hood with a sense of what training states are preserved upon restarting from checkpoints if one seeks to restart a run with an altered config file. 
 
+In general, it is safest to restart without changes to the original config. If one seeks to train a model from a checkpoint file with very different training hyperparameters or datasets (e.g. for fine-tuning), one can use the `ModelFromCheckpoint` [model builder](../api/model).
+```
+
+```{tip}
+Working directories are managed by Hydra, and users can configure how these directories behave, as well as pass these directories to `Lightning` objects (e.g. so that model checkpoints are saved in the Hydra generated directories). Visit Hydra's [output/working directory page](https://hydra.cc/docs/tutorials/basic/running_your_app/working_directory/) to learn more.
+```
 
 ## Testing
 
