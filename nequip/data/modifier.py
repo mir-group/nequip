@@ -45,17 +45,22 @@ class PerAtomModifier(BaseModifier):
 
     Args:
         field (str): graph field to be normalized (e.g. ``total_energy``)
+        factor (float): optional factor to scale the field by (e.g. for unit conversions, etc)
     """
 
-    def __init__(self, field: str) -> None:
+    def __init__(self, field: str, factor: Optional[float] = None) -> None:
         assert field in _key_registry._GRAPH_FIELDS
         super().__init__(field)
+        self._factor = factor
 
     def _func(self, data: AtomicDataDict.Type) -> torch.Tensor:
         num_atoms = (
             data[AtomicDataDict.NUM_NODES_KEY].reciprocal().reshape(-1)
         )  # (N_graph,)
-        return torch.einsum("n..., n -> n...", data[self.field], num_atoms)
+        normed = torch.einsum("n..., n -> n...", data[self.field], num_atoms)
+        if self._factor is not None:
+            normed = self._factor * normed
+        return normed
 
     def __str__(self) -> str:
         return "per_atom_" + _key_registry.ABBREV.get(self.field, self.field)
