@@ -1,5 +1,5 @@
 from ._graph_mixin import GraphModuleMixin, SequentialGraphNetwork
-from ._graph_model import GraphModel
+from .graph_model import GraphModel
 from .compile import CompileGraphModel
 from ._atomwise import (
     AtomwiseOperation,

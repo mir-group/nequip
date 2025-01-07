@@ -1,7 +1,7 @@
 import torch
 
 from nequip.data import AtomicDataDict
-from ._graph_model import GraphModel
+from .graph_model import GraphModel
 from ._graph_mixin import GraphModuleMixin
 from nequip.utils.fx import nequip_make_fx
 
