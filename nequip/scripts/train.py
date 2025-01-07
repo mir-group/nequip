@@ -49,7 +49,12 @@ def main(config: DictConfig) -> None:
         runs = list(config.run)
     else:
         runs = [config.run]
-    assert all([run_type in ["train", "val", "test", "predict"] for run_type in runs])
+    for run_type in runs:
+        # don't have to be too safe for the `function` run type since it's advanced usage anyway
+        assert (
+            run_type in ["train", "val", "test", "predict"]
+            or "function" in run_type.keys()
+        ), f"`run` list can only contain `train`, `val`, `test`, or `predict`, but found {run_type}"
 
     # ensure only single train at most, to protect restart and checkpointing logic later
     assert (
@@ -243,6 +248,8 @@ def main(config: DictConfig) -> None:
             logger.info("PREDICT RUN START")
             trainer.predict(nequip_module, datamodule=datamodule, ckpt_path=ckpt_path)
             logger.info("PREDICT RUN END")
+        else:
+            instantiate(run_type["function"], training_module=nequip_module)
         # update `run_index` and update it in `nequip_module`'s state dict
         run_index += 1
         nequip_module.run_stage[0] = run_index
