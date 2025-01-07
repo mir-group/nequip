@@ -65,6 +65,7 @@ def model_builder(func):
         # this means we're in the outer model, and have to apply the model builder operations
         _IS_BUILDING_MODEL.set(True)
         try:
+            model_cfg = kwargs.copy()
             # === sanity checks ===
             assert all(
                 key in kwargs for key in ["seed", "model_dtype", "type_names"]
@@ -105,8 +106,7 @@ def model_builder(func):
                         # wrap with GraphModel
                         graph_model = graph_model_module(
                             model=model,
-                            type_names=kwargs["type_names"],
-                            model_dtype=dtype,
+                            model_config=model_cfg,
                             model_input_fields=model.irreps_in,
                         )
             return graph_model
