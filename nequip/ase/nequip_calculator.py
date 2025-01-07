@@ -5,17 +5,13 @@ import torch
 from ase.calculators.calculator import Calculator, all_changes
 from ase.stress import full_3x3_to_voigt_6_stress
 
-from nequip.nn import GraphModel
+from nequip.nn import graph_model
 from nequip.model.from_save import ModelFromCheckpoint, ModelFromPackage
-from nequip.model import model_metadata
 from nequip.data import AtomicDataDict, from_ase
 from nequip.data.transforms import (
     ChemicalSpeciesToAtomTypeMapper,
     NeighborListTransform,
 )
-
-
-# TODO: handle global options setting
 
 
 class NequIPCalculator(Calculator):
@@ -35,7 +31,7 @@ class NequIPCalculator(Calculator):
 
     def __init__(
         self,
-        model: GraphModel,
+        model: graph_model.GraphModel,
         device: Union[str, torch.device],
         energy_units_to_eV: float = 1.0,
         length_units_to_A: float = 1.0,
@@ -74,12 +70,11 @@ class NequIPCalculator(Calculator):
             ckpt_path (str): path to checkpoint file
             device (torch.device): the device to use
             chemical_symbols (List[str] or Dict[str, str]): mapping between chemical symbols and model type names
-            set_global_options (str or bool): whether to set global options
+            set_global_options (str/bool): ``True``, ``False``, or ``"warn"``
         """
         return cls._from_save(
             save_path=ckpt_path,
             model_getter=ModelFromCheckpoint,
-            metadata_getter=model_metadata.model_metadata_from_checkpoint,
             device=device,
             chemical_symbols=chemical_symbols,
             set_global_options=set_global_options,
@@ -101,12 +96,11 @@ class NequIPCalculator(Calculator):
             package_path (str): path to packaged model
             device (torch.device): the device to use
             chemical_symbols (List[str] or Dict[str, str]): mapping between chemical symbols and model type names
-            set_global_options (str or bool): whether to set global options
+            set_global_options (str/bool): ``True``, ``False``, or ``"warn"``
         """
         return cls._from_save(
             save_path=package_path,
             model_getter=ModelFromPackage,
-            metadata_getter=model_metadata.model_metadata_from_package,
             device=device,
             chemical_symbols=chemical_symbols,
             set_global_options=set_global_options,
@@ -118,21 +112,19 @@ class NequIPCalculator(Calculator):
         cls,
         save_path: str,
         model_getter: Callable,
-        metadata_getter: Callable,
         device: Union[str, torch.device] = "cpu",
         chemical_symbols: Optional[Union[List[str], Dict[str, str]]] = None,
         set_global_options: Union[str, bool] = "warn",
         **kwargs,
     ):
-        model = model_getter(save_path)
+        model = model_getter(save_path, set_global_options)
         model.eval()
         model.to(device)
 
-        metadata = metadata_getter(save_path)
-        r_max = float(metadata[model_metadata.R_MAX_KEY])
+        r_max = float(model.metadata[graph_model.R_MAX_KEY])
 
         if chemical_symbols is None:
-            type_names = metadata[model_metadata.TYPE_NAMES_KEY].split(" ")
+            type_names = model.metadata[graph_model.TYPE_NAMES_KEY].split(" ")
             # Default to species names
             warnings.warn(
                 "Trying to use model type names as chemical symbols; this may not be correct for your model (and may cause an error if model type names are not chemical symbols)! To avoid this warning, please provide `chemical_symbols` explicitly."
