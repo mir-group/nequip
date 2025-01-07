@@ -69,4 +69,5 @@ def ModelFromPackage(package_path: str):
         )
         imp = torch.package.PackageImporter(package_path)
         model = imp.load_pickle(package="model", resource="model.pkl")
+    # NOTE: model returned is not a GraphModel object tied to the `nequip` in current Python env, but a GraphModel object from the packaged zip file
     return model
