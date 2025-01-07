@@ -112,12 +112,8 @@ def _set_global_options(
             torch.backends.cudnn.allow_tf32 = allow_tf32
 
     # this applies for torch >= 1.11 (our minimum torch version satisfies this)
-    new_strat = _JIT_FUSION_STRATEGY
-    old_strat = torch.jit.set_fusion_strategy(new_strat)
-    if warn_on_override and old_strat != new_strat:
-        warnings.warn(
-            f"Setting the GLOBAL value for jit fusion strategy to `{new_strat}` which is different than the previous value of `{old_strat}`"
-        )
+    # since we hardcode it, there's no need to warn
+    _ = torch.jit.set_fusion_strategy(_JIT_FUSION_STRATEGY)
 
     # Deal with fusers
     # The default PyTorch fuser changed to nvFuser in 1.12
