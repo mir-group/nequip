@@ -58,8 +58,6 @@ def model(model_dtype, request):
                     "sum": sum_reduce,
                 },
             ),
-            model_dtype=dtype_from_name(model_dtype),
-            type_names=type_names,
         )
     return model
 

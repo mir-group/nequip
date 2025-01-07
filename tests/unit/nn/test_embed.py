@@ -19,8 +19,9 @@ def test_onehot(model_dtype, CH3CHO):
         oh = OneHotAtomEncoding(
             type_names=["A", "B", "C"],
         )
+        gm = GraphModel(oh)
     assert_auto_jitable(oh)
-    assert_AtomicData_equivariant(_wrap(oh, mdtype), data)
+    assert_AtomicData_equivariant(gm, data)
 
 
 def test_spharm(model_dtype, CH3CHO):
@@ -28,8 +29,9 @@ def test_spharm(model_dtype, CH3CHO):
     mdtype = dtype_from_name(model_dtype)
     with torch_default_dtype(mdtype):
         sph = SphericalHarmonicEdgeAttrs(irreps_edge_sh="0e + 1o + 2e")
+        gm = GraphModel(sph)
     assert_auto_jitable(sph)
-    assert_AtomicData_equivariant(_wrap(sph, mdtype), data)
+    assert_AtomicData_equivariant(gm, data)
 
 
 def test_radial_basis(model_dtype, CH3CHO):
@@ -43,10 +45,7 @@ def test_radial_basis(model_dtype, CH3CHO):
                 "bessel": BesselEdgeLengthEncoding(cutoff=PolynomialCutoff(6)),
             }
         )
+        gm = GraphModel(rad)
     assert_auto_jitable(rad.edge_norm)
     assert_auto_jitable(rad.bessel)
-    assert_AtomicData_equivariant(_wrap(rad, mdtype), data)
-
-
-def _wrap(module, dtype):
-    return GraphModel(module, ["A", "B", "C"], dtype)
+    assert_AtomicData_equivariant(gm, data)

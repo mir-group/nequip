@@ -23,8 +23,6 @@ def test_rescale(
             OneHotAtomEncoding(
                 type_names=["A", "B", "C"],
             ),
-            model_dtype=dtype_from_name(model_dtype),
-            type_names=["A", "B", "C"],
         )
 
     rescale = RescaleOutput(

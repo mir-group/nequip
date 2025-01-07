@@ -107,8 +107,6 @@ def test_basic(model_dtype):
                     "linear": linear,
                 }
             ),
-            model_dtype=dtype_from_name(model_dtype),
-            type_names=["A", "B", "C", "D"],
         )
     out = model(
         {
