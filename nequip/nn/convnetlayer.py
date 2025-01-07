@@ -5,7 +5,7 @@ from e3nn.nn import Gate, NormActivation
 
 from nequip.data import AtomicDataDict
 from ._graph_mixin import GraphModuleMixin
-from ._interaction_block import InteractionBlock
+from .interaction_block import InteractionBlock
 from .nonlinearities import ShiftedSoftPlus
 from .utils import tp_path_exists
 

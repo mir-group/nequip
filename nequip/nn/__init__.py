@@ -8,9 +8,9 @@ from ._atomwise import (
     PerTypeScaleShift,
 )
 from .interaction_block import InteractionBlock
+from .convnetlayer import ConvNetLayer
 from ._grad_output import GradientOutput, PartialForceOutput, ForceStressOutput
 from .rescale import RescaleOutput
-from ._convnetlayer import ConvNetLayer
 from .misc import Concat, ApplyFactor, SaveForOutput
 from .utils import scatter, tp_path_exists, with_edge_vectors_
 
