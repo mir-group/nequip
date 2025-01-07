@@ -27,6 +27,7 @@ def _training_session(conffile, model_dtype, BENCHMARK_ROOT):
             if "data_source_dir" in config.data:
                 config.data.data_source_dir = data_tmpdir
             config.training_module.model.model_dtype = model_dtype
+            config.data.val_dataloader_kwargs.batch_size = 1
             with open_dict(config):
                 config["hydra"] = {"run": {"dir": tmpdir}}
             config = OmegaConf.create(config)

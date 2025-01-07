@@ -52,6 +52,8 @@ def test_batch_invariance(fake_model_training_session):
 
         # == test training loss reproduced ==
         new_train_loss = nequip_module.loss.metrics_values_epoch
+        print(orig_train_loss)
+        print(new_train_loss)
         assert len(orig_train_loss) == len(new_train_loss)
         assert all(
             [
@@ -62,7 +64,8 @@ def test_batch_invariance(fake_model_training_session):
 
         # == test val metrics invariance to batch size ==
         batchsize1_val_metrics = nequip_module.val_metrics[0].metrics_values_epoch
-
+        print(batchsize5_val_metrics)
+        print(batchsize1_val_metrics)
         assert len(batchsize5_val_metrics) == len(batchsize1_val_metrics)
         assert all(
             [
@@ -155,4 +158,4 @@ def test_restarts(fake_model_training_session):
                     math.isclose(a, b, rel_tol=tol)
                     for a, b in zip(restart_val_metrics, oneshot_val_metrics)
                 ]
-            )
+            ), [restart_val_metrics, oneshot_val_metrics]
