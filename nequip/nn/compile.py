@@ -76,11 +76,10 @@ class CompileGraphModel(GraphModel):
     def __init__(
         self,
         model: GraphModuleMixin,
-        type_names: List[str],
-        model_dtype: Optional[torch.dtype] = None,
+        model_config: Optional[Dict[str, str]] = None,
         model_input_fields: Dict[str, Any] = {},
     ) -> None:
-        super().__init__(model, type_names, model_dtype, model_input_fields)
+        super().__init__(model, model_config, model_input_fields)
         # save model param and buffer names
         self.weight_names = [n for n, _ in self.model.named_parameters()]
         self.buffer_names = [n for n, _ in self.model.named_buffers()]
