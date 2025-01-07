@@ -23,6 +23,7 @@ def ModelFromCheckpoint(
 
       - will ignore the global options from the checkpoint file, and
       - will use the ``compile_mode`` from the checkpoint (unless whoever calls this uses the ``compile_mode`` overriding context manager)
+
     The script using this model builder is responsible for setting up the global options and potentially overriding the compile mode.
 
     Args:
@@ -58,7 +59,15 @@ def ModelFromCheckpoint(
         checkpoint["hyper_parameters"]["info_dict"]["training_module"]["_target_"]
     )
     lightning_module = training_module.load_from_checkpoint(checkpoint_path)
-    return lightning_module.model
+    model = lightning_module.model
+
+    # load EMA weights if EMA model is present
+    if lightning_module.ema_model is not None:
+        # check if the `ema_model` is holding the EMA weights before transferring
+        if lightning_module.ema_model.ema_weights:
+            lightning_module.ema_model.swap_parameters(model)
+
+    return model
 
 
 def ModelFromPackage(
