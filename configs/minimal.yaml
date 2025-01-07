@@ -52,6 +52,9 @@ trainer:
     - _target_: lightning.pytorch.callbacks.ModelCheckpoint
       dirpath: ${hydra:runtime.output_dir}
       save_last: true
+    - _target_: nequip.train.callbacks.NeMoExponentialMovingAverage
+      decay: 0.99
+      every_n_steps: 1
 
 training_module:
   _target_: nequip.train.NequIPLightningModule
@@ -65,11 +68,17 @@ training_module:
           _target_: nequip.train.MeanSquaredError
   val_metrics: 
     _target_: nequip.train.MetricsManager
-    metrics:
-      - name: force_RMSE
-        field: forces
+    metrics:  
+      - name: E_MAE
+        field: total_energy
+        coeff: 1
         metric:
-          _target_: nequip.train.RootMeanSquaredError
+          _target_: nequip.train.MeanAbsoluteError
+      - name: force_MAE
+        field: forces
+        coeff: 1
+        metric:
+          _target_: nequip.train.MeanAbsoluteError
   test_metrics: ${training_module.val_metrics}
   optimizer:
     _target_: torch.optim.Adam
