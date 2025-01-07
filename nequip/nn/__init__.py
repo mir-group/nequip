@@ -7,7 +7,7 @@ from ._atomwise import (
     AtomwiseLinear,
     PerTypeScaleShift,
 )
-from ._interaction_block import InteractionBlock
+from .interaction_block import InteractionBlock
 from ._grad_output import GradientOutput, PartialForceOutput, ForceStressOutput
 from .rescale import RescaleOutput
 from ._convnetlayer import ConvNetLayer
