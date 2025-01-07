@@ -5,6 +5,7 @@ import torch
 from ase.calculators.calculator import Calculator, all_changes
 from ase.stress import full_3x3_to_voigt_6_stress
 
+from nequip.nn import GraphModel
 from nequip.model.from_save import ModelFromCheckpoint, ModelFromPackage
 from nequip.model import model_metadata
 from nequip.data import AtomicDataDict, from_ase
@@ -14,6 +15,9 @@ from nequip.data.transforms import (
 )
 
 
+# TODO: handle global options setting
+
+
 class NequIPCalculator(Calculator):
     """NequIP ASE Calculator.
 
@@ -21,13 +25,17 @@ class NequIPCalculator(Calculator):
 
         If you are running MD with custom species, please make sure to set the correct masses for ASE.
 
+    Args:
+        model (nequip.nn.GraphModel): NequIP GraphModel object
+        device (str/torch.device): device for model to evlauate on, e.g. ``cpu`` or ``cuda``
+        transforms (List[Callable]): list of data transforms
     """
 
     implemented_properties = ["energy", "energies", "forces", "stress", "free_energy"]
 
     def __init__(
         self,
-        model: torch.nn.Module,
+        model: GraphModel,
         device: Union[str, torch.device],
         energy_units_to_eV: float = 1.0,
         length_units_to_A: float = 1.0,
@@ -36,11 +44,17 @@ class NequIPCalculator(Calculator):
     ):
         Calculator.__init__(self, **kwargs)
         self.results = {}
+
+        # === handle model ===
+        assert (
+            not model.training
+        ), "make sure to call .eval() on model before building NequIPCalculator"
         self.model = model
-        assert isinstance(
-            model, torch.nn.Module
-        ), "To build a NequIPCalculator from a packaged model, use NequIPCalculator.from_packaged_model"
+
+        # === handle device ===
         self.device = device
+
+        # === data details ===
         self.energy_units_to_eV = energy_units_to_eV
         self.length_units_to_A = length_units_to_A
         self.transforms = transforms
@@ -54,7 +68,8 @@ class NequIPCalculator(Calculator):
         set_global_options: Union[str, bool] = "warn",
         **kwargs,
     ):
-        """
+        """Creates a NequIPCalculator from a checkpoint file.
+
         Args:
             ckpt_path (str): path to checkpoint file
             device (torch.device): the device to use
@@ -80,7 +95,8 @@ class NequIPCalculator(Calculator):
         set_global_options: Union[str, bool] = "warn",
         **kwargs,
     ):
-        """
+        """Creates a NequIPCalculator from a package file.
+
         Args:
             package_path (str): path to packaged model
             device (torch.device): the device to use
@@ -109,14 +125,14 @@ class NequIPCalculator(Calculator):
         **kwargs,
     ):
         model = model_getter(save_path)
-        model.to(device)
         model.eval()
+        model.to(device)
+
         metadata = metadata_getter(save_path)
         r_max = float(metadata[model_metadata.R_MAX_KEY])
 
-        # build typemapper
-        type_names = metadata[model_metadata.TYPE_NAMES_KEY].split(" ")
         if chemical_symbols is None:
+            type_names = metadata[model_metadata.TYPE_NAMES_KEY].split(" ")
             # Default to species names
             warnings.warn(
                 "Trying to use model type names as chemical symbols; this may not be correct for your model (and may cause an error if model type names are not chemical symbols)! To avoid this warning, please provide `chemical_symbols` explicitly."
@@ -139,25 +155,17 @@ class NequIPCalculator(Calculator):
         )
 
     def calculate(self, atoms=None, properties=["energy"], system_changes=all_changes):
-        """
-        Calculate properties.
-
-        :param atoms: ase.Atoms object
-        :param properties: [str], properties to be computed, used by ASE internally
-        :param system_changes: [str], system changes since last calculation, used by ASE internally
-        :return:
-        """
+        """"""
         # call to base-class to set atoms attribute
         Calculator.calculate(self, atoms)
 
-        # prepare data
-        # TODO handle from_ase kwargs?
+        # === prepare data ===
         data = from_ase(atoms)
         for t in self.transforms:
             data = t(data)
         data = AtomicDataDict.to_(data, self.device)
 
-        # predict + extract data
+        # === predict + extract data ===
         out = self.model(data)
         self.results = {}
         # only store results the model actually computed to avoid KeyErrors
@@ -169,7 +177,7 @@ class NequIPCalculator(Calculator):
                 .numpy()
                 .reshape(tuple())
             )
-            # "force consistant" energy
+            # "force consistent" energy
             self.results["free_energy"] = self.results["energy"]
         if AtomicDataDict.PER_ATOM_ENERGY_KEY in out:
             self.results["energies"] = self.energy_units_to_eV * (
