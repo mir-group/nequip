@@ -14,7 +14,6 @@ from torch.utils.benchmark.utils.common import trim_sigfig, select_unit
 from e3nn.util.jit import script
 
 from nequip.model import ModelFromCheckpoint
-from nequip.model.model_metadata import model_metadata_from_checkpoint
 from nequip.utils import get_current_code_versions, RankedLogger
 from nequip.utils._global_options import _set_global_options
 from nequip.utils.test import assert_AtomicData_equivariant
@@ -193,7 +192,7 @@ def main(args=None):
     else:
         print("Loading model...")
         model = ModelFromCheckpoint(args.ckpt_path)
-        metadata = model_metadata_from_checkpoint(args.ckpt_path)
+        metadata = model.metadata
         print("    model has metadata:")
         print(
             "\n".join(
