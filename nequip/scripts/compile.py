@@ -3,7 +3,6 @@ import torch
 from e3nn.util.jit import script
 
 from nequip.model import (
-    model_metadata,
     override_model_compile_mode,
     ModelFromPackage,
     ModelFromCheckpoint,
@@ -12,12 +11,7 @@ from nequip.data import AtomicDataDict, compile_utils
 from nequip.utils.logger import RankedLogger
 from nequip.utils.compile import prepare_model_for_compile
 from nequip.utils.aot import aot_export_model
-from nequip.utils._global_options import (
-    _set_global_options,
-    _get_latest_global_options,
-    GLOBAL_OPTIONS_METADATA_KEYS,
-)
-
+from nequip.utils._global_options import _get_latest_global_options
 from omegaconf import OmegaConf
 import hydra
 
@@ -25,6 +19,7 @@ import yaml
 import argparse
 import pathlib
 from typing import Final
+
 
 # === setup logging ===
 hydra.core.utils.configure_log(None)
@@ -208,45 +203,20 @@ def main(args=None):
             ".nequip.pt2"
         ), "`output-path` must end with the `.nequip.pt2` extension for `aotinductor` compile mode"
 
-    # === get metadata and set global options ===
-    if use_ckpt:
-        # TODO: this is duplicated from nequip-package, there is room for simplification, but it's unclear if we should be abstracting stuff into a function that sets global options as a side effect
-        # === load checkpoint and extract info ===
-        checkpoint = torch.load(
-            args.ckpt_path,
-            map_location="cpu",
-            weights_only=False,
-        )
-
-        # == get global options from checkpoint and set them ==
-        global_options = checkpoint["hyper_parameters"]["info_dict"]["global_options"]
-        _set_global_options(**global_options)
-
-        # == get metadata ==
-        # = model metadata =
-        metadata = model_metadata.model_metadata_from_config(
-            checkpoint["hyper_parameters"]["model"]
-        )
-
-        # = global metadata =
-        global_options_metadata = _get_latest_global_options(only_metadata_related=True)
-        metadata.update(global_options_metadata)
-    else:
-        metadata = model_metadata.model_metadata_from_package(args.package_path)
-        _set_global_options(
-            seed=_COMPILE_SEED,
-            **{key: metadata[key] for key in GLOBAL_OPTIONS_METADATA_KEYS},
-        )
-    # ensure bool -> int for metadata
-    metadata = {k: int(v) if isinstance(v, bool) else v for k, v in metadata.items()}
-
-    # === load model ===
+    # === set global options and load model ===
     logger.debug("Loading model ...")
     if use_ckpt:
         with override_model_compile_mode(compile_mode=None):
-            model = ModelFromCheckpoint(args.ckpt_path)
+            model = ModelFromCheckpoint(args.ckpt_path, set_global_options=True)
     else:
-        model = ModelFromPackage(args.package_path)
+        model = ModelFromPackage(args.package_path, set_global_options=True)
+
+    # === combine model and global options metadata ===
+    global_options_metadata = _get_latest_global_options(only_metadata_related=True)
+    metadata = model.metadata.copy()
+    metadata.update(global_options_metadata)
+    # ensure bool -> int for metadata
+    metadata = {k: int(v) if isinstance(v, bool) else v for k, v in metadata.items()}
 
     logger.debug(model)
 
