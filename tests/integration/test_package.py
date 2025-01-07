@@ -5,7 +5,8 @@ import subprocess
 import numpy as np
 import torch
 
-from nequip.model import model_metadata
+from nequip.model import ModelFromPackage
+from nequip.nn import graph_model
 from nequip.data import to_ase
 from nequip.ase import NequIPCalculator
 
@@ -42,11 +43,11 @@ def test_package(BENCHMARK_ROOT, fake_model_training_session, device):
     assert package_path.is_file(), "`nequip-package` didn't create file"
 
     # === load model and check that metadata saved ===
-    metadata = model_metadata.model_metadata_from_package(package_path)
+    metadata = ModelFromPackage(package_path).metadata
     assert np.allclose(
-        float(metadata[model_metadata.R_MAX_KEY]), config.training_module.model.r_max
+        float(metadata[graph_model.R_MAX_KEY]), config.training_module.model.r_max
     )
-    assert len(metadata[model_metadata.TYPE_NAMES_KEY].split(" ")) == len(
+    assert len(metadata[graph_model.TYPE_NAMES_KEY].split(" ")) == len(
         config.training_module.model.type_names
     )
 
