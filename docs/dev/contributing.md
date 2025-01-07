@@ -8,8 +8,9 @@
 
  - Prioritize **extensibility** and **configurability** in core abstractions, we can also make simpler user-interfaces when needed.
  - It is preferable to add features with more code (e.g. subclassing core abstractions) than with more options (e.g. by adding new arguments to core abstractions) wherever possible.
- 
- 
+ - Correct `nequip-train` restart-ability must be preserved with any code changes or additions
+
+
 ## Code Standards
 
  ### Unittests
@@ -38,7 +39,9 @@
   
   You can also use ``pre-commit install`` to install a [pre-commit](https://pre-commit.com/) hook.
 
+  ```{tip}
   You may need to install `black`, `flake8` and `Flake8-pyproject` (to read the `flake8` settings from `pyproject.toml`) to run the linter and formatter locally. If using a development IDE such as `VSCode` or `PyCharm`, you may need to update the default `flake8` config to match these settings (also listed in `pyproject.toml`).
+  ```
 
  ### Git Practices
 
