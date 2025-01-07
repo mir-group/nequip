@@ -11,11 +11,10 @@ import numpy as np  # noqa: F401
 import torch
 
 from nequip.data.compile_utils import data_dict_from_checkpoint
-from nequip.model.model_metadata import model_metadata_from_config
 from nequip.model import ModelFromCheckpoint, override_model_compile_mode
 from nequip.utils.logger import RankedLogger
 from nequip.utils.versions import get_current_code_versions
-from nequip.utils._global_options import _set_global_options, _get_latest_global_options
+
 from ..__init__ import _DISCOVERED_NEQUIP_EXTENSION
 
 import os
@@ -91,37 +90,12 @@ def main(args=None):
         weights_only=False,
     )
 
-    # == get global options from checkpoint and set them ==
-    global_options = checkpoint["hyper_parameters"]["info_dict"]["global_options"]
-    _set_global_options(**global_options)
-
-    # == get metadata ==
-    metadata: dict = {}
-    # = model metadata =
-    model_metadata = model_metadata_from_config(checkpoint["hyper_parameters"]["model"])
-    metadata.update(model_metadata)
-
-    # = global metadata =
-    global_options_metadata = _get_latest_global_options(only_metadata_related=True)
-    metadata.update(global_options_metadata)
-
     # === text files to save ===
-    # == metadata ==
-    metadata = yaml.dump(
-        metadata,
-        default_flow_style=False,
-    )
-    logger.debug("Metadata:\n" + metadata)
-
     # == original config ==
     orig_config = checkpoint["hyper_parameters"]["info_dict"].copy()
     # remove version info
     orig_config.pop("versions")
-    orig_config = yaml.dump(
-        OmegaConf.to_yaml(orig_config),
-        default_flow_style=False,
-        default_style=">",
-    )
+    orig_config = OmegaConf.to_yaml(orig_config)
 
     # == version info ==
     version_info = yaml.dump(
@@ -132,7 +106,7 @@ def main(args=None):
     # == build model from checkpoint ==
     # pickle model without torchscript or torch.compile
     with override_model_compile_mode(compile_mode=None):
-        model = ModelFromCheckpoint(args.ckpt_path)
+        model = ModelFromCheckpoint(args.ckpt_path, set_global_options=True)
 
     # == get example data from checkpoint ==
     # the reason for including it here is that whoever receives the packaged model file does not need to have access to the original data source to do `nequip-compile` on the packaged model (AOT export requires example data)
@@ -164,7 +138,6 @@ def main(args=None):
                 obj=data,
                 dependencies=True,
             )
-            exp.save_text("model", "metadata.yaml", metadata)
             exp.save_text("model", "config.yaml", orig_config)
             exp.save_text("model", "versions.txt", version_info)
 
