@@ -137,7 +137,6 @@ class NequIPCalculator(Calculator):
 
         return cls(
             model=model,
-            r_max=r_max,
             device=device,
             transforms=[
                 ChemicalSpeciesToAtomTypeMapper(chemical_symbols),
