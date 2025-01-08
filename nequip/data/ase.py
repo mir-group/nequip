@@ -219,9 +219,10 @@ def to_ase(
             if AtomicDataDict.FORCE_KEY in frame:
                 fields["forces"] = frame[AtomicDataDict.FORCE_KEY].numpy()
             if AtomicDataDict.STRESS_KEY in frame:
-                fields["stress"] = full_3x3_to_voigt_6_stress(
-                    frame[AtomicDataDict.STRESS_KEY].reshape((3, 3)).numpy()
-                )
+                if frame[AtomicDataDict.STRESS_KEY].numel() != 0:
+                    fields["stress"] = full_3x3_to_voigt_6_stress(
+                        frame[AtomicDataDict.STRESS_KEY].reshape((3, 3)).numpy()
+                    )
             mol.calc = SinglePointCalculator(mol, **fields)
 
         # add other information
