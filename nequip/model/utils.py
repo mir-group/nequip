@@ -91,7 +91,9 @@ def model_builder(func):
             # compile mode overriding logic
             if _OVERRIDE_COMPILE_MODE.get():
                 compile_mode = _DEFAULT_COMPILE_MODE.get()
-            assert compile_mode in _COMPILE_MODE_OPTIONS
+            assert (
+                compile_mode in _COMPILE_MODE_OPTIONS
+            ), f"`compile_mode` can only be any of {_COMPILE_MODE_OPTIONS}, but `{compile_mode}` found"
             graph_model_module = (
                 CompileGraphModel if compile_mode == "compile" else GraphModel
             )
