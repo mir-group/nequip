@@ -4,9 +4,12 @@ from lightning.pytorch.utilities.warnings import PossibleUserWarning
 from hydra.utils import instantiate
 from hydra.utils import get_method
 from nequip.data import AtomicDataDict
+from nequip.model import override_model_compile_mode
+from nequip.nn.ema_model import ExponentialMovingAverageModel
 from nequip.utils import RankedLogger
+
 import warnings
-from typing import Optional, Dict
+from typing import Optional, Dict, Callable, Any, Union
 
 
 logger = RankedLogger(__name__, rank_zero_only=True)
@@ -23,18 +26,18 @@ warnings.filterwarnings(
 class NequIPLightningModule(lightning.LightningModule):
     """LightningModule for training, validating, testing and predicting with models constructed in the NequIP ecosystem.
 
-    Data
-    ####
+    **Data**
+
     The ``NequIPLightningModule`` supports a single ``train`` dataset, but multiple ``val`` and ``test`` datasets.
 
-    Run Types and Metrics
-    #####################
+    **Run Types and Metrics**
+
     - For ``train`` runs, users must provide ``loss`` and ``val_metrics``. The ``loss`` is computed on the training dataset to train the model, and requires each metric to have a corresponding coefficient that will be used to generate a ``weighted_sum``. This ``weighted_sum`` is the loss function that will be minimized over the course of training. ``val_metrics`` is computed on the validation dataset(s) for monitoring. Additionally, users may provide ``train_metrics`` to monitor metrics on the training dataset.
     - For ``val`` runs, users must provide ``val_metrics``.
     - For ``test`` runs, users must provide ``test_metrics``.
 
-    Logging Conventions
-    ###################
+    **Logging Conventions**
+
     Logging is performed for the ``train``, ``val``, and ``test`` datasets.
 
     During ``train`` runs,
@@ -47,8 +50,14 @@ class NequIPLightningModule(lightning.LightningModule):
 
     Logging Format
       * ``/`` is used as a delimiter for to exploit the automatic grouping functionality of most loggers. Logged metrics will have the form ``train_{loss/metric}_{step/epoch}/{metric_name}`` and ``{val/test}{data_idx}_epoch/{metric_name}``. For example, ``train_loss_step/force_MSE``, ``train_metric_epoch/E_MAE``, ``val0_epoch/F_RMSE``, etc.
-      * Note that this may have implications on how one would set the parameters for the ``ModelCheckpoint`` callback, i.e. if the name of a metric is used in the checkpoint file's name, the ``/`` will cause a directory to be created when instead a file is desired.
+      * Note that this may have implications on how one would set the parameters for the `ModelCheckpoint <https://lightning.ai/docs/pytorch/stable/api/lightning.pytorch.callbacks.ModelCheckpoint.html>`_ callback, i.e. if the name of a metric is used in the checkpoint file's name, the ``/`` will cause a directory to be created when instead a file is desired.
 
+    **Exponential Moving Average Models**
+
+    If ``ema_decay`` is configured (not ``None``), an exponential moving average (EMA) of the model weights are maintained. Validation and test metrics will be that of the EMA weight model. If EMA is used, models loaded from checkpoint files (except during restarts) will always be the model with EMA weights. Specifically, the EMA models will be the ones loaded in the ``NequIPCalculator``, compiled with ``nequip-compile``, or packaged with ``nequip-package``.
+
+    Args:
+        ema_decay (float): decay constant for the exponential moving average (EMA) of model weights (default ``None``)
     """
 
     def __init__(
@@ -60,6 +69,7 @@ class NequIPLightningModule(lightning.LightningModule):
         train_metrics: Optional[Dict] = None,
         val_metrics: Optional[Dict] = None,
         test_metrics: Optional[Dict] = None,
+        ema_decay: Optional[float] = None,
         **kwargs,
     ):
         super().__init__()
@@ -109,11 +119,14 @@ class NequIPLightningModule(lightning.LightningModule):
             assert (
                 self.loss.do_weighted_sum
             ), "`coeff` must be set for entries of the `loss` MetricsManager for a weighted sum of metrics components to be used as the loss."
+        self.loss.eval()
 
         # == instantiate other metrics ==
         self.train_metrics = instantiate(
             train_metrics, type_names=self.model.type_names
         )
+        if self.train_metrics is not None:
+            self.train_metrics.eval()
         # may need to instantate multiple instances to account for multiple val and test datasets
         self.val_metrics = torch.nn.ModuleList(
             [
@@ -121,18 +134,34 @@ class NequIPLightningModule(lightning.LightningModule):
                 for _ in range(self.num_datasets["val"])
             ]
         )
+        if self.val_metrics is not None:
+            self.val_metrics.eval()
         self.test_metrics = torch.nn.ModuleList(
             [
                 instantiate(test_metrics, type_names=self.model.type_names)
                 for _ in range(self.num_datasets["test"])
             ]
         )
+        if self.test_metrics is not None:
+            self.test_metrics.eval()
 
         # use "/" as delimiter for loggers to automatically categorize logged metrics
         self.logging_delimiter = "/"
 
         # for statefulness of the run stage
         self.register_buffer("run_stage", torch.zeros((1), dtype=torch.long))
+
+        # === EMA ===
+        # we keep an `ema_model` attribute in both cases, to tell `ModelFromCheckpoint` if it should load the EMA model
+        if ema_decay is not None:
+            # set up EMA model
+            with override_model_compile_mode(compile_mode=None):
+                ema_model = model_builder(**model)
+            self.ema_model = ExponentialMovingAverageModel(ema_model, decay=ema_decay)
+            # initialization update
+            self.ema_model.update_parameters(self.model)
+        else:
+            self.ema_model = None
 
     def configure_optimizers(self):
         """"""
@@ -187,6 +216,23 @@ class NequIPLightningModule(lightning.LightningModule):
         )
         return loss
 
+    def optimizer_step(
+        self,
+        epoch: int,
+        batch_idx: int,
+        optimizer: Union[
+            torch.optim.Optimizer, lightning.pytorch.core.optimizer.LightningOptimizer
+        ],
+        optimizer_closure: Optional[Callable[[], Any]] = None,
+    ) -> None:
+        """"""
+        # note that this function is meant to be overriden by subclasses
+        optimizer.step(closure=optimizer_closure)
+        # this function is overriden to do the EMA update
+        # only start EMA updates after one epoch
+        if self.ema_model is not None:
+            self.ema_model.update_parameters(self.model)
+
     def on_train_epoch_end(self):
         """"""
         # optionally compute training metrics
@@ -208,18 +254,21 @@ class NequIPLightningModule(lightning.LightningModule):
     ):
         """"""
         target = batch.copy()
-        output = self(batch)
 
+        # === update basic val metrics ===
+        output = self(batch)
         with torch.no_grad():
             metric_dict = self.val_metrics[dataloader_idx](
                 output,
                 target,
                 prefix=f"val{dataloader_idx}_step{self.logging_delimiter}",
             )
+
         return metric_dict
 
     def on_validation_epoch_end(self):
         """"""
+        # === reset basic val metrics ===
         for idx, metrics in enumerate(self.val_metrics):
             metric_dict = metrics.compute(
                 prefix=f"val{idx}_epoch{self.logging_delimiter}"
@@ -232,8 +281,9 @@ class NequIPLightningModule(lightning.LightningModule):
     ):
         """"""
         target = batch.copy()
-        output = self(batch)
 
+        # === update basic test metrics ===
+        output = self(batch)
         with torch.no_grad():
             metric_dict = self.test_metrics[dataloader_idx](
                 output,
@@ -241,13 +291,67 @@ class NequIPLightningModule(lightning.LightningModule):
                 prefix=f"test{dataloader_idx}_step{self.logging_delimiter}",
             )
         metric_dict.update({f"test_{dataloader_idx}_output": output})
+
         return metric_dict
 
     def on_test_epoch_end(self):
         """"""
+        # === reset basic test metrics ===
         for idx, metrics in enumerate(self.test_metrics):
             metric_dict = metrics.compute(
                 prefix=f"test{idx}_epoch{self.logging_delimiter}"
             )
             self.log_dict(metric_dict)
             metrics.reset()
+
+    # The EMA model and the base model have their weights swapped before and after validation, testing, prediction tasks
+    # The purpose is to take advantage of the compiled state of the base model (torchscript or torch.compile)
+    # the purpose of the `ema_model.ema_weights` attribute is to safeguard against unexpected load scenarios where
+    # `self.model` holds the EMA weights and `self.ema_model` holds the raw weights (we don't expect this to happen, but just in case ...)
+    def on_validation_start(self):
+        if self.ema_model is not None:
+            if not self.ema_model.ema_weights:
+                raise RuntimeError(
+                    "The EMA model holds the base model's weights at the start of validation. If starting from a checkpoint, the checkpoint is likely corrupted. Otherwise, there is something wrong and a GitHub issue should be reported."
+                )
+            self.ema_model.swap_parameters(self.model)
+
+    def on_validation_end(self):
+        if self.ema_model is not None:
+            if self.ema_model.ema_weights:
+                raise RuntimeError(
+                    "The EMA model holds the base model's weights at the end of validation. If starting from a checkpoint, the checkpoint is likely corrupted. Otherwise, there is something wrong and a GitHub issue should be reported."
+                )
+            self.ema_model.swap_parameters(self.model)
+
+    def on_test_start(self):
+        if self.ema_model is not None:
+            if not self.ema_model.ema_weights:
+                raise RuntimeError(
+                    "The EMA model holds the base model's weights at the start of testing. If starting from a checkpoint, the checkpoint is likely corrupted. Otherwise, there is something wrong and a GitHub issue should be reported."
+                )
+            self.ema_model.swap_parameters(self.model)
+
+    def on_test_end(self):
+        if self.ema_model is not None:
+            if self.ema_model.ema_weights:
+                raise RuntimeError(
+                    "The EMA model holds the base model's weights at the end of testing. If starting from a checkpoint, the checkpoint is likely corrupted. Otherwise, there is something wrong and a GitHub issue should be reported."
+                )
+            self.ema_model.swap_parameters(self.model)
+
+    def on_predict_start(self):
+        if self.ema_model is not None:
+            if not self.ema_model.ema_weights:
+                raise RuntimeError(
+                    "The EMA model holds the base model's weights at the start of prediction. If starting from a checkpoint, the checkpoint is likely corrupted. Otherwise, there is something wrong and a GitHub issue should be reported."
+                )
+            self.ema_model.swap_parameters(self.model)
+
+    def on_predict_end(self):
+        if self.ema_model is not None:
+            if self.ema_model.ema_weights:
+                raise RuntimeError(
+                    "The EMA model holds the base model's weights at the end of prediction. If starting from a checkpoint, the checkpoint is likely corrupted. Otherwise, there is something wrong and a GitHub issue should be reported."
+                )
+            self.ema_model.swap_parameters(self.model)
