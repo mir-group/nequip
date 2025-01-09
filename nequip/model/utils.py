@@ -31,9 +31,6 @@ def override_model_compile_mode(compile_mode: Optional[str] = None):
     global _OVERRIDE_COMPILE_MODE
     global _DEFAULT_COMPILE_MODE
     init_state = _OVERRIDE_COMPILE_MODE.get()
-    assert (
-        not init_state
-    ), "`_OVERRIDE_COMPILE_MODE` is already `True` -- something is wrong"
     init_mode = _DEFAULT_COMPILE_MODE.get()
     _OVERRIDE_COMPILE_MODE.set(True)
     _DEFAULT_COMPILE_MODE.set(compile_mode)
