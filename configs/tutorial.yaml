@@ -13,9 +13,8 @@
 run: [train, test]
 
 
-# the following parameters (cutoff_radius, chemical_symbols, model_type_names) are not used direcly by the code
-# parameters that take thier values show up multiple times in the config, so this allows us to use
-# variable interpolation to keep their multiple instances consistent
+# the following parameters (cutoff_radius, chemical_symbols, model_type_names, monitored_metric) are not used direcly by the code
+# parameters that take thier values show up multiple times in the config, so this allows us to use variable interpolation to keep their multiple instances consistent
 
 # data and model r_max can be different (model's r_max should be smaller), but we try to make them the same
 cutoff_radius: 5.0
@@ -31,6 +30,9 @@ cutoff_radius: 5.0
 # This ensures a single location where the values are set to reduce the chances of mis-configuring runs.
 chemical_symbols: [C, H, O, Cu] 
 model_type_names: ${chemical_symbols}
+
+# We want a metric to condition training on (e.g. for best `ModelCheckpoint`, `EarlyStopping`, LR scheduling) which will show up in various places later on, so we set up a "single source of truth" to interpolate
+monitored_metric: val0_epoch/weighted_sum
 
 
 # data is managed by LightningDataModules
@@ -133,13 +135,13 @@ trainer:
 
     # stop training when some criterion is met
     - _target_: lightning.pytorch.callbacks.EarlyStopping
-      monitor: val0_epoch/weighted_sum        # validation metric to monitor
+      monitor: ${monitored_metric}            # validation metric to monitor
       min_delta: 1e-3                         # how much to be considered a "change"
       patience: 20                            # how many instances of "no change" before stopping
 
     # checkpoint based on some criterion
     - _target_: lightning.pytorch.callbacks.ModelCheckpoint
-      monitor: val0_epoch/weighted_sum        # validation metric to monitor
+      monitor: ${monitored_metric}            # validation metric to monitor
       dirpath: ${hydra:runtime.output_dir}    # use hydra output directory
       filename: best                          # best.ckpt is the checkpoint name
       save_last: true                         # last.ckpt will be saved
@@ -148,14 +150,16 @@ trainer:
     - _target_: lightning.pytorch.callbacks.LearningRateMonitor
       logging_interval: epoch
 
-    # use EMA for smoother validation curves and thus more reliable metrics for monitoring
-    - _target_: nequip.train.callbacks.NeMoExponentialMovingAverage
-      decay: 0.99
-      every_n_steps: 1
 
 # training_module refers to a NequIPLightningModule
 training_module:
   _target_: nequip.train.NequIPLightningModule
+
+  # We are using an EMA model (i.e. we keep a separate model whose weights are an exponential moving average of the base model's weights)
+  # The use of an EMA model is configured by setting `ema_decay` to be a float (e.g. 0.999) under `training_module` (it is a `NequIPLightningModule` argument). The default of `ema_decay` is None, which means an EMA model is not used, if `ema_decay` is not explicitly configured
+  # EMA allows for smoother validation curves and thus more reliable metrics for monitoring
+  # Loading from a checkpoint for use in the `nequip.ase.NequIPCalculator` or during `nequip-compile` and `nequip-package` will always load the EMA model if it's present
+  ema_decay: 0.999
 
   # use a MetricsManager (see docs) to construct the loss function
   loss:
@@ -226,7 +230,7 @@ training_module:
       patience: 5
       threshold: 0.2
       min_lr: 1e-6
-    monitor: val0_epoch/weighted_sum
+    monitor: ${monitored_metric}
     interval: epoch
     frequency: 1
 
