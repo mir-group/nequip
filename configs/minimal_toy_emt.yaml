@@ -1,13 +1,13 @@
 run: [train, test]
 
+seed: 1
+cutoff_radius: 5.0
 chemical_symbols: [Cu]
 model_type_names: ${chemical_symbols}
-cutoff_radius: 4.0
 
-data_seed: 456
 data:
   _target_: nequip.data.datamodule.NequIPDataModule
-  seed: ${data_seed}
+  seed: ${seed}
   split_dataset:
     dataset:
       _target_: nequip.data.dataset.EMTTestDataset
@@ -17,17 +17,18 @@ data:
         - _target_: nequip.data.transforms.ChemicalSpeciesToAtomTypeMapper
           chemical_symbols: ${chemical_symbols}
       supercell: [4, 4, 4]
-      seed: ${data_seed}
+      seed: ${seed}
       num_frames: 50
       element: Cu
     train: 30
     val: 10
     test: 10
   train_dataloader_kwargs:
-    batch_size: 2
+    batch_size: 5
   val_dataloader_kwargs:
     batch_size: 5
-  test_dataloader_kwargs: ${data.train_dataloader_kwargs}
+  test_dataloader_kwargs: 
+    batch_size: 5
   stats_manager:
     _target_: nequip.data.DataStatisticsManager
     metrics:
@@ -51,21 +52,21 @@ trainer:
   _target_: lightning.Trainer
   max_epochs: 5
   check_val_every_n_epoch: 1
-  log_every_n_steps: 3
+  log_every_n_steps: 5
   callbacks:
     - _target_: lightning.pytorch.callbacks.ModelCheckpoint
+      monitor: val0_epoch/weighted_sum
       dirpath: ${hydra:runtime.output_dir}
+      filename: best
       save_last: true
     - _target_: nequip.train.callbacks.TestTimeXYZFileWriter
       out_file: ${hydra:runtime.output_dir}/test
       output_fields_from_original_dataset: [total_energy, forces, stress]
       chemical_symbols: ${chemical_symbols}
-    - _target_: nequip.train.callbacks.NeMoExponentialMovingAverage
-      decay: 0.99
-      every_n_steps: 1
 
 training_module:
   _target_: nequip.train.NequIPLightningModule
+  ema_decay: 0.999
   loss:
     _target_: nequip.train.MetricsManager
     metrics:
@@ -108,18 +109,18 @@ training_module:
   test_metrics: ${training_module.val_metrics}
   optimizer:
     _target_: torch.optim.Adam
-
+    lr: 0.01
   model:
     _target_: nequip.model.NequIPGNNModel
     # basic model params
-    seed: 456
-    model_dtype: float32
+    seed: ${seed}
+    model_dtype: float64
     type_names: ${model_type_names}
     r_max: ${cutoff_radius}
     # general model params
     l_max: 1
     parity: true
-    num_layers: 4
+    num_layers: 3
     num_features: 16
     radial_mlp_depth: 1
     radial_mlp_width: 8
@@ -129,4 +130,4 @@ training_module:
     avg_num_neighbors: ${training_data_stats:num_neighbors_mean}
 
 global_options:
-  seed: 789
+  seed: ${seed}
