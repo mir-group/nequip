@@ -94,6 +94,13 @@ class TestTimeXYZFileWriter(Callback):
                     output_out["original_dataset_energy"] = batch["total_energy"]
                 else:
                     output_out["original_dataset_" + field] = batch[field]
+
+            # !! EXTREMELY IMPORTANT -- special handling of PBC key if present !!
+            # ASE data inputs would possess it to be used at data precprocessing time (i.e. neighborlist construction)
+            # but it won't be passed through the model, so we get it from `batch`
+            if AtomicDataDict.PBC_KEY in batch:
+                output_out[AtomicDataDict.PBC_KEY] = batch[AtomicDataDict.PBC_KEY]
+
             # append to the file
             ase.io.write(
                 self.out_file + f"_dataset{dataloader_idx}.xyz",
