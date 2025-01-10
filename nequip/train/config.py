@@ -38,6 +38,7 @@ class ConFIGLightningModule(NequIPLightningModule):
         train_metrics: Optional[Dict] = None,
         val_metrics: Optional[Dict] = None,
         test_metrics: Optional[Dict] = None,
+        ema_decay: Optional[float] = None,
         gradient_clip_val: Optional[float] = None,
         gradient_clip_algorithm: Optional[str] = None,
         cpu_lsqr: bool = False,
@@ -52,6 +53,7 @@ class ConFIGLightningModule(NequIPLightningModule):
             train_metrics=train_metrics,
             val_metrics=val_metrics,
             test_metrics=test_metrics,
+            ema_decay=ema_decay,
             **kwargs,
         )
         # see https://lightning.ai/docs/pytorch/stable/common/optimization.html#id2
@@ -218,6 +220,10 @@ class ConFIGLightningModule(NequIPLightningModule):
         # === finally take step ===
         opt.step()
 
+        # === update EMA model if present ===
+        if self.ema_model is not None:
+            self.ema_model.update_parameters(self.model)
+
         # apply the DDP loss rescale, as usual (we already did this for the individual loss terms above before calling  `manual_backward` on them)
         loss = (
             loss_dict[f"train_loss_step{self.logging_delimiter}weighted_sum"]
@@ -227,12 +233,15 @@ class ConFIGLightningModule(NequIPLightningModule):
 
     def on_validation_epoch_end(self):
         """"""
+        # === reset basic val metrics ===
         for idx, metrics in enumerate(self.val_metrics):
             metric_dict = metrics.compute(
                 prefix=f"val{idx}_epoch{self.logging_delimiter}"
             )
             self.log_dict(metric_dict)
             metrics.reset()
+
+        # === ReduceLROnPlateau scheduler ===
         sch = self.lr_schedulers()
         if sch is not None:
             sch.step(metric_dict[self.ConFIG_monitor])
