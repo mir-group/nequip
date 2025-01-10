@@ -71,6 +71,9 @@ DIELECTRIC_KEY: Final[str] = "dielectric_tensor"
 BORN_CHARGE_KEY: Final[str] = "born_effective_charges"
 POLARIZATION_KEY: Final[str] = "polarization"
 
+# metadata for a frame/graph
+FRAME_SUBSET_KEY: Final[str] = "subset"
+
 # batch related keys
 BATCH_KEY: Final[str] = "batch"
 NUM_NODES_KEY: Final[str] = "num_atoms"

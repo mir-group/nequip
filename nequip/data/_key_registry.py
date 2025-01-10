@@ -16,6 +16,7 @@ _DEFAULT_LONG_FIELDS: Set[str] = {
     _keys.ATOM_TYPE_KEY,
     _keys.BATCH_KEY,
     _keys.NUM_NODES_KEY,
+    _keys.FRAME_SUBSET_KEY,
 }
 _DEFAULT_GRAPH_FIELDS: Set[str] = {
     _keys.TOTAL_ENERGY_KEY,
@@ -28,6 +29,7 @@ _DEFAULT_GRAPH_FIELDS: Set[str] = {
     _keys.TOTAL_MAGMOM_KEY,
     _keys.POLARIZATION_KEY,
     _keys.DIELECTRIC_KEY,
+    _keys.FRAME_SUBSET_KEY,
 }
 _DEFAULT_NODE_FIELDS: Set[str] = {
     _keys.POSITIONS_KEY,
