@@ -7,3 +7,4 @@ Python API
   train
   nn
   model
+  ase
