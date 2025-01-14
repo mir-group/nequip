@@ -25,6 +25,7 @@ data:
     batch_size: 5
   stats_manager:
     _target_: nequip.data.DataStatisticsManager
+    type_names: ${model_type_names}
     dataloader_kwargs:
       batch_size: 10
     metrics:

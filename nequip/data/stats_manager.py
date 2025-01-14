@@ -35,7 +35,7 @@ class DataStatisticsManager(torch.nn.ModuleList):
     Args:
         metrics (list): list of dictionaries with keys ``field``, ``metric``, ``per_type``, ``ignore_nan``, and ``name``
         dataloader_kwargs (dict): arguments of `torch.utils.data.DataLoader <https://pytorch.org/docs/stable/data.html#torch.utils.data.DataLoader>`_ for dataset statitstics computation (ideally, the ``batch_size`` should be as large as possible without triggering OOM)
-        type_names (list): required for ``per_type`` metrics (if this class is used in ``nequip-train``, this is automatically handled such that users need not explicitly fill in this field in the config)
+        type_names (list): required for ``per_type`` metrics (this must match the ``type_names`` argument of the model, it is advisable to use variable interpolation in the config file to make sure they are consistent)
     """
 
     def __init__(

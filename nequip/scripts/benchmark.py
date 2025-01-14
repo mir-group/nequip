@@ -109,12 +109,7 @@ def main(args=None):
 
     # === instantiate datamodule ===
     logger.info("Building datamodule ...")
-
-    # == silently include type_names in stats_manager if present ==
-    assert "type_names" in config.training_module.model
     data = OmegaConf.to_container(config.data, resolve=True)
-    if "stats_manager" in data:
-        data["stats_manager"]["type_names"] = config.training_module.model.type_names
     datamodule = instantiate(data, _recursive_=False)
     assert isinstance(datamodule, NequIPDataModule)
 

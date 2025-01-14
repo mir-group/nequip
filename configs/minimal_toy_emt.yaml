@@ -31,6 +31,7 @@ data:
     batch_size: 5
   stats_manager:
     _target_: nequip.data.DataStatisticsManager
+    type_names: ${model_type_names}
     metrics:
       - field:
           _target_: nequip.data.NumNeighbors

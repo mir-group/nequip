@@ -85,6 +85,9 @@ data:
     # `batch_size` should ideally be as large as possible without trigerring OOM
     dataloader_kwargs:
       batch_size: 10
+    # we need to provide the same type names that correspond to the model's `type_names`
+    # so we interpolate the "central source of truth" model type names from above
+    type_names: ${model_type_names}
     metrics:
       - field:
           _target_: nequip.data.NumNeighbors
