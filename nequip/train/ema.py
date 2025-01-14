@@ -229,11 +229,13 @@ class EMAWeights(torch.nn.Module):
         assert (
             self.is_holding_ema_weights
         ), "EMA module loaded in a state where it does not contain EMA weights -- the checkpoint file is likely corrupted."
-        if self.decay != state["decay"]:
+
+        # handle possibility of restarts overwriting `decay`
+        state_dict_decay = state["decay"]
+        if self.decay != state_dict_decay:
             warnings.warn(
-                "EMA decay parameter set is different from the one loaded -- make sure this is intended."
+                f"EMA decay parameter loaded from state dict ({state_dict_decay}) is different from EMA decay parameter set ({self.decay}) -- make sure this is intended (e.g. you have intentionally overriden `ema_decay` in a restart). The current decay value ({self.decay}) will be used."
             )
-        self.decay = state["decay"]
 
     def get_extra_state(self):
         """"""
