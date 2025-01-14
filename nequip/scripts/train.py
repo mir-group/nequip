@@ -249,6 +249,13 @@ def main(config: DictConfig) -> None:
             trainer.predict(nequip_module, datamodule=datamodule, ckpt_path=ckpt_path)
             logger.info("PREDICT RUN END")
         else:
+            # TODO: make sure we load the correct `best` checkpoint model state dict before using `function`
+            # TODO: make sure the model is set up to perform evaluations (e.g. EMA model is tricky)
+            # for now this is unsupported
+            if "function" in run_type:
+                assert NotImplementedError(
+                    "`function` run type is not ready for use yet"
+                )
             instantiate(run_type["function"], training_module=nequip_module)
         # update `run_index` and update it in `nequip_module`'s state dict
         run_index += 1
