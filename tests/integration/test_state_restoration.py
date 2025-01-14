@@ -93,15 +93,16 @@ def test_state_restoration(BENCHMARK_ROOT, fake_model_training_session, device):
             E_ref = atoms.get_potential_energy()
             F_ref = atoms.get_forces()
 
-            atoms.calc = ckpt_calc
-            ckpt_E = atoms.get_potential_energy()
-            ckpt_F = atoms.get_forces()
+            ckpt_atoms, package_atoms = atoms.copy(), atoms.copy()
+            ckpt_atoms.calc = ckpt_calc
+            ckpt_E = ckpt_atoms.get_potential_energy()
+            ckpt_F = ckpt_atoms.get_forces()
 
-            atoms.calc = package_calc
-            package_E = atoms.get_potential_energy()
-            package_F = atoms.get_forces()
+            package_atoms.calc = package_calc
+            package_E = package_atoms.get_potential_energy()
+            package_F = package_atoms.get_forces()
 
-            del atoms
+            del atoms, ckpt_atoms, package_atoms
             E_err = np.max(np.abs((ckpt_E - package_E)))
             assert E_err <= atol, E_err
             F_err = np.max(np.abs((ckpt_F - package_F)))
@@ -124,15 +125,16 @@ def test_state_restoration(BENCHMARK_ROOT, fake_model_training_session, device):
         E_ref = atoms.get_potential_energy()
         F_ref = atoms.get_forces()
 
-        atoms.calc = ckpt_calc
-        ckpt_E = atoms.get_potential_energy()
-        ckpt_F = atoms.get_forces()
+        ckpt_atoms, package_atoms = atoms.copy(), atoms.copy()
+        ckpt_atoms.calc = ckpt_calc
+        ckpt_E = ckpt_atoms.get_potential_energy()
+        ckpt_F = ckpt_atoms.get_forces()
 
-        atoms.calc = package_calc
-        package_E = atoms.get_potential_energy()
-        package_F = atoms.get_forces()
+        package_atoms.calc = package_calc
+        package_E = package_atoms.get_potential_energy()
+        package_F = package_atoms.get_forces()
 
-        del atoms
+        del atoms, ckpt_atoms, package_atoms
         E_err = np.max(np.abs((ckpt_E - package_E)))
         assert E_err <= atol, E_err
         F_err = np.max(np.abs((ckpt_F - package_F)))

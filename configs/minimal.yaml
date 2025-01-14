@@ -62,8 +62,7 @@ trainer:
       chemical_symbols: ${chemical_symbols}
 
 training_module:
-  _target_: nequip.train.NequIPLightningModule
-  ema_decay: 0.999
+  _target_: nequip.train.EMALightningModule
   loss:
     _target_: nequip.train.MetricsManager
     metrics:
@@ -107,7 +106,7 @@ training_module:
     l_max: 2
     parity: true
     num_layers: 3
-    num_features: 16
+    num_features: 32
     radial_mlp_depth: 1
     radial_mlp_width: 8
     # data-dependent model params

@@ -65,8 +65,7 @@ trainer:
       chemical_symbols: ${chemical_symbols}
 
 training_module:
-  _target_: nequip.train.NequIPLightningModule
-  ema_decay: 0.999
+  _target_: nequip.train.EMALightningModule
   loss:
     _target_: nequip.train.MetricsManager
     metrics:
