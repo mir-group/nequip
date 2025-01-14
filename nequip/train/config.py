@@ -1,5 +1,6 @@
 import torch
 from .lightning import NequIPLightningModule
+from .ema import EMALightningModule
 
 from nequip.data import AtomicDataDict
 
@@ -38,7 +39,6 @@ class ConFIGLightningModule(NequIPLightningModule):
         train_metrics: Optional[Dict] = None,
         val_metrics: Optional[Dict] = None,
         test_metrics: Optional[Dict] = None,
-        ema_decay: Optional[float] = None,
         gradient_clip_val: Optional[float] = None,
         gradient_clip_algorithm: Optional[str] = None,
         cpu_lsqr: bool = False,
@@ -53,7 +53,6 @@ class ConFIGLightningModule(NequIPLightningModule):
             train_metrics=train_metrics,
             val_metrics=val_metrics,
             test_metrics=test_metrics,
-            ema_decay=ema_decay,
             **kwargs,
         )
         # see https://lightning.ai/docs/pytorch/stable/common/optimization.html#id2
@@ -116,8 +115,14 @@ class ConFIGLightningModule(NequIPLightningModule):
     ):
         """"""
         # we have to override the training step to perform the backwards manually
-        # everything looks the same except the end of `training_step`
+        # the details are in encapsulated in `_ConFIG_training_step`
+        loss = self._ConFIG_training_step(batch, batch_idx, dataloader_idx)
+        return loss
 
+    def _ConFIG_training_step(
+        self, batch: AtomicDataDict.Type, batch_idx: int, dataloader_idx: int = 0
+    ):
+        # everything looks the same as the base NequIPLightningModule up to the `manual_optimization` part
         target = batch.copy()
         output = self(batch)
 
@@ -135,11 +140,32 @@ class ConFIGLightningModule(NequIPLightningModule):
         )
         self.log_dict(loss_dict)
 
+        # apply the DDP loss rescale
+        loss = (
+            loss_dict[f"train_loss_step{self.logging_delimiter}weighted_sum"]
+            * self.world_size
+        )
+
         # === manual optimization part ===
-        param_dict = dict(self.model.named_parameters())
         opt = self.optimizers()
         opt.zero_grad(set_to_none=True)
 
+        # === peform "backwards" for ConFIG ===
+        self._ConFIG_backwards(loss_dict)
+
+        # === gradient clipping ===
+        self.clip_gradients(
+            opt,
+            gradient_clip_val=self.gradient_clip_val,
+            gradient_clip_algorithm=self.gradient_clip_algorithm,
+        )
+
+        # === finally take step ===
+        opt.step()
+        return loss
+
+    def _ConFIG_backwards(self, loss_dict):
+        param_dict = dict(self.model.named_parameters())
         # === get loss component gradients ===
         loss_component_grads = []
         for idx, loss_component_key in enumerate(self.ConFIG_loss_component_keys):
@@ -210,27 +236,6 @@ class ConFIGLightningModule(NequIPLightningModule):
                 self.ConFIG_param_shape_list[idx]
             )
 
-        # === gradient clipping ===
-        self.clip_gradients(
-            opt,
-            gradient_clip_val=self.gradient_clip_val,
-            gradient_clip_algorithm=self.gradient_clip_algorithm,
-        )
-
-        # === finally take step ===
-        opt.step()
-
-        # === update EMA model if present ===
-        if self.ema_model is not None:
-            self.ema_model.update_parameters(self.model)
-
-        # apply the DDP loss rescale, as usual (we already did this for the individual loss terms above before calling  `manual_backward` on them)
-        loss = (
-            loss_dict[f"train_loss_step{self.logging_delimiter}weighted_sum"]
-            * self.world_size
-        )
-        return loss
-
     def on_validation_epoch_end(self):
         """"""
         # === reset basic val metrics ===
@@ -245,3 +250,58 @@ class ConFIGLightningModule(NequIPLightningModule):
         sch = self.lr_schedulers()
         if sch is not None:
             sch.step(metric_dict[self.ConFIG_monitor])
+
+
+class EMAConFIGLightningModule(EMALightningModule, ConFIGLightningModule):
+    """Composition of ``ConFIGLightningModule`` and ``EMALightningModule``
+
+    Args:
+        gradient_clip_val (Union[int, float, None]): gradient clipping value (default: ``None``, which disables gradient clipping)
+        gradient_clip_algorithm (Optional[str]): ``value`` to clip by value, or ``norm`` to clip by norm (default: ``norm``)
+        cpu_lsqr (bool): whether to perform least squares solve on CPU (default: ``False``)
+        norm_eps (float): small value to avoid division by zero during normalization (default: ``1e-8``)
+        ema_decay (float): decay constant for the exponential moving average (EMA) of model weights (default ``0.999``)
+    """
+
+    def __init__(
+        self,
+        model: Dict,
+        optimizer: Optional[Dict] = None,
+        lr_scheduler: Optional[Dict] = None,
+        loss: Optional[Dict] = None,
+        train_metrics: Optional[Dict] = None,
+        val_metrics: Optional[Dict] = None,
+        test_metrics: Optional[Dict] = None,
+        gradient_clip_val: Optional[float] = None,
+        gradient_clip_algorithm: Optional[str] = None,
+        cpu_lsqr: bool = False,
+        norm_eps: float = 1e-8,
+        ema_decay: float = 0.999,
+        **kwargs,
+    ):
+        super().__init__(
+            model=model,
+            optimizer=optimizer,
+            lr_scheduler=lr_scheduler,
+            loss=loss,
+            train_metrics=train_metrics,
+            val_metrics=val_metrics,
+            test_metrics=test_metrics,
+            gradient_clip_val=gradient_clip_val,
+            gradient_clip_algorithm=gradient_clip_algorithm,
+            cpu_lsqr=cpu_lsqr,
+            norm_eps=norm_eps,
+            ema_decay=ema_decay,
+            **kwargs,
+        )
+
+    def training_step(
+        self, batch: AtomicDataDict.Type, batch_idx: int, dataloader_idx: int = 0
+    ):
+        """"""
+        # we have to override the training step to perform the backwards manually
+        # the details are in encapsulated in `_ConFIG_training_step`
+        loss = self._ConFIG_training_step(batch, batch_idx, dataloader_idx)
+        # update EMA weights
+        self.ema.update_parameters(self.model)
+        return loss

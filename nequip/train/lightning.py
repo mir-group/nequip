@@ -4,12 +4,10 @@ from lightning.pytorch.utilities.warnings import PossibleUserWarning
 from hydra.utils import instantiate
 from hydra.utils import get_method
 from nequip.data import AtomicDataDict
-from nequip.model import override_model_compile_mode
-from nequip.nn.ema_model import ExponentialMovingAverageModel
 from nequip.utils import RankedLogger
 
 import warnings
-from typing import Optional, Dict, Callable, Any, Union
+from typing import Optional, Dict
 
 
 logger = RankedLogger(__name__, rank_zero_only=True)
@@ -51,13 +49,6 @@ class NequIPLightningModule(lightning.LightningModule):
     Logging Format
       * ``/`` is used as a delimiter for to exploit the automatic grouping functionality of most loggers. Logged metrics will have the form ``train_{loss/metric}_{step/epoch}/{metric_name}`` and ``{val/test}{data_idx}_epoch/{metric_name}``. For example, ``train_loss_step/force_MSE``, ``train_metric_epoch/E_MAE``, ``val0_epoch/F_RMSE``, etc.
       * Note that this may have implications on how one would set the parameters for the `ModelCheckpoint <https://lightning.ai/docs/pytorch/stable/api/lightning.pytorch.callbacks.ModelCheckpoint.html>`_ callback, i.e. if the name of a metric is used in the checkpoint file's name, the ``/`` will cause a directory to be created when instead a file is desired.
-
-    **Exponential Moving Average Models**
-
-    If ``ema_decay`` is configured (not ``None``), an exponential moving average (EMA) of the model weights are maintained. Validation and test metrics will be that of the EMA weight model. If EMA is used, models loaded from checkpoint files (except during restarts) will always be the model with EMA weights. Specifically, the EMA models will be the ones loaded in the ``NequIPCalculator``, compiled with ``nequip-compile``, or packaged with ``nequip-package``.
-
-    Args:
-        ema_decay (float): decay constant for the exponential moving average (EMA) of model weights (default ``None``)
     """
 
     def __init__(
@@ -151,18 +142,6 @@ class NequIPLightningModule(lightning.LightningModule):
         # for statefulness of the run stage
         self.register_buffer("run_stage", torch.zeros((1), dtype=torch.long))
 
-        # === EMA ===
-        # we keep an `ema_model` attribute in both cases, to tell `ModelFromCheckpoint` if it should load the EMA model
-        if ema_decay is not None:
-            # set up EMA model
-            with override_model_compile_mode(compile_mode=None):
-                ema_model = model_builder(**model)
-            self.ema_model = ExponentialMovingAverageModel(ema_model, decay=ema_decay)
-            # initialization update
-            self.ema_model.update_parameters(self.model)
-        else:
-            self.ema_model = None
-
     def configure_optimizers(self):
         """"""
         # currently support 1 optimizer and 1 scheduler
@@ -185,6 +164,10 @@ class NequIPLightningModule(lightning.LightningModule):
         # enable grad for forces, stress, etc
         with torch.enable_grad():
             return self.model(inputs)
+
+    @property
+    def evaluation_model(self) -> torch.nn.Module:
+        return self.model
 
     def training_step(
         self, batch: AtomicDataDict.Type, batch_idx: int, dataloader_idx: int = 0
@@ -215,23 +198,6 @@ class NequIPLightningModule(lightning.LightningModule):
             * self.world_size
         )
         return loss
-
-    def optimizer_step(
-        self,
-        epoch: int,
-        batch_idx: int,
-        optimizer: Union[
-            torch.optim.Optimizer, lightning.pytorch.core.optimizer.LightningOptimizer
-        ],
-        optimizer_closure: Optional[Callable[[], Any]] = None,
-    ) -> None:
-        """"""
-        # note that this function is meant to be overriden by subclasses
-        optimizer.step(closure=optimizer_closure)
-        # this function is overriden to do the EMA update
-        # only start EMA updates after one epoch
-        if self.ema_model is not None:
-            self.ema_model.update_parameters(self.model)
 
     def on_train_epoch_end(self):
         """"""
@@ -303,55 +269,3 @@ class NequIPLightningModule(lightning.LightningModule):
             )
             self.log_dict(metric_dict)
             metrics.reset()
-
-    # The EMA model and the base model have their weights swapped before and after validation, testing, prediction tasks
-    # The purpose is to take advantage of the compiled state of the base model (torchscript or torch.compile)
-    # the purpose of the `ema_model.ema_weights` attribute is to safeguard against unexpected load scenarios where
-    # `self.model` holds the EMA weights and `self.ema_model` holds the raw weights (we don't expect this to happen, but just in case ...)
-    def on_validation_start(self):
-        if self.ema_model is not None:
-            if not self.ema_model.ema_weights:
-                raise RuntimeError(
-                    "The EMA model holds the base model's weights at the start of validation. If starting from a checkpoint, the checkpoint is likely corrupted. Otherwise, there is something wrong and a GitHub issue should be reported."
-                )
-            self.ema_model.swap_parameters(self.model)
-
-    def on_validation_end(self):
-        if self.ema_model is not None:
-            if self.ema_model.ema_weights:
-                raise RuntimeError(
-                    "The EMA model holds the base model's weights at the end of validation. If starting from a checkpoint, the checkpoint is likely corrupted. Otherwise, there is something wrong and a GitHub issue should be reported."
-                )
-            self.ema_model.swap_parameters(self.model)
-
-    def on_test_start(self):
-        if self.ema_model is not None:
-            if not self.ema_model.ema_weights:
-                raise RuntimeError(
-                    "The EMA model holds the base model's weights at the start of testing. If starting from a checkpoint, the checkpoint is likely corrupted. Otherwise, there is something wrong and a GitHub issue should be reported."
-                )
-            self.ema_model.swap_parameters(self.model)
-
-    def on_test_end(self):
-        if self.ema_model is not None:
-            if self.ema_model.ema_weights:
-                raise RuntimeError(
-                    "The EMA model holds the base model's weights at the end of testing. If starting from a checkpoint, the checkpoint is likely corrupted. Otherwise, there is something wrong and a GitHub issue should be reported."
-                )
-            self.ema_model.swap_parameters(self.model)
-
-    def on_predict_start(self):
-        if self.ema_model is not None:
-            if not self.ema_model.ema_weights:
-                raise RuntimeError(
-                    "The EMA model holds the base model's weights at the start of prediction. If starting from a checkpoint, the checkpoint is likely corrupted. Otherwise, there is something wrong and a GitHub issue should be reported."
-                )
-            self.ema_model.swap_parameters(self.model)
-
-    def on_predict_end(self):
-        if self.ema_model is not None:
-            if self.ema_model.ema_weights:
-                raise RuntimeError(
-                    "The EMA model holds the base model's weights at the end of prediction. If starting from a checkpoint, the checkpoint is likely corrupted. Otherwise, there is something wrong and a GitHub issue should be reported."
-                )
-            self.ema_model.swap_parameters(self.model)
