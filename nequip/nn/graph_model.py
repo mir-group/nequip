@@ -83,7 +83,7 @@ class GraphModel(GraphModuleMixin, torch.nn.Module):
         self.type_names = []
         if model_config is not None:
             self.metadata = _model_metadata_from_config(model_config)
-            self.type_names = self.metadata[TYPE_NAMES_KEY]
+            self.type_names = self.metadata[TYPE_NAMES_KEY].split(" ")
             model_dtype = {"float32": torch.float32, "float64": torch.float64}[
                 self.metadata[MODEL_DTYPE_KEY]
             ]
