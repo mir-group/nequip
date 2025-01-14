@@ -86,7 +86,6 @@ def test_batch_invariance(fake_model_training_session):
 
 # TODO: will fail if train dataloader has shuffle=True
 def test_restarts(fake_model_training_session):
-    # TODO: check if the sanity checking validation stage affects the generator states
     config, tmpdir, env = fake_model_training_session
     tol = {"float32": 1e-5, "float64": 1e-8}[config.training_module.model.model_dtype]
     orig_max_epochs = config.trainer.max_epochs
@@ -156,3 +155,34 @@ def test_restarts(fake_model_training_session):
                     for a, b in zip(restart_val_metrics, oneshot_val_metrics)
                 ]
             ), [restart_val_metrics, oneshot_val_metrics]
+
+
+def test_model_from_save(fake_model_training_session):
+    """
+    Tests if `ModelFromCheckpoint` can be used for a fresh start.
+    """
+    config, tmpdir, env = fake_model_training_session
+
+    # == continue training for a few more epochs ==
+    with tempfile.TemporaryDirectory() as new_tmpdir_1:
+        new_config = config.copy()
+        with open_dict(new_config):
+            new_config["training_module"]["model"] = {
+                "_target_": "nequip.model.ModelFromCheckpoint",
+                "checkpoint_path": f"{tmpdir}/last.ckpt",
+            }
+        new_config = OmegaConf.create(new_config)
+        config_path = new_tmpdir_1 + "/newconf.yaml"
+        OmegaConf.save(config=new_config, f=config_path)
+        retcode = subprocess.run(
+            [
+                "nequip-train",
+                "-cn",
+                "newconf",
+            ],
+            cwd=new_tmpdir_1,
+            env=dict(os.environ),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        _check_and_print(retcode)
