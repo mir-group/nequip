@@ -252,6 +252,7 @@ class ConFIGLightningModule(NequIPLightningModule):
             sch.step(metric_dict[self.ConFIG_monitor])
 
 
+# note the inheritance order -- this means `EMALightningModule` takes precedence over `ConFIGLightningModule` as a parent
 class EMAConFIGLightningModule(EMALightningModule, ConFIGLightningModule):
     """Composition of ``ConFIGLightningModule`` and ``EMALightningModule``
 
@@ -294,6 +295,8 @@ class EMAConFIGLightningModule(EMALightningModule, ConFIGLightningModule):
             ema_decay=ema_decay,
             **kwargs,
         )
+        # some sanity checks that diamond inheritance worked correctly
+        assert not self.automatic_optimization
 
     def training_step(
         self, batch: AtomicDataDict.Type, batch_idx: int, dataloader_idx: int = 0
@@ -302,6 +305,8 @@ class EMAConFIGLightningModule(EMALightningModule, ConFIGLightningModule):
         # we have to override the training step to perform the backwards manually
         # the details are in encapsulated in `_ConFIG_training_step`
         loss = self._ConFIG_training_step(batch, batch_idx, dataloader_idx)
-        # update EMA weights
+
+        # since we're using `manual_optimization`, `self.optimizer_step` is not used
+        # so we update the EMA weights here
         self.ema.update_parameters(self.model)
         return loss
