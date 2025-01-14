@@ -59,14 +59,7 @@ def ModelFromCheckpoint(
         checkpoint["hyper_parameters"]["info_dict"]["training_module"]["_target_"]
     )
     lightning_module = training_module.load_from_checkpoint(checkpoint_path)
-    model = lightning_module.model
-
-    # load EMA weights if EMA model is present
-    if lightning_module.ema_model is not None:
-        # check if the `ema_model` is holding the EMA weights before transferring
-        if lightning_module.ema_model.ema_weights:
-            lightning_module.ema_model.swap_parameters(model)
-
+    model = lightning_module.evaluation_model
     return model
 
 
