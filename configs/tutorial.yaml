@@ -151,14 +151,15 @@ trainer:
       logging_interval: epoch
 
 
-# training_module refers to a NequIPLightningModule
-training_module:
-  _target_: nequip.train.NequIPLightningModule
-
-  # We are using an EMA model (i.e. we keep a separate model whose weights are an exponential moving average of the base model's weights)
-  # The use of an EMA model is configured by setting `ema_decay` to be a float (e.g. 0.999) under `training_module` (it is a `NequIPLightningModule` argument). The default of `ema_decay` is None, which means an EMA model is not used, if `ema_decay` is not explicitly configured
-  # EMA allows for smoother validation curves and thus more reliable metrics for monitoring
+# training_module refers to a NequIPLightningModule or its subclass
+# here we use the subclass that holds an exponential moving average of the base model's weights (an EMA model)
+# one could also use the base `NequIPLightningModule` here if one does not want to use an EMA model
+# EMA allows for smoother validation curves and thus more reliable metrics for monitoring
   # Loading from a checkpoint for use in the `nequip.ase.NequIPCalculator` or during `nequip-compile` and `nequip-package` will always load the EMA model if it's present
+training_module:
+  _target_: nequip.train.EMALightningModule
+
+  # the ema decay parameter of an EMA model
   ema_decay: 0.999
 
   # use a MetricsManager (see docs) to construct the loss function
