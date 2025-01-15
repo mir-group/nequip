@@ -116,10 +116,12 @@ def test_state_restoration(BENCHMARK_ROOT, fake_model_training_session, device):
     # `minimal.yaml` and `minimal_emt.yaml` use energy and force MAEs
     E_MAE_ckpt = np.mean(E_abs_list)
     F_MAE_ckpt = np.mean(np.concatenate(F_abs_list, 0))
-    E_err = np.max(np.abs(val_metrics[0] - E_MAE_ckpt))
-    assert E_err <= atol, f"train:{val_metrics[0]},  ckpt: {E_MAE_ckpt}"
-    F_err = np.max(np.abs(val_metrics[1] - F_MAE_ckpt))
-    assert F_err <= atol, f"train:{val_metrics[1]},  ckpt: {F_MAE_ckpt}"
+    train_time_val_E_MAE = val_metrics["total_energy_mae"]
+    E_err = np.max(np.abs(train_time_val_E_MAE - E_MAE_ckpt))
+    assert E_err <= atol, f"train:{train_time_val_E_MAE},  ckpt: {E_MAE_ckpt}"
+    train_time_val_F_MAE = val_metrics["forces_mae"]
+    F_err = np.max(np.abs(train_time_val_F_MAE - F_MAE_ckpt))
+    assert F_err <= atol, f"train:{train_time_val_F_MAE},  ckpt: {F_MAE_ckpt}"
 
     # get test metrics
     test_atoms = read(f"{tmpdir}/test_dataset0.xyz", ":")

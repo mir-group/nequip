@@ -6,6 +6,8 @@ from nequip.train import (
     MeanAbsoluteError,
     MeanSquaredError,
     RootMeanSquaredError,
+    EnergyForceLoss,
+    EnergyForceMetrics,
 )
 
 
@@ -299,3 +301,130 @@ def data_w_NaN(data):
     ][1:-1]
 
     yield pred, ref, wo_nan_pred, wo_nan_ref
+
+
+class TestMetricsManagerBuilders:
+
+    @pytest.mark.parametrize(
+        "ratio", [(1, 1), (1, 2), (1, 3), (10, 10), (1, 100), (1, 1e5)]
+    )
+    @pytest.mark.parametrize("per_atom_energy", [True, False])
+    def test_loss_function_builder(self, data, ratio, per_atom_energy):
+        pred1, ref1, pred2, ref2 = data
+        mm = EnergyForceLoss(
+            coeffs={
+                AtomicDataDict.TOTAL_ENERGY_KEY: ratio[0],
+                AtomicDataDict.FORCE_KEY: ratio[1],
+            },
+            per_atom_energy=per_atom_energy,
+        )
+
+        for pred, ref in [(pred1, ref1), (pred2, ref2)]:
+            metrics_dict = mm(pred, ref)
+            assert len(metrics_dict) > 0
+            assert isinstance(metrics_dict, dict)
+            for key, value in metrics_dict.items():
+                assert isinstance(value, torch.Tensor)
+            E_MSE = self.compute_MSE(
+                pred, ref, AtomicDataDict.TOTAL_ENERGY_KEY, per_atom_energy
+            )
+            F_MSE = self.compute_MSE(pred, ref, AtomicDataDict.FORCE_KEY)
+            weighted_sum = (ratio[0] * E_MSE + ratio[1] * F_MSE) / sum(ratio)
+            assert torch.allclose(
+                metrics_dict[
+                    "per_atom_energy_mse" if per_atom_energy else "total_energy_mse"
+                ],
+                E_MSE,
+            )
+            assert torch.allclose(metrics_dict["forces_mse"], F_MSE)
+            assert torch.allclose(metrics_dict["weighted_sum"], weighted_sum)
+
+    @pytest.mark.parametrize("ratio1", [1])
+    @pytest.mark.parametrize("ratio2", [1, 10])
+    @pytest.mark.parametrize("ratio3", [1, 10, 100])
+    @pytest.mark.parametrize("ratio4", [1, 10, 100, None])
+    @pytest.mark.parametrize("ratio5", [1, 10])
+    @pytest.mark.parametrize("ratio6", [1, 10])
+    def test_EnergyForceMetrics(
+        self, data, ratio1, ratio2, ratio3, ratio4, ratio5, ratio6
+    ):
+        pred1, ref1, pred2, ref2 = data
+        mm = EnergyForceMetrics(
+            coeffs={
+                "total_energy_rmse": ratio1,
+                "forces_rmse": ratio2,
+                "total_energy_mae": ratio3,
+                "forces_mae": ratio4,
+                "per_atom_energy_rmse": ratio5,
+                "per_atom_energy_mae": ratio6,
+            },
+        )
+
+        for pred, ref in [(pred1, ref1), (pred2, ref2)]:
+            metrics_dict = mm(pred, ref)
+            assert len(metrics_dict) > 0
+            assert isinstance(metrics_dict, dict)
+            for key, value in metrics_dict.items():
+                assert isinstance(value, torch.Tensor)
+            E_RMSE = self.compute_RMSE(
+                pred, ref, AtomicDataDict.TOTAL_ENERGY_KEY, per_atom_energy=False
+            )
+            F_RMSE = self.compute_RMSE(pred, ref, AtomicDataDict.FORCE_KEY)
+            per_atom_E_RMSE = self.compute_RMSE(
+                pred, ref, AtomicDataDict.TOTAL_ENERGY_KEY, per_atom_energy=True
+            )
+            E_MAE = self.compute_MAE(
+                pred, ref, AtomicDataDict.TOTAL_ENERGY_KEY, per_atom_energy=False
+            )
+            F_MAE = self.compute_MAE(pred, ref, AtomicDataDict.FORCE_KEY)
+            per_atom_E_MAE = self.compute_MAE(
+                pred, ref, AtomicDataDict.TOTAL_ENERGY_KEY, per_atom_energy=True
+            )
+            if not ratio4:
+                ratio4 = 0
+            weighted_sum = (
+                ratio1 * E_RMSE
+                + ratio2 * F_RMSE
+                + ratio3 * E_MAE
+                + ratio4 * F_MAE
+                + ratio5 * per_atom_E_RMSE
+                + ratio6 * per_atom_E_MAE
+            ) / (ratio1 + ratio2 + ratio3 + ratio4 + ratio5 + ratio6)
+            assert torch.allclose(metrics_dict["total_energy_rmse"], E_RMSE)
+            assert torch.allclose(metrics_dict["forces_rmse"], F_RMSE)
+            assert torch.allclose(metrics_dict["total_energy_mae"], E_MAE)
+            assert torch.allclose(metrics_dict["forces_mae"], F_MAE)
+            assert torch.allclose(metrics_dict["per_atom_energy_rmse"], per_atom_E_RMSE)
+            assert torch.allclose(metrics_dict["per_atom_energy_mae"], per_atom_E_MAE)
+            assert torch.allclose(metrics_dict["weighted_sum"], weighted_sum)
+
+    def normalize_energy(self, atomic_dict):
+        new_atomic_dict = atomic_dict.copy()
+        new_atomic_dict[AtomicDataDict.TOTAL_ENERGY_KEY] = new_atomic_dict[
+            AtomicDataDict.TOTAL_ENERGY_KEY
+        ] / new_atomic_dict[AtomicDataDict.NUM_NODES_KEY].reshape(
+            new_atomic_dict[AtomicDataDict.TOTAL_ENERGY_KEY].shape
+        )
+        return new_atomic_dict
+
+    def compute_MSE(self, pred, ref, property_key, per_atom_energy=False):
+        if per_atom_energy:
+            pred = self.normalize_energy(pred)
+            ref = self.normalize_energy(ref)
+        MSE = torch.mean((pred[property_key] - ref[property_key]) ** 2)
+        return MSE
+
+    def compute_MAE(self, pred, ref, property_key, per_atom_energy=False):
+        if per_atom_energy:
+            pred = self.normalize_energy(pred)
+            ref = self.normalize_energy(ref)
+        MAE = torch.mean(torch.abs(pred[property_key] - ref[property_key]))
+        return MAE
+
+    def compute_RMSE(self, pred, ref, property_key, per_atom_energy=False):
+        if per_atom_energy:
+            pred = self.normalize_energy(pred)
+            ref = self.normalize_energy(ref)
+        MSE = torch.mean((pred[property_key] - ref[property_key]) ** 2)
+        RMSE = torch.sqrt(MSE)
+        return RMSE

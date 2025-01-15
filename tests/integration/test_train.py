@@ -67,7 +67,7 @@ def test_batch_invariance(fake_model_training_session):
         assert all(
             [
                 math.isclose(a, b, rel_tol=tol)
-                for a, b in zip(orig_train_loss, new_train_loss)
+                for a, b in zip(orig_train_loss.values(), new_train_loss.values())
             ]
         )
 
@@ -79,7 +79,9 @@ def test_batch_invariance(fake_model_training_session):
         assert all(
             [
                 math.isclose(a, b, rel_tol=tol)
-                for a, b in zip(batchsize5_val_metrics, batchsize1_val_metrics)
+                for a, b in zip(
+                    batchsize5_val_metrics.values(), batchsize1_val_metrics.values()
+                )
             ]
         )
 
@@ -152,7 +154,9 @@ def test_restarts(fake_model_training_session):
             assert all(
                 [
                     math.isclose(a, b, rel_tol=tol)
-                    for a, b in zip(restart_val_metrics, oneshot_val_metrics)
+                    for a, b in zip(
+                        restart_val_metrics.values(), oneshot_val_metrics.values()
+                    )
                 ]
             ), [restart_val_metrics, oneshot_val_metrics]
 
