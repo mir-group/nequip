@@ -132,17 +132,18 @@ class NequIPLightningModule(lightning.LightningModule):
         # NOTE: this must be updated externally by the script that sets up the training run
         self.world_size = 1
 
-        # add dist_sync_on_step for loss metrics
-        for metric_dict in loss["metrics"]:
-            # silently ensure that dist_sync_on_step is true for loss metrics
-            metric_dict["metric"]["dist_sync_on_step"] = True
-
         # == instantiate loss ==
         self.loss = instantiate(loss, type_names=type_names)
         if self.loss is not None:
             assert (
                 self.loss.do_weighted_sum
             ), "`coeff` must be set for entries of the `loss` MetricsManager for a weighted sum of metrics components to be used as the loss."
+
+        # `dist_sync_on_step` is set to True metrics in the loss
+        # this is done after the loss is instantiated so that there are no assumptions that
+        # `metrics` will be a key on the config dictionary
+        for metric in self.loss.values():
+            metric.dist_sync_on_step = True
         self.loss.eval()
 
         # == instantiate other metrics ==
