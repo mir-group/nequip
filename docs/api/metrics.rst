@@ -4,6 +4,16 @@ MetricsManager
  .. autoclass:: nequip.train.MetricsManager
     :members:
 
+Constructor for MetricsManager
+##############################
+A few helper methods that simplify the construction of ``nequip.train.MetricsManager`` objects for the loss function and training/validation metrics.
+
+ .. autoclass:: nequip.train.EnergyForceLoss
+    :members:
+
+ .. autoclass:: nequip.train.EnergyForceMetrics
+    :members:
+
 
 Error Metrics
 #############
