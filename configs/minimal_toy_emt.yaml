@@ -103,17 +103,17 @@ training_module:
   val_metrics:
     _target_: nequip.train.MetricsManager
     metrics:
-      - name: E_MAE
+      - name: total_energy_mae
         field: total_energy
         coeff: 1
         metric:
           _target_: nequip.train.MeanAbsoluteError
-      - name: force_MAE
+      - name: forces_mae
         field: forces
         coeff: 1
         metric:
           _target_: nequip.train.MeanAbsoluteError
-      - name: stress_MAE
+      - name: stress_mae
         field: stress
         coeff: 1
         metric:
