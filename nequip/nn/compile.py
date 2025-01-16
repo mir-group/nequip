@@ -1,6 +1,7 @@
 import torch
 
 from nequip.data import AtomicDataDict
+from nequip.data._key_registry import get_dynamic_shapes
 from .graph_model import GraphModel
 from ._graph_mixin import GraphModuleMixin
 from nequip.utils.fx import nequip_make_fx
@@ -118,6 +119,7 @@ class CompileGraphModel(GraphModel):
                 output_keys=self.output_fields,
                 state_dict_keys=self.weight_names + self.buffer_names,
             )
+
             fx_model = nequip_make_fx(
                 model=model_to_trace,
                 data=data,
@@ -125,11 +127,28 @@ class CompileGraphModel(GraphModel):
                 extra_inputs=weights + buffers,
             )
 
-            # == compile ==
+            # == export with dynamic shape specification ==
+            # TODO: (maybe) include range for dynamic dims
+            batch_map = {
+                "graph": torch.export.dynamic_shapes.Dim("graph"),
+                "node": torch.export.dynamic_shapes.Dim("node"),
+                "edge": torch.export.dynamic_shapes.Dim("edge"),
+            }
+            dynamic_shapes = get_dynamic_shapes(
+                self.input_fields + self.weight_names + self.buffer_names, batch_map
+            )
+            exported = torch.export.export(
+                fx_model,
+                (*([data[k] for k in self.input_fields] + weights + buffers),),
+                dynamic_shapes=dynamic_shapes,
+            )
+
+            # == compile exported program ==
+            # see https://pytorch.org/tutorials/intermediate/torch_export_tutorial.html#running-the-exported-program
             # TODO: compile options
             self._compiled_model = (
                 torch.compile(
-                    fx_model,
+                    exported.module(),
                     dynamic=True,
                     fullgraph=True,
                 ),
