@@ -161,7 +161,7 @@ def _register_field_prefix(prefix: str) -> None:
     )
 
 
-def get_field_type(field: str) -> str:
+def get_field_type(field: str, error_on_unregistered: bool = True) -> str:
     if field in _GRAPH_FIELDS:
         return "graph"
     elif field in _NODE_FIELDS:
@@ -169,7 +169,10 @@ def get_field_type(field: str) -> str:
     elif field in _EDGE_FIELDS:
         return "edge"
     else:
-        raise KeyError(f"Unregistered field {field} found")
+        if error_on_unregistered:
+            raise KeyError(f"Unregistered field {field} found")
+        else:
+            return None
 
 
 # === abbreviations ===
