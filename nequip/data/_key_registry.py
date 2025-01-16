@@ -1,10 +1,9 @@
 """_key_registry.py: manage information about what kinds of data different keys refer to."""
 
-from typing import Dict, Set, Sequence
-
+import torch
 from e3nn.io import CartesianTensor
-
 from . import _keys
+from typing import Dict, Set, Sequence
 
 
 # === Key Registration ===
@@ -173,6 +172,36 @@ def get_field_type(field: str, error_on_unregistered: bool = True) -> str:
             raise KeyError(f"Unregistered field {field} found")
         else:
             return None
+
+
+def get_dynamic_shapes(input_fields, batch_map):
+    """
+    Get dynamic shape information based on field names. As this helper function is used for both `torch.compile` during training and for deployment, the logic has to account for both actual model inputs (which can have dynamic shapes), and also weights (which can only have static shapes).
+    """
+    # See export API: https://pytorch.org/docs/stable/export.html#torch.export.export
+    # "The dynamic shape of a tensor argument can be specified as either (1) a dict from dynamic dimension indices to Dim() types, where it is not required to include static dimension indices in this dict, but when they are, they should be mapped to None"
+    # ^ may be outdated because using `None` raises the warning
+    # "Using None as a dynamic shape dimension is deprecated. Please use Dim.STATIC instead"
+
+    # CORE ASSUMPTION:
+    # all actual input fields are registered correctly (with edge indices being a special case)
+    # anything that is not registered is deemed static
+    dynamic_shapes = ()
+    for field in input_fields:
+        # special case edge indices (2, num_edges), which won't have a field type
+        if field == _keys.EDGE_INDEX_KEY:
+            dynamic_shapes += ({0: torch.export.Dim.STATIC, 1: batch_map["edge"]},)
+            continue
+        field_type = get_field_type(field, error_on_unregistered=False)
+        if field_type is not None:
+            shape_dict = {0: batch_map[field_type], 1: torch.export.Dim.STATIC}
+            # NOTE that the following assumes only rank-2 cartesian tensors
+            if field in _CARTESIAN_TENSOR_FIELDS or field == _keys.CELL_KEY:
+                shape_dict.update({2: torch.export.Dim.STATIC})
+            dynamic_shapes += (shape_dict,)
+        else:
+            dynamic_shapes += ({},)
+    return dynamic_shapes
 
 
 # === abbreviations ===

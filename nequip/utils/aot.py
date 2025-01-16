@@ -1,7 +1,8 @@
 import torch
 
 from nequip.nn.compile import ListInputOutputWrapper
-from nequip.data import AtomicDataDict, _key_registry
+from nequip.data import AtomicDataDict
+from nequip.data._key_registry import get_dynamic_shapes
 from .fx import nequip_make_fx
 from .compile import prepare_model_for_compile
 
@@ -61,24 +62,3 @@ def aot_export_model(
         _ = loaded_model([data[k] for k in input_fields])
 
     return out_path
-
-
-def get_dynamic_shapes(input_fields, batch_map):
-    dynamic_shapes = ()
-    for field in input_fields:
-        # special case edge indices (2, num_edges)
-        if field == AtomicDataDict.EDGE_INDEX_KEY:
-            dynamic_shapes += ({0: torch.export.Dim.STATIC, 1: batch_map["edge"]},)
-        else:
-            shape_dict = {
-                0: batch_map[_key_registry.get_field_type(field)],
-                1: torch.export.Dim.STATIC,
-            }
-            # NOTE that the following assumes only rank-2 cartesian tensors
-            if (
-                field in _key_registry._CARTESIAN_TENSOR_FIELDS
-                or field == AtomicDataDict.CELL_KEY
-            ):
-                shape_dict.update({2: torch.export.Dim.STATIC})
-            dynamic_shapes += (shape_dict,)
-    return dynamic_shapes
