@@ -5,6 +5,7 @@ import subprocess
 import numpy as np
 import torch
 
+from nequip.train.lightning import _SOLE_MODEL_KEY
 from nequip.model import ModelFromPackage
 from nequip.nn import graph_model
 from nequip.data import to_ase
@@ -58,7 +59,8 @@ def test_state_restoration(BENCHMARK_ROOT, fake_model_training_session, device):
     ]
 
     # === load model and check that metadata saved ===
-    metadata = ModelFromPackage(package_path).metadata
+    # we only test single model case (we expect the core `nequip` repo to only house single model `LightningModule`s)
+    metadata = ModelFromPackage(package_path)[_SOLE_MODEL_KEY].metadata
     assert np.allclose(
         float(metadata[graph_model.R_MAX_KEY]), config.training_module.model.r_max
     )
