@@ -21,8 +21,8 @@ def get_current_code_versions(verbose=True) -> Tuple[dict, dict]:
         code_versions[code.__name__] = str(code.__version__)
 
     if verbose:
-        logger.info("{:^29}".format("Version Information"))
+        logger.info("Version Information:")
         for k, v in code_versions.items():
-            logger.info(f"{k:^14}:{v:^14}")
+            logger.info(f"{k} {v}")
 
     return code_versions
