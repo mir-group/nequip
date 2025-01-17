@@ -4,6 +4,7 @@ from lightning.pytorch.utilities.warnings import PossibleUserWarning
 from hydra.utils import instantiate
 from hydra.utils import get_method
 from nequip.data import AtomicDataDict
+from nequip.nn import GraphModel
 from nequip.utils import RankedLogger
 
 import warnings
@@ -19,6 +20,9 @@ warnings.filterwarnings(
     message=".*when logging on epoch level in distributed setting to accumulate the metric across.*",
     category=PossibleUserWarning,
 )
+
+
+_SOLE_MODEL_KEY = "sole_model"
 
 
 class NequIPLightningModule(lightning.LightningModule):
@@ -70,9 +74,38 @@ class NequIPLightningModule(lightning.LightningModule):
         # reason for following implementation instead of just `hydra.utils.instantiate(model)` is to prevent omegaconf from being a model dependency
         model = model.copy()  # make a copy because of `pop`
         model_builder = get_method(model.pop("_target_"))
-        self.model = model_builder(**model)
+        model_object = model_builder(**model)
 
-        logger.debug(f"Built Model Details:\n{str(self.model)}")
+        # === account for multiple models ===
+        # contract:
+        # - for multiple models, they must be in the form of a `ModuleDict` of `GraphModel`s
+        # - if a single `GraphModel` is provided, we wrap it in a `ModuleDict`
+        # - all models must have the same `type_names`
+        assert isinstance(model_object, torch.nn.ModuleDict) or isinstance(
+            model_object, GraphModel
+        )
+        if isinstance(model_object, GraphModel):
+            model_object = torch.nn.ModuleDict({_SOLE_MODEL_KEY: model_object})
+        self.model = model_object
+        type_names_list = []
+        for k, v in self.model.items():
+            assert isinstance(v, GraphModel)
+            type_names_list.append(v.type_names)
+            logger.debug(f"Built Model Details ({k}):\n{str(v)}")
+        assert all(
+            [
+                all(
+                    [
+                        name1 == name2
+                        for (name1, name2) in zip(type_names_list[0], type_names)
+                    ]
+                )
+                for type_names in type_names_list
+            ]
+        ), "If multiple models are used, they must have the same type names parameter."
+        type_names = type_names_list[0]  # passed to `MetricsManager`s later
+
+        # === optimizer and lr scheduler ===
         self.optimizer_config = optimizer
         self.lr_scheduler_config = lr_scheduler
 
@@ -105,7 +138,7 @@ class NequIPLightningModule(lightning.LightningModule):
             metric_dict["metric"]["dist_sync_on_step"] = True
 
         # == instantiate loss ==
-        self.loss = instantiate(loss, type_names=self.model.type_names)
+        self.loss = instantiate(loss, type_names=type_names)
         if self.loss is not None:
             assert (
                 self.loss.do_weighted_sum
@@ -113,15 +146,13 @@ class NequIPLightningModule(lightning.LightningModule):
         self.loss.eval()
 
         # == instantiate other metrics ==
-        self.train_metrics = instantiate(
-            train_metrics, type_names=self.model.type_names
-        )
+        self.train_metrics = instantiate(train_metrics, type_names=type_names)
         if self.train_metrics is not None:
             self.train_metrics.eval()
         # may need to instantate multiple instances to account for multiple val and test datasets
         self.val_metrics = torch.nn.ModuleList(
             [
-                instantiate(val_metrics, type_names=self.model.type_names)
+                instantiate(val_metrics, type_names=type_names)
                 for _ in range(self.num_datasets["val"])
             ]
         )
@@ -129,7 +160,7 @@ class NequIPLightningModule(lightning.LightningModule):
             self.val_metrics.eval()
         self.test_metrics = torch.nn.ModuleList(
             [
-                instantiate(test_metrics, type_names=self.model.type_names)
+                instantiate(test_metrics, type_names=type_names)
                 for _ in range(self.num_datasets["test"])
             ]
         )
@@ -163,7 +194,8 @@ class NequIPLightningModule(lightning.LightningModule):
         """"""
         # enable grad for forces, stress, etc
         with torch.enable_grad():
-            return self.model(inputs)
+            # multi-model subclasses will need to override this function
+            return self.model[_SOLE_MODEL_KEY](inputs)
 
     @property
     def evaluation_model(self) -> torch.nn.Module:
