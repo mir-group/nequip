@@ -5,6 +5,7 @@ import torch
 from ase.calculators.calculator import Calculator, all_changes
 from ase.stress import full_3x3_to_voigt_6_stress
 
+from nequip.train.lightning import _SOLE_MODEL_KEY
 from nequip.nn import graph_model
 from nequip.model.from_save import ModelFromCheckpoint, ModelFromPackage
 from nequip.data import AtomicDataDict, from_ase
@@ -62,6 +63,7 @@ class NequIPCalculator(Calculator):
         device: Union[str, torch.device] = "cpu",
         chemical_symbols: Optional[Union[List[str], Dict[str, str]]] = None,
         set_global_options: Union[str, bool] = "warn",
+        model_name: str = _SOLE_MODEL_KEY,
         **kwargs,
     ):
         """Creates a NequIPCalculator from a checkpoint file.
@@ -78,6 +80,7 @@ class NequIPCalculator(Calculator):
             device=device,
             chemical_symbols=chemical_symbols,
             set_global_options=set_global_options,
+            model_name=model_name,
             **kwargs,
         )
 
@@ -88,6 +91,7 @@ class NequIPCalculator(Calculator):
         device: Union[str, torch.device] = "cpu",
         chemical_symbols: Optional[Union[List[str], Dict[str, str]]] = None,
         set_global_options: Union[str, bool] = "warn",
+        model_name: str = _SOLE_MODEL_KEY,
         **kwargs,
     ):
         """Creates a NequIPCalculator from a package file.
@@ -104,6 +108,7 @@ class NequIPCalculator(Calculator):
             device=device,
             chemical_symbols=chemical_symbols,
             set_global_options=set_global_options,
+            model_name=model_name,
             **kwargs,
         )
 
@@ -115,9 +120,11 @@ class NequIPCalculator(Calculator):
         device: Union[str, torch.device] = "cpu",
         chemical_symbols: Optional[Union[List[str], Dict[str, str]]] = None,
         set_global_options: Union[str, bool] = "warn",
+        model_name: str = _SOLE_MODEL_KEY,
         **kwargs,
     ):
-        model = model_getter(save_path, set_global_options)
+        model: torch.nn.ModuleDict = model_getter(save_path, set_global_options)
+        model: graph_model.GraphModel = model[model_name]
         model.eval()
         model.to(device)
 
