@@ -6,6 +6,7 @@ from nequip.data._key_registry import get_dynamic_shapes
 from .fx import nequip_make_fx
 from .compile import prepare_model_for_compile
 
+import packaging.version
 from typing import List, Dict, Union, Any
 
 
@@ -21,6 +22,11 @@ def aot_export_model(
     test: bool = False,
     seed: int = 1,
 ) -> str:
+    # === torch version check ===
+    torch_version = packaging.version.parse(torch.__version__)
+    assert torch_version >= packaging.version.parse(
+        "2.6"
+    ), f"PyTorch >= 2.6 required for PT2 compilation functionality, but {torch_version} found."
 
     # defensively refresh the cache
     torch._dynamo.reset()

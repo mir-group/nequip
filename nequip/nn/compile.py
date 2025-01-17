@@ -6,6 +6,7 @@ from .graph_model import GraphModel
 from ._graph_mixin import GraphModuleMixin
 from nequip.utils.fx import nequip_make_fx
 
+import packaging.version
 from typing import Dict, Sequence, List, Optional, Any
 
 
@@ -80,6 +81,12 @@ class CompileGraphModel(GraphModel):
         model_config: Optional[Dict[str, str]] = None,
         model_input_fields: Dict[str, Any] = {},
     ) -> None:
+        # === torch version check ===
+        torch_version = packaging.version.parse(torch.__version__)
+        assert torch_version >= packaging.version.parse(
+            "2.6"
+        ), f"PyTorch >= 2.6 required for PT2 compilation functionality, but {torch_version} found."
+
         super().__init__(model, model_config, model_input_fields)
         # save model param and buffer names
         self.weight_names = [n for n, _ in self.model.named_parameters()]
