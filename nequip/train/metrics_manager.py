@@ -2,9 +2,9 @@ import torch
 from torchmetrics import Metric
 from nequip.data import AtomicDataDict, BaseModifier
 
-from typing import List, Dict, Union, Callable, Final
+from typing import List, Dict, Union, Callable, Final, Optional
 
-_METRICS_MANAGER_INPUT_KEYS: Final[str] = [
+_METRICS_MANAGER_INPUT_KEYS: Final[List[str]] = [
     "field",
     "metric",
     "name",
@@ -13,8 +13,13 @@ _METRICS_MANAGER_INPUT_KEYS: Final[str] = [
     "ignore_nan",
 ]
 
+_METRICS_MANAGER_MANDATORY_INPUT_KEYS: Final[List[str]] = [
+    "field",
+    "metric",
+]
 
-class MetricsManager(torch.nn.ModuleList):
+
+class MetricsManager(torch.nn.ModuleDict):
     """Manages ``nequip`` metrics that can be applied to ``AtomicDataDict`` to compute error metrics.
 
     This class manages both metrics for loss functions and metrics for monitoring and reporting purposes. The main input argument ``metrics`` is a list of dictionaries, where each dictionary contains the following keys.
@@ -51,79 +56,105 @@ class MetricsManager(torch.nn.ModuleList):
         type_names: List[str] = None,
     ):
         super().__init__()
-
-        # === sanity checks ===
+        self.metrics: Dict[str, Dict[str, Union[float, str, bool]]] = {}
+        per_type_encountered = False
         for metric_dict in metrics:
+            # === sanity checks ===
+            # == check that keys present are expected ==
             for key in metric_dict.keys():
                 assert (
                     key in _METRICS_MANAGER_INPUT_KEYS
                 ), f"unrecognized key `{key}` found as input in `MetricsManager`"
 
-        self.num_metrics = len(metrics)
-        # === MANDATORY dict keys ===
-        self.fields = [
-            (
-                BaseModifier(metric["field"])
-                if isinstance(metric["field"], str)
-                else metric["field"]
+            # == check that mandatory keys are present ==
+            for mandatory_key in _METRICS_MANAGER_MANDATORY_INPUT_KEYS:
+                assert (
+                    mandatory_key in metric_dict.keys()
+                ), f"Each dictionary in `MetricManager`'s `metrics` argument must possess both of the following mandatory keys: {_METRICS_MANAGER_MANDATORY_INPUT_KEYS}"
+
+            # === handle mandatory keys ===
+            # == field ==
+            field = (
+                BaseModifier(metric_dict["field"])
+                if isinstance(metric_dict["field"], str)
+                else metric_dict["field"]
             )
-            for metric in metrics
-        ]
-        for metric in metrics:
-            self.append(metric["metric"])
+            # == metric ==
+            metric = metric_dict["metric"]
 
-        # === OPTIONAL dict keys and logic based on dict.get(key, None) ===
-        # == ignore Nan ==
-        self.ignore_nans = [metric.get("ignore_nan", False) for metric in metrics]
-        assert all(isinstance(item, bool) for item in self.ignore_nans)
-
-        # == process names ==
-        self.names = []
-        for idx in range(self.num_metrics):
-            name = metrics[idx].get("name", None)
+            # === handle optional keys ===
+            # === names ===
+            name = metric_dict.get("name", None)
             if name is None:
-                name = "_".join([str(self.fields[idx]), str(self[idx])])
-            assert name != "weighted_sum"  # special name check, just in case
-            self.names.append(name)
-        assert len(self.names) == len(
-            set(self.names)
-        ), f"Repeated names found ({self.names}) -- names must be unique. It is recommended to give custom names instead of relying on the automatic naming."
-
-        # === per_type metrics ===
-        self.per_type = [metric.get("per_type", False) for metric in metrics]
-        if any(self.per_type):
+                name = "_".join([str(field), str(metric)])
             assert (
-                type_names is not None
-            ), "`type_names` must be provided if any `per_type=True`"
-        self.type_names = type_names
+                name != "weighted_sum"
+            ), "`weighted_sum` is a specially reserved metric name that should not be configured."
+            assert (
+                name not in self.metrics.keys()
+            ), f"Repeated names found ({name}) -- names must be unique. It is recommended to give custom names instead of relying on the automatic naming."
 
-        for idx in range(self.num_metrics):
-            if self.per_type[idx]:
-                field_type = self.fields[idx].type
-                # TODO: potentially implement per_type edge metrics
-                if field_type != "node":
+            # == ignore Nan ==
+            ignore_nan = metric_dict.get("ignore_nan", False)
+            assert isinstance(
+                ignore_nan, bool
+            ), f"`ignore_nan` should be a bool, but found {ignore_nan} of type {type(ignore_nan)}"
+
+            # == per_type metrics ==
+            per_type = metric_dict.get("per_type", False)
+            # sanity check that `type_names` is provided
+            # to only do the assert once
+            if per_type and not per_type_encountered:
+                per_type_encountered = True
+                assert (
+                    type_names is not None
+                ), "`type_names` must be provided if any `per_type=True`"
+                self.type_names = type_names
+            # logic to proliferate metrics objects
+            if per_type:
+                if field.type != "node":
                     raise RuntimeError(
-                        f"`per_type` metrics only supported for node fields, but {field_type} field found for {self.names[idx]}."
+                        f"`per_type` metrics only supported for node fields, but {field.type} field found for {name}."
                     )
                 # set up per_type metrics as a ModuleList
                 # one copy of the base Metric for each type in forward() and compute()
                 ptm_list = torch.nn.ModuleList([])
-                if field_type == "node":
-                    num_types = len(self.type_names)
-                elif field_type == "edge":
-                    num_types = len(self.type_names) * len(self.type_names)
-                for _ in range(num_types):
-                    ptm_list.append(self[idx].clone())
-                self[idx] = ptm_list
+                for _ in range(len(self.type_names)):
+                    ptm_list.append(metric.clone())
+                metric = ptm_list
 
-        # == process coeffs ==
-        self.coeffs = [metric.get("coeff", None) for metric in metrics]
+            # == coeffs ==
+            coeff = metric_dict.get("coeff", None)
+
+            # === construct dict entry ===
+            self.metrics.update(
+                {
+                    name: {
+                        "field": field,
+                        "ignore_nan": ignore_nan,
+                        "per_type": per_type,
+                        "coeff": coeff,
+                    }
+                }
+            )
+            self.update({name: metric})
+
+            del field
+            del metric
+            del name
+            del ignore_nan
+            del per_type
+            del coeff
+
+        # === process coefficients ===
         self.do_weighted_sum = False
-        self.set_coeffs(self.coeffs)  # normalize coefficients if not all None
+        self.set_coeffs(
+            {k: v["coeff"] for k, v in self.metrics.items()}
+        )  # normalize coefficients if not all None
 
         # convenient to cache metrics computed last for callbacks
-        self.metrics_values_step = []
-        self.metrics_values_epoch = []
+        self.metrics_values_step = {k: None for k in self.metrics.keys()}
+        self.metrics_values_epoch = {k: None for k in self.metrics.keys()}
 
     def forward(
         self,
@@ -135,14 +166,19 @@ class MetricsManager(torch.nn.ModuleList):
         """
         Computes and accumulates metrics (intended for use at batch steps).
         """
-        self.metrics_values_step = []
+        self.metrics_values_step = {k: None for k in self.metrics.keys()}
         if self.do_weighted_sum:
             weighted_sum = 0.0
         metric_dict = {}
-        for idx in range(self.num_metrics):
-            preds_field, target_field = self.fields[idx](preds, target)
 
-            if self.per_type[idx]:
+        for metric_name, metric_params in self.metrics.items():
+            field: Callable = metric_params["field"]
+            per_type: bool = metric_params["per_type"]
+            ignore_nan: bool = metric_params["ignore_nan"]
+            coeff: Optional[float] = metric_params["coeff"]
+
+            preds_field, target_field = field(preds, target)
+            if per_type:
                 metric = 0
                 num_contributing_types = 0
                 for type_idx, type_name in enumerate(self.type_names):
@@ -152,7 +188,7 @@ class MetricsManager(torch.nn.ModuleList):
                     per_type_target = target_field[selector]
 
                     # mask out NaNs (based on target)
-                    if self.ignore_nans[idx]:
+                    if ignore_nan:
                         notnan_mask = ~torch.isnan(per_type_target)
                         per_type_preds = torch.masked_select(
                             per_type_preds, notnan_mask
@@ -161,9 +197,11 @@ class MetricsManager(torch.nn.ModuleList):
                             per_type_target, notnan_mask
                         )
 
-                    pt_metric = self[idx][type_idx](per_type_preds, per_type_target)
+                    pt_metric = self[metric_name][type_idx](
+                        per_type_preds, per_type_target
+                    )
                     pt_metric_name = (
-                        prefix + "_".join([self.names[idx], type_name]) + suffix
+                        prefix + "_".join([metric_name, type_name]) + suffix
                     )
                     metric_dict.update({pt_metric_name: pt_metric})
                     # account for batches without atom type
@@ -175,18 +213,18 @@ class MetricsManager(torch.nn.ModuleList):
                 metric = metric / num_contributing_types
             else:
                 # mask out NaNs (based on target)
-                if self.ignore_nans[idx]:
+                if ignore_nan:
                     notnan_mask = ~torch.isnan(target_field)
                     preds_field = torch.masked_select(preds_field, notnan_mask)
                     target_field = torch.masked_select(target_field, notnan_mask)
-                metric = self[idx](preds_field, target_field)
+                metric = self[metric_name](preds_field, target_field)
 
-            metric_dict.update({prefix + self.names[idx] + suffix: metric})
-            self.metrics_values_step.append(metric.item())
+            metric_dict.update({prefix + metric_name + suffix: metric})
+            self.metrics_values_step.update({metric_name: metric.item()})
 
             if self.do_weighted_sum:
-                if self.coeffs[idx] is not None:
-                    weighted_sum = weighted_sum + metric * self.coeffs[idx]
+                if coeff is not None:
+                    weighted_sum = weighted_sum + metric * coeff
         if self.do_weighted_sum:
             metric_dict.update({prefix + "weighted_sum" + suffix: weighted_sum})
         return metric_dict
@@ -195,63 +233,76 @@ class MetricsManager(torch.nn.ModuleList):
         """
         Aggregates accumulated metrics (intended for use at the end of an epoch).
         """
-        self.metrics_values_epoch = []
+        self.metrics_values_epoch = {k: None for k in self.metrics.keys()}
         if self.do_weighted_sum:
             weighted_sum = 0.0
         metric_dict = {}
-        for idx in range(self.num_metrics):
-            if self.per_type[idx]:
+        for metric_name, metric_params in self.metrics.items():
+            per_type = metric_params["per_type"]
+            coeff = metric_params["coeff"]
+            if per_type:
                 metric = 0
                 for type_idx, type_name in enumerate(self.type_names):
-                    ps_metric = self[idx][type_idx].compute()
+                    ps_metric = self[metric_name][type_idx].compute()
                     ps_metric_name = (
-                        prefix + "_".join([self.names[idx], type_name]) + suffix
+                        prefix + "_".join([metric_name, type_name]) + suffix
                     )
                     metric_dict.update({ps_metric_name: ps_metric})
                     metric = metric + ps_metric
                 metric = metric / len(self.type_names)
             else:
-                metric = self[idx].compute()
-            metric_dict.update({prefix + self.names[idx] + suffix: metric})
-            self.metrics_values_epoch.append(metric.item())
+                metric = self[metric_name].compute()
+            metric_dict.update({prefix + metric_name + suffix: metric})
+            self.metrics_values_epoch.update({metric_name: metric.item()})
             if self.do_weighted_sum:
-                if self.coeffs[idx] is not None:
-                    weighted_sum = weighted_sum + metric * self.coeffs[idx]
+                if coeff is not None:
+                    weighted_sum = weighted_sum + metric * coeff
         if self.do_weighted_sum:
             metric_dict.update({prefix + "weighted_sum" + suffix: weighted_sum})
 
         return metric_dict
 
     def reset(self):
-        for idx in range(self.num_metrics):
-            if self.per_type[idx]:
+        for metric_name, metric_params in self.metrics.items():
+            if metric_params["per_type"]:
                 for type_idx in range(len(self.type_names)):
-                    self[idx][type_idx].reset()
+                    self[metric_name][type_idx].reset()
             else:
-                self[idx].reset()
+                self[metric_name].reset()
 
-    def set_coeffs(self, coeffs: List[float]) -> None:
+    def set_coeffs(self, coeff_dict: Dict[str, Optional[float]]) -> None:
         """
         Sanity checks and normalizes coefficients to one before setting the new coefficients.
+        If some metrics are unspecified, the ``coeff`` will be assumed to be ``None``.
         """
-        assert len(coeffs) == len(self.coeffs)
-        if not all([coeff is None for coeff in coeffs]):
+        # add `None` if metric coeff is unspecified
+        for metric_name in self.metrics.keys():
+            if metric_name not in coeff_dict.keys():
+                coeff_dict[metric_name] = None
+        # normalize the coeffs
+        if not all([v is None for k, v in coeff_dict.items()]):
             # normalize coefficients to sum up to 1 wherever provided
-            tot = sum([c if c is not None else 0.0 for c in coeffs])
-            coeffs = [c / tot if c is not None else None for c in coeffs]
+            tot = sum([v if v is not None else 0.0 for k, v in coeff_dict.items()])
+            for name, metric_dict in self.metrics.items():
+                metric_dict["coeff"] = (
+                    coeff_dict[name] / tot if coeff_dict[name] is not None else None
+                )
             self.do_weighted_sum = True
-        self.coeffs = coeffs
+        else:
+            for name, metric_dict in self.metrics.items():
+                metric_dict["coeff"] = None
+            self.do_weighted_sum = False
 
     def get_extra_state(self) -> None:
         """"""
         return {
-            "coeffs": self.coeffs,
+            "coeff_dict": {k: v["coeff"] for k, v in self.metrics.items()},
             "metrics_values_step": self.metrics_values_step,
             "metrics_values_epoch": self.metrics_values_epoch,
         }
 
     def set_extra_state(self, state: Dict) -> None:
         """"""
-        self.set_coeffs(state["coeffs"])
+        self.set_coeffs(state["coeff_dict"])
         self.metrics_values_step = state["metrics_values_step"]
         self.metrics_values_epoch = state["metrics_values_epoch"]
