@@ -86,9 +86,9 @@ def register_fields(
         long_fields (Sequence[str]): long ``dtype`` fields
         cartesian_tensor_fields (Dict[str, str]): Cartesian tensor fields (both the name, and the ``formula`` must be provided, e.g. ``"ij=ji"``, see `e3nn docs <https://docs.e3nn.org/en/stable/api/io/cartesian_tensor.html>`_)
     """
+    graph_fields: set = set(graph_fields)
     node_fields: set = set(node_fields)
     edge_fields: set = set(edge_fields)
-    graph_fields: set = set(graph_fields)
     long_fields: set = set(long_fields)
 
     # error checking: prevents registering fields as contradictory types
@@ -103,6 +103,13 @@ def register_fields(
     assert len(_EDGE_FIELDS.intersection(graph_fields)) == 0
     assert len(_GRAPH_FIELDS.intersection(edge_fields)) == 0
     assert len(_GRAPH_FIELDS.intersection(node_fields)) == 0
+
+    # check that the fields don't have "." (to avoid clashes with nn parameter names)
+    assert all(["." not in field for field in graph_fields])
+    assert all(["." not in field for field in node_fields])
+    assert all(["." not in field for field in edge_fields])
+    assert all(["." not in field for field in long_fields])
+    assert all(["." not in field for field in cartesian_tensor_fields.keys()])
 
     # check that Cartesian tensor fields to add are rank-2 (higher ranks not supported)
     for cart_tensor_key in cartesian_tensor_fields:

@@ -78,5 +78,7 @@ FRAME_SUBSET_KEY: Final[str] = "subset"
 BATCH_KEY: Final[str] = "batch"
 NUM_NODES_KEY: Final[str] = "num_atoms"
 
-# Make a list of allowed keys
+# make a list of allowed keys
 ALLOWED_KEYS: List[str] = [v for k, v in globals().items() if k.endswith("_KEY")]
+# check that the fields don't have "." (to avoid clashes with nn parameter names)
+assert all(["." not in key for key in ALLOWED_KEYS])
