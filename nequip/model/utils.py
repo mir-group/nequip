@@ -1,7 +1,8 @@
 import torch
 from lightning.pytorch.utilities.seed import isolate_rng
 
-from nequip.nn import GraphModel, CompileGraphModel
+from nequip.nn.graph_model import GraphModel
+from nequip.nn.compile import CompileGraphModel
 from nequip.utils import (
     dtype_from_name,
     torch_default_dtype,

@@ -1,6 +1,5 @@
 from ._graph_mixin import GraphModuleMixin, SequentialGraphNetwork
 from .graph_model import GraphModel
-from .compile import CompileGraphModel
 from ._atomwise import (
     AtomwiseOperation,
     AtomwiseReduce,
@@ -17,7 +16,6 @@ from .utils import scatter, tp_path_exists, with_edge_vectors_
 
 __all__ = [
     GraphModel,
-    CompileGraphModel,
     GraphModuleMixin,
     SequentialGraphNetwork,
     AtomwiseOperation,
