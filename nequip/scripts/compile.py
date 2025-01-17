@@ -7,6 +7,7 @@ from nequip.model import (
     ModelFromPackage,
     ModelFromCheckpoint,
 )
+from nequip.train.lightning import _SOLE_MODEL_KEY
 from nequip.data import AtomicDataDict, compile_utils
 from nequip.utils.logger import RankedLogger
 from nequip.utils.compile import prepare_model_for_compile
@@ -122,6 +123,13 @@ def main(args=None):
         required=True,
     )
 
+    parser.add_argument(
+        "--model",
+        help=f"name of model to compile -- this option is only relevant when using multiple models (default: {_SOLE_MODEL_KEY}, meant to work for the conventional single model case)",
+        type=str,
+        default=_SOLE_MODEL_KEY,
+    )
+
     # args specific to export
     parser.add_argument(
         "--target",
@@ -210,6 +218,8 @@ def main(args=None):
             model = ModelFromCheckpoint(args.ckpt_path, set_global_options=True)
     else:
         model = ModelFromPackage(args.package_path, set_global_options=True)
+    model = model[args.model]
+    # ^ `ModuleDict` of `GraphModel` is loaded, we then select the desired `GraphModel` (`args.model` defaults to work for single model case)
 
     # === combine model and global options metadata ===
     global_options_metadata = _get_latest_global_options(only_metadata_related=True)
