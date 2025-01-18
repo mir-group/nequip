@@ -1,7 +1,6 @@
 import torch
 import lightning
 from lightning.pytorch.callbacks import Callback
-
 from nequip.data import AtomicDataDict
 from nequip.train import NequIPLightningModule
 
@@ -41,12 +40,8 @@ class LossCoefficientMonitor(Callback):
         batch_idx: int,
     ) -> None:
         """"""
-        if self.interval == "batch":
-            if trainer.global_step % self.frequency == 0:
-                loss = pl_module.loss
-                for idx in range(loss.num_metrics):
-                    if loss.coeffs[idx] is not None:
-                        pl_module.log(loss.names[idx] + "_coeff", loss.coeffs[idx])
+        if self.interval == "batch" and trainer.global_step % self.frequency == 0:
+            self._log_coefficients(pl_module)
 
     def on_train_epoch_end(
         self,
@@ -54,9 +49,10 @@ class LossCoefficientMonitor(Callback):
         pl_module: NequIPLightningModule,
     ) -> None:
         """"""
-        if self.interval == "epoch":
-            if trainer.current_epoch % self.frequency == 0:
-                loss = pl_module.loss
-                for idx in range(loss.num_metrics):
-                    if loss.coeffs[idx] is not None:
-                        pl_module.log(loss.names[idx] + "_coeff", loss.coeffs[idx])
+        if self.interval == "epoch" and trainer.current_epoch % self.frequency == 0:
+            self._log_coefficients(pl_module)
+
+    def _log_coefficients(self, pl_module: NequIPLightningModule) -> None:
+        for metric_name, metric_dict in pl_module.loss.metrics.items():
+            if metric_dict["coeff"] is not None:
+                pl_module.log("loss_coeff/" + metric_name, metric_dict["coeff"])

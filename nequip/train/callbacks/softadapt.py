@@ -1,16 +1,19 @@
-import numpy as np
-
+from math import sqrt, exp
 import lightning
 from lightning.pytorch.callbacks import Callback
-
 from nequip.data import AtomicDataDict
 from nequip.train import NequIPLightningModule
-
-from typing import List
+from typing import List, Dict
 
 
 class SoftAdapt(Callback):
     """Adaptively modify loss coefficients over a training run using the `SoftAdapt <https://arxiv.org/abs/2403.18122>`_ scheme.
+
+    .. warning::
+        The SoftAdapt requires that all components of the loss function contribute to the loss function, i.e. that their ``coeff`` in the ``MetricsManager`` is not ``None``.
+
+    .. warning::
+        It is dangerous to restart training (with SoftAdapt) and use a differently configured loss function for the restart because SoftAdapt's loaded checkpoint state will become ill-suited for the new loss function.
 
     Example usage in config where the loss coefficients are updated every 5 epochs:
     ::
@@ -43,15 +46,23 @@ class SoftAdapt(Callback):
         self.frequency = frequency
         self.eps = eps
 
-        self.prev_losses = None
-        self.cached_coeffs = []
+        self.prev_losses: Dict[str, float] = None
+        self.cached_coeffs: List[Dict[str, float]] = []
 
     def _softadapt_update(
         self,
-        new_losses: List[float],
+        new_losses: Dict[str, float],
         trainer: lightning.Trainer,
         pl_module: NequIPLightningModule,
     ):
+        # === sanity checks ===
+        assert all(
+            [
+                metric_dict["coeff"] is not None
+                for metric_dict in pl_module.loss.metrics.values()
+            ]
+        ), "all components of loss must have `coeff!=None` to use the SoftAdapt callback"
+
         if self.interval == "epoch":
             step = trainer.current_epoch  # use epochs
         else:
@@ -66,26 +77,39 @@ class SoftAdapt(Callback):
             self.prev_losses = new_losses
             return
         else:
-            # compute normalized loss change
-            loss_change = new_losses - self.prev_losses
-            loss_change = loss_change / np.maximum(
-                np.linalg.norm(loss_change), self.eps
+            # TODO (maybe): the check could be stronger by matching the keys themselves, but might add overhead
+            assert len(new_losses) == len(self.prev_losses)
+
+            # compute loss component changes
+            loss_changes = {
+                k: new_losses[k] - self.prev_losses[k] for k in new_losses.keys()
+            }
+            # normalize and apply softmax
+            sum_of_squares = sum(
+                [loss_changes[k] * loss_changes[k] for k in new_losses.keys()]
             )
+            factor = self.beta / max(sqrt(sum_of_squares), self.eps)
+            exps = {k: exp(factor * v) for k, v in loss_changes.items()}
+            softmax_denom = sum([exps[k] for k in new_losses.keys()]) + self.eps
+            new_coeffs = {k: exp_term / softmax_denom for k, exp_term in exps.items()}
+
+            # update with new coefficients
+            self.cached_coeffs.append(new_coeffs)
+            del new_coeffs
+            # update previous loss components
             self.prev_losses = new_losses
-            # compute new weights with softmax
-            exps = np.exp(self.beta * loss_change)
-            self.cached_coeffs.append(exps / (np.sum(exps) + self.eps))
 
         # average weights over previous cycle and update
         if step % self.frequency == 1:
-            softadapt_weights = np.mean(np.stack(self.cached_coeffs, axis=-1), axis=-1)
-            # make sure None entries stay None
-            new_coeffs = []
-            for idx, new_coeff in enumerate(softadapt_weights.tolist()):
-                new_coeffs.append(
-                    new_coeff if pl_module.loss.coeffs[idx] is not None else None
+            num_updates = len(self.cached_coeffs)
+            softadapt_weights = {
+                metric_name: sum(
+                    [self.cached_coeffs[idx][metric_name] for idx in range(num_updates)]
                 )
-            pl_module.loss.set_coeffs(new_coeffs)
+                / num_updates
+                for metric_name in pl_module.loss.keys()
+            }
+            pl_module.loss.set_coeffs(softadapt_weights)
 
     def on_train_batch_start(
         self,
@@ -98,8 +122,9 @@ class SoftAdapt(Callback):
         if trainer.global_step == 0:
             return
         if self.interval == "batch":
-            new_losses = np.array(pl_module.loss.metrics_values_step)
-            self._softadapt_update(new_losses, trainer, pl_module)
+            self._softadapt_update(
+                pl_module.loss.metrics_values_step, trainer, pl_module
+            )
 
     def on_train_epoch_start(
         self,
@@ -110,8 +135,9 @@ class SoftAdapt(Callback):
         if trainer.current_epoch == 0:
             return
         if self.interval == "epoch":
-            new_losses = np.array(pl_module.loss.metrics_values_epoch)
-            self._softadapt_update(new_losses, trainer, pl_module)
+            self._softadapt_update(
+                pl_module.loss.metrics_values_epoch, trainer, pl_module
+            )
 
     def state_dict(self):
         """"""
