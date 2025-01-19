@@ -61,6 +61,13 @@ trainer:
       out_file: ${hydra:runtime.output_dir}/test
       output_fields_from_original_dataset: [total_energy, forces]
       chemical_symbols: ${chemical_symbols}
+    - _target_: nequip.train.callbacks.LossCoefficientMonitor
+      interval: epoch
+      frequency: 5
+    - _target_: nequip.train.callbacks.SoftAdapt
+      beta: 1.1
+      interval: epoch
+      frequency: 2
 
 training_module:
   _target_: nequip.train.EMALightningModule
