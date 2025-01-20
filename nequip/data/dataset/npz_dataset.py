@@ -8,10 +8,12 @@ from ._base_datasets import AtomicDataset
 from typing import Union, Dict, List, Callable
 
 
-class sGDMLNPZDataset(AtomicDataset):
-    """``AtomicDataset`` that loads data from an NPZ file following sGDML conventions.
+class NPZDataset(AtomicDataset):
+    """``AtomicDataset`` that loads data from an NPZ file following `sGDML <https://www.sgdml.org/#datasets>`_ conventions.
+    It is also compatible with other datasets such as rMD-17, with a change in ``key_mapping``
+    (the default ``key_mapping`` is set to be compatible with sGDML datasets).
 
-    The ``sGDMLNPZDataset`` avoids loading the whole dataset into memory.
+    The ``NPZDataset`` avoids loading the whole dataset into memory.
 
     Args:
         file_path (str): path to npz file

@@ -67,7 +67,7 @@ class sGDML_CCSD_DataModule(NequIPDataModule):
             [data_source_dir, self.DATASET_MAP[dataset] + "-test.npz"]
         )
         trainval_config = {
-            "_target_": "nequip.data.dataset.sGDMLNPZDataset",
+            "_target_": "nequip.data.dataset.NPZDataset",
             "file_path": train_file_path,
             "transforms": transforms,
         }
