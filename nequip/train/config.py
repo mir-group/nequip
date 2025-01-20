@@ -83,18 +83,13 @@ class ConFIGLightningModule(NequIPLightningModule):
         del param_dict
 
         # === process loss functions ===
-        self.ConFIG_loss_idxs = [
-            idx
-            for idx in range(self.loss.num_metrics)
-            if self.loss.coeffs[idx] is not None
-        ]
         assert (
-            len(self.ConFIG_loss_idxs) >= 1
-        ), f"`ConFIGLightningModule` is used for cases with multiple loss components, but {len(self.ConFIG_loss_idxs)} found"
-        self.ConFIG_loss_component_keys = [
-            f"train_loss_step{self.logging_delimiter}" + self.loss.names[idx]
-            for idx in self.ConFIG_loss_idxs
-        ]
+            len(self.loss) >= 1
+        ), f"`ConFIGLightningModule` is used for cases with multiple loss components, but {len(self.loss)} found"
+        self.ConFIG_loss_component_keys: Dict[str, str] = {
+            metric_name: f"train_loss_step{self.logging_delimiter}" + metric_name
+            for metric_name in self.loss.keys()
+        }
 
         # === method specific hyperparameters ===
         self.ConFIG_eps = norm_eps
@@ -174,16 +169,46 @@ class ConFIGLightningModule(NequIPLightningModule):
         return loss
 
     def _ConFIG_backwards(self, loss_dict):
+
+        # account for loss contributions that can be `None`
+        coeff_dict: Dict[str, float] = {
+            metric_name: metric_dict["coeff"]
+            for metric_name, metric_dict in self.loss.metrics.items()
+        }
+        num_active_loss_components = sum(
+            [coeff is not None for coeff in coeff_dict.values()]
+        )
+        if num_active_loss_components == 0:
+            raise RuntimeError(
+                "At least one active loss component is required for training, i.e. at least on component in the loss function must have `coeff` that is not `None`."
+            )
+        elif num_active_loss_components == 1:
+            # short-circuit if there's only one active loss component
+            self.manual_backward(
+                (
+                    loss_dict[f"train_loss_step{self.logging_delimiter}weighted_sum"]
+                    * self.world_size
+                )
+            )
+            return
+
+        # if we get here, it means there's at least two active loss components and we proceed to the ConFIG logic
         param_dict = dict(self.model.named_parameters())
         # === get loss component gradients ===
         loss_component_grads = []
-        for idx, loss_component_key in enumerate(self.ConFIG_loss_component_keys):
+        loss_component_coefficients = []
+        for idx, metric_name in enumerate(self.loss.keys()):
+            # skip the loop if there's no coefficient
+            if coeff_dict[metric_name] is None:
+                continue
+            loss_component_coefficients.append(coeff_dict[metric_name])
             # get loss component and backward (with world size factor for DDP)
+            loss_component_key = self.ConFIG_loss_component_keys[metric_name]
             loss_component = loss_dict[loss_component_key] * self.world_size
             # gradients should get synced by DDP during the below backwards pass,
             # such that afterwards we have gradients of the loss term w.r.t. the global batch.
             self.manual_backward(
-                loss_component, retain_graph=idx < len(self.ConFIG_loss_idxs) - 1
+                loss_component, retain_graph=idx < num_active_loss_components - 1
             )
             # ^ don't retain graph for the last term
 
@@ -209,7 +234,7 @@ class ConFIGLightningModule(NequIPLightningModule):
         # construct loss coeff vector (num_loss_components,)
         b = torch.nn.functional.normalize(
             torch.tensor(
-                [self.loss.coeffs[idx] for idx in self.ConFIG_loss_idxs],
+                loss_component_coefficients,
                 dtype=A.dtype,
                 device="cpu" if self.ConFIG_cpu_lsqr else A.device,
             ),
