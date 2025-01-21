@@ -4,7 +4,7 @@ import pytest
 from ase.io import write
 
 from nequip.data import AtomicDataDict
-from nequip.data.dataset import ASEDataset, HDF5Dataset, EMTTestDataset
+from nequip.data.dataset import ASEDataset, HDF5Dataset, EMTTestDataset, NPZDataset
 from nequip.data.transforms import NeighborListTransform
 
 from omegaconf import OmegaConf
@@ -26,6 +26,28 @@ def npz():
         energy=np.random.random(nframes) * -600,
         Z=np.random.randint(1, MAX_ATOMIC_NUMBER, size=(nframes, natoms)),
     )
+
+
+@pytest.fixture(scope="module")
+def npz_for_NPZDataset():
+    np.random.seed(0)
+    natoms = NATOMS
+    nframes = 8
+    yield dict(
+        R=np.random.random((nframes, natoms, 3)),
+        F=np.random.random((nframes, natoms, 3)),
+        E=np.random.random(nframes) * -600,
+        z=np.random.randint(1, MAX_ATOMIC_NUMBER, size=natoms),
+    )
+
+
+@pytest.fixture(scope="module")
+def npz_dataset(npz_for_NPZDataset, temp_data):
+    with tempfile.NamedTemporaryFile(suffix=".npz") as path:
+        np.savez(path.name, **npz_for_NPZDataset)
+        yield NPZDataset(
+            file_path=path.name, transforms=[NeighborListTransform(r_max=3)]
+        )
 
 
 @pytest.fixture(scope="module")
@@ -67,7 +89,9 @@ def emt_dataset():
     )
 
 
-@pytest.fixture(scope="module", params=["ase_dataset", "emt_dataset", "hdf5_dataset"])
+@pytest.fixture(
+    scope="module", params=["ase_dataset", "emt_dataset", "hdf5_dataset", "npz_dataset"]
+)
 def dataset(request):
     yield request.getfixturevalue(request.param)
 
