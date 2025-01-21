@@ -71,10 +71,7 @@ class NequIPLightningModule(lightning.LightningModule):
         self.save_hyperparameters()
 
         # === instantiate model ===
-        # reason for following implementation instead of just `hydra.utils.instantiate(model)` is to prevent omegaconf from being a model dependency
-        model = model.copy()  # make a copy because of `pop`
-        model_builder = get_method(model.pop("_target_"))
-        model_object = model_builder(**model)
+        model_object = self._build_model(model)
 
         # === account for multiple models ===
         # contract:
@@ -172,6 +169,17 @@ class NequIPLightningModule(lightning.LightningModule):
 
         # for statefulness of the run stage
         self.register_buffer("run_stage", torch.zeros((1), dtype=torch.long))
+
+    def _build_model(self, model_config: Dict) -> torch.nn.ModuleDict:
+        """Constructs a ``torch.nn.ModuleDict[str, nequip.nn.GraphModel]`` from a pure Python dictionary.
+
+        Subclasses that require more control over how the model is built can override this method.
+        """
+        # reason for following implementation instead of just `hydra.utils.instantiate(model)` is to prevent omegaconf from being a model dependency
+        model_config = model_config.copy()  # make a copy because of `pop` mutation
+        model_builder = get_method(model_config.pop("_target_"))
+        model = model_builder(**model_config)
+        return model
 
     def configure_optimizers(self):
         """"""
