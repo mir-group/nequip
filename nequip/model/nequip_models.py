@@ -6,7 +6,7 @@ from nequip.data import AtomicDataDict
 from nequip.nn import (
     GraphModel,
     SequentialGraphNetwork,
-    AtomwiseLinear,
+    ScalarMLP,
     AtomwiseReduce,
     PerTypeScaleShift,
     ConvNetLayer,
@@ -233,11 +233,14 @@ def FullNequIPGNNEnergyModel(
         modules.update({f"layer{layer_i}_convnet": current_convnet})
 
     # === readout ===
-    # linear readout
-    per_atom_energy_readout = AtomwiseLinear(
-        irreps_in=prev_irreps_out,
-        irreps_out="1x0e",
+    # configure `ScalarMLP` to act as a linear scalar readout
+    per_atom_energy_readout = ScalarMLP(
+        output_dim=1,
+        bias=False,
+        forward_weight_init=True,
+        field=AtomicDataDict.NODE_FEATURES_KEY,
         out_field=AtomicDataDict.PER_ATOM_ENERGY_KEY,
+        irreps_in=prev_irreps_out,
     )
 
     per_type_energy_scale_shift = PerTypeScaleShift(
