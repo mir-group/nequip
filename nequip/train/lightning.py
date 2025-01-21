@@ -139,9 +139,8 @@ class NequIPLightningModule(lightning.LightningModule):
                 self.loss.do_weighted_sum
             ), "`coeff` must be set for entries of the `loss` MetricsManager for a weighted sum of metrics components to be used as the loss."
 
-        # `dist_sync_on_step` is set to True metrics in the loss
-        # this is done after the loss is instantiated so that there are no assumptions that
-        # `metrics` will be a key on the config dictionary
+        # set `dist_sync_on_step=True` for loss metrics
+        # to ensure correct DDP syncing of loss function for batch steps
         for metric in self.loss.values():
             metric.dist_sync_on_step = True
         self.loss.eval()
