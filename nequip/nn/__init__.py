@@ -6,6 +6,7 @@ from ._atomwise import (
     AtomwiseLinear,
     PerTypeScaleShift,
 )
+from .mlp import ScalarMLP, ScalarMLPFunction
 from .interaction_block import InteractionBlock
 from .convnetlayer import ConvNetLayer
 from ._grad_output import GradientOutput, PartialForceOutput, ForceStressOutput
@@ -22,6 +23,8 @@ __all__ = [
     AtomwiseReduce,
     AtomwiseLinear,
     PerTypeScaleShift,
+    ScalarMLP,
+    ScalarMLPFunction,
     InteractionBlock,
     GradientOutput,
     PartialForceOutput,
