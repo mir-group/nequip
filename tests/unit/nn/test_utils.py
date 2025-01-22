@@ -5,11 +5,52 @@ import torch
 
 from nequip.data import AtomicDataDict, compute_neighborlist_, from_ase
 from nequip.nn.embedding import OneHotAtomEncoding
+from nequip.nn.embedding._edge import _process_per_edge_type_cutoff
 from nequip.nn import SequentialGraphNetwork, SaveForOutput, AtomwiseLinear, GraphModel
 from nequip.nn.utils import with_edge_vectors_
 from nequip.utils import dtype_from_name, torch_default_dtype
+from nequip.utils.global_dtype import _GLOBAL_DTYPE
 
 import ase
+
+
+def test_process_per_edge_cutoff():
+    # Unit case
+    assert torch.all(
+        _process_per_edge_type_cutoff(["O"], {"O": 2.0}, r_max=4.0)
+        == torch.as_tensor([[2.0]], dtype=_GLOBAL_DTYPE)
+    )
+    # Unit case more complex
+    assert torch.all(
+        _process_per_edge_type_cutoff(["O"], {"O": {"O": 2.0}}, r_max=4.0)
+        == torch.as_tensor([[2.0]], dtype=_GLOBAL_DTYPE)
+    )
+
+    # Normal behavior
+    type_names = ["H", "C", "O"]
+    per_edge_type_cutoff = {"H": 2.0, "C": {"H": 4.0, "C": 3.5, "O": 3.7}, "O": 3.9}
+
+    assert torch.all(
+        _process_per_edge_type_cutoff(type_names, per_edge_type_cutoff, r_max=4.0)
+        == torch.as_tensor(
+            [[2.0, 2.0, 2.0], [4.0, 3.5, 3.7], [3.9, 3.9, 3.9]], dtype=_GLOBAL_DTYPE
+        )
+    )
+
+    # Ignores unspecified atoms
+    type_names = ["H", "C", "O"]
+    per_edge_type_cutoff = {
+        "H": 2.0,
+        "C": {"H": 4.0, "C": 3.5, "O": 3.7, "N": 3.7},
+        "O": 3.9,
+    }
+
+    assert torch.all(
+        _process_per_edge_type_cutoff(type_names, per_edge_type_cutoff, r_max=4.0)
+        == torch.as_tensor(
+            [[2.0, 2.0, 2.0], [4.0, 3.5, 3.7], [3.9, 3.9, 3.9]], dtype=_GLOBAL_DTYPE
+        )
+    )
 
 
 def test_non_periodic_edge(CH3CHO):
