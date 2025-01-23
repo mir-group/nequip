@@ -116,8 +116,10 @@ class CompileGraphModel(GraphModel):
             # use intersection of data keys and GraphModel input/outputs, which assumes
             # - correctness of irreps registration system
             # - all input `data` batches have the same keys, and contain all necessary inputs and reference labels (outputs)
-            self.input_fields = list(data.keys() & self.model_input_fields)
-            self.output_fields = list(data.keys() & self.model.irreps_out.keys())
+            self.input_fields = sorted(list(data.keys() & self.model_input_fields))
+            self.output_fields = sorted(
+                list(data.keys() & self.model.irreps_out.keys())
+            )
 
             # == preprocess model and make_fx ==
             model_to_trace = ListInputOutputStateDictWrapper(
