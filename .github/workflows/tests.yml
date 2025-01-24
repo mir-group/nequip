@@ -3,28 +3,34 @@ name: Run Tests
 on:
   push:
     branches:
-    - main
-
+      - main
+      - develop
   pull_request:
     branches:
-    - main
+      - main
+      - develop
 
 jobs:
-  build:
 
-    runs-on: ubuntu-latest
+  build:
+    runs-on: ${{ github.event.repository.private && 'self-hosted' || 'ubuntu-latest' }}
     strategy:
       matrix:
         python-version: [3.9]
         torch-version: [2.2.0, "2.*"]
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
-    - name: Install dependencies
+    - name: Linting
+      run: |
+          pip install flake8==7.1.0 Flake8-pyproject black
+          flake8 . --count --show-source --statistics
+          black . --check
+    - name: Install test dependencies
       env:
         TORCH: "${{ matrix.torch-version }}"
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -32,10 +38,8 @@ jobs:
         python -m pip install --upgrade pip
         pip install setuptools wheel
         pip install torch==${TORCH} -f https://download.pytorch.org/whl/cpu/torch_stable.html
-        pip install h5py scikit-learn  # install packages that aren't required dependencies but that the tests do need
+        pip install h5py scikit-learn  # install packages that aren't required dependencies but that the tests do need        
         pip install --upgrade-strategy only-if-needed .
-    - name: Install pytest
-      run: |
         pip install pytest
         pip install pytest-xdist[psutil]
     - name: Test with pytest
