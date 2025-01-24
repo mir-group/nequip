@@ -1,12 +1,27 @@
 import math
 import torch
 from torch.fx.experimental.proxy_tensor import make_fx
-
 from nequip.data import AtomicDataDict
-
+import contextlib
 import difflib
 import os
 from typing import List
+
+
+@contextlib.contextmanager
+def fx_duck_shape(enabled: bool):
+    """
+    For our use of `make_fx` to unfold the autograd graph, we must set the following `use_duck_shape` parameter to `False` (it's `True` by default).
+    It forces dynamic batch dims (num_frames, num_atoms, num_edges) to shape specialize if the batch dim is the same as that of a static dim.
+    E.g. in training, shape specialization would occur if a weight tensor has a dimension with shape (16,) and we use a batch size of 16 (so the dynamic batch dim `num_frames` is 16) because of the duck shaping.
+    """
+    # save previous state
+    init_duck_shape = torch.fx.experimental._config.use_duck_shape
+    # set mode variables
+    torch.fx.experimental._config.use_duck_shape = enabled
+    yield
+    # restore state
+    torch.fx.experimental._config.use_duck_shape = init_duck_shape
 
 
 def nequip_make_fx(
@@ -15,6 +30,7 @@ def nequip_make_fx(
     fields: List[str],
     extra_inputs: List[torch.Tensor] = [],
     seed: int = 1,
+    check_tol: float = 1e-5,
 ):
     """
     Args:
@@ -24,16 +40,17 @@ def nequip_make_fx(
         extra_inputs (List[torch.Tensor]): list of additional ``torch.Tensor`` input data that are not ``AtomicDataDict`` fields
         seed (int): optional seed for reproducibility
     """
-    # we do it three times
+    # we do it twice
     # 1. once with the original input data
     test_data_list = [data[key] for key in fields]
-    _ = _nequip_make_fx(model, test_data_list + extra_inputs)
+    fx_model = _nequip_make_fx(model, test_data_list + extra_inputs)
 
-    # 2. once with augmented data
+    # 2. once with augmented data where all batch dims (num_frames, num_atoms, num_edges) are different
     device = data[AtomicDataDict.POSITIONS_KEY].device
     # get global seed to construct generator for reproducibility
     generator = torch.Generator(device).manual_seed(seed)
-    num_nodes = AtomicDataDict.num_nodes(data)
+    single_frame = AtomicDataDict.frame_from_batched(data, 0)
+    num_nodes = AtomicDataDict.num_nodes(single_frame)
     node_idx = torch.randint(
         low=0,
         high=num_nodes,
@@ -41,27 +58,40 @@ def nequip_make_fx(
         generator=generator,
         device=device,
     )
-    augmented_data = AtomicDataDict.without_nodes(data, node_idx)
-    augmented_data_list = [augmented_data[key] for key in fields]
-    augmented_fx_model = _nequip_make_fx(model, augmented_data_list + extra_inputs)
+    augmented_data = AtomicDataDict.batched_from_list(
+        [data, AtomicDataDict.without_nodes(single_frame, node_idx)]
+    )
+    augmented_data = [augmented_data[key] for key in fields]
+    augmented_fx_model = _nequip_make_fx(model, augmented_data + extra_inputs)
+    del augmented_data, node_idx, single_frame
 
-    # 3. finally with the original input data again
-    fx_model = _nequip_make_fx(model, test_data_list + extra_inputs)
+    # perform two sanity checks
+    # 1. check that the fx graphs are identical
+    # because we use different batch dims for each fx model, this check ensures that `make_fx` didn't shape-specialize
+    check_make_fx_diff(fx_model, augmented_fx_model, fields)
+    # 2. check that both models lead to the same output with the same inputs
+    out1 = fx_model(*(test_data_list + extra_inputs))
+    out2 = augmented_fx_model(*(test_data_list + extra_inputs))
+    for t1, t2 in zip(out1, out2):
+        assert torch.allclose(t1, t2, atol=check_tol, rtol=check_tol), torch.max(
+            torch.abs(t1 - t2)
+        ).item()
+    del out1, out2
 
-    # then test last two (which corresponds to different shapes)
-    check_make_fx_diff(augmented_fx_model, fx_model)
+    # clean up
+    torch.cuda.empty_cache()
 
-    # and return the last one
     return fx_model
 
 
 def _nequip_make_fx(model, inputs):
-    return make_fx(
-        model,
-        tracing_mode="symbolic",
-        _allow_non_fake_inputs=True,
-        _error_on_data_dependent_ops=True,
-    )(*inputs)
+    with fx_duck_shape(False):
+        return make_fx(
+            model,
+            tracing_mode="symbolic",
+            _allow_non_fake_inputs=True,
+            _error_on_data_dependent_ops=True,
+        )(*[i.clone() for i in inputs])
 
 
 def highlight_code_differences(code1, code2):
@@ -82,7 +112,7 @@ def highlight_code_differences(code1, code2):
     return "\n".join(highlighted)
 
 
-def check_make_fx_diff(fx_model_1, fx_model_2):
+def check_make_fx_diff(fx_model_1, fx_model_2, fields: List[str]):
     if fx_model_1.code != fx_model_2.code:
         # the following is commented to prevent obscuring the error message below
         # devs can uncomment for diagonosing shape specializations
@@ -90,8 +120,10 @@ def check_make_fx_diff(fx_model_1, fx_model_2):
         dump_dir = str(os.getcwd()) + "/nequip_fx_dump"
         os.mkdir(dump_dir)
         with open(dump_dir + "/fx_model_1.txt", "w") as f:
+            f.write(f"# Argument order:\n{fields} + extra_inputs\n")
             f.write(fx_model_1.code)
         with open(dump_dir + "/fx_model_2.txt", "w") as f:
+            f.write(f"# Argument order:\n{fields} + extra_inputs\n")
             f.write(fx_model_2.code)
         raise RuntimeError(
             f"An unexpected internal error has occurred (the fx'ed models for different input shapes do not agree) -- please report this issue on the NequIP GitHub, and upload the files in {dump_dir}."
