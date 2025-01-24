@@ -107,6 +107,8 @@ class CompileGraphModel(GraphModel):
         # === compile ===
         # compilation happens on the first data pass when there are at least two atoms (hard to pre-emp pathological data)
         if not self._compiled_model:
+            tol = {torch.float32: 1e-5, torch.float64: 1e-12}[self.model_dtype]
+
             # short-circuit
             if AtomicDataDict.num_nodes(data) < 2:
                 # use parent class's forward
@@ -134,6 +136,7 @@ class CompileGraphModel(GraphModel):
                 data=data,
                 fields=self.input_fields,
                 extra_inputs=weights + buffers,
+                check_tol=tol,
             )
 
             # == export with dynamic shape specification ==
@@ -164,6 +167,23 @@ class CompileGraphModel(GraphModel):
             )
             # NOTE: the compiled model is wrapped in a tuple so that it's not registered and saved in the state dict -- this is necessary to enable `GraphModel` to load `CompileGraphModel` state dicts
             # see https://discuss.pytorch.org/t/saving-nn-module-to-parent-nn-module-without-registering-paremeters/132082/6
+
+            # run original model and compiled model with data to sanity check
+
+            # compiled model
+            data_list = _list_from_dict(self.input_fields, data)
+            out_list = self._compiled_model[0](*(data_list + weights + buffers))
+            out_dict = _list_to_dict(self.output_fields, out_list)
+            to_return = data.copy()
+            to_return.update(out_dict)
+
+            # original model
+            orig_out = self.model(data)
+            for k in to_return.keys():
+                assert torch.allclose(orig_out[k], to_return[k], atol=tol, rtol=tol)
+            del orig_out
+
+            return to_return
 
         # === run compiled model ===
         data_list = _list_from_dict(self.input_fields, data)
