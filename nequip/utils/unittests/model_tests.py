@@ -20,9 +20,14 @@ from nequip.data import (
 from nequip.data.transforms import ChemicalSpeciesToAtomTypeMapper
 from nequip.nn import GraphModuleMixin, ForceStressOutput, PartialForceOutput
 from nequip.utils import dtype_to_name, find_first_of_type
-from nequip.utils.test import assert_AtomicData_equivariant, FLOAT_TOLERANCE
+from nequip.utils.test import (
+    assert_AtomicData_equivariant,
+    FLOAT_TOLERANCE,
+    override_irreps_debug,
+)
 
-from hydra.utils import instantiate
+from hydra.utils import get_method
+import packaging.version
 
 
 # see https://github.com/pytest-dev/pytest/issues/421#issuecomment-943386533
@@ -38,11 +43,7 @@ class BaseModelTests:
 
     @pytest.fixture(
         scope="class",
-        params=(
-            [torch.device("cuda"), torch.device("cpu")]
-            if torch.cuda.is_available()
-            else [torch.device("cpu")]
-        ),
+        params=(["cuda", "cpu"] if torch.cuda.is_available() else ["cpu"]),
     )
     def device(self, request):
         return request.param
@@ -50,7 +51,8 @@ class BaseModelTests:
     @staticmethod
     def make_model(model_config, device):
         config = model_config.copy()
-        model = instantiate(config, _recursive_=False)
+        model_builder = get_method(config.pop("_target_"))
+        model = model_builder(**config)
         model = model.to(device)
         # test if possible to print model
         print(model)
@@ -58,18 +60,39 @@ class BaseModelTests:
 
     @pytest.fixture(scope="class")
     def model(self, config, device, model_dtype):
+        # === sanity check contracts with subclasses ===
+        assert (
+            "model_dtype" not in config
+        ), "model test subclasses should not include `model_dtype` in the configs -- the test class will handle it (looping over `float32` and `float64`)"
+        assert (
+            "compile_mode" not in config
+        ), "model test subclasses should not include `compile_mode` in the configs -- the test class will handle it (looping over TorchScript and `torch.compile` modes)"
+        config = config.copy()
         config.update({"model_dtype": model_dtype})
         model = self.make_model(config, device=device)
         out_fields = model.irreps_out.keys()
-        return model, out_fields
+        # we return the config with the correct `model_dtype`
+        return model, config, out_fields
+
+    @pytest.fixture(scope="class")
+    def model_test_data(self, config, atomic_batch, device):
+        # clone the data to avoid mutating the original batch
+        # cpu because we need to reconstruct the neighborlist
+        atomic_batch = {
+            k: v.clone().detach().to("cpu") for k, v in atomic_batch.items()
+        }
+        # reset neighborlist
+        atomic_batch = compute_neighborlist_(atomic_batch, r_max=config["r_max"])
+        # return the data in the device for testing
+        return AtomicDataDict.to_(atomic_batch, device)
 
     # == common tests for all models ==
     def test_init(self, model):
-        instance, _ = model
+        instance, _, _ = model
         assert isinstance(instance, GraphModuleMixin)
 
     def test_jit(self, model, atomic_batch, device):
-        instance, out_fields = model
+        instance, _, out_fields = model
         data = AtomicDataDict.to_(atomic_batch, device)
         model_script = script(instance)
 
@@ -111,16 +134,61 @@ class BaseModelTests:
                     atol=atol,
                 ), f"JIT didn't repro save-and-loaded JIT on field {out_field} with max error {(out_script[out_field] - out_load[out_field]).abs().max().item()}"
 
-    def test_forward(self, model, atomic_batch, device):
-        instance, out_fields = model
-        data = AtomicDataDict.to_(atomic_batch, device)
-        output = instance(data)
+    @override_irreps_debug(False)
+    def test_compile(self, model, model_test_data, device):
+
+        if packaging.version.parse(torch.__version__) < packaging.version.parse("2.6"):
+            pytest.skip("PT2 compile tests skipped for torch < 2.6")
+
+        # TODO: sort out the CPU compilation issues
+        if device == "cpu":
+            pytest.skip(
+                "compile tests are skipped for CPU as there are known compilation bugs for both NequIP and Allegro models on CPU"
+            )
+
+        instance, config, _ = model
+        # get tolerance based on model_dtype
+        tol = {
+            torch.float32: 5e-5,
+            torch.float64: 1e-12,
+        }[instance.model_dtype]
+
+        # make compiled model
+        config = config.copy()
+        config["compile_mode"] = "compile"
+        compile_model = self.make_model(config, device=device)
+
+        compile_out = compile_model(model_test_data.copy())  # shallow copy
+        assert compile_model._compiled_model, "compilation unsuccessful"
+        # if compilation was successful, internal checks would have ensured consistency of base and compiled model predictions
+        # here, we check that backward pass of the model works for training
+
+        if not any([p.requires_grad for p in compile_model.parameters()]):
+            pytest.skip("no trainable weights")
+
+        compile_loss = compile_out[AtomicDataDict.TOTAL_ENERGY_KEY].square().sum()
+        compile_loss.backward()
+
+        # compute base model predictions
+        out = instance(model_test_data.copy())  # shallow copy
+        loss = out[AtomicDataDict.TOTAL_ENERGY_KEY].square().sum()
+        loss.backward()
+        compile_params = dict(compile_model.named_parameters())
+        for k, v in instance.named_parameters():
+            err = torch.max(torch.abs(v.grad - compile_params[k].grad))
+            assert torch.allclose(
+                v.grad, compile_params[k].grad, atol=tol, rtol=tol
+            ), err
+
+    def test_forward(self, model, model_test_data):
+        instance, _, out_fields = model
+        output = instance(model_test_data)
         for out_field in out_fields:
             assert out_field in output
 
     def test_wrapped_unwrapped(self, model, device, Cu_bulk):
         atoms, data_orig = Cu_bulk
-        instance, out_fields = model
+        instance, _, out_fields = model
         data = from_ase(atoms)
         data = compute_neighborlist_(data, r_max=3.5)
         data[AtomicDataDict.ATOM_TYPE_KEY] = data_orig[AtomicDataDict.ATOM_TYPE_KEY]
@@ -175,18 +243,17 @@ class BaseModelTests:
                     out_ref[out_field], out_unwrapped[out_field], atol=tolerance
                 ), f'failed for key "{out_field}" with max absolute diff {torch.abs(out_ref[out_field] - out_unwrapped[out_field]).max().item():.5g} (tol={tolerance:.5g})'
 
-    def test_batch(self, model, atomic_batch, device):
+    def test_batch(self, model, model_test_data):
         """Confirm that the results for individual examples are the same regardless of whether they are batched."""
-        instance, out_fields = model
+        instance, _, out_fields = model
 
         tolerance = FLOAT_TOLERANCE[dtype_to_name(instance.model_dtype)]
         allclose = functools.partial(torch.allclose, atol=tolerance)
-        data = AtomicDataDict.to_(atomic_batch, device)
-        data1 = AtomicDataDict.frame_from_batched(data, 0)
-        data2 = AtomicDataDict.frame_from_batched(data, 1)
+        data1 = AtomicDataDict.frame_from_batched(model_test_data, 0)
+        data2 = AtomicDataDict.frame_from_batched(model_test_data, 1)
         output1 = instance(data1)
         output2 = instance(data2)
-        output = instance(data)
+        output = instance(model_test_data)
         for out_field in out_fields:
             # to ignore
             if out_field in [
@@ -237,23 +304,20 @@ class BaseModelTests:
                     f"Found unregistered `out_field` = {out_field}"
                 )
 
-    def test_equivariance(self, model, atomic_batch, device):
-        instance, out_fields = model
+    def test_equivariance(self, model, model_test_data, device):
+        instance, _, _ = model
         instance = instance.to(device=device)
-        atomic_batch = AtomicDataDict.to_(atomic_batch, device)
 
         assert_AtomicData_equivariant(
             func=instance,
-            data_in=atomic_batch,
+            data_in=model_test_data,
             e3_tolerance={torch.float32: 1e-3, torch.float64: 1e-8}[
                 instance.model_dtype
             ],
         )
 
-    def test_embedding_cutoff(self, model, config, device):
-        instance, out_fields = model
-
-        config = config.copy()
+    def test_embedding_cutoff(self, model, device):
+        instance, config, _ = model
         r_max = config["r_max"]
 
         # make a synthetic three atom example
@@ -313,8 +377,8 @@ class BaseModelTests:
 
 
 class BaseEnergyModelTests(BaseModelTests):
-    def test_large_separation(self, model, config, molecules, device):
-        instance, _ = model
+    def test_large_separation(self, model, molecules, device):
+        instance, config, _ = model
         atol = {torch.float32: 1e-4, torch.float64: 1e-10}[instance.model_dtype]
         r_max = config["r_max"]
         atoms1 = molecules[0].copy()
@@ -394,7 +458,7 @@ class BaseEnergyModelTests(BaseModelTests):
         batch = AtomicDataDict.batched_from_list(
             [nequip_dataset[i] for i in range(len(nequip_dataset))]
         )
-        energy_model, out_fields = model
+        energy_model, _, _ = model
         data = AtomicDataDict.to_(batch, device)
         data[AtomicDataDict.POSITIONS_KEY].requires_grad = True
 
@@ -414,7 +478,7 @@ class BaseEnergyModelTests(BaseModelTests):
         assert in_frame_grad.abs().max().item() > 0
 
     def test_numeric_gradient(self, model, atomic_batch, device):
-        model, out_fields = model
+        model, _, out_fields = model
         if AtomicDataDict.FORCE_KEY not in out_fields:
             pytest.skip()
 
@@ -450,10 +514,9 @@ class BaseEnergyModelTests(BaseModelTests):
                 numeric, analytical, rtol=5e-2
             ), f"numeric: {numeric.item()}, analytical: {analytical.item()}"
 
-    def test_partial_forces(
-        self, config, atomic_batch, device, strict_locality, model_dtype
-    ):
-        aux_model = self.make_model(config, device=device)
+    def test_partial_forces(self, model, atomic_batch, device, strict_locality):
+        _, config, _ = model
+        aux_model = self.make_model(config.copy(), device=device)
         module = find_first_of_type(aux_model, ForceStressOutput)
         # skip test if force/stress module not found
         if module is None:
@@ -462,7 +525,7 @@ class BaseEnergyModelTests(BaseModelTests):
         aux_model.model = PartialForceOutput(module.func)
         partial_model = aux_model
         # instantiate new force/stress model
-        model = self.make_model(config, device=device)
+        model = self.make_model(config.copy(), device=device)
 
         data = AtomicDataDict.to_(atomic_batch, device)
         output = model(data)
@@ -507,8 +570,8 @@ class BaseEnergyModelTests(BaseModelTests):
         # for non-adjacent atoms, all partial forces must be zero
         assert torch.all(partial_forces[~adjacency] == 0)
 
-    def test_force_smoothness(self, model, config, device):
-        instance, out_fields = model
+    def test_force_smoothness(self, model, device):
+        instance, config, out_fields = model
         if AtomicDataDict.FORCE_KEY not in out_fields:
             pytest.skip()
 
@@ -535,9 +598,9 @@ class BaseEnergyModelTests(BaseModelTests):
             torch.zeros(1, device=device, dtype=forces.dtype),
         )
 
-    def test_isolated_atom_energies(self, model, config, device):
+    def test_isolated_atom_energies(self, model, device):
         """Checks that isolated atom energies provided for the per-atom shifts are restored for isolated atoms."""
-        instance, out_fields = model
+        instance, config, _ = model
 
         if "per_type_energy_shifts" not in config:
             pytest.skip()
