@@ -41,13 +41,14 @@ def ModelFromCheckpoint(
     session_versions = get_current_code_versions(verbose=False)
 
     for code, session_version in session_versions.items():
-        ckpt_version = ckpt_versions[code]
-        # sanity check that versions for current build matches versions from ckpt
-        # TODO: or should we just throw an error
-        if ckpt_version != session_version:
-            warnings.warn(
-                f"`{code}` versions differ between the checkpoint file ({ckpt_version}) and the current run ({session_version}) -- `ModelFromCheckpoint` will be built with the current run's versions, but please check that this decision is as intended."
-            )
+        if code in ckpt_versions:
+            ckpt_version = ckpt_versions[code]
+            # sanity check that versions for current build matches versions from ckpt
+            # TODO: or should we just throw an error
+            if ckpt_version != session_version:
+                warnings.warn(
+                    f"`{code}` versions differ between the checkpoint file ({ckpt_version}) and the current run ({session_version}) -- `ModelFromCheckpoint` will be built with the current run's versions, but please check that this decision is as intended."
+                )
 
     if set_global_options:
         global_options = checkpoint["hyper_parameters"]["info_dict"]["global_options"]
