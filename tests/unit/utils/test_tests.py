@@ -99,7 +99,7 @@ def test_equivar_test():
 
 def test_permute_fail():
     mod = BadPermuteModule()
-    natom = 10
+    natom = 3
     inp = {
         AtomicDataDict.POSITIONS_KEY: mod.irreps_in[AtomicDataDict.POSITIONS_KEY].randn(
             natom, -1
