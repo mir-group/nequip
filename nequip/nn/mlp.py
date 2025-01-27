@@ -1,3 +1,4 @@
+from math import sqrt
 import torch
 
 from e3nn import o3
@@ -108,34 +109,36 @@ class ScalarMLPFunction(torch.nn.Module):
         # === build the MLP + weight init ===
         self.mlp = torch.nn.Sequential()
         for layer, (h_in, h_out) in enumerate(zip(self.dims, self.dims[1:])):
-            # === instantiate `Linear` ===
-            linear_layer = torch.nn.Linear(h_in, h_out, bias=bias)
+
             # === weight initialization ===
             # normalize to preserve variance of forward activations or backward derivatives
             # we use "relu" gain as a stand-in for the smooth nonlinearities we use, and only apply them if there is a nonlinearity
             # for forward (backward) norm, we don't include the gain for the first (last) layer
             if forward_weight_init:
-                kaiming_mode = "fan_in"
-                init_nonlinearity = (
-                    "linear"
+
+                norm_dim = h_in
+                gain = (
+                    1.0
                     if isinstance(nonlinearity_module, torch.nn.Identity)
                     or (layer == 0)
-                    else "relu"
+                    else sqrt(2)
                 )
             else:
-                kaiming_mode = "fan_out"
-                init_nonlinearity = (
-                    "linear"
+                norm_dim = h_out
+                gain = (
+                    1.0
                     if isinstance(nonlinearity_module, torch.nn.Identity)
                     or (layer == self.num_layers - 1)
-                    else "relu"
+                    else sqrt(2)
                 )
-            torch.nn.init.kaiming_uniform_(
-                linear_layer.weight, mode=kaiming_mode, nonlinearity=init_nonlinearity
-            )
-            del kaiming_mode, init_nonlinearity
+            self.mlp.append(ScalarNormalize(gain / sqrt(norm_dim)))
+            del gain, norm_dim
 
+            # === instantiate `Linear` ===
+            linear_layer = torch.nn.Linear(h_in, h_out, bias=bias)
+            torch.nn.init.uniform_(linear_layer.weight, -sqrt(3), sqrt(3))
             self.mlp.append(linear_layer)
+
             # === add nonlinearity (if any) except for last layer ===
             if layer != self.num_layers - 1:
                 self.mlp.append(nonlinearity_module())
@@ -147,3 +150,12 @@ class ScalarMLPFunction(torch.nn.Module):
 
     def forward(self, x):
         return self.mlp(x)
+
+
+class ScalarNormalize(torch.nn.Module):
+    def __init__(self, alpha: float):
+        super().__init__()
+        self.alpha = alpha
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return torch.mul(x, self.alpha)
