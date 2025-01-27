@@ -20,6 +20,7 @@ jobs:
         torch-version: [2.2.0, "2.*"]
     container:
       image: python:${{ matrix.python-version }}
+      options: --gpus all
     steps:
     - uses: actions/checkout@v4
     - name: Linting
