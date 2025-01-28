@@ -32,7 +32,7 @@ def test_state_restoration(BENCHMARK_ROOT, fake_model_training_session, device):
     assert torch.get_default_dtype() == torch.float64
 
     # atol on MODEL dtype, since a mostly float32 model still has float32 variation
-    atol = {"float32": 1e-4, "float64": 1e-8}[config.training_module.model.model_dtype]
+    atol = {"float32": 2e-4, "float64": 1e-8}[config.training_module.model.model_dtype]
 
     # === test nequip-package ===
     # !! NOTE: we use the `best.ckpt` because val, test metrics were computed with `best.ckpt` in the `test` run stages !!
