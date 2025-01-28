@@ -112,8 +112,9 @@ class ScalarMLPFunction(torch.nn.Module):
 
             # === weight initialization ===
             # normalize to preserve variance of forward activations or backward derivatives
-            # we use "relu" gain as a stand-in for the smooth nonlinearities we use, and only apply them if there is a nonlinearity
+            # we use "relu" gain (sqrt(2)) as a stand-in for the smooth nonlinearities we use, and only apply them if there is a nonlinearity
             # for forward (backward) norm, we don't include the gain for the first (last) layer
+            # see https://pytorch.org/docs/stable/nn.init.html#torch.nn.init.kaiming_uniform_
             if forward_weight_init:
 
                 norm_dim = h_in
