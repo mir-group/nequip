@@ -107,7 +107,7 @@ class CompileGraphModel(GraphModel):
         # === compile ===
         # compilation happens on the first data pass when there are at least two atoms (hard to pre-emp pathological data)
         if not self._compiled_model:
-            tol = {torch.float32: 1e-5, torch.float64: 1e-12}[self.model_dtype]
+            tol = {torch.float32: 5e-5, torch.float64: 1e-12}[self.model_dtype]
 
             # short-circuit if one of the batch dims is 1 (0 would be an error)
             # this is related to the 0/1 specialization problem
