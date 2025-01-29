@@ -1,4 +1,4 @@
-""" Custom Nose-Hoover NVT thermostat based on ASE.
+"""Custom Nose-Hoover NVT thermostat based on ASE.
 
 This code was originally written by Jonathan Mailoa based on these notes:
 

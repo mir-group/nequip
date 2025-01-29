@@ -1,4 +1,4 @@
-""" Interaction Block """
+"""Interaction Block"""
 
 from typing import Optional, Dict, Callable
 
