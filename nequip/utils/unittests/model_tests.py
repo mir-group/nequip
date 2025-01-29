@@ -620,14 +620,20 @@ class BaseEnergyModelTests(BaseModelTests):
         if AtomicDataDict.FORCE_KEY not in out_fields:
             pytest.skip()
 
-        # make a synthetic three atom example
+        # The test only works for systems with more than one atom type
+        if len(config["type_names"]) < 2:
+            pytest.skip()
+
+        # Check that r_max > 1.0
         r_max = config["r_max"]
         assert (
             config["r_max"] > 1.0
         ), f"r_max > 1.0 is necessary for smoothness test, but found r_max={r_max}"
+
+        # Control group: force is non-zero within the cutoff radius
         data = {
-            "atom_types": np.array([0, 1, 1]),
-            "pos": np.array([[0.0, 0.0, 0.0], [0.0, 1.0, 0.0], [r_max, 0.0, 0.0]]),
+            "atom_types": np.array([0, 1]),
+            "pos": np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]]),
         }
         # intentionally construct neighborlist that includes the boundary neighbor
         data = compute_neighborlist_(from_dict(data), r_max=r_max + 1)
@@ -636,12 +642,43 @@ class BaseEnergyModelTests(BaseModelTests):
         forces = out[AtomicDataDict.FORCE_KEY]
         # expect some nonzero terms on the two connected atoms
         # NOTE: sometimes it can be zero if the model has so little features such that the nonlinearity causes the activation to be ~0
-        assert forces[:2].abs().sum() > 1e-4, forces
-        # the atom at the cutoff should be zero
+        assert forces.abs().sum() > 1e-4, f"{forces=}"
+
+        # For Test 1 and 2:
+        # No need to enforce `strictly_local`. Message passing models such as NequiIP should not receive information from beyond the cutoff radius.
+        # In fact, checking that message-passing models still have zero force at the cutoff radius is a good test of locality.
+
+        # Test 1: force is zero at the cutoff radius
+        data = {
+            "atom_types": np.array([0, 1]),
+            "pos": np.array([[0.0, 0.0, 0.0], [r_max, 0.0, 0.0]]),
+        }
+        # intentionally construct neighborlist that includes the boundary neighbor
+        data = compute_neighborlist_(from_dict(data), r_max=r_max + 1)
+        out = instance(AtomicDataDict.to_(data, device))
+
+        forces = out[AtomicDataDict.FORCE_KEY]
+
         assert torch.allclose(
-            forces[2],
-            torch.zeros(1, device=device, dtype=forces.dtype),
-        )
+            forces,
+            torch.zeros_like(forces, device=device, dtype=forces.dtype),
+        ), f"{forces=}"
+
+        # Test 2: force is zero outside of the cutoff radius
+        data = {
+            "atom_types": np.array([0, 1]),
+            "pos": np.array([[0.0, 0.0, 0.0], [r_max + 0.5, 0.0, 0.0]]),
+        }
+        # intentionally construct neighborlist that includes the boundary neighbor
+        data = compute_neighborlist_(from_dict(data), r_max=r_max + 1)
+        out = instance(AtomicDataDict.to_(data, device))
+
+        forces = out[AtomicDataDict.FORCE_KEY]
+
+        assert torch.allclose(
+            forces,
+            torch.zeros_like(forces, device=device, dtype=forces.dtype),
+        ), f"{forces=}"
 
     def test_isolated_atom_energies(self, model, device):
         """Checks that isolated atom energies provided for the per-atom shifts are restored for isolated atoms."""
