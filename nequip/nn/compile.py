@@ -109,10 +109,19 @@ class CompileGraphModel(GraphModel):
         if not self._compiled_model:
             tol = {torch.float32: 1e-5, torch.float64: 1e-12}[self.model_dtype]
 
-            # short-circuit
-            if AtomicDataDict.num_nodes(data) < 2:
+            # short-circuit if one of the batch dims is 1 (0 would be an error)
+            # this is related to the 0/1 specialization problem
+            # see https://docs.google.com/document/d/16VPOa3d-Liikf48teAOmxLc92rgvJdfosIy-yoT38Io/edit?fbclid=IwAR3HNwmmexcitV0pbZm_x1a4ykdXZ9th_eJWK-3hBtVgKnrkmemz6Pm5jRQ&tab=t.0#heading=h.ez923tomjvyk
+            # we just need something that doesn't have a batch dim of 1 to `make_fx` or else it'll shape specialize
+            # after the first `make_fx` -> `export` -> `compile`, the compiled code can run on `batch_size=1` data
+            # (it just needs to recompile for a while, but we don't have to fear the 0/1 specialization problem then)
+            if (
+                AtomicDataDict.num_nodes(data) < 2
+                or AtomicDataDict.num_frames(data) < 2
+                or AtomicDataDict.num_edges(data) < 2
+            ):
                 # use parent class's forward
-                return super()(data)
+                return super().forward(data)
 
             # == get input and output fields ==
             # use intersection of data keys and GraphModel input/outputs, which assumes
