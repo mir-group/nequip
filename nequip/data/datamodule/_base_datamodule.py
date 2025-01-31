@@ -130,19 +130,25 @@ class NequIPDataModule(lightning.LightningDataModule):
         self.generator_state = torch.Generator().manual_seed(self.seed).get_state()
 
         # == dataloader kwargs ==
+        # copy first so that mutating for collate_fn doesn't affect the original
+        self.train_dataloader_kwargs = train_dataloader_kwargs.copy()
+        self.val_dataloader_kwargs = val_dataloader_kwargs.copy()
+        self.test_dataloader_kwargs = test_dataloader_kwargs.copy()
+        self.predict_dataloader_kwargs = predict_dataloader_kwargs.copy()
         for kwargs in [
-            train_dataloader_kwargs,
-            val_dataloader_kwargs,
-            test_dataloader_kwargs,
-            predict_dataloader_kwargs,
+            self.train_dataloader_kwargs,
+            self.val_dataloader_kwargs,
+            self.test_dataloader_kwargs,
+            self.predict_dataloader_kwargs,
         ]:
             assert "dataset" not in kwargs
             assert "generator" not in kwargs
-            assert "collate_fn" not in kwargs
-        self.train_dataloader_kwargs = train_dataloader_kwargs
-        self.val_dataloader_kwargs = val_dataloader_kwargs
-        self.test_dataloader_kwargs = test_dataloader_kwargs
-        self.predict_dataloader_kwargs = predict_dataloader_kwargs
+            if "collate_fn" not in kwargs:
+                # Allow collate_fn to be overridden by a function wrapping
+                # AtomicDataDict.batched_from_list, but default to it.
+                kwargs["collate_fn"] = {
+                    "_target_": "nequip.data.datamodule._base_datamodule._default_collate_fn_factory"
+                }
 
         # == data statistics manager ==
         self.stats_manager_cfg = stats_manager
@@ -248,9 +254,8 @@ class NequIPDataModule(lightning.LightningDataModule):
         return [
             DataLoader(
                 dataset,
-                collate_fn=AtomicDataDict.batched_from_list,
                 generator=generator,
-                **dloader_kwargs,
+                **instantiate(dloader_kwargs),
             )
             for dataset in dataset
         ]
@@ -291,3 +296,8 @@ class NequIPDataModule(lightning.LightningDataModule):
         finally:
             self.teardown(stage=task_map[dataset])
         return stats_dict
+
+
+def _default_collate_fn_factory() -> callable:
+    """Allow `instantiate` to get the default collate_fn by calling this function."""
+    return AtomicDataDict.batched_from_list
