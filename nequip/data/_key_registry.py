@@ -86,6 +86,17 @@ def register_fields(
         long_fields (Sequence[str]): long ``dtype`` fields
         cartesian_tensor_fields (Dict[str, str]): Cartesian tensor fields (both the name, and the ``formula`` must be provided, e.g. ``"ij=ji"``, see `e3nn docs <https://docs.e3nn.org/en/stable/api/io/cartesian_tensor.html>`_)
     """
+    # Because str is itself a Sequence[str], we need to avoid hard-to-debug errors due to register_fields(graph_fields="field")
+    # which tries to register five fields named "f", "i", etc.
+    message = " must be a sequence of strings, each representing a field name, rather than a single string"
+    assert not isinstance(graph_fields, str), "graph_fields" + message
+    assert not isinstance(node_fields, str), "node_fields" + message
+    assert not isinstance(edge_fields, str), "edge_fields" + message
+    assert not isinstance(long_fields, str), "long_fields" + message
+    assert not isinstance(
+        cartesian_tensor_fields, str
+    ), "cartesian_tensor_fields must be a Dict[str, str], not a single string"
+
     graph_fields: set = set(graph_fields)
     node_fields: set = set(node_fields)
     edge_fields: set = set(edge_fields)
