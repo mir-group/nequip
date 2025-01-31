@@ -22,6 +22,7 @@ saved_model/
 tutorial/results/
 tutorial/tutorial_data/
 .DS_store/
+.python-version
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
