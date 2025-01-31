@@ -9,3 +9,4 @@ User Guide
     faq_errors
     conventions
     upgrading
+    advanced
