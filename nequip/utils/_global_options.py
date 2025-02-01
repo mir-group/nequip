@@ -101,6 +101,7 @@ def _set_global_options(
 
     # Set TF32 support
     # See https://pytorch.org/docs/stable/notes/cuda.html#tensorfloat-32-tf32-on-ampere-devices
+    # NOTE: it is also possible to use https://pytorch.org/docs/stable/generated/torch.set_float32_matmul_precision.html
     if torch.cuda.is_available():
         if torch.torch.backends.cuda.matmul.allow_tf32 is not allow_tf32:
             # update the setting
