@@ -282,11 +282,11 @@ class NequIPDataModule(lightning.LightningDataModule):
             self.prepare_data()
             self.setup(stage=task_map[dataset])
 
-            # get dataloader, using dataloader_kwargs from stats manager if available else use that of the datamodule
-            if not stats_manager.dataloader_kwargs:
-                dloader_kwargs = getattr(self, dataset + "_dataloader_kwargs")
-            else:
-                dloader_kwargs = stats_manager.dataloader_kwargs
+            # get dataloader, using dataloader_kwargs from the appropriate dataset.
+            # stats manager can override options if it wants to, like batch size.
+            dloader_kwargs = getattr(self, dataset + "_dataloader_kwargs").copy()
+            if stats_manager.dataloader_kwargs is not None:
+                dloader_kwargs.update(stats_manager.dataloader_kwargs)
             dloader = self._get_dloader(
                 getattr(self, dataset + "_dataset"), self.generator, dloader_kwargs
             )
