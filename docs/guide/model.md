@@ -3,7 +3,59 @@
 
 ## Dataset Statistics as Parameters
 
-TODO: show data stats manager and explain how the resolver syntax works. Cover`avg_num_neighbors`, `forces_rms`, `per_type_forces_rms`, `per_atom_energy_mean`.
+Certain choices of model hyperparameters can be derived from the statistics of the dataset used for training. For example, it is reasonable to use the average number of neighbors around a central atom to normalize the sum over edge features. Users are able to configure specific types of dataset statistics to compute with the `stats_manager` argument of the `DataModule` used under the `data` section of the config file. Let us consider the following example.
+
+```
+data:
+  _target_: # the datamodule
+  
+  # datamodule arguments
+
+  stats_manager:
+    _target_: nequip.data.DataStatisticsManager
+    type_names: ${model_type_names}
+    dataloader_kwargs:
+      batch_size: 10
+    metrics:
+      - field:
+          _target_: nequip.data.NumNeighbors
+        metric: 
+          _target_: nequip.data.Mean
+        name: num_neighbors_mean
+      - field:
+          _target_: nequip.data.PerAtomModifier
+          field: total_energy
+        metric:
+          _target_: nequip.data.Mean
+        name: per_atom_energy_mean
+      - field: forces
+        metric:
+          _target_: nequip.data.RootMeanSquare
+        name: forces_rms
+```
+In the above example, we specifically request for `num_neighbors_mean`, `per_atom_energy_mean`, and `forces_rms` to be computed. We are then able to refer to these dataset statistics variables when configuring the model hyperparameters in the `model` section of the config file, as follows.
+```
+training_module:
+  _target_: nequip.train.EMALightningModule
+  
+  # other `EMALightningModule` arguments
+
+  model:
+    _target_: nequip.model.NequIPGNNModel
+
+    # other model hyperparameters
+
+    avg_num_neighbors: ${training_data_stats:num_neighbors_mean}
+    per_type_energy_shifts: ${training_data_stats:per_atom_energy_mean}
+    per_type_energy_scales: ${training_data_stats:per_type_forces_rms}
+```
+Note the special syntax `${training_data_stats:name_of_dataset_statistic}` that resembles variable interpolation (it's actually an `omegaconf` [resolver](https://omegaconf.readthedocs.io/en/latest/custom_resolvers.html)). Under the hood, it tells the NequIP infrastructure to look for the dataset statistics computed by the `stats_manager` and copy their values into the `model` configuration dictionary.
+
+```{tip}
+The `name` of the dataset statistic is customizable, but the same `name` must be used when referring to it from the `model` section of the config file. For example, if you call the dataset statistic `name: my_custom_stat`, the model part of the config should use `${training_data_stats:my_custom_stat}`.
+```
+
+The three dataset statistics `num_neighbors_mean`, `per_atom_energy_mean`, and `forces_rms` are often sufficient for most cases (though note that it might be favorable to use isolated atom energies as `per_type_energy_shifts` instead of `per_atom_energy_mean`). The NequIP infrastructure supports other possibilities, and interested users are directed to the [Dataset Statistics page](../api/data_stats) to learn more.
 
 ## Energy Shifts & Scales
 
