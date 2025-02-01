@@ -1,4 +1,4 @@
-from math import sqrt
+from math import sqrt, prod
 import torch
 
 from e3nn import o3
@@ -107,7 +107,7 @@ class ScalarMLPFunction(torch.nn.Module):
         self.is_nonlinear = False  # updated below in loop
 
         # === build the MLP + weight init ===
-        self.mlp = torch.nn.Sequential()
+        mlp = torch.nn.Sequential()
         for layer, (h_in, h_out) in enumerate(zip(self.dims, self.dims[1:])):
 
             # === weight initialization ===
@@ -116,47 +116,97 @@ class ScalarMLPFunction(torch.nn.Module):
             # for forward (backward) norm, we don't include the gain for the first (last) layer
             # see https://pytorch.org/docs/stable/nn.init.html#torch.nn.init.kaiming_uniform_
             if forward_weight_init:
-
                 norm_dim = h_in
-                gain = (
-                    1.0
-                    if isinstance(nonlinearity_module, torch.nn.Identity)
-                    or (layer == 0)
-                    else sqrt(2)
-                )
+                gain = 1.0 if nonlinearity is None or (layer == 0) else sqrt(2)
             else:
                 norm_dim = h_out
                 gain = (
                     1.0
-                    if isinstance(nonlinearity_module, torch.nn.Identity)
-                    or (layer == self.num_layers - 1)
+                    if nonlinearity is None or (layer == self.num_layers - 1)
                     else sqrt(2)
                 )
-            self.mlp.append(ScalarNormalize(gain / sqrt(norm_dim)))
+            # === instantiate `Linear` ===
+            linear_layer = ScalarLinearLayer(
+                in_features=h_in,
+                out_features=h_out,
+                alpha=gain / sqrt(norm_dim),
+                bias=bias,
+            )
+            mlp.append(linear_layer)
             del gain, norm_dim
 
-            # === instantiate `Linear` ===
-            linear_layer = torch.nn.Linear(h_in, h_out, bias=bias)
-            torch.nn.init.uniform_(linear_layer.weight, -sqrt(3), sqrt(3))
-            self.mlp.append(linear_layer)
-
             # === add nonlinearity (if any) except for last layer ===
-            if layer != self.num_layers - 1:
-                self.mlp.append(nonlinearity_module())
+            if (layer != self.num_layers - 1) and (nonlinearity is not None):
                 # only update `self.is_nonlinear` when a nonlinearity is applied
-                if not self.is_nonlinear:
-                    self.is_nonlinear = not isinstance(
-                        nonlinearity_module, torch.nn.Identity
-                    )
+                mlp.append(nonlinearity_module())
+                self.is_nonlinear = True
+
+        # the following attribute is only used for the "deep linear" code path in `forward`
+        # its definition is not conditioned on the "deep linear" codepath for TorchScript compatibility
+
+        # use `multidot` based implementation for deep linear net (no nonlinearity, no bias, more than one layer)
+        # otherwise use the `mlp` built in init
+        if (not self.is_nonlinear) and (not self.bias) and (self.num_layers > 1):
+            self.mlp = DeepLinearMLP(mlp)
+            del mlp
+        else:
+            self.mlp = mlp
 
     def forward(self, x):
         return self.mlp(x)
 
 
-class ScalarNormalize(torch.nn.Module):
-    def __init__(self, alpha: float):
-        super().__init__()
-        self.alpha = alpha
+class DeepLinearMLP(torch.nn.Module):
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return torch.mul(x, self.alpha)
+    def __init__(self, mlp) -> None:
+
+        super().__init__()
+        self.weights = torch.nn.ParameterList()
+        alphas = []
+        for this_idx, mlp_idx in enumerate(reversed(range(len(mlp)))):
+            new_weight = torch.clone(mlp[mlp_idx].weight)
+            self.weights.append(new_weight)
+            del new_weight
+            alphas.append(mlp[mlp_idx].alpha)
+        self.alpha = prod(alphas)
+        del alphas
+
+    def forward(self, input: torch.Tensor) -> torch.Tensor:
+        weight = torch.mul(
+            torch.linalg.multi_dot([weight for weight in self.weights]), self.alpha
+        )
+        return torch.nn.functional.linear(input, weight, bias=None)
+
+
+class ScalarLinearLayer(torch.nn.Module):
+    """Module implementing a linear layer with a scaling factor `alpha` applied to the weights."""
+
+    in_features: int
+    out_features: int
+
+    def __init__(
+        self,
+        in_features: int,
+        out_features: int,
+        alpha: float = 1.0,
+        bias: bool = False,
+    ) -> None:
+        super().__init__()
+        self.in_features = in_features
+        self.out_features = out_features
+        self.alpha = alpha
+        self.weight = torch.nn.Parameter(torch.empty((out_features, in_features)))
+        # initialize weights to uniform distribution with mean 0 variance 1
+        torch.nn.init.uniform_(self.weight, -sqrt(3), sqrt(3))
+        # initialize bias (if any) to zeros
+        if bias:
+            self.bias = torch.nn.Parameter(torch.zeros(out_features))
+        else:
+            self.register_parameter("bias", None)
+
+    def forward(self, input: torch.Tensor) -> torch.Tensor:
+        weight = self.weight * self.alpha
+        return torch.nn.functional.linear(input, weight, self.bias)
+
+    def extra_repr(self) -> str:
+        return f"in_features={self.in_features}, out_features={self.out_features}, bias={self.bias is not None}"

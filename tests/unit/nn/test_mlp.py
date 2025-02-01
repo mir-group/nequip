@@ -1,6 +1,6 @@
 import torch
 from nequip.nn import ScalarMLPFunction
-from nequip.utils import torch_default_dtype
+from nequip.utils import torch_default_dtype, dtype_from_name
 import pytest
 
 
@@ -10,7 +10,7 @@ import pytest
 @pytest.mark.parametrize("hl_depth", [0, 1, 2, 3])
 @pytest.mark.parametrize("hl_width", [2, 5, 11])
 @pytest.mark.parametrize("act", [None, "silu", "mish", "gelu"])
-@pytest.mark.parametrize("model_dtype", [torch.float32, torch.float64])
+@pytest.mark.parametrize("model_dtype", ["float32", "float64"])
 def test_mlp(
     batch,
     input_dim,
@@ -20,10 +20,10 @@ def test_mlp(
     act,
     model_dtype,
 ):
-    with torch_default_dtype(model_dtype):
+    with torch_default_dtype(dtype_from_name(model_dtype)):
         data = torch.randn(batch, input_dim)
 
-        mlp = ScalarMLPFunction(
+        mlp_module = ScalarMLPFunction(
             input_dim=input_dim,
             output_dim=output_dim,
             hidden_layers_depth=hl_depth,
@@ -31,5 +31,8 @@ def test_mlp(
             nonlinearity=act,
         )
 
-    out = mlp(data)
+    if act is None or hl_depth == 0:
+        assert not mlp_module.is_nonlinear
+
+    out = mlp_module(data)
     assert out.shape == (batch, output_dim)
