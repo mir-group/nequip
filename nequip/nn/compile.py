@@ -189,7 +189,16 @@ class CompileGraphModel(GraphModel):
             # original model
             orig_out = self.model(data)
             for k in to_return.keys():
-                assert torch.allclose(orig_out[k], to_return[k], atol=tol, rtol=tol)
+                t1, t2 = to_return[k], orig_out[k]
+                assert torch.allclose(t1, t2, atol=tol, rtol=tol), (
+                    f"`{k}` error: "
+                    + str(
+                        torch.max(
+                            torch.abs(t1.detach().double() - t2.detach().double())
+                        ).item()
+                    )
+                    + f" (tol: {tol})"
+                )
             del orig_out
 
             return to_return
