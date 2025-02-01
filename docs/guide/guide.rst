@@ -6,6 +6,7 @@ User Guide
     install
     workflow
     config
+    model
     faq_errors
     conventions
     upgrading
