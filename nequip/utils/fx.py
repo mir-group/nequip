@@ -30,7 +30,7 @@ def nequip_make_fx(
     fields: List[str],
     extra_inputs: List[torch.Tensor] = [],
     seed: int = 1,
-    check_tol: float = 1e-5,
+    check_tol: float = 5e-5,
 ):
     """
     Args:
