@@ -49,15 +49,15 @@ _LMP_OUTPUTS = [
 ]
 
 _ASE_OUTPUTS = [
+    AtomicDataDict.PER_ATOM_ENERGY_KEY,
     AtomicDataDict.TOTAL_ENERGY_KEY,
     AtomicDataDict.FORCE_KEY,
-    # TODO: include stress?
     AtomicDataDict.STRESS_KEY,
 ]
 
 _ALLEGRO_FIELDS = {"input": _ALLEGRO_INPUTS, "output": _LMP_OUTPUTS}
 _NEQUIP_FIELDS = {"input": _NEQUIP_INPUTS, "output": _LMP_OUTPUTS}
-_ASE_FIELDS = {"input": _NEQUIP_FIELDS, "output": _ASE_OUTPUTS}
+_ASE_FIELDS = {"input": _NEQUIP_INPUTS, "output": _ASE_OUTPUTS}
 
 _TARGET_DICT = {
     "pair_nequip": _NEQUIP_FIELDS,
@@ -263,7 +263,7 @@ def main(args=None):
 
             # make num_frames batch dims static
             # TODO: generalize this?
-            if args.target in ["pair_nequip", "pair_allegro"]:
+            if args.target in ["pair_nequip", "pair_allegro", "ase"]:
                 batch_map["graph"] = torch.export.Dim.STATIC
 
         logger.debug(
@@ -289,10 +289,11 @@ def main(args=None):
                 data = compile_utils.data_dict_from_package(args.package_path)
         data = AtomicDataDict.to_(data, device)
 
-        # because of the 0/1 specialization problem, and the fact that the LAMMPS pair style requires `num_frames=1`
+        # because of the 0/1 specialization problem,
+        # and the fact that the LAMMPS pair style (and ASE) requires `num_frames=1`
         # we need to augment to data to remove the `BATCH_KEY` and `NUM_NODES_KEY`
         # to take more optimized code paths
-        if args.target in ["pair_nequip", "pair_allegro"]:
+        if args.target in ["pair_nequip", "pair_allegro", "ase"]:
             data.pop(AtomicDataDict.BATCH_KEY)
             data.pop(AtomicDataDict.NUM_NODES_KEY)
 
