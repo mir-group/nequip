@@ -14,6 +14,7 @@ from torch.utils.benchmark.utils.common import trim_sigfig, select_unit
 from e3nn.util.jit import script
 
 from nequip.model import ModelFromCheckpoint
+from nequip.train.lightning import _SOLE_MODEL_KEY
 from nequip.utils import get_current_code_versions, RankedLogger
 from nequip.utils._global_options import _set_global_options
 from nequip.utils.test import assert_AtomicData_equivariant
@@ -41,6 +42,12 @@ def main(args=None):
         help="Path to a checkpoint file for benchmarking a pre-trained model.",
         type=str,
         default=None,
+    )
+    parser.add_argument(
+        "--model",
+        help=f"name of model to compile -- this option is only relevant when using multiple models (default: {_SOLE_MODEL_KEY}, meant to work for the conventional single model case)",
+        type=str,
+        default=_SOLE_MODEL_KEY,
     )
     parser.add_argument(
         "--profile",
@@ -113,31 +120,6 @@ def main(args=None):
     datamodule = instantiate(data, _recursive_=False)
     assert isinstance(datamodule, NequIPDataModule)
 
-    # === compute dataset statistics and use resolver to get dataset statistics to model config ===
-    dataset_stats_time = time.time()
-    stats_dict = datamodule.get_statistics(dataset="train")
-    dataset_stats_time = time.time() - dataset_stats_time
-    print(f"Train dataset statistics computation took {dataset_stats_time:.4f}s")
-
-    print("Train dataset statistics:")
-    for k, v in stats_dict.items():
-        print(f"{k:^30}: {v}")
-
-    def training_data_stats(stat_name: str):
-        stat = stats_dict.get(stat_name, None)
-        if stat is None:
-            raise RuntimeError(
-                f"Data statistics field `{stat_name}` was requested for use in model initialization, but was not computed -- users must explicitly configure its computation with the `stats_manager` DataModule argument."
-            )
-        return stat
-
-    OmegaConf.register_new_resolver(
-        "training_data_stats",
-        training_data_stats,
-        use_cache=True,
-    )
-    nequip_module_cfg = OmegaConf.to_object(config.training_module)
-
     # === get smaller data list for testing ===
     datas_list = []
     try:
@@ -164,6 +146,32 @@ def main(args=None):
     # === instantiate NequIP Lightning module ===
 
     if args.ckpt_path is None:
+
+        # === compute dataset statistics and use resolver to get dataset statistics to model config ===
+        dataset_stats_time = time.time()
+        stats_dict = datamodule.get_statistics(dataset="train")
+        dataset_stats_time = time.time() - dataset_stats_time
+        print(f"Train dataset statistics computation took {dataset_stats_time:.4f}s")
+
+        print("Train dataset statistics:")
+        for k, v in stats_dict.items():
+            print(f"{k:^30}: {v}")
+
+        def training_data_stats(stat_name: str):
+            stat = stats_dict.get(stat_name, None)
+            if stat is None:
+                raise RuntimeError(
+                    f"Data statistics field `{stat_name}` was requested for use in model initialization, but was not computed -- users must explicitly configure its computation with the `stats_manager` DataModule argument."
+                )
+            return stat
+
+        OmegaConf.register_new_resolver(
+            "training_data_stats",
+            training_data_stats,
+            use_cache=True,
+        )
+        nequip_module_cfg = OmegaConf.to_object(config.training_module)
+
         print("Building model and training modules ... ")
         model_time = time.time()
         try:
@@ -175,7 +183,7 @@ def main(args=None):
                 _convert_="all",
                 num_datasets=datamodule.num_datasets,
             )
-            model = nequip_module.model
+            model = nequip_module.evaluation_model[args.model]
         except:  # noqa: E722
             if args.pdb:
                 traceback.print_exc()
@@ -185,8 +193,9 @@ def main(args=None):
         model_time = time.time() - model_time
         print(f"    building model and training modules took {model_time:.4f}s")
     else:
-        print("Loading model...")
+        print("Loading model from checkpoint ...")
         model = ModelFromCheckpoint(args.ckpt_path)
+        model = model[args.model]
         metadata = model.metadata
         print("    model has metadata:")
         print(
@@ -194,6 +203,7 @@ def main(args=None):
                 "        %s: %s" % e for e in metadata.items() if e[0] != "config"
             )
         )
+
     print(f"    model has {sum(p.numel() for p in model.parameters())} weights")
     print(
         f"    model has {sum(p.numel() for p in model.parameters() if p.requires_grad)} trainable weights"
