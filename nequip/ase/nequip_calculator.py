@@ -13,6 +13,7 @@ from nequip.data.transforms import (
     ChemicalSpeciesToAtomTypeMapper,
     NeighborListTransform,
 )
+from nequip.utils._global_options import _set_global_options, TF32_KEY
 
 
 class NequIPCalculator(Calculator):
@@ -32,7 +33,7 @@ class NequIPCalculator(Calculator):
 
     def __init__(
         self,
-        model: graph_model.GraphModel,
+        model: torch.nn.Module,
         device: Union[str, torch.device],
         energy_units_to_eV: float = 1.0,
         length_units_to_A: float = 1.0,
@@ -55,6 +56,81 @@ class NequIPCalculator(Calculator):
         self.energy_units_to_eV = energy_units_to_eV
         self.length_units_to_A = length_units_to_A
         self.transforms = transforms
+
+    @classmethod
+    def from_compiled_model(
+        cls,
+        compile_path: str,
+        device: Union[str, torch.device] = "cpu",
+        chemical_symbols: Optional[Union[List[str], Dict[str, str]]] = None,
+        **kwargs,
+    ):
+        """Creates a NequIPCalculator from a compiled model file.
+
+        Args:
+            compile_path (str): path to compiled model file
+            device (torch.device): the device to use
+            chemical_symbols (List[str] or Dict[str, str]): mapping between chemical symbols and model type names
+        """
+        compile_fname = str(compile_path).split("/")[-1]
+        if compile_fname.endswith(".nequip.pth"):
+            # == model ==
+            metadata = {
+                graph_model.R_MAX_KEY: None,
+                graph_model.TYPE_NAMES_KEY: None,
+                TF32_KEY: None,
+            }
+            model = torch.jit.load(compile_path, _extra_files=metadata)
+            model = torch.jit.freeze(model)
+            # == metadata ==
+            r_max = float(metadata[graph_model.R_MAX_KEY])
+            type_names = metadata[graph_model.TYPE_NAMES_KEY].decode("utf-8").split(" ")
+        elif compile_fname.endswith(".nequip.pt2"):
+            # == imports and sanity checks ==
+            from nequip.utils.versions import check_pt2_compile_compatibility
+            from nequip.scripts.compile import _ASE_FIELDS
+
+            # check torch version
+            check_pt2_compile_compatibility()
+
+            # == model ==
+            compiled_model = torch._inductor.aoti_load_package(compile_path)
+            model = _ASEListDictWrapper(
+                compiled_model, _ASE_FIELDS["input"], _ASE_FIELDS["output"]
+            )
+            # == metadata ==
+            metadata = compiled_model.get_metadata()
+            r_max = float(metadata[graph_model.R_MAX_KEY])
+            type_names = metadata[graph_model.TYPE_NAMES_KEY].split(" ")
+        else:
+            raise ValueError(
+                f"Unknown file type: {compile_fname} (expected `*.nequip.pth` or `*.nequip.pt2`)"
+            )
+
+        # == global options ==
+        global_options = {"seed": 1, TF32_KEY: bool(int(metadata[TF32_KEY]))}
+        _set_global_options(**global_options)
+
+        # prepare model for inference
+        model = model.to(device)
+        model.eval()
+
+        # use `type_names` metadata as substitute for `chemical_symbols` if latter not provided
+        if chemical_symbols is None:
+            warnings.warn(
+                "Trying to use model type names as chemical symbols; this may not be correct for your model (and may cause an error if model type names are not chemical symbols)! To avoid this warning, please provide `chemical_symbols` explicitly."
+            )
+            chemical_symbols = type_names
+
+        return cls(
+            model=model,
+            device=device,
+            transforms=[
+                ChemicalSpeciesToAtomTypeMapper(chemical_symbols),
+                NeighborListTransform(r_max=r_max),
+            ],
+            **kwargs,
+        )
 
     @classmethod
     def from_checkpoint_model(
@@ -198,3 +274,21 @@ class NequIPCalculator(Calculator):
             # ase wants voigt format
             stress_voigt = full_3x3_to_voigt_6_stress(stress)
             self.results["stress"] = stress_voigt
+
+
+class _ASEListDictWrapper(torch.nn.Module):
+    def __init__(self, model, input_keys: List[str], output_keys: List[str]):
+        super().__init__()
+        from nequip.nn.compile import _list_to_dict, _list_from_dict
+
+        self.model = model
+        self.input_keys = input_keys
+        self.output_keys = output_keys
+        self._list_to_dict = _list_to_dict
+        self._list_from_dict = _list_from_dict
+
+    def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
+        input_list = self._list_from_dict(self.input_keys, data)
+        with torch.inference_mode():
+            out_list = self.model(input_list)
+        return self._list_to_dict(self.output_keys, out_list)
