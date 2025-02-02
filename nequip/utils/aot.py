@@ -28,6 +28,9 @@ def aot_export_model(
         "2.6"
     ), f"PyTorch >= 2.6 required for PT2 compilation functionality, but {torch_version} found."
 
+    # get tolerance for sanity checks
+    tol = {torch.float32: 5e-5, torch.float64: 1e-12}[model.model_dtype]
+
     # defensively refresh the cache
     torch._dynamo.reset()
 
@@ -40,6 +43,7 @@ def aot_export_model(
         data=data,
         fields=input_fields,
         seed=seed,
+        check_tol=tol,
     )
 
     # === perform export ===
