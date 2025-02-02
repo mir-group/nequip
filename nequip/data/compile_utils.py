@@ -17,6 +17,9 @@ def data_dict_from_checkpoint(ckpt_path: str) -> AtomicDataDict.Type:
             weights_only=False,
         )
         data_config = checkpoint["hyper_parameters"]["info_dict"]["data"].copy()
+        if "train_dataloader_kwargs" not in data_config:
+            data_config["train_dataloader_kwargs"] = {}
+        data_config["train_dataloader_kwargs"]["batch_size"] = 1
         datamodule = instantiate(data_config, _recursive_=False)
         # TODO: better way of doing this?
         # instantiate the datamodule, dataset, and get train dataloader
@@ -24,9 +27,7 @@ def data_dict_from_checkpoint(ckpt_path: str) -> AtomicDataDict.Type:
             datamodule.prepare_data()
             # instantiate train dataset
             datamodule.setup(stage="fit")
-            dloader = datamodule._get_dloader(
-                datamodule.train_dataset, datamodule.generator, {"batch_size": 1}
-            )[0]
+            dloader = datamodule.train_dataloader()
             for data in dloader:
                 if AtomicDataDict.num_nodes(data) > 3:
                     break
