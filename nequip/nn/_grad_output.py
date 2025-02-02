@@ -213,7 +213,6 @@ class ForceStressOutput(GraphModuleMixin, torch.nn.Module):
             num_batch: int = 1
 
         pos = data[AtomicDataDict.POSITIONS_KEY]
-
         has_cell: bool = AtomicDataDict.CELL_KEY in data
 
         if has_cell:
@@ -234,14 +233,19 @@ class ForceStressOutput(GraphModuleMixin, torch.nn.Module):
         # Paper they worked from:
         # Knuth et. al. Comput. Phys. Commun 190, 33-50, 2015
         # https://pure.mpg.de/rest/items/item_2085135_9/component/file_2156800/content
-        displacement = torch.zeros(
-            (3, 3),
-            dtype=pos.dtype,
-            device=pos.device,
-        )
+
         if num_batch > 1:
-            # add n_batch dimension
-            displacement = displacement.view(-1, 3, 3).expand(num_batch, 3, 3)
+            displacement = torch.zeros(
+                (num_batch, 3, 3),
+                dtype=pos.dtype,
+                device=pos.device,
+            )
+        else:
+            displacement = torch.zeros(
+                (3, 3),
+                dtype=pos.dtype,
+                device=pos.device,
+            )
         displacement.requires_grad_(True)
         data["_displacement"] = displacement
         # in the above paper, the infinitesimal distortion is *symmetric*
