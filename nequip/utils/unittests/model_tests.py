@@ -20,6 +20,7 @@ from nequip.data import (
 from nequip.data.transforms import ChemicalSpeciesToAtomTypeMapper
 from nequip.nn import GraphModuleMixin, ForceStressOutput, PartialForceOutput
 from nequip.utils import dtype_to_name, find_first_of_type
+from nequip.utils.versions import _TORCH_GE_2_6
 from nequip.utils.test import (
     assert_AtomicData_equivariant,
     FLOAT_TOLERANCE,
@@ -27,7 +28,6 @@ from nequip.utils.test import (
 )
 
 from hydra.utils import get_method
-import packaging.version
 
 
 # see https://github.com/pytest-dev/pytest/issues/421#issuecomment-943386533
@@ -137,7 +137,7 @@ class BaseModelTests:
     @override_irreps_debug(False)
     def test_compile(self, model, model_test_data, device):
 
-        if packaging.version.parse(torch.__version__) < packaging.version.parse("2.6"):
+        if not _TORCH_GE_2_6:
             pytest.skip("PT2 compile tests skipped for torch < 2.6")
 
         # TODO: sort out the CPU compilation issues

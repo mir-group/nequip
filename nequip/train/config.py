@@ -3,13 +3,13 @@ from .lightning import NequIPLightningModule
 from .ema import EMALightningModule
 
 from nequip.data import AtomicDataDict
-
+from nequip.utils.versions import _TORCH_GE_2_6
 from itertools import accumulate
-import packaging.version
+
 from typing import Dict, Optional
 
 # === torch>=2.6 requires the flag for compile with multiple backwards ===
-if packaging.version.parse(torch.__version__) >= packaging.version.parse("2.6"):
+if _TORCH_GE_2_6:
     # relevant PyTorch commit: https://github.com/pytorch/pytorch/commit/87059d4547551f197731f5c084e3be6054797578
     # comments from PyTorch code:
     # This controls whether we collect donated buffer. This flag must be set

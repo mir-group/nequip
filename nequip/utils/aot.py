@@ -5,8 +5,8 @@ from nequip.data import AtomicDataDict
 from nequip.data._key_registry import get_dynamic_shapes
 from .fx import nequip_make_fx
 from .compile import prepare_model_for_compile
+from .versions import check_pt2_compile_compatibility
 
-import packaging.version
 from typing import List, Dict, Union, Any
 
 
@@ -23,10 +23,7 @@ def aot_export_model(
     seed: int = 1,
 ) -> str:
     # === torch version check ===
-    torch_version = packaging.version.parse(torch.__version__)
-    assert torch_version >= packaging.version.parse(
-        "2.6"
-    ), f"PyTorch >= 2.6 required for PT2 compilation functionality, but {torch_version} found."
+    check_pt2_compile_compatibility()
 
     # get tolerance for sanity checks
     tol = {torch.float32: 5e-5, torch.float64: 1e-12}[model.model_dtype]

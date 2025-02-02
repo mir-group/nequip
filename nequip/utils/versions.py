@@ -6,8 +6,19 @@ from ..__init__ import _DISCOVERED_NEQUIP_EXTENSION
 from .logger import RankedLogger
 from typing import Tuple
 import importlib
+import packaging.version
 
 logger = RankedLogger(__name__, rank_zero_only=True)
+
+_TORCH_VERSION = packaging.version.parse(torch.__version__)
+_TORCH_GE_2_6 = _TORCH_VERSION >= packaging.version.parse("2.6")
+
+
+def check_pt2_compile_compatibility():
+    assert (
+        _TORCH_GE_2_6
+    ), f"PyTorch >= 2.6 required for PT2 compilation functionality, but {_TORCH_VERSION} found."
+
 
 # get versions of torch, e3nn, nequip and all extension packages
 _DEFAULT_VERSION_CODES = [torch, e3nn, nequip]
