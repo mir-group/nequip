@@ -4,6 +4,7 @@ from torch.fx.experimental.proxy_tensor import make_fx
 from nequip.data import AtomicDataDict
 import contextlib
 import difflib
+import uuid
 import os
 from typing import List
 
@@ -45,7 +46,10 @@ def nequip_make_fx(
     test_data_list = [data[key] for key in fields]
     fx_model = _nequip_make_fx(model, test_data_list + extra_inputs)
 
-    # 2. once with augmented data where all batch dims (num_frames, num_atoms, num_edges) are different
+    # 2. once with augmented data where batch dims are different
+    # there are two cases:
+    # - if there are no batches, num_atoms, num_edges are different (num_frames assumed to be 1)
+    # - else all three of num_frames, num_atoms, num_edges are differnt
     device = data[AtomicDataDict.POSITIONS_KEY].device
     # get global seed to construct generator for reproducibility
     generator = torch.Generator(device).manual_seed(seed)
@@ -58,9 +62,9 @@ def nequip_make_fx(
         generator=generator,
         device=device,
     )
-    augmented_data = AtomicDataDict.batched_from_list(
-        [data, AtomicDataDict.without_nodes(single_frame, node_idx)]
-    )
+    augmented_data = AtomicDataDict.without_nodes(single_frame, node_idx)
+    if AtomicDataDict.BATCH_KEY in data:
+        augmented_data = AtomicDataDict.batched_from_list([data, augmented_data])
     augmented_data = [augmented_data[key] for key in fields]
     augmented_fx_model = _nequip_make_fx(model, augmented_data + extra_inputs)
     del augmented_data, node_idx, single_frame
@@ -117,7 +121,7 @@ def check_make_fx_diff(fx_model_1, fx_model_2, fields: List[str]):
         # the following is commented to prevent obscuring the error message below
         # devs can uncomment for diagonosing shape specializations
         # print(highlight_code_differences(fx_model_1.code, fx_model_2.code))
-        dump_dir = str(os.getcwd()) + "/nequip_fx_dump"
+        dump_dir = str(os.getcwd()) + "/nequip_fx_dump_" + str(uuid.uuid4())
         os.mkdir(dump_dir)
         with open(dump_dir + "/fx_model_1.txt", "w") as f:
             f.write(f"# Argument order:\n{fields} + extra_inputs\n")

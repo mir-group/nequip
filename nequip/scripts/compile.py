@@ -289,6 +289,13 @@ def main(args=None):
                 data = compile_utils.data_dict_from_package(args.package_path)
         data = AtomicDataDict.to_(data, device)
 
+        # because of the 0/1 specialization problem, and the fact that the LAMMPS pair style requires `num_frames=1`
+        # we need to augment to data to remove the `BATCH_KEY` and `NUM_NODES_KEY`
+        # to take more optimized code paths
+        if args.target in ["pair_nequip", "pair_allegro"]:
+            data.pop(AtomicDataDict.BATCH_KEY)
+            data.pop(AtomicDataDict.NUM_NODES_KEY)
+
         # === inductor configs ===
         inductor_configs = dict(item.split("=") for item in args.inductor_configs)
 
