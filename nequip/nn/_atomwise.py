@@ -230,6 +230,9 @@ class PerTypeScaleShift(GraphModuleMixin, torch.nn.Module):
         else:
             shifts = self.shifts  # dummy for torchscript
 
+        # === explicit cast ===
+        in_field = in_field.to(self.out_dtype)
+
         # === scale/shift ===
         if self.has_scales and self.has_shifts:
             # we can used an FMA for performance
