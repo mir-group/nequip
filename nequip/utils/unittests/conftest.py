@@ -42,11 +42,6 @@ if _is_pytest_xdist and torch.cuda.is_available():
     del _xdist_worker_rank, _cuda_vis_devs, _local_gpu_rank
 
 
-if "NEQUIP_NUM_TASKS" not in os.environ:
-    # Test parallelization, but don't waste time spawning tons of workers if lots of cores available
-    os.environ["NEQUIP_NUM_TASKS"] = "2"
-
-
 @pytest.fixture(scope="session", params=["float32", "float64"])
 def model_dtype(default_dtype, request):
     default_dtype = dtype_to_name(torch.get_default_dtype())
