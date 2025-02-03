@@ -20,9 +20,11 @@ def fx_duck_shape(enabled: bool):
     init_duck_shape = torch.fx.experimental._config.use_duck_shape
     # set mode variables
     torch.fx.experimental._config.use_duck_shape = enabled
-    yield
-    # restore state
-    torch.fx.experimental._config.use_duck_shape = init_duck_shape
+    try:
+        yield
+    finally:
+        # restore state
+        torch.fx.experimental._config.use_duck_shape = init_duck_shape
 
 
 def nequip_make_fx(
