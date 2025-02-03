@@ -15,6 +15,7 @@ from nequip.data import (
 )
 from nequip.utils.misc import dtype_from_name
 
+from functools import wraps
 from typing import Union, Optional, List
 
 
@@ -428,6 +429,31 @@ def set_irreps_debug(enabled: bool = False) -> None:
 
     _DEBUG_HOOKS = (h1, h2)
     return
+
+
+def override_irreps_debug(enabled=True):
+    """Decorator that toggles `set_irreps_debug` at the start of the test
+    and restores it to the original state at the end.
+
+    This decorator is crucial for PT2 compilation tests. (the hook modifications in `set_irreps_debug` may interfere with the compilation process).
+
+    Args:
+        enabled (bool): whether to enable or disable irreps debug mode
+    """
+
+    def decorator(test_func):
+        @wraps(test_func)
+        def wrapper(*args, **kwargs):
+            original_state = _DEBUG_HOOKS is not None
+            set_irreps_debug(enabled)
+            try:
+                return test_func(*args, **kwargs)
+            finally:
+                set_irreps_debug(original_state)
+
+        return wrapper
+
+    return decorator
 
 
 def edgeset_from_AtomicDataDict(data, **nl_kwargs):
