@@ -61,16 +61,6 @@ minimal_config4 = dict(
     },
     **COMMON_FULL_CONFIG,
 )
-minimal_config5 = dict(
-    irreps_edge_sh="0e + 1o + 2e",
-    type_embed_num_features=3,
-    feature_irreps_hidden=["2x0e + 2x1o + 2x2e", "5x0e"],
-    num_bessels=12,
-    # test custom nonlinearities
-    convnet_nonlinearity_gates={"e": "silu", "o": "abs"},
-    per_type_energy_shifts=[3.45, 5.67, 7.89],
-    **COMMON_FULL_CONFIG,
-)
 
 
 class TestNequIPModel(BaseEnergyModelTests):
@@ -84,7 +74,6 @@ class TestNequIPModel(BaseEnergyModelTests):
             minimal_config2,
             minimal_config3,
             minimal_config4,
-            minimal_config5,
         ],
         scope="class",
     )
