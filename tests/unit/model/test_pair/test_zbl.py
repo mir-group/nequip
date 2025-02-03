@@ -14,7 +14,8 @@ from nequip.data.transforms import (
 from nequip.ase import NequIPCalculator
 from nequip.utils.unittests.model_tests import BaseEnergyModelTests
 
-from hydra.utils import instantiate
+
+_ZBL_TEST_RMAX: float = 8.0  # see zbl_data.lmps
 
 
 class TestZBLModel(BaseEnergyModelTests):
@@ -24,46 +25,39 @@ class TestZBLModel(BaseEnergyModelTests):
 
     @pytest.fixture(scope="class")
     def config(self):
+
         config = {
             "_target_": "nequip.model.ZBLPairPotential",
             "seed": 123,
-            "model_dtype": "float64",
-            "r_max": 5.0,
+            "r_max": _ZBL_TEST_RMAX + 1,  # To make cutoff envelope irrelevant
+            "polynomial_cutoff_p": 80,  # almost a step function
             "type_names": ["H", "O", "C", "N", "Cu", "Au"],
             "chemical_species": ["H", "O", "C", "N", "Cu", "Au"],
             "units": "metal",
         }
         return config
 
-    def test_lammps_repro(self, config):
+    def test_lammps_repro(self, model, device):
+        ZBL_model, config, _ = model
         if config["model_dtype"] != "float64":
             pytest.skip()
-        config = config.copy()
-        r_max: float = 8.0  # see zbl_data.lmps
-        config.update(
-            {
-                "r_max": r_max + 1,  # To make cutoff envelope irrelevant
-                "polynomial_cutoff_p": 80,  # almost a step function
-            }
-        )
         transforms = [
             ChemicalSpeciesToAtomTypeMapper(
                 chemical_symbols=config["chemical_species"],
             ),
-            NeighborListTransform(r_max=r_max),
+            NeighborListTransform(r_max=_ZBL_TEST_RMAX),
         ]
-        ZBL_model = instantiate(config)
         ZBL_model.eval()
         # make test system of two atoms:
         atoms = ase.Atoms(positions=np.zeros((2, 3)), symbols=["H", "H"])
-        atoms.calc = NequIPCalculator(ZBL_model, device="cpu", transforms=transforms)
+        atoms.calc = NequIPCalculator(ZBL_model, device=device, transforms=transforms)
         # == load precomputed reference data ==
         # To regenerate this data, run
         # $ lmp -in zbl_data.lmps
         # $ python -c "import numpy as np; d = np.loadtxt('zbl.dat', skiprows=1); np.save('zbl.npy', d)"
         refdata = np.load(Path(__file__).parent / "zbl.npy")
         for r, Zi, Zj, pe, fxi, fxj in refdata:
-            if r >= r_max:
+            if r >= _ZBL_TEST_RMAX:
                 continue
             atoms.positions[1, 0] = r
             atoms.set_atomic_numbers([int(Zi), int(Zj)])
