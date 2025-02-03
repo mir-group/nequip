@@ -164,7 +164,7 @@ def FullNequIPGNNEnergyModel(
         )
     if per_type_energy_scales is None:
         warnings.warn(
-            "Found `per_type_energy_shifts=None` -- it is recommended to set `per_type_energy_scales` for better numerics during training."
+            "Found `per_type_energy_scales=None` -- it is recommended to set `per_type_energy_scales` for better numerics during training."
         )
     if per_type_energy_shifts is None:
         warnings.warn(
