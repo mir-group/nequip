@@ -11,7 +11,6 @@ from nequip.train.lightning import _SOLE_MODEL_KEY
 from nequip.data import AtomicDataDict, compile_utils
 from nequip.utils.logger import RankedLogger
 from nequip.utils.compile import prepare_model_for_compile
-from nequip.utils.aot import aot_export_model
 from nequip.utils._global_options import _get_latest_global_options
 from omegaconf import OmegaConf
 import hydra
@@ -241,6 +240,12 @@ def main(args=None):
 
     # === AOT Inductor ===
     if args.mode == "aotinductor":
+
+        # === sanity check and guarded imports ===
+        from nequip.utils.versions import check_pt2_compile_compatibility
+
+        check_pt2_compile_compatibility()
+        from nequip.utils.aot import aot_export_model
 
         # === parse batch dims range ===
         batch_map = {
