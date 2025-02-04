@@ -52,10 +52,12 @@ def main(config: DictConfig):
                 logger.info(
                     f"Constructing LMDB data file for {config.file_path}_{run}_{data_idx} ..."
                 )
+                dloader_kwargs = getattr(datamodule, run + "_dataloader_kwargs").copy()
+                dloader_kwargs.update({"batch_size": 1})
                 dloader = datamodule._get_dloader(
                     getattr(datamodule, run + "_dataset"),
                     datamodule.generator,
-                    {"batch_size": 1},
+                    dloader_kwargs,
                 )
                 NequIPLMDBDataset.save_from_iterator(
                     file_path=f"{config.file_path}_{run}_{data_idx}",
