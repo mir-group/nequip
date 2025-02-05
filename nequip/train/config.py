@@ -8,14 +8,6 @@ from itertools import accumulate
 
 from typing import Dict, Optional
 
-# === torch>=2.6 requires the flag for compile with multiple backwards ===
-if _TORCH_GE_2_6:
-    # relevant PyTorch commit: https://github.com/pytorch/pytorch/commit/87059d4547551f197731f5c084e3be6054797578
-    # comments from PyTorch code:
-    # This controls whether we collect donated buffer. This flag must be set
-    # False if a user wants to retain_graph=True for backward.
-    torch._functorch.config.donated_buffer = False
-
 
 class ConFIGLightningModule(NequIPLightningModule):
     """
@@ -54,6 +46,14 @@ class ConFIGLightningModule(NequIPLightningModule):
         norm_eps: float = 1e-8,
         **kwargs,
     ):
+        # === torch>=2.6 requires the flag for compile with multiple backwards ===
+        if _TORCH_GE_2_6:
+            # relevant PyTorch commit: https://github.com/pytorch/pytorch/commit/87059d4547551f197731f5c084e3be6054797578
+            # comments from PyTorch code:
+            # This controls whether we collect donated buffer. This flag must be set
+            # False if a user wants to retain_graph=True for backward.
+            torch._functorch.config.donated_buffer = False
+
         super().__init__(
             model=model,
             optimizer=optimizer,
