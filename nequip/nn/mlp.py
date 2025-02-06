@@ -57,6 +57,7 @@ class ScalarMLP(GraphModuleMixin, torch.nn.Module):
         return data
 
 
+@compile_mode("script")
 class ScalarMLPFunction(torch.nn.Module):
     """Module implementing an MLP according to provided options.
 
@@ -163,7 +164,7 @@ class DeepLinearMLP(torch.nn.Module):
         super().__init__()
         self.weights = torch.nn.ParameterList()
         alphas = []
-        for this_idx, mlp_idx in enumerate(reversed(range(len(mlp)))):
+        for this_idx, mlp_idx in enumerate(range(len(mlp))):
             new_weight = torch.clone(mlp[mlp_idx].weight)
             self.weights.append(new_weight)
             del new_weight
@@ -175,7 +176,7 @@ class DeepLinearMLP(torch.nn.Module):
         weight = torch.mul(
             torch.linalg.multi_dot([weight for weight in self.weights]), self.alpha
         )
-        return torch.nn.functional.linear(input, weight, bias=None)
+        return torch.mm(input, weight)
 
 
 class ScalarLinearLayer(torch.nn.Module):
@@ -195,7 +196,7 @@ class ScalarLinearLayer(torch.nn.Module):
         self.in_features = in_features
         self.out_features = out_features
         self.alpha = alpha
-        self.weight = torch.nn.Parameter(torch.empty((out_features, in_features)))
+        self.weight = torch.nn.Parameter(torch.empty((in_features, out_features)))
         # initialize weights to uniform distribution with mean 0 variance 1
         torch.nn.init.uniform_(self.weight, -sqrt(3), sqrt(3))
         # initialize bias (if any) to zeros
@@ -206,7 +207,10 @@ class ScalarLinearLayer(torch.nn.Module):
 
     def forward(self, input: torch.Tensor) -> torch.Tensor:
         weight = self.weight * self.alpha
-        return torch.nn.functional.linear(input, weight, self.bias)
+        if self.bias is None:
+            return torch.mm(input, weight)
+        else:
+            return torch.addmm(self.bias, input, weight)
 
     def extra_repr(self) -> str:
         return f"in_features={self.in_features}, out_features={self.out_features}, bias={self.bias is not None}"
