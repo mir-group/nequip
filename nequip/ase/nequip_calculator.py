@@ -102,6 +102,11 @@ class NequIPCalculator(Calculator):
             )
             # == metadata ==
             metadata = compiled_model.get_metadata()
+            compile_device = metadata["AOTI_DEVICE_KEY"]
+            if compile_device != device:
+                raise RuntimeError(
+                    f"`{compile_path}` was compiled for `{compile_device}` and won't work with `NequIPCalculator.from_compiled_model(device={device})`, use `NequIPCalculator.from_compiled_model(device={compile_device})` instead."
+                )
             r_max = float(metadata[graph_model.R_MAX_KEY])
             type_names = metadata[graph_model.TYPE_NAMES_KEY].split(" ")
         else:
