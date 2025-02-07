@@ -137,8 +137,6 @@ def FullNequIPGNNEnergyModel(
     convnet_nonlinearity_type: str = "gate",
     convnet_nonlinearity_scalars: Dict[int, Callable] = {"e": "silu", "o": "tanh"},
     convnet_nonlinearity_gates: Dict[int, Callable] = {"e": "silu", "o": "tanh"},
-    # interaction block
-    interaction_block_nonlinearity_scalars: Dict[int, Callable] = {"e": "silu"},
 ) -> GraphModel:
     """NequIP GNN model that predicts energies based on a more extensive set of arguments."""
     # === sanity checks and warnings ===
@@ -222,7 +220,6 @@ def FullNequIPGNNEnergyModel(
                 "avg_num_neighbors": avg_num_neighbors,
                 # to ensure isolated atom limit
                 "use_sc": layer_i != 0,
-                "nonlinearity_scalars": interaction_block_nonlinearity_scalars,
             },
             resnet=(layer_i != 0) and convnet_resnet,
             nonlinearity_type=convnet_nonlinearity_type,

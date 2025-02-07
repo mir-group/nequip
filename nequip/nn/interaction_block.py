@@ -1,17 +1,16 @@
 """Interaction Block"""
 
-from typing import Optional, Dict, Callable
+from typing import Optional
 
 import torch
 
 from e3nn import o3
-from e3nn.nn import FullyConnectedNet
 from e3nn.o3 import TensorProduct, Linear, FullyConnectedTensorProduct
 
 from nequip.data import AtomicDataDict
+from .mlp import ScalarMLPFunction
 from ._graph_mixin import GraphModuleMixin
 from .utils import scatter
-from .nonlinearities import ShiftedSoftPlus
 
 
 class InteractionBlock(GraphModuleMixin, torch.nn.Module):
@@ -26,7 +25,6 @@ class InteractionBlock(GraphModuleMixin, torch.nn.Module):
         radial_mlp_width=8,
         avg_num_neighbors=None,
         use_sc=True,
-        nonlinearity_scalars: Dict[int, Callable] = {"e": "silu"},
     ) -> None:
         """InteractionBlock.
 
@@ -108,14 +106,14 @@ class InteractionBlock(GraphModuleMixin, torch.nn.Module):
         )
 
         # init_irreps already confirmed that the edge embeddding is all invariant scalars
-        self.fc = FullyConnectedNet(
-            [self.irreps_in[AtomicDataDict.EDGE_EMBEDDING_KEY].num_irreps]
-            + radial_mlp_depth * [radial_mlp_width]
-            + [tp.weight_numel],
-            {
-                "ssp": ShiftedSoftPlus,
-                "silu": torch.nn.functional.silu,
-            }[nonlinearity_scalars["e"]],
+        self.edge_mlp = ScalarMLPFunction(
+            input_dim=self.irreps_in[AtomicDataDict.EDGE_EMBEDDING_KEY].num_irreps,
+            output_dim=tp.weight_numel,
+            hidden_layers_depth=radial_mlp_depth,
+            hidden_layers_width=radial_mlp_width,
+            nonlinearity="silu",  # hardcode SiLU
+            bias=False,
+            forward_weight_init=True,
         )
 
         self.tp = tp
@@ -140,7 +138,7 @@ class InteractionBlock(GraphModuleMixin, torch.nn.Module):
             )
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
-        weight = self.fc(data[AtomicDataDict.EDGE_EMBEDDING_KEY])
+        weight = self.edge_mlp(data[AtomicDataDict.EDGE_EMBEDDING_KEY])
 
         x = data[AtomicDataDict.NODE_FEATURES_KEY]
         edge_src = data[AtomicDataDict.EDGE_INDEX_KEY][1]
