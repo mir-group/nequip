@@ -25,7 +25,7 @@ class NequIPCalculator(Calculator):
 
     Args:
         model (nequip.nn.GraphModel): NequIP GraphModel object
-        device (str/torch.device): device for model to evlauate on, e.g. ``cpu`` or ``cuda``
+        device (str/torch.device): device for model to evaluate on, e.g. ``cpu`` or ``cuda``
         transforms (List[Callable]): list of data transforms
     """
 
@@ -80,7 +80,9 @@ class NequIPCalculator(Calculator):
                 graph_model.TYPE_NAMES_KEY: None,
                 TF32_KEY: None,
             }
-            model = torch.jit.load(compile_path, _extra_files=metadata)
+            model = torch.jit.load(
+                compile_path, _extra_files=metadata, map_location=device
+            )
             model = torch.jit.freeze(model)
             # == metadata ==
             r_max = float(metadata[graph_model.R_MAX_KEY])
