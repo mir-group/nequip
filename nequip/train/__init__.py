@@ -3,6 +3,7 @@ from .metrics import (
     MeanSquaredError,
     RootMeanSquaredError,
     HuberLoss,
+    StratifiedHuberForceLoss,
 )
 from .metrics_manager import (
     MetricsManager,
@@ -30,5 +31,6 @@ __all__ = [
     MeanSquaredError,
     RootMeanSquaredError,
     HuberLoss,
+    StratifiedHuberForceLoss,
     SimpleDDPStrategy,
 ]
