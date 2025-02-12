@@ -127,7 +127,7 @@ class ConFIGLightningModule(NequIPLightningModule):
         self, batch: AtomicDataDict.Type, batch_idx: int, dataloader_idx: int = 0
     ):
         # everything looks the same as the base NequIPLightningModule up to the `manual_optimization` part
-        target = batch.copy()
+        target = self.process_target(batch, batch_idx, dataloader_idx)
         output = self(batch)
 
         # optionally compute training metrics

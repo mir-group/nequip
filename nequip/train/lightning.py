@@ -209,11 +209,18 @@ class NequIPLightningModule(lightning.LightningModule):
     def evaluation_model(self) -> torch.nn.Module:
         return self.model
 
+    def process_target(
+        self, batch: AtomicDataDict.Type, batch_idx: int, dataloader_idx: int = 0
+    ) -> AtomicDataDict.Type:
+        """"""
+        # subclasses can override this function
+        return batch.copy()
+
     def training_step(
         self, batch: AtomicDataDict.Type, batch_idx: int, dataloader_idx: int = 0
     ):
         """"""
-        target = batch.copy()
+        target = self.process_target(batch, batch_idx, dataloader_idx)
         output = self(batch)
 
         # optionally compute training metrics
@@ -259,7 +266,7 @@ class NequIPLightningModule(lightning.LightningModule):
         self, batch: AtomicDataDict.Type, batch_idx: int, dataloader_idx: int = 0
     ):
         """"""
-        target = batch.copy()
+        target = self.process_target(batch, batch_idx, dataloader_idx)
 
         # === update basic val metrics ===
         output = self(batch)
@@ -286,7 +293,7 @@ class NequIPLightningModule(lightning.LightningModule):
         self, batch: AtomicDataDict.Type, batch_idx: int, dataloader_idx: int = 0
     ):
         """"""
-        target = batch.copy()
+        target = self.process_target(batch, batch_idx, dataloader_idx)
 
         # === update basic test metrics ===
         output = self(batch)
