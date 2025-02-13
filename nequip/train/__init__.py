@@ -8,6 +8,7 @@ from .metrics_manager import MetricsManager, EnergyForceLoss, EnergyForceMetrics
 from .lightning import NequIPLightningModule
 from .ema import EMALightningModule
 from .config import ConFIGLightningModule, EMAConFIGLightningModule
+from .simple_ddp import SimpleDDPStrategy
 
 __all__ = [
     NequIPLightningModule,
@@ -21,4 +22,5 @@ __all__ = [
     MeanSquaredError,
     RootMeanSquaredError,
     HuberLoss,
+    SimpleDDPStrategy,
 ]
