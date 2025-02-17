@@ -7,3 +7,4 @@ nequip.train
   lightning_module
   metrics
   callbacks
+  ddp
