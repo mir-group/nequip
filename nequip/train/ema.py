@@ -136,15 +136,27 @@ class EMAWeights(torch.nn.Module):
                 f"Invalid decay value {decay} provided. Please provide a value in [0,1] range."
             )
         self.decay = decay
-        # EMA weights
-        self.ema_weights = torch.nn.ParameterList(
-            [torch.empty_like(p) for p in model.parameters()]
-        )
+        # store EMA weights as buffers
+        _params = [torch.empty_like(p) for p in model.parameters()]
+        for idx, param in enumerate(_params):
+            self.register_buffer(f"ema_weight_{idx}", param)
+        self.num_ema_weights = len(_params)
+        del _params
         # counter for weight updates
         self.num_updates = 0
         # flag to control if this module is holding EMA weights or raw model weights
         # latter is true when `swap_parameters` is called
         self.is_holding_ema_weights = True
+
+    @property
+    def ema_weights(self):
+        # we adopt a similar solution from the following discussion
+        # https://discuss.pytorch.org/t/why-no-nn-bufferlist-like-function-for-registered-buffer-tensor/18884/10
+        # since it makes the code that comes below more readable
+        # by imitating a `ParameterList` for buffers
+        return [
+            getattr(self, f"ema_weight_{idx}") for idx in range(self.num_ema_weights)
+        ]
 
     def forward(self, *args, **kwargs):
         """"""
