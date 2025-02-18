@@ -81,43 +81,18 @@ trainer:
 training_module:
   _target_: nequip.train.EMALightningModule
   loss:
-    _target_: nequip.train.MetricsManager
-    metrics:
-      - name: per_atom_energy_mse
-        field:
-          _target_: nequip.data.PerAtomModifier
-          field: total_energy
-        coeff: 1
-        metric:
-          _target_: nequip.train.MeanSquaredError
-      - name: forces_mse
-        field: forces
-        coeff: 1
-        metric:
-          _target_: nequip.train.MeanSquaredError
-      - name: stress_mse
-        field: stress
-        coeff: 1
-        metric:
-          _target_: nequip.train.MeanSquaredError
+    _target_: nequip.train.EnergyForceStressLoss
+    per_atom_energy: true
+    coeffs:
+      total_energy: 1.0
+      forces: 1.0
+      stress: 1.0
   val_metrics:
-    _target_: nequip.train.MetricsManager
-    metrics:
-      - name: total_energy_mae
-        field: total_energy
-        coeff: 1
-        metric:
-          _target_: nequip.train.MeanAbsoluteError
-      - name: forces_mae
-        field: forces
-        coeff: 1
-        metric:
-          _target_: nequip.train.MeanAbsoluteError
-      - name: stress_mae
-        field: stress
-        coeff: 1
-        metric:
-          _target_: nequip.train.MeanAbsoluteError
+    _target_: nequip.train.EnergyForceStressMetrics
+    coeffs:
+      total_energy_mae: 1.0
+      forces_mae: 1.0
+      stress_mae: 1.0
   train_metrics: ${training_module.val_metrics}
   test_metrics: ${training_module.val_metrics}
   optimizer:
