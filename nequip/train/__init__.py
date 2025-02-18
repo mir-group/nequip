@@ -4,7 +4,13 @@ from .metrics import (
     RootMeanSquaredError,
     HuberLoss,
 )
-from .metrics_manager import MetricsManager, EnergyForceLoss, EnergyForceMetrics
+from .metrics_manager import (
+    MetricsManager,
+    EnergyForceLoss,
+    EnergyForceMetrics,
+    EnergyForceStressLoss,
+    EnergyForceStressMetrics,
+)
 from .lightning import NequIPLightningModule
 from .ema import EMALightningModule
 from .config import ConFIGLightningModule, EMAConFIGLightningModule
@@ -18,6 +24,8 @@ __all__ = [
     MetricsManager,
     EnergyForceLoss,
     EnergyForceMetrics,
+    EnergyForceStressLoss,
+    EnergyForceStressMetrics,
     MeanAbsoluteError,
     MeanSquaredError,
     RootMeanSquaredError,

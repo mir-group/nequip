@@ -392,7 +392,7 @@ def EnergyForceMetrics(
               forces_mae: null
 
     Args:
-        coeffs (Dict[str, float]): ``dict`` that stores the relative contribution of the different energy and forces metrics to the ``weighted_sum`` version of the metric as in ``nequip.train.MetricsManager`` (default ``{'total_energy_rmse': 1.0, 'per_atom_energy_rmse': None, 'forces_rmse': 1.0, 'total_energy_mae': None, 'per_atom_energy_mae': None, 'forces_mae: None'}``)
+        coeffs (Dict[str, float]): ``dict`` that stores the relative contribution of the different energy and forces metrics to the ``weighted_sum`` version of the metric as in ``nequip.train.MetricsManager`` (default ``{'total_energy_rmse': 1.0, 'per_atom_energy_rmse': None, 'forces_rmse': 1.0, 'total_energy_mae': None, 'per_atom_energy_mae': None, 'forces_mae': None}``)
     """
     metrics = [
         {
@@ -430,6 +430,152 @@ def EnergyForceMetrics(
             "field": AtomicDataDict.FORCE_KEY,
             "metric": MeanAbsoluteError(),
             "coeff": coeffs.get("forces_mae", None),
+        },
+    ]
+    return MetricsManager(metrics, type_names=type_names)
+
+
+def EnergyForceStressLoss(
+    coeffs: Dict[str, float] = {
+        AtomicDataDict.TOTAL_ENERGY_KEY: 1.0,
+        AtomicDataDict.FORCE_KEY: 1.0,
+        AtomicDataDict.STRESS_KEY: 1.0,
+    },
+    per_atom_energy: bool = True,
+    type_names=None,
+):
+    """Simplified ``MetricsManager`` wrapper for a **loss** term containing energy, forces and stress MSEs.
+
+    Example usage in config:
+    ::
+
+        training_module:
+          _target_: nequip.train.NequIPLightningModule
+
+          loss:
+            _target_: nequip.train.EnergyForceLoss
+            per_atom_energy: true
+            coeffs:
+              total_energy: 1.0
+              forces: 1.0
+              stress: 1.0
+
+    Args:
+        coeffs (Dict[str, float]): ``dict`` that stores the relative weight of energy and forces to the overall loss (default ``{'total_energy': 1.0, 'forces': 1.0, 'stress': 1.0}``)
+        per_atom_energy (bool, optional): whether to normalize the total energy by the number of atoms (default ``True``)
+    """
+
+    metrics = [
+        {
+            "name": "per_atom_energy_mse" if per_atom_energy else "total_energy_mse",
+            "field": (
+                PerAtomModifier(AtomicDataDict.TOTAL_ENERGY_KEY)
+                if per_atom_energy
+                else AtomicDataDict.TOTAL_ENERGY_KEY
+            ),
+            "coeff": coeffs[AtomicDataDict.TOTAL_ENERGY_KEY],
+            "metric": MeanSquaredError(),
+        },
+        {
+            "name": "forces_mse",
+            "field": AtomicDataDict.FORCE_KEY,
+            "coeff": coeffs[AtomicDataDict.FORCE_KEY],
+            "metric": MeanSquaredError(),
+        },
+        {
+            "name": "stress_mse",
+            "field": AtomicDataDict.STRESS_KEY,
+            "coeff": coeffs[AtomicDataDict.STRESS_KEY],
+            "metric": MeanSquaredError(),
+        },
+    ]
+    return MetricsManager(metrics, type_names=type_names)
+
+
+def EnergyForceStressMetrics(
+    coeffs: Dict[str, float] = {
+        "total_energy_rmse": 1.0,
+        "per_atom_energy_rmse": None,
+        "forces_rmse": 1.0,
+        "stress_rmse": 1.0,
+        "total_energy_mae": None,
+        "per_atom_energy_mae": None,
+        "forces_mae": None,
+        "stress_mae": None,
+    },
+    type_names=None,
+):
+    """Simplified ``MetricsManager`` wrapper for a **metric** term containing energy, force and stress MAEs and RMSEs.
+
+    Example usage in config:
+    ::
+
+        training_module:
+          _target_: nequip.train.NequIPLightningModule
+
+          val_metrics:
+            _target_: nequip.train.EnergyForceMetrics
+            coeffs:
+              total_energy_rmse: 1.0
+              per_atom_energy_rmse: null
+              forces_rmse: 1.0
+              stress_rmse: 1.0
+              total_energy_mae: null
+              per_atom_energy_mae: null
+              forces_mae: null
+              stress_mae: null
+
+    Args:
+        coeffs (Dict[str, float]): ``dict`` that stores the relative contribution of the different energy and forces metrics to the ``weighted_sum`` version of the metric as in ``nequip.train.MetricsManager`` (default ``{'total_energy_rmse': 1.0, 'per_atom_energy_rmse': None, 'forces_rmse': 1.0, 'stress_rmse': 1.0, 'total_energy_mae': None, 'per_atom_energy_mae': None, 'forces_mae': None, 'stress_mae': None}``)
+    """
+    metrics = [
+        {
+            "name": "total_energy_rmse",
+            "field": AtomicDataDict.TOTAL_ENERGY_KEY,
+            "metric": RootMeanSquaredError(),
+            "coeff": coeffs.get("total_energy_rmse", None),
+        },
+        {
+            "name": "total_energy_mae",
+            "field": AtomicDataDict.TOTAL_ENERGY_KEY,
+            "metric": MeanAbsoluteError(),
+            "coeff": coeffs.get("total_energy_mae", None),
+        },
+        {
+            "name": "per_atom_energy_rmse",
+            "field": PerAtomModifier(AtomicDataDict.TOTAL_ENERGY_KEY),
+            "metric": RootMeanSquaredError(),
+            "coeff": coeffs.get("per_atom_energy_rmse", None),
+        },
+        {
+            "name": "per_atom_energy_mae",
+            "field": PerAtomModifier(AtomicDataDict.TOTAL_ENERGY_KEY),
+            "metric": MeanAbsoluteError(),
+            "coeff": coeffs.get("per_atom_energy_mae", None),
+        },
+        {
+            "name": "forces_rmse",
+            "field": AtomicDataDict.FORCE_KEY,
+            "metric": RootMeanSquaredError(),
+            "coeff": coeffs.get("forces_rmse", None),
+        },
+        {
+            "name": "forces_mae",
+            "field": AtomicDataDict.FORCE_KEY,
+            "metric": MeanAbsoluteError(),
+            "coeff": coeffs.get("forces_mae", None),
+        },
+        {
+            "name": "stress_rmse",
+            "field": AtomicDataDict.STRESS_KEY,
+            "metric": RootMeanSquaredError(),
+            "coeff": coeffs.get("stress_rmse", None),
+        },
+        {
+            "name": "stress_mae",
+            "field": AtomicDataDict.STRESS_KEY,
+            "metric": MeanAbsoluteError(),
+            "coeff": coeffs.get("stress_mae", None),
         },
     ]
     return MetricsManager(metrics, type_names=type_names)
