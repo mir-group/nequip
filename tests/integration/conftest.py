@@ -19,7 +19,7 @@ def _check_and_print(retcode):
 
 def _training_session(conffile, training_module, model_dtype, BENCHMARK_ROOT):
     path_to_this_file = pathlib.Path(__file__)
-    config_path = path_to_this_file.parents[2] / f"configs/{conffile}"
+    config_path = path_to_this_file.parents[0] / conffile
     config = OmegaConf.load(config_path)
 
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -53,7 +53,7 @@ def _training_session(conffile, training_module, model_dtype, BENCHMARK_ROOT):
 
 @pytest.fixture(
     scope="session",
-    params=["minimal.yaml", "minimal_toy_emt.yaml"],
+    params=["minimal_aspirin.yaml", "minimal_toy_emt.yaml"],
 )
 def conffile(request):
     return request.param
