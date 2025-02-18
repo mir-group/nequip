@@ -165,42 +165,18 @@ training_module:
   # the ema decay parameter of an EMA model
   ema_decay: 0.999
 
-  # use a MetricsManager constructor (see docs) to construct the loss function:
+  # here, we use a simplified MetricsManager wrapper (see docs) to construct the energy-force loss function
+  # the more general `nequip.train.MetricsManager` could also be used to configure a custom loss function
   loss:
     _target_: nequip.train.EnergyForceLoss
     per_atom_energy: true
     coeffs:
       total_energy: 1.0
       forces: 1.0
-    # This is equivalent to instantiating the Metrics manager directly:
-    # _target_: nequip.train.MetricsManager
-    # metrics:
-    #   - name: peratomE_MSE
-    #     field:
-    #       _target_: nequip.data.PerAtomModifier
-    #       field: total_energy
-    #     coeff: 1
-    #     metric:
-    #       _target_: nequip.train.MeanSquaredError
-    #   - name: force_MSE
-    #     field: forces
-    #     coeff: 1
-    #     metric:
-    #       _target_: nequip.train.MeanSquaredError
 
-    # one could also use a per-type averaged metric
-    # in this case, there are two types of atoms, C and H, so
-    # separate per-type C and H force MSEs are computed before averaging the two
-    # unlike the above that just averages all forces without accounting for the atom types
-    #- name: force_MSE
-    #  field: forces
-    #  per_type: true
-    #  coeff: 1
-    #  metric:
-    #    _target_: nequip.train.MeanSquaredError
-
-  # use a MetricsManager (see docs) to construct the metrics used for monitoring
-  # and influencing training, e.g. with LR schedulers or early stopping, etc
+  # again, we use a simplified MetricsManager wrapper (see docs) to construct the energy-force metrics
+  # the more general `nequip.train.MetricsManager` could also be used in this case
+  # validation metrics are used for monitoring and influencing training, e.g. with LR schedulers or early stopping, etc
   val_metrics:
     _target_: nequip.train.EnergyForceMetrics
     coeffs:
@@ -208,28 +184,6 @@ training_module:
       forces_mae: 1.0
       # keys `total_energy_rmse` and `forces_rmse`, `per_atom_energy_rmse`
       # and `per_atom_energy_mae` are also available
-  # As before, this is equivalent to instantiating the MetricsManager directly:
-  # val_metrics:
-  #   _target_: nequip.train.MetricsManager
-  #   metrics:
-  #     - name: E_MAE
-  #       field: total_energy
-  #       coeff: 1
-  #       metric:
-  #         _target_: nequip.train.MeanAbsoluteError
-  #     - name: force_MAE
-  #       field: forces
-  #       coeff: 1
-  #       metric:
-  #         _target_: nequip.train.MeanAbsoluteError
-
-  # here it is also possible to use a per-type averaged MAE
-      # - name: force_MAE
-      #  field: forces
-      #  per_type: true
-      #  coeff: 1
-      #  metric:
-      #    _target_: nequip.train.MeanAbsoluteError
 
   # we could have train_metrics and test_metrics be different from val_metrics, but it makes sense to have them be the same
   train_metrics: ${training_module.val_metrics}  # use variable interpolation
