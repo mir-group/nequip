@@ -2,7 +2,8 @@ import torch
 from torchmetrics import Metric
 from . import AtomicDataDict
 
-from .modifier import BaseModifier
+from .modifier import BaseModifier, PerAtomModifier, NumNeighbors
+from .stats import Mean, RootMeanSquare
 from typing import List, Dict, Union, Callable, Iterable
 
 from nequip.utils.logger import RankedLogger
@@ -215,3 +216,55 @@ class DataStatisticsManager(torch.nn.ModuleList):
         for data in data_source:
             self(data)
         return self.compute()
+
+
+def CommonDataStatisticsManager(
+    dataloader_kwargs: Dict = {},
+    type_names: List[str] = None,
+):
+    """``DataStatisticsManager`` wrapper that implements common dataset statistics.
+
+    The dataset statistics computed by using this wrapper include ``num_neighbors_mean``, ``per_atom_energy_mean``, ``forces_rms``, and ``per_type_forces_rms``, which are variables that can be interpolated for in the ``model`` section of the config file.
+
+    For example::
+
+        training_module:
+        _target_: nequip.train.EMALightningModule
+
+        # other `EMALightningModule` arguments
+
+        model:
+          _target_: nequip.model.NequIPGNNModel
+
+          # other model hyperparameters
+          avg_num_neighbors: ${training_data_stats:num_neighbors_mean}
+          per_type_energy_shifts: ${training_data_stats:per_atom_energy_mean}
+          per_type_energy_scales: ${training_data_stats:forces_rms}
+          # or alternatively the per-type forces RMS
+          # per_type_energy_scales: ${training_data_stats:per_type_forces_rms}
+
+    """
+    metrics = [
+        {
+            "name": "num_neighbors_mean",
+            "field": NumNeighbors(),
+            "metric": Mean(),
+        },
+        {
+            "name": "per_atom_energy_mean",
+            "field": PerAtomModifier(AtomicDataDict.TOTAL_ENERGY_KEY),
+            "metric": Mean(),
+        },
+        {
+            "name": "forces_rms",
+            "field": AtomicDataDict.FORCE_KEY,
+            "metric": RootMeanSquare(),
+        },
+        {
+            "name": "per_type_forces_rms",
+            "field": AtomicDataDict.FORCE_KEY,
+            "metric": RootMeanSquare(),
+            "per_type": True,
+        },
+    ]
+    return DataStatisticsManager(metrics, dataloader_kwargs, type_names)
