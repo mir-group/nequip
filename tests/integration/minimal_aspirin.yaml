@@ -24,27 +24,10 @@ data:
   test_dataloader_kwargs:
     batch_size: 5
   stats_manager:
-    _target_: nequip.data.DataStatisticsManager
+    _target_: nequip.data.CommonDataStatisticsManager
     type_names: ${model_type_names}
     dataloader_kwargs:
       batch_size: 10
-    metrics:
-      - field:
-          _target_: nequip.data.NumNeighbors
-        metric: 
-          _target_: nequip.data.Mean
-        name: num_neighbors_mean
-      - field:
-          _target_: nequip.data.PerAtomModifier
-          field: total_energy
-        metric:
-          _target_: nequip.data.Mean
-        name: per_atom_energy_mean
-      - field: forces
-        metric:
-          _target_: nequip.data.RootMeanSquare
-        per_type: true
-        name: per_type_forces_rms
 
 trainer:
   _target_: lightning.Trainer
