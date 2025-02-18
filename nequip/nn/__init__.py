@@ -1,6 +1,6 @@
 from ._graph_mixin import GraphModuleMixin, SequentialGraphNetwork
 from .graph_model import GraphModel
-from ._atomwise import (
+from .atomwise import (
     AtomwiseOperation,
     AtomwiseReduce,
     AtomwiseLinear,
