@@ -12,28 +12,12 @@ data:
   # datamodule arguments
 
   stats_manager:
-    _target_: nequip.data.DataStatisticsManager
+    _target_: _target_: nequip.data.CommonDataStatisticsManager
     type_names: ${model_type_names}
     dataloader_kwargs:
       batch_size: 10
-    metrics:
-      - field:
-          _target_: nequip.data.NumNeighbors
-        metric: 
-          _target_: nequip.data.Mean
-        name: num_neighbors_mean
-      - field:
-          _target_: nequip.data.PerAtomModifier
-          field: total_energy
-        metric:
-          _target_: nequip.data.Mean
-        name: per_atom_energy_mean
-      - field: forces
-        metric:
-          _target_: nequip.data.RootMeanSquare
-        name: forces_rms
 ```
-In the above example, we specifically request for `num_neighbors_mean`, `per_atom_energy_mean`, and `forces_rms` to be computed. We are then able to refer to these dataset statistics variables when configuring the model hyperparameters in the `model` section of the config file, as follows.
+In the above example, we call `nequip.data.CommonDataStatisticsManager`, which will automatically compute the following dataset statistics: `num_neighbors_mean`, `per_atom_energy_mean`, `forces_rms`, and `per_type_forces_rms`. One could also configure custom dataset statistics with `nequip.data.DataStatisticsManager`. See [API docs](../../api/data_stats) for the dataset statistics managers for more details. We are then able to refer to these dataset statistics variables when configuring the model hyperparameters in the `model` section of the config file, as follows.
 ```
 training_module:
   _target_: nequip.train.EMALightningModule
@@ -82,7 +66,7 @@ Users may also consider toggling `per_type_energy_shifts_trainable` and `per_typ
 Regardless of whether `per_type_energy_shifts` and/or `per_type_energy_scales` are specified as a single value or on a per-type basis, making the shifts/scales trainable will always lead to a per-type treatment internally (which may lead to a small additional expense).
 ```
 
-## Ziegler-Biersack-Littmark (ZBL)
+## Ziegler-Biersack-Littmark (ZBL) Potential
 
 For practical molecular dynamics simulations, it may be favorable to train models with a strong prior for repulsion at close atomic distances. One can add the Ziegler-Biersack-Littmark (ZBL) screened nuclear repulsion term as a `pair_potential` in NequIP and Allegro models. This section of the config file could look something like
 
