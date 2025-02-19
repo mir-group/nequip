@@ -31,14 +31,3 @@
 	```
 
 ## Common Warnings
-
-
-### Other
-
-  - Setting global configuration settings
-    
-    Warnings of the form
-    ```txt
-    Setting the GLOBAL value for ...
-    ```
-    `nequip` manages a number of global configuration settings of PyTorch and e3nn and correctly restores those values when a deployed model is loaded. These settings, however, must be set at a global level and thus may affect a host application;  for this reason `nequip` by default will warn whenever overriding global configuration options.  If you need to, these warnings can be silenced with `set_global_options=True`.  (Setting `set_global_options=False` is **strongly** discouraged and might lead to strange issues or incorrect numerical results.)
