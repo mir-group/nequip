@@ -1,16 +1,8 @@
 # Conventions
 
-## Glossary
-
-Some common terms used in the codebase are presented as follows.
-
- - **config**: the `.yaml` file that is used to configure the training, validation, and/or testing run
-
-
 ## Data Format Conventions
  - Cells vectors are given in ASE style as the **rows** of the cell matrix
  - The first index in an edge tuple (``edge_index[0]``) is the center atom, and the second (``edge_index[1]``) is the neighbor
-
 
 
 ## Pressure / stress / virials
