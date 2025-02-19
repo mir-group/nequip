@@ -14,11 +14,12 @@ Most recent change on the bottom.
  - `LightningDataModule`s for dataset management
  - dataset statistics managed by a `DataStatisticsManager`
  - error metrics managed by a `MetricsManager`
+ - `EnergyForceLoss`, `EnergyForceStressLoss`, `EnergyForceMetrics`, `EnergyForceStressMetrics` as `MetricsManager` wrappers
  - `torchmetrics` based metrics for both dataset statistics and error metrics
  - multi-GPU training
  - `Lightning` based callbacks
- - `EnergyForceLoss` and `EnergyForceMetrics` as constructors for `MetricsManager`
  - `rMD17DataModule` for working with the [revised MD17 dataset](https://figshare.com/articles/dataset/Revised_MD17_dataset_rMD17_/12672038).
+ - `HuberLoss` and `StratifiedHuberForceLoss` loss metric classes.
 
 ### Changed
  - [Breaking] migrate existing callbacks (loss weight scheduler and SoftAdapt) to `Lightning`'s callbacks systems
