@@ -19,7 +19,6 @@ def aot_export_model(
     batch_map: Dict[str, torch.export.dynamic_shapes.Dim],
     output_path: str,
     inductor_configs: Dict[str, Any] = {},
-    test: bool = False,
     seed: int = 1,
 ) -> str:
     # === torch version check ===
@@ -45,8 +44,6 @@ def aot_export_model(
 
     # === perform export ===
     # == define dynamics dims ==
-
-    # TODO (maybe): account for custom unregistered fields
     dynamic_shapes = get_dynamic_shapes(input_fields, batch_map)
 
     # == export ==
@@ -63,9 +60,15 @@ def aot_export_model(
     )
     assert out_path == output_path
 
-    # === test ===
-    if test:
-        loaded_model = torch._inductor.aoti_load_package(out_path)
-        _ = loaded_model([data[k] for k in input_fields])
-
+    # === sanity check ===
+    aot_model = torch._inductor.aoti_load_package(out_path)
+    aot_out = aot_model([data[k] for k in input_fields])
+    eager_out = model(data)
+    del aot_model, model
+    for idx, field in enumerate(output_fields):
+        err = torch.max(torch.abs(aot_out[idx] - eager_out[field])).item()
+        assert torch.allclose(
+            aot_out[idx], eager_out[field], rtol=tol, atol=tol
+        ), f"AOT Inductor export eager vs export sanity check failed with MaxAbsError = {err:.6g} (tol={tol}) for field `{field}`."
+    del aot_out, eager_out
     return out_path
