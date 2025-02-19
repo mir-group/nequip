@@ -136,7 +136,9 @@ class BaseModelTests:
 
     @override_irreps_debug(False)
     def test_compile(self, model, model_test_data, device):
-
+        """
+        Test train-time compilation, i.e. `make_fx` -> `export` -> `AOTAutograd` correctness.
+        """
         if not _TORCH_GE_2_6:
             pytest.skip("PT2 compile tests skipped for torch < 2.6")
 
@@ -179,6 +181,55 @@ class BaseModelTests:
             assert torch.allclose(
                 v.grad, compile_params[k].grad, atol=tol, rtol=tol
             ), err
+
+    @override_irreps_debug(False)
+    def test_aot_export(self, model, model_test_data, device):
+        """
+        Tests inference-time compilation, i.e. that `make_fx` -> `export` -> `AOTExport` correctness.
+
+        For now, we only test the unbatched case, i.e. a single frame, relevant for ase, pair-nequip, and pair-allegro.
+        """
+        if not _TORCH_GE_2_6:
+            pytest.skip("PT2 compile tests skipped for torch < 2.6")
+        from nequip.model import override_model_compile_mode
+        from nequip.utils.compile import prepare_model_for_compile
+        from nequip.utils.aot import aot_export_model
+        from nequip.scripts.compile import _ASE_FIELDS
+
+        # TODO: sort out the CPU compilation issues
+        if device == "cpu":
+            pytest.skip(
+                "compile tests are skipped for CPU as there are known compilation bugs for both NequIP and Allegro models on CPU"
+            )
+
+        # get a single frame, and drop batch fields to take optimized path
+        export_data = AtomicDataDict.frame_from_batched(model_test_data.copy(), 0)
+        export_data.pop(AtomicDataDict.BATCH_KEY)
+        export_data.pop(AtomicDataDict.NUM_NODES_KEY)
+
+        _, config, _ = model
+        with override_model_compile_mode(compile_mode=None):
+            model = self.make_model(config, device=device)
+        model = prepare_model_for_compile(model, device)
+        # export model
+        batch_map = {
+            "graph": torch.export.Dim.STATIC,
+            "node": torch.export.dynamic_shapes.Dim("num_nodes", min=2, max=torch.inf),
+            "edge": torch.export.dynamic_shapes.Dim("num_edges", min=2, max=torch.inf),
+        }
+        # sanity checking done when exporting
+        with tempfile.TemporaryDirectory() as tmpdir:
+            _ = aot_export_model(
+                model=model,
+                device=device,
+                input_fields=_ASE_FIELDS["input"],
+                output_fields=_ASE_FIELDS["output"],
+                data=export_data,
+                batch_map=batch_map,
+                output_path=tmpdir + "/export_test.pt2",
+                inductor_configs={},
+                seed=0,
+            )
 
     def test_forward(self, model, model_test_data):
         instance, _, out_fields = model
