@@ -8,6 +8,8 @@ from nequip.train import (
     RootMeanSquaredError,
     EnergyForceLoss,
     EnergyForceMetrics,
+    EnergyForceStressLoss,
+    EnergyForceStressMetrics,
 )
 
 
@@ -85,6 +87,104 @@ class TestMetricsManager:
         metrics_dict = mm.compute()
         assert torch.allclose(metrics_dict["E_mae"], E_MAE)
         assert torch.allclose(metrics_dict["F_mae"], F_MAE)
+        assert torch.allclose(metrics_dict["weighted_sum"], weighted_sum)
+
+    @pytest.mark.parametrize("ratio", [(1, 1, 1), (1, 1, 2), (1, 2, 3), (1, 10, 100)])
+    def test_stress_and_weighted_sum(self, data, ratio):
+        pred1, ref1, pred2, ref2 = data
+        mm = MetricsManager(
+            [
+                {
+                    "field": AtomicDataDict.TOTAL_ENERGY_KEY,
+                    "coeff": ratio[0],
+                    "metric": MeanAbsoluteError(),
+                },
+                {
+                    "field": AtomicDataDict.FORCE_KEY,
+                    "coeff": ratio[1],
+                    "metric": MeanAbsoluteError(),
+                },
+                {
+                    "field": AtomicDataDict.STRESS_KEY,
+                    "coeff": ratio[2],
+                    "metric": MeanAbsoluteError(),
+                },
+            ]
+        )
+
+        for pred, ref in [(pred1, ref1), (pred2, ref2)]:
+            metrics_dict = mm(pred, ref)
+            assert len(metrics_dict) > 0
+            assert isinstance(metrics_dict, dict)
+            for key, value in metrics_dict.items():
+                assert isinstance(value, torch.Tensor)
+            E_MAE = torch.mean(
+                torch.abs(
+                    pred[AtomicDataDict.TOTAL_ENERGY_KEY]
+                    - ref[AtomicDataDict.TOTAL_ENERGY_KEY]
+                )
+            )
+            F_MAE = torch.mean(
+                torch.abs(
+                    pred[AtomicDataDict.FORCE_KEY] - ref[AtomicDataDict.FORCE_KEY]
+                )
+            )
+            S_MAE = torch.mean(
+                torch.abs(
+                    pred[AtomicDataDict.STRESS_KEY] - ref[AtomicDataDict.STRESS_KEY]
+                )
+            )
+            weighted_sum = (
+                ratio[0] * E_MAE + ratio[1] * F_MAE + ratio[2] * S_MAE
+            ) / sum(ratio)
+            assert torch.allclose(metrics_dict["E_mae"], E_MAE)
+            assert torch.allclose(metrics_dict["F_mae"], F_MAE)
+            assert torch.allclose(metrics_dict["stress_mae"], S_MAE)
+            assert torch.allclose(metrics_dict["weighted_sum"], weighted_sum)
+
+        E_MAE = torch.mean(
+            torch.abs(
+                torch.cat(
+                    [
+                        pred1[AtomicDataDict.TOTAL_ENERGY_KEY],
+                        pred2[AtomicDataDict.TOTAL_ENERGY_KEY],
+                    ]
+                )
+                - torch.cat(
+                    [
+                        ref1[AtomicDataDict.TOTAL_ENERGY_KEY],
+                        ref2[AtomicDataDict.TOTAL_ENERGY_KEY],
+                    ]
+                )
+            )
+        )
+        F_MAE = torch.mean(
+            torch.abs(
+                torch.cat(
+                    [pred1[AtomicDataDict.FORCE_KEY], pred2[AtomicDataDict.FORCE_KEY]]
+                )
+                - torch.cat(
+                    [ref1[AtomicDataDict.FORCE_KEY], ref2[AtomicDataDict.FORCE_KEY]]
+                )
+            )
+        )
+        S_MAE = torch.mean(
+            torch.abs(
+                torch.cat(
+                    [pred1[AtomicDataDict.STRESS_KEY], pred2[AtomicDataDict.STRESS_KEY]]
+                )
+                - torch.cat(
+                    [ref1[AtomicDataDict.STRESS_KEY], ref2[AtomicDataDict.STRESS_KEY]]
+                )
+            )
+        )
+        weighted_sum = (ratio[0] * E_MAE + ratio[1] * F_MAE + ratio[2] * S_MAE) / sum(
+            ratio
+        )
+        metrics_dict = mm.compute()
+        assert torch.allclose(metrics_dict["E_mae"], E_MAE)
+        assert torch.allclose(metrics_dict["F_mae"], F_MAE)
+        assert torch.allclose(metrics_dict["stress_mae"], S_MAE)
         assert torch.allclose(metrics_dict["weighted_sum"], weighted_sum)
 
     def test_per_type(self, data):
@@ -238,6 +338,7 @@ def data():
         AtomicDataDict.FORCE_KEY: torch.rand(10, 3),
         AtomicDataDict.TOTAL_ENERGY_KEY: torch.rand((2, 1)),
         AtomicDataDict.ATOM_TYPE_KEY: atom_types,
+        AtomicDataDict.STRESS_KEY: torch.rand((2, 3, 3)),
     }
     ref1 = {
         AtomicDataDict.BATCH_KEY: batch,
@@ -245,6 +346,7 @@ def data():
         AtomicDataDict.FORCE_KEY: torch.rand(10, 3),
         AtomicDataDict.TOTAL_ENERGY_KEY: torch.rand((2, 1)),
         AtomicDataDict.ATOM_TYPE_KEY: atom_types,
+        AtomicDataDict.STRESS_KEY: torch.rand((2, 3, 3)),
     }
     batch = torch.tensor([0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 2, 2, 2], dtype=torch.int64)
     num_atoms = torch.tensor([4, 6, 3], dtype=torch.int64)
@@ -255,6 +357,7 @@ def data():
         AtomicDataDict.FORCE_KEY: torch.rand(13, 3),
         AtomicDataDict.TOTAL_ENERGY_KEY: torch.rand((3, 1)),
         AtomicDataDict.ATOM_TYPE_KEY: atom_types,
+        AtomicDataDict.STRESS_KEY: torch.rand((3, 3, 3)),
     }
     ref2 = {
         AtomicDataDict.BATCH_KEY: batch,
@@ -262,6 +365,7 @@ def data():
         AtomicDataDict.FORCE_KEY: torch.rand(13, 3),
         AtomicDataDict.TOTAL_ENERGY_KEY: torch.rand((3, 1)),
         AtomicDataDict.ATOM_TYPE_KEY: atom_types,
+        AtomicDataDict.STRESS_KEY: torch.rand((3, 3, 3)),
     }
     yield pred1, ref1, pred2, ref2
 
@@ -309,7 +413,7 @@ class TestMetricsManagerBuilders:
         "ratio", [(1, 1), (1, 2), (1, 3), (10, 10), (1, 100), (1, 1e5)]
     )
     @pytest.mark.parametrize("per_atom_energy", [True, False])
-    def test_loss_function_builder(self, data, ratio, per_atom_energy):
+    def test_EnergyForceLoss(self, data, ratio, per_atom_energy):
         pred1, ref1, pred2, ref2 = data
         mm = EnergyForceLoss(
             coeffs={
@@ -394,6 +498,115 @@ class TestMetricsManagerBuilders:
             assert torch.allclose(metrics_dict["forces_rmse"], F_RMSE)
             assert torch.allclose(metrics_dict["total_energy_mae"], E_MAE)
             assert torch.allclose(metrics_dict["forces_mae"], F_MAE)
+            assert torch.allclose(metrics_dict["per_atom_energy_rmse"], per_atom_E_RMSE)
+            assert torch.allclose(metrics_dict["per_atom_energy_mae"], per_atom_E_MAE)
+            assert torch.allclose(metrics_dict["weighted_sum"], weighted_sum)
+
+    @pytest.mark.parametrize(
+        "ratio", [(1, 1, 1), (1, 2, 3), (10, 10, 10), (1, 100, 1000), (1, 1e3, 1e5)]
+    )
+    @pytest.mark.parametrize("per_atom_energy", [True, False])
+    def test_EnergyForceStressLoss(self, data, ratio, per_atom_energy):
+        pred1, ref1, pred2, ref2 = data
+        mm = EnergyForceStressLoss(
+            coeffs={
+                AtomicDataDict.TOTAL_ENERGY_KEY: ratio[0],
+                AtomicDataDict.FORCE_KEY: ratio[1],
+                AtomicDataDict.STRESS_KEY: ratio[2],
+            },
+            per_atom_energy=per_atom_energy,
+        )
+
+        for pred, ref in [(pred1, ref1), (pred2, ref2)]:
+            metrics_dict = mm(pred, ref)
+            assert len(metrics_dict) > 0
+            assert isinstance(metrics_dict, dict)
+            for key, value in metrics_dict.items():
+                assert isinstance(value, torch.Tensor)
+
+            E_MSE = self.compute_MSE(
+                pred, ref, AtomicDataDict.TOTAL_ENERGY_KEY, per_atom_energy
+            )
+            F_MSE = self.compute_MSE(pred, ref, AtomicDataDict.FORCE_KEY)
+            S_MSE = self.compute_MSE(pred, ref, AtomicDataDict.STRESS_KEY)
+
+            weighted_sum = (
+                ratio[0] * E_MSE + ratio[1] * F_MSE + ratio[2] * S_MSE
+            ) / sum(ratio)
+
+            assert torch.allclose(
+                metrics_dict[
+                    "per_atom_energy_mse" if per_atom_energy else "total_energy_mse"
+                ],
+                E_MSE,
+            )
+            assert torch.allclose(metrics_dict["forces_mse"], F_MSE)
+            assert torch.allclose(metrics_dict["stress_mse"], S_MSE)
+            assert torch.allclose(metrics_dict["weighted_sum"], weighted_sum)
+
+    @pytest.mark.parametrize("ratio1", [1])
+    @pytest.mark.parametrize("ratio2", [1, 10])
+    @pytest.mark.parametrize("ratio3", [1, 10, 100])
+    @pytest.mark.parametrize("ratio4", [1, 10])
+    @pytest.mark.parametrize("ratio5", [1, 10])
+    @pytest.mark.parametrize("ratio6", [1, 10, 100])
+    @pytest.mark.parametrize("ratio7", [1, 10])
+    @pytest.mark.parametrize("ratio8", [1, 10])
+    def test_EnergyForceStressMetrics(
+        self, data, ratio1, ratio2, ratio3, ratio4, ratio5, ratio6, ratio7, ratio8
+    ):
+        pred1, ref1, pred2, ref2 = data
+        mm = EnergyForceStressMetrics(
+            coeffs={
+                "total_energy_rmse": ratio1,
+                "forces_rmse": ratio2,
+                "stress_rmse": ratio3,
+                "total_energy_mae": ratio4,
+                "forces_mae": ratio5,
+                "stress_mae": ratio6,
+                "per_atom_energy_rmse": ratio7,
+                "per_atom_energy_mae": ratio8,
+            },
+        )
+
+        for pred, ref in [(pred1, ref1), (pred2, ref2)]:
+            metrics_dict = mm(pred, ref)
+            assert len(metrics_dict) > 0
+            assert isinstance(metrics_dict, dict)
+            for key, value in metrics_dict.items():
+                assert isinstance(value, torch.Tensor)
+            E_RMSE = self.compute_RMSE(
+                pred, ref, AtomicDataDict.TOTAL_ENERGY_KEY, per_atom_energy=False
+            )
+            F_RMSE = self.compute_RMSE(pred, ref, AtomicDataDict.FORCE_KEY)
+            S_RMSE = self.compute_RMSE(pred, ref, AtomicDataDict.STRESS_KEY)
+            E_MAE = self.compute_MAE(
+                pred, ref, AtomicDataDict.TOTAL_ENERGY_KEY, per_atom_energy=False
+            )
+            F_MAE = self.compute_MAE(pred, ref, AtomicDataDict.FORCE_KEY)
+            S_MAE = self.compute_MAE(pred, ref, AtomicDataDict.STRESS_KEY)
+            per_atom_E_RMSE = self.compute_RMSE(
+                pred, ref, AtomicDataDict.TOTAL_ENERGY_KEY, per_atom_energy=True
+            )
+            per_atom_E_MAE = self.compute_MAE(
+                pred, ref, AtomicDataDict.TOTAL_ENERGY_KEY, per_atom_energy=True
+            )
+            weighted_sum = (
+                ratio1 * E_RMSE
+                + ratio2 * F_RMSE
+                + ratio3 * S_RMSE
+                + ratio4 * E_MAE
+                + ratio5 * F_MAE
+                + ratio6 * S_MAE
+                + ratio7 * per_atom_E_RMSE
+                + ratio8 * per_atom_E_MAE
+            ) / (ratio1 + ratio2 + ratio3 + ratio4 + ratio5 + ratio6 + ratio7 + ratio8)
+            assert torch.allclose(metrics_dict["total_energy_rmse"], E_RMSE)
+            assert torch.allclose(metrics_dict["forces_rmse"], F_RMSE)
+            assert torch.allclose(metrics_dict["stress_rmse"], S_RMSE)
+            assert torch.allclose(metrics_dict["total_energy_mae"], E_MAE)
+            assert torch.allclose(metrics_dict["forces_mae"], F_MAE)
+            assert torch.allclose(metrics_dict["stress_mae"], S_MAE)
             assert torch.allclose(metrics_dict["per_atom_energy_rmse"], per_atom_E_RMSE)
             assert torch.allclose(metrics_dict["per_atom_energy_mae"], per_atom_E_MAE)
             assert torch.allclose(metrics_dict["weighted_sum"], weighted_sum)
