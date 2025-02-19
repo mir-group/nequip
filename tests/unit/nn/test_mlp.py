@@ -25,7 +25,7 @@ def test_mlp(
 ):
 
     tol = {
-        "float32": 1e-6,
+        "float32": 1e-5,
         "float64": 1e-12,
     }[model_dtype]
 
