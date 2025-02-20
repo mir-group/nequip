@@ -55,3 +55,6 @@ Error Metrics
 
  .. autoclass:: nequip.train.HuberLoss
     :members:
+
+.. autoclass:: nequip.train.StratifiedHuberForceLoss
+    :members:
