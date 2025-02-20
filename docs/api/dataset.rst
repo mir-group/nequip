@@ -13,6 +13,9 @@ nequip.data.dataset
  .. autoclass:: nequip.data.dataset.HDF5Dataset
     :members:
 
+ .. autoclass:: nequip.data.dataset.NPZDataset
+    :members:
+
  .. autoclass:: nequip.data.dataset.EMTTestDataset
     :members:
 

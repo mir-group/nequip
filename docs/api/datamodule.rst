@@ -25,6 +25,9 @@ All data modules should (and would) share the following features
  .. autoclass:: nequip.data.datamodule.sGDML_CCSD_DataModule
      :members:
 
+ .. autoclass:: nequip.data.datamodule.rMD17DataModule
+     :members:
+
  .. autoclass:: nequip.data.datamodule.NequIP3BPADataModule
      :members:
 
