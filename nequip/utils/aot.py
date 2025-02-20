@@ -66,9 +66,8 @@ def aot_export_model(
     eager_out = model(data)
     del aot_model, model
     for idx, field in enumerate(output_fields):
-        err = torch.max(torch.abs(aot_out[idx] - eager_out[field])).item()
         assert torch.allclose(
             aot_out[idx], eager_out[field], rtol=tol, atol=tol
-        ), f"AOT Inductor export eager vs export sanity check failed with MaxAbsError = {err:.6g} (tol={tol}) for field `{field}`."
+        ), f"AOT Inductor export eager vs export sanity check failed with MaxAbsError = {torch.max(torch.abs(aot_out[idx] - eager_out[field])).item():.6g} (tol={tol}) for field `{field}`."
     del aot_out, eager_out
     return out_path

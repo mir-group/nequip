@@ -79,10 +79,10 @@ def nequip_make_fx(
     out1 = fx_model(*(test_data_list + extra_inputs))
     out2 = augmented_fx_model(*(test_data_list + extra_inputs))
     for idx, (t1, t2) in enumerate(zip(out1, out2)):
-        err = torch.max(torch.abs(t1 - t2)).item()
+        # err =
         assert torch.allclose(
             t1, t2, atol=check_tol, rtol=check_tol
-        ), f"`make_fx` sanity check failed with MaxAbsError = {err:.6g} (tol={check_tol}) for field `{fields[idx]}`. This error might arise because of poor initialization if the error is close to the tolerance. Consider trying a different seed, or raising a GitHub issue."
+        ), f"`make_fx` sanity check failed with MaxAbsError = {torch.max(torch.abs(t1 - t2)).item():.6g} (tol={check_tol}) for field `{fields[idx]}`. This error might arise because of poor initialization if the error is close to the tolerance. Consider trying a different seed, or raising a GitHub issue."
     del out1, out2
 
     # clean up
