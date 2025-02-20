@@ -17,7 +17,8 @@ Most recent change on the bottom.
  - `torchmetrics` based metrics for both dataset statistics and error metrics
  - multi-GPU training
  - `Lightning` based callbacks
- - `EnergyForceMSELoss` and `EnergyForceMetrics` as constructors for `MetricsManager`
+ - `EnergyForceLoss` and `EnergyForceMetrics` as constructors for `MetricsManager`
+ - `rMD17DataModule` for working with the [revised MD17 dataset](https://figshare.com/articles/dataset/Revised_MD17_dataset_rMD17_/12672038).
 
 ### Changed
  - [Breaking] migrate existing callbacks (loss weight scheduler and SoftAdapt) to `Lightning`'s callbacks systems
