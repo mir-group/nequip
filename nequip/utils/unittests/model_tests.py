@@ -75,6 +75,20 @@ class BaseModelTests:
         return model, config, out_fields
 
     @pytest.fixture(scope="class")
+    def partial_model(self, model, device):
+        _, config, _ = model
+        aux_model = self.make_model(config.copy(), device=device)
+        module = find_first_of_type(aux_model, ForceStressOutput)
+        # skip test if force/stress module not found
+        if module is None:
+            pytest.skip("force/stress module not found")
+        # replace force/stress module with partial force module
+        aux_model.model = PartialForceOutput(module.func)
+        out_fields = aux_model.model.irreps_out.keys()
+
+        return aux_model, config, out_fields
+
+    @pytest.fixture(scope="class")
     def model_test_data(self, config, atomic_batch, device):
         # clone the data to avoid mutating the original batch
         # cpu because we need to reconstruct the neighborlist
@@ -559,18 +573,11 @@ class BaseEnergyModelTests(BaseModelTests):
                 numeric, analytical, rtol=5e-2
             ), f"numeric: {numeric.item()}, analytical: {analytical.item()}"
 
-    def test_partial_forces(self, model, atomic_batch, device, strict_locality):
-        _, config, _ = model
-        aux_model = self.make_model(config.copy(), device=device)
-        module = find_first_of_type(aux_model, ForceStressOutput)
-        # skip test if force/stress module not found
-        if module is None:
-            pytest.skip()
-        # replace force/stress module with partial force module
-        aux_model.model = PartialForceOutput(module.func)
-        partial_model = aux_model
-        # instantiate new force/stress model
-        model = self.make_model(config.copy(), device=device)
+    def test_partial_forces(
+        self, model, partial_model, atomic_batch, device, strict_locality
+    ):
+        model, _, _ = model
+        partial_model, _, _ = partial_model
 
         data = AtomicDataDict.to_(atomic_batch, device)
         output = model(data)
@@ -615,14 +622,46 @@ class BaseEnergyModelTests(BaseModelTests):
         # for non-adjacent atoms, all partial forces must be zero
         assert torch.all(partial_forces[~adjacency] == 0)
 
-    def test_force_smoothness(self, model, device):
-        instance, config, out_fields = model
+    @pytest.fixture(scope="class")
+    def pair_force(self, model, partial_model, device):
+        """
+        Helper function to calculate forces/partial forces between a pair of atoms of specified types and separation distance.
+        """
+        # Initialize the models
+        instance, _, out_fields = model
+        partial_instance, _, out_fields_partial = partial_model
+
+        # Skip the test if the models do not have the necessary output fields
         if AtomicDataDict.FORCE_KEY not in out_fields:
             pytest.skip()
-
-        # The test only works for systems with more than one atom type
-        if len(config["type_names"]) < 2:
+        if AtomicDataDict.PARTIAL_FORCE_KEY not in out_fields_partial:
             pytest.skip()
+
+        def wrapped(node_index, neighbor_index, dist, neighborlist_dist, partial=False):
+            # Create a pair of atoms of the specified types, separated by the specified distance
+            data = {
+                "atom_types": np.array([node_index, neighbor_index]),
+                "pos": np.array([[0.0, 0.0, 0.0], [dist, 0.0, 0.0]]),
+            }
+
+            # Create a neighborlist with the specified neighbor distance
+            data = compute_neighborlist_(from_dict(data), r_max=neighborlist_dist)
+
+            # Calculate forces/partial forces
+            if partial:
+                out = partial_instance(AtomicDataDict.to_(data, device))
+                return out[AtomicDataDict.PARTIAL_FORCE_KEY]
+            else:
+                out = instance(AtomicDataDict.to_(data, device))
+                return out[AtomicDataDict.FORCE_KEY]
+
+        return wrapped
+
+    def test_force_smoothness(self, model, device, pair_force):
+        _, config, _ = model
+
+        if len(config["type_names"]) < 2:
+            pytest.skip("Test only works for systems with more than one atom type")
 
         # Check that r_max > 1.0
         r_max = config["r_max"]
@@ -631,15 +670,7 @@ class BaseEnergyModelTests(BaseModelTests):
         ), f"r_max > 1.0 is necessary for smoothness test, but found r_max={r_max}"
 
         # Control group: force is non-zero within the cutoff radius
-        data = {
-            "atom_types": np.array([0, 1]),
-            "pos": np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]]),
-        }
-        # intentionally construct neighborlist that includes the boundary neighbor
-        data = compute_neighborlist_(from_dict(data), r_max=r_max + 1)
-        out = instance(AtomicDataDict.to_(data, device))
-
-        forces = out[AtomicDataDict.FORCE_KEY]
+        forces = pair_force(0, 1, 1, r_max + 1)
         # expect some nonzero terms on the two connected atoms
         # NOTE: sometimes it can be zero if the model has so little features such that the nonlinearity causes the activation to be ~0
         assert forces.abs().sum() > 1e-4, f"{forces=}"
@@ -649,53 +680,25 @@ class BaseEnergyModelTests(BaseModelTests):
         # In fact, checking that message-passing models still have zero force at the cutoff radius is a good test of locality.
 
         # Test 1: force is zero at the cutoff radius
-        data = {
-            "atom_types": np.array([0, 1]),
-            "pos": np.array([[0.0, 0.0, 0.0], [r_max, 0.0, 0.0]]),
-        }
-        # intentionally construct neighborlist that includes the boundary neighbor
-        data = compute_neighborlist_(from_dict(data), r_max=r_max + 1)
-        out = instance(AtomicDataDict.to_(data, device))
-
-        forces = out[AtomicDataDict.FORCE_KEY]
-
+        forces = pair_force(0, 1, r_max, r_max + 1)
         assert torch.allclose(
             forces,
             torch.zeros_like(forces, device=device, dtype=forces.dtype),
         ), f"{forces=}"
 
         # Test 2: force is zero outside of the cutoff radius
-        data = {
-            "atom_types": np.array([0, 1]),
-            "pos": np.array([[0.0, 0.0, 0.0], [r_max + 0.5, 0.0, 0.0]]),
-        }
-        # intentionally construct neighborlist that includes the boundary neighbor
-        data = compute_neighborlist_(from_dict(data), r_max=r_max + 1)
-        out = instance(AtomicDataDict.to_(data, device))
-
-        forces = out[AtomicDataDict.FORCE_KEY]
-
+        forces = pair_force(0, 1, r_max + 0.5, r_max + 1)
         assert torch.allclose(
             forces,
             torch.zeros_like(forces, device=device, dtype=forces.dtype),
         ), f"{forces=}"
 
-    def test_partial_force_smoothness(self, model, device):
+    def test_partial_force_smoothness(self, partial_model, device, pair_force):
         # NOTE: This test is designed for models that have a variable cutoff radius, though it still applicable with
         # fixed cutoff models. This works on the assumption that the partial energies on the node should not be affected
         # by the presence of a neighbor outside the cutoff radius, thus making the corresponding forces zero.
 
-        _, config, _ = model
-        aux_model = self.make_model(config, device=device)
-        module = find_first_of_type(aux_model, ForceStressOutput)
-        # skip test if force/stress module not found
-        if module is None:
-            pytest.skip()
-        # replace force/stress module with partial force module
-        aux_model.model = PartialForceOutput(module.func)
-        partial_model = aux_model
-        # instantiate new force/stress model
-        # model = self.make_model(config, device=device)
+        _, config, _ = partial_model
 
         # Extract the per-type cutoff. Check that r_cutoff > 1.0
         r_max = config["r_max"]
@@ -708,25 +711,17 @@ class BaseEnergyModelTests(BaseModelTests):
         per_edge_type = False if per_edge_type_cutoff is None else True
 
         # Check each edge type
-        for node_index, node_type in enumerate(type_names):
-            for neighbor_index, neighbor_type in enumerate(type_names):
+        for node_idx, node_type in enumerate(type_names):
+            for nbor_idx, nbor_type in enumerate(type_names):
                 if per_edge_type:
-                    r_cutoff = self._get_edge_cutoff(
-                        per_edge_type_cutoff, node_type, neighbor_type
+                    r_max = self._get_edge_cutoff(
+                        per_edge_type_cutoff, node_type, nbor_type
                     )
-                else:
-                    r_cutoff = r_max
 
                 # Control group: force is non-zero within the cutoff radius
-                data = {
-                    "atom_types": np.array([node_index, neighbor_index]),
-                    "pos": np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]]),
-                }
-                # intentionally construct neighborlist that includes the boundary neighbor
-                data = compute_neighborlist_(from_dict(data), r_max=r_max + 1)
-                # Calculate partial forces
-                output_partial = partial_model(AtomicDataDict.to_(data, device))
-                partial_forces = output_partial[AtomicDataDict.PARTIAL_FORCE_KEY]
+                partial_forces = pair_force(
+                    node_idx, nbor_idx, 1, r_max + 1, partial=True
+                )
                 node_partial_forces = partial_forces[0]
 
                 # NOTE: sometimes it can be zero if the model has so little features such that the nonlinearity causes the activation to be ~0
@@ -739,14 +734,11 @@ class BaseEnergyModelTests(BaseModelTests):
                 # In fact, checking that message-passing models still have zero force at the cutoff radius is a good test of locality even with variable cutoffs.
 
                 # Test 1: force is zero at the cutoff radius
-                data = {
-                    "atom_types": np.array([node_index, neighbor_index]),
-                    "pos": np.array([[0.0, 0.0, 0.0], [r_cutoff, 0.0, 0.0]]),
-                }
-                data = compute_neighborlist_(from_dict(data), r_max=r_max + 1)
-                # Calculate partial forces
-                output_partial = partial_model(AtomicDataDict.to_(data, device))
-                partial_forces = output_partial[AtomicDataDict.PARTIAL_FORCE_KEY]
+                partial_forces = pair_force(
+                    node_idx, nbor_idx, r_max, r_max + 1, partial=True
+                )
+                # Take only the gradients for the energy relating to the node.
+                # Only these forces are affected by the node's cutoff radius
                 node_partial_forces = partial_forces[0]
 
                 assert torch.allclose(
@@ -759,15 +751,11 @@ class BaseEnergyModelTests(BaseModelTests):
                 ), f"partial forces: {node_partial_forces}"
 
                 # Test 2: force is zero outside of the cutoff radius
-                data = {
-                    "atom_types": np.array([node_index, neighbor_index]),
-                    "pos": np.array([[0.0, 0.0, 0.0], [r_cutoff + 0.5, 0.0, 0.0]]),
-                }
-                # intentionally construct neighborlist that includes the boundary neighbor
-                data = compute_neighborlist_(from_dict(data), r_max=r_max + 1)
-                # Calculate partial forces
-                output_partial = partial_model(AtomicDataDict.to_(data, device))
-                partial_forces = output_partial[AtomicDataDict.PARTIAL_FORCE_KEY]
+                partial_forces = pair_force(
+                    node_idx, nbor_idx, r_max + 0.5, r_max + 1, partial=True
+                )
+                # Take only the gradients for the energy relating to the node.
+                # Only these forces are affected by the node's cutoff radius
                 node_partial_forces = partial_forces[0]
 
                 assert torch.allclose(
