@@ -659,39 +659,41 @@ class BaseEnergyModelTests(BaseModelTests):
 
     def test_force_smoothness(self, model, device, pair_force):
         _, config, _ = model
-
-        if len(config["type_names"]) < 2:
-            pytest.skip("Test only works for systems with more than one atom type")
-
-        # Check that r_max > 1.0
         r_max = config["r_max"]
-        assert (
-            config["r_max"] > 1.0
-        ), f"r_max > 1.0 is necessary for smoothness test, but found r_max={r_max}"
+        type_names = config["type_names"]
+        num_types = len(type_names)
 
-        # Control group: force is non-zero within the cutoff radius
-        forces = pair_force(0, 1, 1, r_max + 1)
-        # expect some nonzero terms on the two connected atoms
-        # NOTE: sometimes it can be zero if the model has so little features such that the nonlinearity causes the activation to be ~0
-        assert forces.abs().sum() > 1e-4, f"{forces=}"
+        # Whether the cutoff radius is specified per edge type
+        per_edge_type_cutoff = config.get("per_edge_type_cutoff")
+        if per_edge_type_cutoff is not None:
+            pytest.skip("Test not implemented for models with per-edge-type cutoffs")
 
-        # For Test 1 and 2:
-        # No need to enforce `strictly_local`. Message passing models such as NequiIP should not receive information from beyond the cutoff radius.
-        # In fact, checking that message-passing models still have zero force at the cutoff radius is a good test of locality.
+        for node_idx in range(num_types):
+            for nbor_idx in range(num_types):
 
-        # Test 1: force is zero at the cutoff radius
-        forces = pair_force(0, 1, r_max, r_max + 1)
-        assert torch.allclose(
-            forces,
-            torch.zeros_like(forces, device=device, dtype=forces.dtype),
-        ), f"{forces=}"
+                # Control group: force is non-zero within the cutoff radius
+                forces = pair_force(node_idx, nbor_idx, 0.5 * r_max, 1.5 * r_max)
+                # expect some nonzero terms on the two connected atoms
+                # NOTE: sometimes it can be zero if the model has so little features such that the nonlinearity causes the activation to be ~0
+                assert forces.abs().sum() > 1e-4, f"{forces=}"
 
-        # Test 2: force is zero outside of the cutoff radius
-        forces = pair_force(0, 1, r_max + 0.5, r_max + 1)
-        assert torch.allclose(
-            forces,
-            torch.zeros_like(forces, device=device, dtype=forces.dtype),
-        ), f"{forces=}"
+                # For Test 1 and 2:
+                # No need to enforce `strictly_local`. Message passing models such as NequiIP should not receive information from beyond the cutoff radius.
+                # In fact, checking that message-passing models still have zero force at the cutoff radius is a good test of locality.
+
+                # Test 1: force is zero at the cutoff radius
+                forces = pair_force(node_idx, nbor_idx, r_max, 1.5 * r_max)
+                assert torch.allclose(
+                    forces,
+                    torch.zeros_like(forces, device=device, dtype=forces.dtype),
+                ), f"{forces=}"
+
+                # Test 2: force is zero outside of the cutoff radius
+                forces = pair_force(node_idx, nbor_idx, 1.1 * r_max, 1.5 * r_max)
+                assert torch.allclose(
+                    forces,
+                    torch.zeros_like(forces, device=device, dtype=forces.dtype),
+                ), f"{forces=}"
 
     def test_partial_force_smoothness(self, partial_model, device, pair_force):
         # NOTE: This test is designed for models that have a variable cutoff radius, though it still applicable with
@@ -699,28 +701,25 @@ class BaseEnergyModelTests(BaseModelTests):
         # by the presence of a neighbor outside the cutoff radius, thus making the corresponding forces zero.
 
         _, config, _ = partial_model
-
-        # Extract the per-type cutoff. Check that r_cutoff > 1.0
         r_max = config["r_max"]
-        assert (
-            config["r_max"] > 1.0
-        ), f"r_max > 1.0 is necessary for smoothness test, but found r_max={r_max}"
         type_names = config["type_names"]
 
+        # Whether the cutoff radius is specified per edge type
         per_edge_type_cutoff = config.get("per_edge_type_cutoff")
-        per_edge_type = False if per_edge_type_cutoff is None else True
+        per_edge_type = not (per_edge_type_cutoff is None)
 
         # Check each edge type
         for node_idx, node_type in enumerate(type_names):
             for nbor_idx, nbor_type in enumerate(type_names):
+                # Extract the cutoff radius for the edge type
                 if per_edge_type:
-                    r_max = self._get_edge_cutoff(
-                        per_edge_type_cutoff, node_type, nbor_type
-                    )
+                    r_max = per_edge_type_cutoff[node_type]
+                    if not isinstance(r_max, float):
+                        r_max = r_max[nbor_type]
 
                 # Control group: force is non-zero within the cutoff radius
                 partial_forces = pair_force(
-                    node_idx, nbor_idx, 1, r_max + 1, partial=True
+                    node_idx, nbor_idx, 0.5 * r_max, 1.5 * r_max, partial=True
                 )
                 node_partial_forces = partial_forces[0]
 
@@ -735,7 +734,7 @@ class BaseEnergyModelTests(BaseModelTests):
 
                 # Test 1: force is zero at the cutoff radius
                 partial_forces = pair_force(
-                    node_idx, nbor_idx, r_max, r_max + 1, partial=True
+                    node_idx, nbor_idx, r_max, 1.5 * r_max, partial=True
                 )
                 # Take only the gradients for the energy relating to the node.
                 # Only these forces are affected by the node's cutoff radius
@@ -752,7 +751,7 @@ class BaseEnergyModelTests(BaseModelTests):
 
                 # Test 2: force is zero outside of the cutoff radius
                 partial_forces = pair_force(
-                    node_idx, nbor_idx, r_max + 0.5, r_max + 1, partial=True
+                    node_idx, nbor_idx, 1.1 * r_max, 1.5 * r_max, partial=True
                 )
                 # Take only the gradients for the energy relating to the node.
                 # Only these forces are affected by the node's cutoff radius
