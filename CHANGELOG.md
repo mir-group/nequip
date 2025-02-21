@@ -10,16 +10,17 @@ Most recent change on the bottom.
 
 ### Added
  - migrate to `Lightning`, `torchmetrics` and `hydra` (and `omegaconf`) based infrastructure
- - `NequIPLightningModule` for facilitating training
+ - `NequIPLightningModule` and its subclasses facilitate training
  - `LightningDataModule`s for dataset management
+ - `rMD17DataModule` for working with the [revised MD17 dataset](https://figshare.com/articles/dataset/Revised_MD17_dataset_rMD17_/12672038).
  - dataset statistics managed by a `DataStatisticsManager`
+ - simplified `CommonDataStatisticsManager` as a `DataStatisticsManager` wrapper
  - error metrics managed by a `MetricsManager`
- - `EnergyForceLoss`, `EnergyForceStressLoss`, `EnergyForceMetrics`, `EnergyForceStressMetrics` as `MetricsManager` wrappers
+ - simplified `EnergyForceLoss`, `EnergyForceStressLoss`, `EnergyForceMetrics`, `EnergyForceStressMetrics` as `MetricsManager` wrappers
  - `torchmetrics` based metrics for both dataset statistics and error metrics
  - multi-GPU training
- - `Lightning` based callbacks
- - `rMD17DataModule` for working with the [revised MD17 dataset](https://figshare.com/articles/dataset/Revised_MD17_dataset_rMD17_/12672038).
- - `HuberLoss` and `StratifiedHuberForceLoss` loss metric classes.
+ - `HuberLoss` and `StratifiedHuberForceLoss` loss metric classes
+  - `Lightning` based callbacks
 
 ### Changed
  - [Breaking] migrate existing callbacks (loss weight scheduler and SoftAdapt) to `Lightning`'s callbacks systems
@@ -29,6 +30,8 @@ Most recent change on the bottom.
  - [Breaking] type embedding implementation based on one-hot + linear replaced by `torch.nn.Embedding`
 
 ### Removed
+ - [Breaking] `nequip-evaluate` (functionality can be achieved in `nequip-train`)
+ - [Breaking] `nequip-benchmark`
  - [Breaking] `AtomicDataset.rdf` and `examples/rdf.py` and `AtomicInMemoryDataset`
  - [Breaking] `dataset_per_species_*` statistics
  - [Breaking] `NpzDataset`
