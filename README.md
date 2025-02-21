@@ -22,16 +22,11 @@ The best way to learn how to use NequIP is through the [Colab Tutorial](https://
 
 This [document](docs/guide/workflow.md) explains the `nequip` workflow.
 
-A number of example configuration files are provided:
- - [`configs/minimal.yaml`](configs/minimal.yaml): A minimal example of training.
- - [`configs/tutorial.yaml`](configs/tutorial.yaml): A complete configuration file containing all available options along with documenting comments. This file is **for reference**.
-
-**! PLEASE NOTE:** the first few calls to a NequIP model can be painfully slow. This is expected behaviour as the [profile-guided optimization of TorchScript models](https://program-transformations.github.io/slides/pytorch_neurips.pdf) takes a number of calls to warm up before optimizing the model. (The `nequip-benchmark` script accounts for this.)
-
+ [`configs/tutorial.yaml`](configs/tutorial.yaml) is a complete configuration file containing all available options along with documenting comments. This file is **for reference**.
 
 ### Using models in Python
 
-An ASE calculator is also provided in `nequip.dynamics`.
+An ASE calculator is also provided in `nequip.ase`.
 
 ### LAMMPS Integration 
 
