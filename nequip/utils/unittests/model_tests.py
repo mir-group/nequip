@@ -537,6 +537,9 @@ class BaseEnergyModelTests(BaseModelTests):
         assert in_frame_grad.abs().max().item() > 0
 
     def test_numeric_gradient(self, model, atomic_batch, device):
+        """
+        Tests the ForceStressOutput model by comparing numerical gradients of the forces to the analytical gradients.
+        """
         model, _, out_fields = model
         if AtomicDataDict.FORCE_KEY not in out_fields:
             pytest.skip()
@@ -547,31 +550,38 @@ class BaseEnergyModelTests(BaseModelTests):
         forces = output[AtomicDataDict.FORCE_KEY]
         epsilon = 1e-3
 
-        iatom = 1
-        for idir in range(3):
-            pos = data[AtomicDataDict.POSITIONS_KEY][iatom, idir]
-            data[AtomicDataDict.POSITIONS_KEY][iatom, idir] = pos + epsilon
-            output = model(data)
-            e_plus = (
-                output[AtomicDataDict.TOTAL_ENERGY_KEY]
-                .sum()
-                .to(torch.get_default_dtype())
-            )
+        # Compute numerical gradients for each atom and direction and compare to analytical gradients
+        for iatom in range(len(data[AtomicDataDict.POSITIONS_KEY])):
+            for idir in range(3):
+                # Shift `iatom` an `epsilon` in the `idir` direction
+                pos = data[AtomicDataDict.POSITIONS_KEY][iatom, idir]
+                data[AtomicDataDict.POSITIONS_KEY][iatom, idir] = pos + epsilon
+                output = model(data)
+                e_plus = (
+                    output[AtomicDataDict.TOTAL_ENERGY_KEY]
+                    .sum()
+                    .to(torch.get_default_dtype())
+                )
 
-            data[AtomicDataDict.POSITIONS_KEY][iatom, idir] -= epsilon * 2
-            output = model(data)
-            e_minus = (
-                output[AtomicDataDict.TOTAL_ENERGY_KEY]
-                .sum()
-                .to(torch.get_default_dtype())
-            )
+                # Shift `iatom` an `epsilon` in the negative `idir` direction
+                data[AtomicDataDict.POSITIONS_KEY][iatom, idir] -= epsilon * 2
+                output = model(data)
+                e_minus = (
+                    output[AtomicDataDict.TOTAL_ENERGY_KEY]
+                    .sum()
+                    .to(torch.get_default_dtype())
+                )
 
-            numeric = -(e_plus - e_minus) / (epsilon * 2)
-            analytical = forces[iatom, idir].to(torch.get_default_dtype())
+                # Symmetric difference to get the partial forces to all the atoms
+                numeric = -(e_plus - e_minus) / (epsilon * 2)
+                analytical = forces[iatom, idir].to(torch.get_default_dtype())
 
-            assert torch.isclose(numeric, analytical, atol=2e-2) or torch.isclose(
-                numeric, analytical, rtol=5e-2
-            ), f"numeric: {numeric.item()}, analytical: {analytical.item()}"
+                assert torch.isclose(numeric, analytical, atol=2e-2) or torch.isclose(
+                    numeric, analytical, rtol=5e-3
+                ), f"numeric: {numeric.item()}, analytical: {analytical.item()}"
+
+                # Reset the position
+                data[AtomicDataDict.POSITIONS_KEY][iatom, idir] += epsilon
 
     def test_partial_forces(
         self, model, partial_model, atomic_batch, device, strict_locality
@@ -621,6 +631,56 @@ class BaseEnergyModelTests(BaseModelTests):
             ].view(1, -1)
         # for non-adjacent atoms, all partial forces must be zero
         assert torch.all(partial_forces[~adjacency] == 0)
+
+    def test_numeric_gradient_partial(self, partial_model, atomic_batch, device):
+        """
+        Tests the PartialForceOutput model by comparing numerical gradients of the partial forces to the analytical gradients.
+        """
+
+        partial_model, _, out_fields = partial_model
+        if AtomicDataDict.PARTIAL_FORCE_KEY not in out_fields:
+            pytest.skip()
+
+        # physical predictions (energy, forces, etc) will be converted to default_dtype (float64) before comparing
+        data = AtomicDataDict.to_(atomic_batch, device)
+        output = partial_model(data)
+        partial_forces = output[AtomicDataDict.PARTIAL_FORCE_KEY]
+        epsilon = 1e-3
+
+        # Compute numerical gradients for each atom and direction and compare to analytical gradients
+        for iatom in range(len(data[AtomicDataDict.POSITIONS_KEY])):
+            for idir in range(3):
+                # Shift `iatom` an `epsilon` in the `idir` direction
+                pos = data[AtomicDataDict.POSITIONS_KEY][iatom, idir]
+                data[AtomicDataDict.POSITIONS_KEY][iatom, idir] = pos + epsilon
+                output = partial_model(data)
+                e_plus = (
+                    output[AtomicDataDict.PER_ATOM_ENERGY_KEY]
+                    .to(torch.get_default_dtype())
+                    .flatten()
+                )
+
+                # Shift `iatom` an `epsilon` in the negative `idir` direction
+                data[AtomicDataDict.POSITIONS_KEY][iatom, idir] -= epsilon * 2
+                output = partial_model(data)
+                e_minus = (
+                    output[AtomicDataDict.PER_ATOM_ENERGY_KEY]
+                    .to(torch.get_default_dtype())
+                    .flatten()
+                )
+
+                # Symmetric difference
+                numeric = -(e_plus - e_minus) / (epsilon * 2)
+                analytical = partial_forces[:, iatom, idir].to(
+                    torch.get_default_dtype()
+                )
+
+                assert torch.allclose(numeric, analytical, atol=2e-2) or torch.allclose(
+                    numeric, analytical, rtol=5e-2
+                ), f"numeric: {numeric.item()}, analytical: {analytical.item()}"
+
+                # Reset the position
+                data[AtomicDataDict.POSITIONS_KEY][iatom, idir] += epsilon
 
     @pytest.fixture(scope="class")
     def pair_force(self, model, partial_model, device):
