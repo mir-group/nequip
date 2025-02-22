@@ -8,6 +8,8 @@ import matplotlib.pyplot as plt
 
 import torch
 
+from nequip.model import ModelFromCheckpoint
+from nequip.train.lightning import _SOLE_MODEL_KEY
 from nequip.data import AtomicDataDict, from_dict, compute_neighborlist_
 import hydra
 
@@ -17,13 +19,20 @@ parser = argparse.ArgumentParser(
 )
 
 parser.add_argument(
-    "-ckpt_path",
+    "--ckpt-path",
     help="Path to checkpoint file",
     type=str,
 )
-
 parser.add_argument(
-    "--device", help="Device", default="cuda" if torch.cuda.is_available() else "cpu"
+    "--device",
+    help="Device",
+    default="cuda" if torch.cuda.is_available() else "cpu",
+)
+parser.add_argument(
+    "--model",
+    help=f"name of model to use -- this option is only relevant when using multiple models (default: {_SOLE_MODEL_KEY}, meant to work for the conventional single model case)",
+    type=str,
+    default=_SOLE_MODEL_KEY,
 )
 parser.add_argument("--output", help="File to write plot to", default=None)
 parser.add_argument("--r-min", default=1.0, type=float)
@@ -33,25 +42,13 @@ args = parser.parse_args()
 
 print("Loading model... ")
 
-# === get model hyperparameters ===
-checkpoint = torch.load(
-    args.ckpt_path,
-    map_location="cpu",
-    weights_only=False,
-)
-
-training_module = checkpoint["hyper_parameters"]["info_dict"]["training_module"]
-model_cfg = training_module["model"]
-model_r_max = float(model_cfg["r_max"])
-type_names = model_cfg["type_names"]
+# === load model and get metadata ===
+model = ModelFromCheckpoint(args.ckpt_path)[args.model]
+model_r_max = float(model.metadata["r_max"])
+type_names = model.metadata["type_names"].split(" ")
 num_types = len(type_names)
 
-# === load model ===
-training_module = hydra.utils.get_class(training_module["_target_"])
-lightning_module = training_module.load_from_checkpoint(args.ckpt_path)
-model = lightning_module.model
 model.to(args.device)
-
 
 print("Computing dimers...")
 potential = {}
