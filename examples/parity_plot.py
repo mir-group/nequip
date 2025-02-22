@@ -16,7 +16,7 @@ parser = argparse.ArgumentParser(
 )
 parser.add_argument(
     "xyzoutput",
-    help=".xyz file from running something like `nequip-evaluate ... --output out.xyz --output-fields-from-original-dataset total_energy,forces",
+    help=".xyz file from using `nequip.train.callbacks.TestTimeXYZFileWriter`",
 )
 parser.add_argument("--output", help="File to write plot to", default=None)
 args = parser.parse_args()
@@ -29,7 +29,7 @@ for frame in ase.io.iread(args.xyzoutput):
     forces.append(frame.get_forces().flatten())
     true_forces.append(frame.arrays["original_dataset_forces"].flatten())
     energies.append(frame.get_potential_energy())
-    true_energies.append(frame.info["original_dataset_total_energy"])
+    true_energies.append(frame.info["original_dataset_energy"])
 forces = np.concatenate(forces, axis=0)
 true_forces = np.concatenate(true_forces, axis=0)
 energies = np.asarray(energies)
