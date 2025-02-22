@@ -32,3 +32,28 @@ def torch_default_dtype(dtype):
         yield
     finally:
         torch.set_default_dtype(orig_default_dtype)
+
+
+_FLOAT64_MODEL_TOL = 1e-12
+_FLOAT32_MODEL_TOL = 5e-5
+_TF32_MODEL_TOL = 1e-4
+# TODO: ^ TF32 tolerance is untested
+
+
+def floating_point_tolerance(model_dtype: Union[str, torch.dtype]):
+    """
+    Consistent set of floating point tolerances for sanity checking based on ``model_dtype``, that also accounts for TF32 state.
+
+    Assumes global dtype if ``float64``, and that TF32 will only ever be used if ``model_dtype`` is ``float32``.
+    """
+    using_tf32 = False
+    if torch.cuda.is_available():
+        # assume that both are set to be the same
+        assert torch.backends.cuda.matmul.allow_tf32 == torch.backends.cudnn.allow_tf32
+        using_tf32 = torch.torch.backends.cuda.matmul.allow_tf32
+    return {
+        torch.float32: _TF32_MODEL_TOL if using_tf32 else _FLOAT32_MODEL_TOL,
+        "float32": _TF32_MODEL_TOL if using_tf32 else _FLOAT32_MODEL_TOL,
+        torch.float64: _FLOAT64_MODEL_TOL,
+        "float64": _FLOAT64_MODEL_TOL,
+    }[model_dtype]

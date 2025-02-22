@@ -6,6 +6,7 @@ from nequip.data._key_registry import get_dynamic_shapes
 from .fx import nequip_make_fx
 from .compile import prepare_model_for_compile
 from .versions import check_pt2_compile_compatibility
+from .misc import floating_point_tolerance
 
 from typing import List, Dict, Union, Any
 
@@ -25,7 +26,7 @@ def aot_export_model(
     check_pt2_compile_compatibility()
 
     # get tolerance for sanity checks
-    tol = {torch.float32: 5e-5, torch.float64: 1e-12}[model.model_dtype]
+    tol = floating_point_tolerance(model.model_dtype)
 
     # defensively refresh the cache
     torch._dynamo.reset()
