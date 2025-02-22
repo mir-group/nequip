@@ -1,6 +1,9 @@
 Lennard-Jones Custom Module Example
 ===================================
 
+> [!WARNING]
+> This example is outdated, open a GitHub issue if a custom module example is needed.
+
 Note: for production simulations, a more appropriate Lennard-Jones energy term is provided in `nequip.model.PairPotentialTerm` / `nequip.model.PairPotential`.
 
 Run commands with
