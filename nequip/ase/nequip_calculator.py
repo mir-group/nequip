@@ -24,7 +24,7 @@ class NequIPCalculator(Calculator):
         If you are running MD with custom species, please make sure to set the correct masses for ASE.
 
     Args:
-        model (nequip.nn.GraphModel): NequIP GraphModel object
+        model: a model in the NequIP framework, e.g. a NequIP GNN model or an Allegro model, etc
         device (str/torch.device): device for model to evaluate on, e.g. ``cpu`` or ``cuda``
         transforms (List[Callable]): list of data transforms
     """
@@ -90,14 +90,14 @@ class NequIPCalculator(Calculator):
         elif compile_fname.endswith(".nequip.pt2"):
             # == imports and sanity checks ==
             from nequip.utils.versions import check_pt2_compile_compatibility
-            from nequip.scripts.compile import _ASE_FIELDS
 
-            # check torch version
             check_pt2_compile_compatibility()
+            from nequip.scripts.compile import _ASE_FIELDS
+            from nequip.nn.compile import DictInputOutputWrapper
 
             # == model ==
             compiled_model = torch._inductor.aoti_load_package(compile_path)
-            model = _ASEListDictWrapper(
+            model = DictInputOutputWrapper(
                 compiled_model, _ASE_FIELDS["input"], _ASE_FIELDS["output"]
             )
             # == metadata ==
@@ -281,21 +281,3 @@ class NequIPCalculator(Calculator):
             # ase wants voigt format
             stress_voigt = full_3x3_to_voigt_6_stress(stress)
             self.results["stress"] = stress_voigt
-
-
-class _ASEListDictWrapper(torch.nn.Module):
-    def __init__(self, model, input_keys: List[str], output_keys: List[str]):
-        super().__init__()
-        from nequip.nn.compile import _list_to_dict, _list_from_dict
-
-        self.model = model
-        self.input_keys = input_keys
-        self.output_keys = output_keys
-        self._list_to_dict = _list_to_dict
-        self._list_from_dict = _list_from_dict
-
-    def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
-        input_list = self._list_from_dict(self.input_keys, data)
-        with torch.inference_mode():
-            out_list = self.model(input_list)
-        return self._list_to_dict(self.output_keys, out_list)

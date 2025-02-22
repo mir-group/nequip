@@ -44,6 +44,24 @@ class ListInputOutputWrapper(torch.nn.Module):
         return _list_from_dict(self.output_keys, outputs)
 
 
+class DictInputOutputWrapper(torch.nn.Module):
+    """
+    Wraps a model that takes and returns ``Sequence[torch.Tensor]`` to have it take and return ``Dict[str, torch.Tensor]`` for specified input and output fields (i.e. the opposite of ``ListInputOutputWrapper``).
+    """
+
+    def __init__(self, model, input_keys: List[str], output_keys: List[str]):
+        super().__init__()
+        self.model = model
+        self.input_keys = input_keys
+        self.output_keys = output_keys
+
+    def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
+        inputs = _list_from_dict(self.input_keys, data)
+        with torch.inference_mode():
+            outputs = self.model(inputs)
+        return _list_to_dict(self.output_keys, outputs)
+
+
 class ListInputOutputStateDictWrapper(ListInputOutputWrapper):
     """Like ``ListInputOutputWrapper``, but also updates the model with state dict entries before each ``forward``."""
 
