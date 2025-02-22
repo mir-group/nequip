@@ -1,5 +1,5 @@
 from .modules import find_first_of_type
-from .misc import (
+from .dtype import (
     dtype_to_name,
     dtype_from_name,
     torch_default_dtype,

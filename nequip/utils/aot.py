@@ -6,7 +6,7 @@ from nequip.data._key_registry import get_dynamic_shapes
 from .fx import nequip_make_fx
 from .compile import prepare_model_for_compile
 from .versions import check_pt2_compile_compatibility
-from .misc import floating_point_tolerance
+from .dtype import floating_point_tolerance
 
 from typing import List, Dict, Union, Any
 

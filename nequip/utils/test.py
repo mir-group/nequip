@@ -13,7 +13,7 @@ from nequip.data import (
     _EDGE_FIELDS,
     _CARTESIAN_TENSOR_FIELDS,
 )
-from nequip.utils.misc import dtype_from_name
+from .dtype import dtype_from_name
 
 from functools import wraps
 from typing import Union, Optional, List
