@@ -1,5 +1,4 @@
 import torch
-from torch.utils.data import DataLoader
 from .. import AtomicDataDict
 from nequip.utils.logger import RankedLogger
 
@@ -31,10 +30,10 @@ class NequIPDataModule(lightning.LightningDataModule):
         test_dataset (Dict/List[Dict]): test dataset(s) (can provide multiple datasets in a list)
         predict_dataset (Dict/List[Dict]): prediction dataset(s) (can provide multiple datasets in a list)
         split_dataset (Dict/List[Dict]): dictionary with a ``dataset`` key, which defines the dataset and the keys ``train``, ``val``, ``test``, ``predict`` which represent the subsets to split ``dataset`` into and are either ``int`` s that sum up to the size of ``dataset`` or ``float`` s that sum up to 1 (at least 2, but not necessarily all of ``train``, ``val``, ``test``, ``predict`` must be provided if this option is used)
-        train_dataloader_kwargs (Dict): arguments of the training ``DataLoader``
-        val_dataloader_kwargs (Dict): arguments of the validation ``DataLoader``
-        test_dataloader_kwargs (Dict): arguments of the testing ``DataLoader``
-        predict_dataloader_kwargs (Dict): arguments of the prediction ``DataLoader``
+        train_dataloader (Dict): training ``DataLoader`` configuration dictionary
+        val_dataloader (Dict): validation ``DataLoader`` configuration dictionary
+        test_dataloader (Dict): testing ``DataLoader`` configuration dictionary
+        predict_dataloader (Dict): prediction ``DataLoader`` configuration dictionary
         stats_manager (Dict): dictionary that can be instantiated into a ``nequip.data.DataStatisticsManager`` object
     """
 
@@ -46,10 +45,10 @@ class NequIPDataModule(lightning.LightningDataModule):
         test_dataset: Optional[Union[Dict, List]] = [],
         predict_dataset: Optional[Union[Dict, List]] = [],
         split_dataset: Optional[Union[Dict, List]] = [],
-        train_dataloader_kwargs: Dict = {},
-        val_dataloader_kwargs: Dict = {},
-        test_dataloader_kwargs: Dict = {},
-        predict_dataloader_kwargs: Dict = {},
+        train_dataloader: Dict = {},
+        val_dataloader: Dict = {},
+        test_dataloader: Dict = {},
+        predict_dataloader: Dict = {},
         stats_manager: Optional[Dict] = None,
     ):
         super().__init__()
@@ -129,26 +128,26 @@ class NequIPDataModule(lightning.LightningDataModule):
         )
         self.generator_state = torch.Generator().manual_seed(self.seed).get_state()
 
-        # == dataloader kwargs ==
-        # copy first so that mutating for collate_fn doesn't affect the original
-        self.train_dataloader_kwargs = train_dataloader_kwargs.copy()
-        self.val_dataloader_kwargs = val_dataloader_kwargs.copy()
-        self.test_dataloader_kwargs = test_dataloader_kwargs.copy()
-        self.predict_dataloader_kwargs = predict_dataloader_kwargs.copy()
-        for kwargs in [
-            self.train_dataloader_kwargs,
-            self.val_dataloader_kwargs,
-            self.test_dataloader_kwargs,
-            self.predict_dataloader_kwargs,
-        ]:
-            assert "dataset" not in kwargs
-            assert "generator" not in kwargs
-            if "collate_fn" not in kwargs:
+        # == dataloader ==
+        for dataloader_dict, varname in zip(
+            [train_dataloader, val_dataloader, test_dataloader, predict_dataloader],
+            ["train", "val", "test", "predict"],
+        ):
+            # copy to be safe against mutation
+            dataloader_dict = dataloader_dict.copy()
+            if isinstance(dataloader_dict, DictConfig):
+                dataloader_dict = OmegaConf.to_container(
+                    dataloader_dict.copy(), resolve=True
+                )
+            assert "dataset" not in dataloader_dict
+            assert "generator" not in dataloader_dict
+            if "collate_fn" not in dataloader_dict:
                 # Allow collate_fn to be overridden by a function wrapping
                 # AtomicDataDict.batched_from_list, but default to it.
-                kwargs["collate_fn"] = {
+                dataloader_dict["collate_fn"] = {
                     "_target_": "nequip.data.datamodule._base_datamodule._default_collate_fn_factory"
                 }
+            setattr(self, f"{varname}_dataloader_config", dataloader_dict)
 
         # == data statistics manager ==
         self.stats_manager_cfg = stats_manager
@@ -229,35 +228,35 @@ class NequIPDataModule(lightning.LightningDataModule):
         # must only return single train dataloader for now
         # see https://lightning.ai/docs/pytorch/stable/data/iterables.html#multiple-dataloaders
         return self._get_dloader(
-            self.train_dataset, self.train_generator, self.train_dataloader_kwargs
+            self.train_dataset, self.train_generator, self.train_dataloader_config
         )[0]
 
     def val_dataloader(self):
         """"""
         return self._get_dloader(
-            self.val_dataset, self.generator, self.val_dataloader_kwargs
+            self.val_dataset, self.generator, self.val_dataloader_config
         )
 
     def test_dataloader(self):
         """"""
         return self._get_dloader(
-            self.test_dataset, self.generator, self.test_dataloader_kwargs
+            self.test_dataset, self.generator, self.test_dataloader_config
         )
 
     def predict_dataloader(self):
         """"""
         self._get_dloader(
-            self.predict_dataset, self.generator, self.predict_dataloader_kwargs
+            self.predict_dataset, self.generator, self.predict_dataloader_config
         )
 
-    def _get_dloader(self, dataset, generator, dloader_kwargs):
+    def _get_dloader(self, datasets, generator, dataloader_dict):
         return [
-            DataLoader(
-                dataset,
+            instantiate(
+                dataloader_dict,
+                dataset=dataset,
                 generator=generator,
-                **instantiate(dloader_kwargs),
             )
-            for dataset in dataset
+            for dataset in datasets
         ]
 
     def get_statistics(self, dataset: str = "train", dataset_idx: int = 0):
@@ -270,7 +269,7 @@ class NequIPDataModule(lightning.LightningDataModule):
         """
         if self.stats_manager_cfg is None:
             return {}
-        stats_manager = instantiate(self.stats_manager_cfg)
+        stats_manager = instantiate(self.stats_manager_cfg)  # , _recursive_=False)
         assert dataset in ["train", "val", "test", "predict"]
         task_map = {
             "train": "fit",
@@ -284,11 +283,11 @@ class NequIPDataModule(lightning.LightningDataModule):
 
             # get dataloader, using dataloader_kwargs from the appropriate dataset.
             # stats manager can override options if it wants to, like batch size.
-            dloader_kwargs = getattr(self, dataset + "_dataloader_kwargs").copy()
+            dataloader_dict = getattr(self, dataset + "_dataloader_config").copy()
             if stats_manager.dataloader_kwargs is not None:
-                dloader_kwargs.update(stats_manager.dataloader_kwargs)
+                dataloader_dict.update(stats_manager.dataloader_kwargs)
             dloader = self._get_dloader(
-                getattr(self, dataset + "_dataset"), self.generator, dloader_kwargs
+                getattr(self, dataset + "_dataset"), self.generator, dataloader_dict
             )
             dloader = dloader[dataset_idx]
 
