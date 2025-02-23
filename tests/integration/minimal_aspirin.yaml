@@ -5,6 +5,10 @@ cutoff_radius: 5.0
 chemical_symbols: [C, O, H]
 model_type_names: ${chemical_symbols}
 
+dataloader:
+  _target_: torch.utils.data.DataLoader
+  batch_size: 5
+
 data:
   _target_: nequip.data.datamodule.sGDML_CCSD_DataModule
   dataset: aspirin
@@ -17,12 +21,9 @@ data:
   trainval_test_subset: [40, 10]
   train_val_split: [30, 10]
   seed: ${seed}
-  train_dataloader_kwargs:
-    batch_size: 5
-  val_dataloader_kwargs:
-    batch_size: 5
-  test_dataloader_kwargs:
-    batch_size: 5
+  train_dataloader: ${dataloader}
+  val_dataloader: ${dataloader}
+  test_dataloader: ${dataloader}
   stats_manager:
     _target_: nequip.data.CommonDataStatisticsManager
     type_names: ${model_type_names}

@@ -115,7 +115,8 @@ def TolueneDataModule(num_trainval_test, batch_size):
           train_val_split: [0.8, 0.2]
           trainval_test_subset: [{}, {}]
           seed: 1234
-          train_dataloader_kwargs:
+          train_dataloader:
+            _target_: torch.utils.data.DataLoader
             batch_size: {}
             shuffle: true
         """.format(

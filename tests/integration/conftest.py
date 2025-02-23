@@ -28,7 +28,7 @@ def _training_session(conffile, training_module, model_dtype, BENCHMARK_ROOT):
                 config.data.data_source_dir = data_tmpdir
             config.training_module._target_ = training_module
             config.training_module.model.model_dtype = model_dtype
-            config.data.val_dataloader_kwargs.batch_size = 1
+            config.data.val_dataloader.batch_size = 1
             with open_dict(config):
                 config["hydra"] = {"run": {"dir": tmpdir}}
                 # mitigate nondeterminism for tests

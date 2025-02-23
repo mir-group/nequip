@@ -40,7 +40,7 @@ def test_batch_invariance(fake_model_training_session):
     # == train again with validation batch size 1 ==
     with tempfile.TemporaryDirectory() as new_tmpdir:
         new_config = config.copy()
-        new_config.data.val_dataloader_kwargs.batch_size = 1
+        new_config.data.val_dataloader.batch_size = 1
         with open_dict(new_config):
             new_config["hydra"] = {"run": {"dir": new_tmpdir}}
         new_config = OmegaConf.create(new_config)

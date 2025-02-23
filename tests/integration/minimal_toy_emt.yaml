@@ -5,6 +5,10 @@ cutoff_radius: 5.0
 chemical_symbols: [Cu]
 model_type_names: ${chemical_symbols}
 
+dataloader:
+  _target_: torch.utils.data.DataLoader
+  batch_size: 5
+
 data:
   _target_: nequip.data.datamodule.NequIPDataModule
   seed: ${seed}
@@ -23,12 +27,9 @@ data:
     train: 30
     val: 10
     test: 10
-  train_dataloader_kwargs:
-    batch_size: 5
-  val_dataloader_kwargs:
-    batch_size: 5
-  test_dataloader_kwargs: 
-    batch_size: 5
+  train_dataloader: ${dataloader}
+  val_dataloader: ${dataloader}
+  test_dataloader: ${dataloader}
   stats_manager:
     _target_: nequip.data.CommonDataStatisticsManager
     type_names: ${model_type_names}
