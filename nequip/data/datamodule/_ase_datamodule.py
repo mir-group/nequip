@@ -21,11 +21,6 @@ class ASEDataModule(NequIPDataModule):
         include_keys (List[str]): the keys that needs to be parsed in addition to forces and energy; the data stored in ``ase.atoms.Atoms.array`` has the lowest priority, and it will be overrided by data in ``ase.atoms.Atoms.info`` and ``ase.atoms.Atoms.calc.results``
         exclude_keys (List[str]): list of keys that may be present in the ASE-readable file but the user wishes to exclude
         key_mapping (Dict[str, str]): mapping of ``ase`` keys to ``AtomicDataDict`` keys
-        train_dataloader_kwargs (Dict): arguments of the training ``DataLoader``
-        val_dataloader_kwargs (Dict): arguments of the validation ``DataLoader``
-        test_dataloader_kwargs (Dict): arguments of the testing ``DataLoader``
-        predict_dataloader_kwargs (Dict): arguments of the prediction ``DataLoader``
-        stats_manager (Dict): dictionary that can be instantiated into a ``nequip.data.DataStatisticsManager`` object
     """
 
     def __init__(
@@ -44,12 +39,7 @@ class ASEDataModule(NequIPDataModule):
         include_keys: Optional[List[str]] = [],
         exclude_keys: Optional[List[str]] = [],
         key_mapping: Optional[Dict[str, str]] = {},
-        # dataloader kwargs
-        train_dataloader_kwargs: Union[dict, DictConfig] = {},
-        val_dataloader_kwargs: Union[dict, DictConfig] = {},
-        test_dataloader_kwargs: Union[dict, DictConfig] = {},
-        predict_dataloader_kwargs: Union[dict, DictConfig] = {},
-        stats_manager: Optional[Dict] = None,
+        **kwargs,
     ):
 
         # == first convert all dataset paths to lists if not already lists ==
@@ -114,9 +104,5 @@ class ASEDataModule(NequIPDataModule):
             test_dataset=dataset_configs[2],
             predict_dataset=dataset_configs[3],
             split_dataset=split_config,
-            train_dataloader_kwargs=train_dataloader_kwargs,
-            val_dataloader_kwargs=val_dataloader_kwargs,
-            test_dataloader_kwargs=test_dataloader_kwargs,
-            predict_dataloader_kwargs=predict_dataloader_kwargs,
-            stats_manager=stats_manager,
+            **kwargs,
         )
