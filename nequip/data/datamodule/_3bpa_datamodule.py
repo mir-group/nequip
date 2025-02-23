@@ -3,7 +3,7 @@ from nequip.utils.file_utils import download_url, extract_tar
 from nequip.utils.logger import RankedLogger
 
 import os
-from typing import Union, Sequence, List, Callable, Optional, Dict
+from typing import Union, Sequence, List, Callable
 
 logger = RankedLogger(__name__, rank_zero_only=True)
 
@@ -48,10 +48,6 @@ class NequIP3BPADataModule(ASEDataModule):
         data_source_dir (str): directory to download 3BPA dataset to, or where the ``dataset_3BPA`` directory is located if already downloaded and unzipped
         train_set (str): either ``300K`` or ``mixedT``
         test_set (List[str]): list that can contain ``300K``, ``600K``, ``1200K``, ``dih_beta120``, ``dih_beta150``, and/or ``dih_beta180``
-        train_dataloader_kwargs (Dict): arguments of the training ``DataLoader``
-        val_dataloader_kwargs (Dict): arguments of the validation ``DataLoader``
-        test_dataloader_kwargs (Dict): arguments of the testing ``DataLoader``
-        stats_manager (Dict): dictionary that can be instantiated into a ``nequip.data.DataStatisticsManager`` object
     """
 
     def __init__(
@@ -62,10 +58,7 @@ class NequIP3BPADataModule(ASEDataModule):
         data_source_dir: str,
         train_set: str = "300K",
         test_sets: List[str] = test_set_names,
-        train_dataloader_kwargs: Dict = {},
-        val_dataloader_kwargs: Dict = {},
-        test_dataloader_kwargs: Dict = {},
-        stats_manager: Optional[Dict] = None,
+        **kwargs,
     ):
         # sanity check
         assert train_set in ["300K" or "mixedT"]
@@ -85,10 +78,7 @@ class NequIP3BPADataModule(ASEDataModule):
             },
             test_file_path=test_file_paths,
             transforms=transforms,
-            train_dataloader_kwargs=train_dataloader_kwargs,
-            val_dataloader_kwargs=val_dataloader_kwargs,
-            test_dataloader_kwargs=test_dataloader_kwargs,
-            stats_manager=stats_manager,
+            **kwargs,
         )
         self.data_source_dir = data_source_dir
         self.train_file_path = train_file_path
