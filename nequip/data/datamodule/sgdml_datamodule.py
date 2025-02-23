@@ -3,7 +3,7 @@ from nequip.utils import download_url, extract_zip
 from nequip.utils.logger import RankedLogger
 
 import os
-from typing import Union, Sequence, Optional, List, Callable, Dict
+from typing import Union, Sequence, Optional, List, Callable
 
 logger = RankedLogger(__name__, rank_zero_only=True)
 
@@ -21,10 +21,6 @@ class sGDML_CCSD_DataModule(NequIPDataModule):
         seed (int): data seed for reproducibility
         train_val_split (List[float]/List[int]): train-validation split either in fractions ``[1, 1-f]`` or integers ``[N_train, N_val]``
         trainval_test_subset (List[int]): Subset of ``[N_train + N_val, N_test]`` to use from the full dataset (the intended use is for minimal tests)
-        train_dataloader_kwargs (Dict): arguments of the training ``DataLoader``
-        val_dataloader_kwargs (Dict): arguments of the validation ``DataLoader``
-        test_dataloader_kwargs (Dict): arguments of the testing ``DataLoader``
-        stats_manager (Dict): dictionary that can be instantiated into a ``nequip.data.DataStatisticsManager`` object
     """
 
     DATASET_MAP = {
@@ -50,10 +46,7 @@ class sGDML_CCSD_DataModule(NequIPDataModule):
         seed: int,
         train_val_split: Sequence[Union[int, float]],
         trainval_test_subset: Optional[List[int]] = None,
-        train_dataloader_kwargs: Dict = {},
-        val_dataloader_kwargs: Dict = {},
-        test_dataloader_kwargs: Dict = {},
-        stats_manager: Optional[Dict] = None,
+        **kwargs,
     ):
 
         assert (
@@ -101,10 +94,7 @@ class sGDML_CCSD_DataModule(NequIPDataModule):
                     "val": train_val_split[1],
                 }
             ],
-            train_dataloader_kwargs=train_dataloader_kwargs,
-            val_dataloader_kwargs=val_dataloader_kwargs,
-            test_dataloader_kwargs=test_dataloader_kwargs,
-            stats_manager=stats_manager,
+            **kwargs,
         )
         self.dataset = dataset
         self.data_source_dir = data_source_dir
