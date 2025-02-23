@@ -8,12 +8,12 @@ nequip.data.datamodule
   
 An ``ASEDataModule`` is also provided as a general wrapper of the ``NequIPDataModule`` if the datasets are all in the same `ASE <https://wiki.fysik.dtu.dk/ase/ase/io/io.html>`_-readable file formats.
 
-Two additional classes, the ``sGDML_CCSD_DataModule`` and ``NequIP3BPADataModule``, are examples of data modules for specific datasets. Such datasets may support auto-downloading capabilities, pre-defined train-test splits and involve more a more minimal set of arguments.
+The ``sGDML_CCSD_DataModule`` and ``NequIP3BPADataModule`` are examples of data modules for specific datasets. Such datasets may support auto-downloading capabilities, pre-defined train-test splits and involve more a more minimal set of arguments.
 
 All data modules should (and would) share the following features
 
   * a ``seed`` is always required for reproducibility
-  * ``xxx_dataloader_kwargs``, which refers to the arguments of `torch.utils.data.DataLoader <https://pytorch.org/docs/stable/data.html#torch.utils.data.DataLoader>`_. Crucially, this is where one would specify the ``batch_size`` (number of frames per batch), ``num_workers``, and ``shuffle`` as common parameters that should be configured.
+  * ``xxx_dataloader``, which refers to a `torch.utils.data.DataLoader <https://pytorch.org/docs/stable/data.html#torch.utils.data.DataLoader>`_ config. Crucially, this is where one would specify the ``batch_size`` (number of frames per batch), ``num_workers``, and ``shuffle`` as common parameters that should be configured.
 
 
  .. autoclass:: nequip.data.datamodule.NequIPDataModule
