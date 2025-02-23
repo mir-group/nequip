@@ -3,7 +3,7 @@ from nequip.utils import download_url, extract_zip
 from nequip.utils.logger import RankedLogger
 
 import os
-from typing import Optional, Dict, Union, Sequence, List, Callable
+from typing import Union, Sequence, List, Callable
 
 logger = RankedLogger(__name__, rank_zero_only=True)
 
@@ -59,10 +59,6 @@ class TM23DataModule(ASEDataModule):
         element(str): element from TM23 dataset to use
         transforms (List[Callable]): list of data transforms
         train_val_split (List[float] or List[int]): train-validation split either in fractions ``[1, 1-f]`` or integers ``[N_train, N_val]``
-        train_dataloader_kwargs (Dict): arguments of the training ``DataLoader``
-        val_dataloader_kwargs (Dict): arguments of the validation ``DataLoader``
-        test_dataloader_kwargs (Dict): arguments of the testing ``DataLoader``
-        stats_manager (Dict): dictionary that can be instantiated into a ``nequip.data.DataStatisticsManager`` object
     """
 
     def __init__(
@@ -72,10 +68,7 @@ class TM23DataModule(ASEDataModule):
         element: str,
         transforms: List[Callable],
         train_val_split: Sequence[Union[int, float]],
-        train_dataloader_kwargs: Dict = {},
-        val_dataloader_kwargs: Dict = {},
-        test_dataloader_kwargs: Dict = {},
-        stats_manager: Optional[Dict] = None,
+        **kwargs,
     ):
         assert element in supported_elements
 
@@ -103,10 +96,7 @@ class TM23DataModule(ASEDataModule):
             },
             transforms=transforms,
             ase_args={"format": "extxyz"},
-            train_dataloader_kwargs=train_dataloader_kwargs,
-            val_dataloader_kwargs=val_dataloader_kwargs,
-            test_dataloader_kwargs=test_dataloader_kwargs,
-            stats_manager=stats_manager,
+            **kwargs,
         )
         self.element = element
         self.data_source_dir = data_source_dir
