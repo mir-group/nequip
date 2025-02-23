@@ -234,5 +234,4 @@ training_module:
 
 # global options
 global_options:
-  seed: 789
   allow_tf32: false

@@ -56,7 +56,7 @@ def model_dtype(default_dtype, request):
 def default_dtype(request):
     old_dtype = torch.get_default_dtype()
     # global dtype is always set to float64
-    _set_global_options(seed=123)
+    _set_global_options()
     yield torch.get_default_dtype()
     torch.set_default_dtype(old_dtype)
 

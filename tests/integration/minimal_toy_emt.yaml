@@ -103,4 +103,4 @@ training_module:
     avg_num_neighbors: ${training_data_stats:num_neighbors_mean}
 
 global_options:
-  seed: ${seed}
+  allow_tf32: false

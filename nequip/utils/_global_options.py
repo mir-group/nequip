@@ -22,7 +22,16 @@ _MULTIPROCESSING_SHARING_STRATEGY: Final[str] = os.environ.get(
     "NEQUIP_MULTIPROCESSING_SHARING_STRATEGY", "file_system"
 )
 
-# hardcode jit fusion strategy
+# === hardcode jit fusion strategy ===
+# avoid 20 iters of pain, see https://github.com/pytorch/pytorch/issues/52286
+# Quote from eelison in PyTorch slack:
+# https://pytorch.slack.com/archives/CDZD1FANA/p1644259272007529?thread_ts=1644064449.039479&cid=CDZD1FANA
+# > Right now the default behavior is to specialize twice on static shapes and then on dynamic shapes.
+# > To reduce warmup time you can do something like setFusionStrartegy({{FusionBehavior::DYNAMIC, 3}})
+# > ... Although we would wouldn't really expect to recompile a dynamic shape fusion in a model,
+# > provided broadcasting patterns remain fixed
+# We default to DYNAMIC alone because the number of edges is always dynamic,
+# even if the number of atoms is fixed
 _JIT_FUSION_STRATEGY: Final[List[Tuple[Union[str, int]]]] = [("DYNAMIC", 10)]
 
 # === global options metadata ===
@@ -50,67 +59,19 @@ def _get_latest_global_options(only_metadata_related=False) -> Dict:
 
 
 def _set_global_options(
-    # global seed is mandatory
-    seed: int,
-    # TODO: clean the following up eventually
-    # avoid 20 iters of pain, see https://github.com/pytorch/pytorch/issues/52286
-    # Quote from eelison in PyTorch slack:
-    # https://pytorch.slack.com/archives/CDZD1FANA/p1644259272007529?thread_ts=1644064449.039479&cid=CDZD1FANA
-    # > Right now the default behavior is to specialize twice on static shapes and then on dynamic shapes.
-    # > To reduce warmup time you can do something like setFusionStrartegy({{FusionBehavior::DYNAMIC, 3}})
-    # > ... Although we would wouldn't really expect to recompile a dynamic shape fusion in a model,
-    # > provided broadcasting patterns remain fixed
-    # We default to DYNAMIC alone because the number of edges is always dynamic,
-    # even if the number of atoms is fixed:
-    # _jit_fusion_strategy: List[Tuple[Union[str, int]]] = [("DYNAMIC", 3)],
-    # Due to what appear to be ongoing bugs with nvFuser, we default to NNC (fuser1) for now:
-    # TODO: still default to NNC on CPU regardless even if change this for GPU
-    # TODO: default for ROCm?
-    # _jit_fuser="fuser1",  # TODO: what is this?
     allow_tf32: bool = False,
-    # e3nn_optimization_defaults
-    specialized_code: bool = True,
-    optimize_einsums: bool = True,
-    jit_script_fx: bool = True,
     warn_on_override: bool = False,
 ) -> None:
-    """Configure global options of libraries like `torch` and `e3nn` based on `config`.
-
-    The following fields are fixed and cannot be configured by this function:
-      - ``input_dtype``
-      - ``_jit_fusion_strategy``
+    """Configure global options.
 
     Args:
         warn_on_override: whether to warn if new options are inconsistent with previously set ones
     """
-    # === update global config ===
-    # NOTE: fixed fields are not reflected in the global config
-    global _latest_global_config
-    _latest_global_config.update(
-        {
-            "seed": seed,
-            TF32_KEY: allow_tf32,
-            "specialized_code": specialized_code,
-            "optimize_einsums": optimize_einsums,
-            "jit_script_fx": jit_script_fx,
-        }
-    )
-
     # === set global seed ===
-    seed_everything(seed, workers=True, verbose=False)
+    seed_everything(123, workers=True, verbose=False)
 
-    # Set TF32 support
-    # See https://pytorch.org/docs/stable/notes/cuda.html#tensorfloat-32-tf32-on-ampere-devices
-    # NOTE: it is also possible to use https://pytorch.org/docs/stable/generated/torch.set_float32_matmul_precision.html
-    if torch.cuda.is_available():
-        if torch.torch.backends.cuda.matmul.allow_tf32 is not allow_tf32:
-            # update the setting
-            if warn_on_override:
-                warnings.warn(
-                    f"Setting the GLOBAL value for allow_tf32 to {allow_tf32} which is different than the previous value of {torch.torch.backends.cuda.matmul.allow_tf32}"
-                )
-            torch.backends.cuda.matmul.allow_tf32 = allow_tf32
-            torch.backends.cudnn.allow_tf32 = allow_tf32
+    # === set global dtype ===
+    torch.set_default_dtype(_GLOBAL_DTYPE)
 
     # this applies for torch >= 1.11 (our minimum torch version satisfies this)
     # since we hardcode it, there's no need to warn
@@ -141,17 +102,39 @@ def _set_global_options(
     else:
         os.environ[k] = "1"
 
-    torch.set_default_dtype(_GLOBAL_DTYPE)
-
+    # === e3nn optimization flags ===
+    # we initialize them all to true
     e3nn.set_optimization_defaults(
-        specialized_code=specialized_code,
-        optimize_einsums=optimize_einsums,
-        jit_script_fx=jit_script_fx,
+        specialized_code=True,
+        optimize_einsums=True,
+        jit_script_fx=True,
     )
 
     # ENVIRONMENT VARIABLES
     # torch.multiprocessing fix for batch_size=1
     # see https://stackoverflow.com/questions/48250053/pytorchs-dataloader-too-many-open-files-error-when-no-files-should-be-open
     torch.multiprocessing.set_sharing_strategy(_MULTIPROCESSING_SHARING_STRATEGY)
+
+    # === TF32 ===
+    # See https://pytorch.org/docs/stable/notes/cuda.html#tensorfloat-32-tf32-on-ampere-devices
+    # NOTE: it is also possible to use https://pytorch.org/docs/stable/generated/torch.set_float32_matmul_precision.html
+    if torch.cuda.is_available():
+        if torch.torch.backends.cuda.matmul.allow_tf32 is not allow_tf32:
+            # update the setting
+            if warn_on_override:
+                warnings.warn(
+                    f"Setting the GLOBAL value for allow_tf32 to {allow_tf32} which is different than the previous value of {torch.torch.backends.cuda.matmul.allow_tf32}"
+                )
+            torch.backends.cuda.matmul.allow_tf32 = allow_tf32
+            torch.backends.cudnn.allow_tf32 = allow_tf32
+
+    # === update global config ===
+    # NOTE: fixed fields are not reflected in the global config
+    global _latest_global_config
+    _latest_global_config.update(
+        {
+            TF32_KEY: allow_tf32,
+        }
+    )
 
     return

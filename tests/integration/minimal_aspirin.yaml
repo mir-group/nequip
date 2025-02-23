@@ -90,4 +90,4 @@ training_module:
     per_type_energy_scales: ${training_data_stats:per_type_forces_rms}
 
 global_options:
-  seed: ${seed}
+  allow_tf32: false
