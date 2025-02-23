@@ -35,7 +35,15 @@ class SimpleDDPStrategy(DDPStrategy):
             flat_grads = torch.cat(grad_tensors)
             # NOTE: averaging (i.e. summing and dividing by number of ranks) is consistent with PyTorch Lightning's `DDPStrategy`
             # in the training loop, we account for this by multiplying the loss by the number of ranks before the backwards call
-            torch.distributed.all_reduce(flat_grads, op=torch.distributed.ReduceOp.AVG)
+            if torch.distributed.get_backend() == "gloo":
+                torch.distributed.all_reduce(
+                    flat_grads, op=torch.distributed.ReduceOp.SUM
+                )
+                flat_grads /= torch.distributed.get_world_size()
+            else:
+                torch.distributed.all_reduce(
+                    flat_grads, op=torch.distributed.ReduceOp.AVG
+                )
 
             # copy reduced gradients back
             offset = 0
