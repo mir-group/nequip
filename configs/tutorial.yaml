@@ -65,16 +65,18 @@ data:
     - _target_: nequip.data.transforms.ChemicalSpeciesToAtomTypeMapper
       chemical_symbols: ${chemical_symbols}
 
-  # the following are torch.utils.data.dataloader arguments except for `dataset` and `collate_fn`
+  # the following are torch.utils.data.DataLoader configs excluding the arguments `dataset` and `collate_fn`
   # https://pytorch.org/docs/stable/data.html#torch.utils.data.DataLoader
-  train_dataloader_kwargs:
+  train_dataloader:
+    _target_: torch.utils.data.DataLoader
     batch_size: 5
     num_workers: 5
     shuffle: true
-  val_dataloader_kwargs:
+  val_dataloader:
+    _target_: torch.utils.data.DataLoader
     batch_size: 10
-    num_workers: ${data.train_dataloader_kwargs.num_workers}  # we want to use the same num_workers -- variable interpolation helps
-  test_dataloader_kwargs: ${data.val_dataloader_kwargs}  # variable interpolation comes in handy again
+    num_workers: ${data.train_dataloader.num_workers}  # we want to use the same num_workers -- variable interpolation helps
+  test_dataloader: ${data.val_dataloader}  # variable interpolation comes in handy again
 
   # dataset statistics can be calculated to be used for model initialization such as for shifting, scaling and standardizing.
   # it is advised to provide custom names -- you will have to retrieve them later under model to initialize certain parameters to the dataset statistics computed
