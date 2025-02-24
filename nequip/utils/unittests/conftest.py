@@ -19,7 +19,7 @@ from nequip.data.transforms import (
     NeighborListTransform,
 )
 from nequip.utils.test import set_irreps_debug
-from nequip.utils._global_options import _set_global_options
+from nequip.utils.global_state import set_global_state
 from nequip.utils import dtype_to_name
 
 
@@ -43,7 +43,7 @@ if _is_pytest_xdist and torch.cuda.is_available():
 
 
 @pytest.fixture(scope="session", params=["float32", "float64"])
-def model_dtype(default_dtype, request):
+def model_dtype(request):
     default_dtype = dtype_to_name(torch.get_default_dtype())
     if default_dtype != "float64":
         pytest.skip(
@@ -53,10 +53,10 @@ def model_dtype(default_dtype, request):
 
 
 @pytest.fixture(scope="session", autouse=True)
-def default_dtype(request):
+def default_dtype():
     old_dtype = torch.get_default_dtype()
     # global dtype is always set to float64
-    _set_global_options()
+    set_global_state()
     yield torch.get_default_dtype()
     torch.set_default_dtype(old_dtype)
 

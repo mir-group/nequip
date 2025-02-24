@@ -72,12 +72,10 @@ def test_state_restoration(BENCHMARK_ROOT, fake_model_training_session, device):
     ckpt_calc = NequIPCalculator.from_checkpoint_model(
         ckpt_path,
         device=device,
-        set_global_options=False,
     )
     package_calc = NequIPCalculator.from_packaged_model(
         package_path,
         device=device,
-        set_global_options=False,
     )
 
     # == get validation data by instantiating datamodules ==

@@ -93,7 +93,6 @@ def test_compile(fake_model_training_session, device, mode):
         ckpt_calc = NequIPCalculator.from_checkpoint_model(
             ckpt_path,
             device=load_device,
-            set_global_options=False,
         )
         compile_calc = NequIPCalculator.from_compiled_model(
             output_path,
