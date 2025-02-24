@@ -13,7 +13,7 @@ from nequip.data.transforms import (
     ChemicalSpeciesToAtomTypeMapper,
     NeighborListTransform,
 )
-from nequip.utils._global_options import _set_global_options, TF32_KEY
+from nequip.utils.global_state import set_global_state, TF32_KEY
 
 
 class NequIPCalculator(Calculator):
@@ -114,9 +114,12 @@ class NequIPCalculator(Calculator):
                 f"Unknown file type: {compile_fname} (expected `*.nequip.pth` or `*.nequip.pt2`)"
             )
 
-        # == global options ==
-        global_options = {"seed": 1, TF32_KEY: bool(int(metadata[TF32_KEY]))}
-        _set_global_options(**global_options)
+        # == global state initialization ==
+        set_global_state(
+            **{
+                TF32_KEY: bool(int(metadata[TF32_KEY])),
+            }
+        )
 
         # prepare model for inference
         model = model.to(device)
@@ -145,7 +148,7 @@ class NequIPCalculator(Calculator):
         ckpt_path: str,
         device: Union[str, torch.device] = "cpu",
         chemical_symbols: Optional[Union[List[str], Dict[str, str]]] = None,
-        set_global_options: Union[str, bool] = "warn",
+        allow_tf32: bool = False,
         model_name: str = _SOLE_MODEL_KEY,
         **kwargs,
     ):
@@ -155,14 +158,14 @@ class NequIPCalculator(Calculator):
             ckpt_path (str): path to checkpoint file
             device (torch.device): the device to use
             chemical_symbols (List[str] or Dict[str, str]): mapping between chemical symbols and model type names
-            set_global_options (str/bool): ``True``, ``False``, or ``"warn"``
+            allow_tf32 (bool): whether to allow TensorFloat32 operations
         """
         return cls._from_save(
             save_path=ckpt_path,
             model_getter=ModelFromCheckpoint,
             device=device,
             chemical_symbols=chemical_symbols,
-            set_global_options=set_global_options,
+            allow_tf32=allow_tf32,
             model_name=model_name,
             **kwargs,
         )
@@ -173,7 +176,7 @@ class NequIPCalculator(Calculator):
         package_path: str,
         device: Union[str, torch.device] = "cpu",
         chemical_symbols: Optional[Union[List[str], Dict[str, str]]] = None,
-        set_global_options: Union[str, bool] = "warn",
+        allow_tf32: bool = False,
         model_name: str = _SOLE_MODEL_KEY,
         **kwargs,
     ):
@@ -183,14 +186,14 @@ class NequIPCalculator(Calculator):
             package_path (str): path to packaged model
             device (torch.device): the device to use
             chemical_symbols (List[str] or Dict[str, str]): mapping between chemical symbols and model type names
-            set_global_options (str/bool): ``True``, ``False``, or ``"warn"``
+            allow_tf32 (bool): whether to allow TensorFloat32 operations
         """
         return cls._from_save(
             save_path=package_path,
             model_getter=ModelFromPackage,
             device=device,
             chemical_symbols=chemical_symbols,
-            set_global_options=set_global_options,
+            allow_tf32=allow_tf32,
             model_name=model_name,
             **kwargs,
         )
@@ -202,11 +205,15 @@ class NequIPCalculator(Calculator):
         model_getter: Callable,
         device: Union[str, torch.device] = "cpu",
         chemical_symbols: Optional[Union[List[str], Dict[str, str]]] = None,
-        set_global_options: Union[str, bool] = "warn",
+        allow_tf32: bool = False,
         model_name: str = _SOLE_MODEL_KEY,
         **kwargs,
     ):
-        model: torch.nn.ModuleDict = model_getter(save_path, set_global_options)
+        # === set global state ===
+        set_global_state(allow_tf32=allow_tf32)
+
+        # === build model ===
+        model: torch.nn.ModuleDict = model_getter(save_path)
         model: graph_model.GraphModel = model[model_name]
         model.eval()
         model.to(device)
