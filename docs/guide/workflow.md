@@ -1,11 +1,11 @@
 # The `nequip` workflow
 
 The `nequip` workflow is made up of the following components:
- 1. **Train**:  `nequip-train`
- 2. **Test**: `nequip-train`
- 3. **Package**: `nequip-package`
- 4. **Compile**: `nequip-compile`
- 5. **Production**: [Integrations](../integrations/all.rst)
+ 1. [**Train**](#training):  `nequip-train`
+ 2. [**Test**](#testing): `nequip-train`
+ 3. [**Compile**](#compilation): `nequip-compile`
+ 4. [**Package**](#packaging): `nequip-package`
+ 5. [**Production**](#production-simulations): [Integrations](../integrations/all.rst)
 
 
 ## Training
@@ -49,17 +49,57 @@ Testing is also performed with `nequip-train` by adding `test` to the list of `r
 
 There are two main ways users can use `test`.
  - One can have testing be done automatically after training in the same `nequip-train` session by specifying `run: [train, test]` in the config. The `test` phase will use the `best` model checkpoint from the `train` phase.
- - One can run tests from a checkpoint file by having `run: [test]` in the config and using the same command as restarts in the command line, that is, 
-  ```bash
-  nequip-train -cp full/path/to/config/directory -cn config_name.yaml ++ckpt_path='path/to/ckpt_file'
-  ```
+ - One can run tests from a checkpoint file by having `run: [test]` in the config and using the `ModelFromCheckpoint` [model builder](../api/model) to load a model from a checkpoint file.
 
 One can use `nequip.train.callbacks.TestTimeXYZFileWriter` ([see API](../api/callbacks.rst)) as a callback to have `.xyz` files written with the predictions of the model on the test dataset(s). (This is the replacement for the role `nequip-evaluate` served before `nequip` version `0.7.0`)
+
+## Compilation
+
+`nequip-compile` is the command used to compile a model (from a checkpoint file or a package file) for [production simulations](#production-simulations) with our various [integrations](../integrations/all.rst). There are two modes that users can use for compilation, `torchscript` and `aotinductor`. The latter `aotinductor` requires at least PyTorch 2.6.
+
+The command to compile a TorchScript model is as follows.
+```bash
+nequip-compile \
+--ckpt-path path/to/ckpt_file \
+--output-path path/to/packaged_model.nequip.pth \
+--device (cpu/cuda) \
+--mode torchscript
+```
+The command to compile an AOT Inductor model is as follows.
+```bash
+nequip-compile \
+--ckpt-path path/to/ckpt_file \
+--output-path path/to/packaged_model.nequip.pt2 \
+--device (cpu/cuda) \
+--mode aotinductor \
+--target target_integration
+```
+
+```{warning}
+`--mode torchscript` imposes that the `--output-path` ends with a `.nequip.pth` extension.\
+`--mode aotinductor` imposes that the `--output-path` ends with a `.nequip.pt2` extension.
+```
+
+```{important}
+`nequip-compile` should be called on the device where the compiled model will be used on for the production simulation. While this constraint is not a hard requirement for TorchScript mode compilation, it is necessary for AOT Inductor mode compilation as the models are compiled specifically for a particular device. 
+
+Note also that AOT Inductor mode compilation requires access to compilers (e.g. `gcc`) when doing `nequip-compile`.
+```
+
+```{tip}
+If `--mode aotinductor` is used for [compilation](#compilation), the `nequip-compile` call must be configured in a manner specific to the intended integration. For supported integrations, a convenience flag is provided in the form of `--target`, which could be `--target ase` for compiled models to be used with ASE, or `--target pair_nequip` for compiled NequIP GNN models to be used in LAMMPS, or `--target pair_allegro` for compiled Allegro models to be used in LAMMPS.
+
+The `--target` flag is a simplification over having to provide `--input-fields` and `--output-fields`. Developers designing new models or wanting to set up new integrations can manually provide `--input-fields` and `--output-fields`. New integration "target"s may be added through PRs or through NequIP extension packages. Engage with us on GitHub if you seek to do something like this.
+```
+
+```{tip}
+To see command line options, one can use `nequip-compile -h`
+```
 
 
 ## Packaging
 
-The recommended way to distribute a trained model is to `package` it.
+The recommended way to archive a trained model is to `package` it.
 ```bash
 nequip-package --ckpt-path path/to/ckpt_file --output-path path/to/packaged_model.nequip.zip
 ```
@@ -67,45 +107,13 @@ nequip-package --ckpt-path path/to/ckpt_file --output-path path/to/packaged_mode
 The output path MUST have the extension `.nequip.zip`.
 ```
 
-To see command line options, one can use
-```bash
-nequip-package -h
+```{tip}
+To see command line options, one can use `nequip-package -h`
 ```
+
 
 `nequip-package` will save not only the model and its weights, but also the very code that the model depends on (besides config file parameters). The packaged model can thus be loaded and used independently from the model code in the Python environment's NequIP (and extensions such as Allegro).
 
-## Compilation
-
-`nequip-compile` is the command used to compile a model (from a checkpoint file or a package file) for use in C++ environments, chiefly in our LAMMPS integration. There are two modes that users can use for compilation, `torchscript` and `aotinductor`.
-
 ## Production Simulations
 
-### ...to run simulations and other calculations
-
-There are many ways a deployed model can be used. Most often it can be [used for moelcular dynamics and other calculations in LAMMPS](../integrations/lammps.md). For integrations with other codes and simulation engines, see [Integrations](../integrations/all.rst).
-
-### ...at a low level in your own code
-While LAMMPS, or other integrations should be sufficient for the vast majority of usecases, deployed models can also be loaded as PyTorch TorchScript models to be called in your own code:
-```python
-import torch
-import ase.io
-from nequip.data import AtomicData, AtomicDataDict
-from nequip.scripts.deploy import load_deployed_model, R_MAX_KEY
-
-device = "cpu"  # "cuda" etc.
-model, metadata = load_deployed_model(
-    "path_to_deployed_model.pth,
-    device=device,
-)
-
-# Load some input structure from an XYZ or other ASE readable file:
-data = AtomicData.from_ase(ase.io.read("example_input_structure.xyz"), r_max=metadata[R_MAX_KEY])
-data = data.to(device)
-
-out = model(AtomicData.to_AtomicDataDict(data))
-
-print(f"Total energy: {out[AtomicDataDict.TOTAL_ENERGY_KEY]}")
-print(f"Force on atom 0: {out[AtomicDataDict.FORCE_KEY][0]}")
-```
-
-
+Once a model has been [trained](#training) in the NequIP framework, it can be [compiled](#compilation) for use in production simulations in our supported [integrations](../integrations/all.rst) with other codes and simulation engines, including [LAMMPS](../integrations/lammps.md) and [ASE](../integrations/ase.md).
