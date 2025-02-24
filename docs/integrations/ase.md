@@ -1,45 +1,91 @@
-ASE
-===
+# ASE
 
+## Introduction
 The [Atomic Simulation Environment (ASE)](https://wiki.fysik.dtu.dk/ase/) is a popular Python package providing a framework for working with atomic data, reading and writing common formats, and running various simulations and calculations.
 
-The `nequip` package provides a ASE "calculator" object that allows NequIP and Allegro models to be used through the standardized ASE interface. A calculator can be constructed from a **deployed** model as follows:
+The `nequip` package provides seamless integration of NequIP models with the standard ASE interface through an [ASE Calculator](https://wiki.fysik.dtu.dk/ase/ase/calculators/calculators.html). The `NequIPCalculator` can be constructed from a model [compiled](../guide/workflow.md#compilation) with `nequip-compile` as detailed in the [ASE calculator API](../api/ase.rst). Other options include using a model from a checkpoint file or one that has been [packaged](../guide/workflow.md#packaging), but it is strongly recommended to use compiled models as they are optimized for inference.
+
+## Creating an ASE Calculator
+
+The following code block shows how one can built an ASE `NequIPCalculator` from a compiled model file or checkpoint file.
+
 ```python
 from nequip.ase import NequIPCalculator
 
-calculator = NequIPCalculator.from_deployed_model(
-    model_path="path/to/deployed_model.pth",
-    device="cpu",  # "cuda", etc.
+# from compiled model (optimized for inference)
+calculator = NequIPCalculator.from_compiled_model(
+    compile_path="path/to/compiled_model.nequip.pt2",
+    device="cpu",  # "cuda", etc
 )
-```
-If you do this, you will see this warning:
-```txt
-Trying to use chemical symbols as NequIP type names; this may not be correct for your model! To avoid this warning, please provide `species_to_type_name` explicitly
-```
-ASE models the types of atoms with their atomic numbers, or correspondingly, chemical symbols. `nequip`, on the other hand, can handle an arbitrary number of atom types with arbitrary alphanumeric names (see [Datasets](../guide/dataset.md) for details). By default, `nequip` assumes (as with when the types are specified to `nequip` with the `chemical_symbols` option) that the `nequip` model's types are named after chemical symbols, and maps the atoms from ASE accordingly.  If this is not the case, or if you want to silence this warning, explicitly provide the type mapping from chemical species in ASE to the `nequip` type names:
-```python
-calculator = NequIPCalculator.from_deployed_model(
-    model_path="path/to/deployed_model.pth",
-    device="cpu",  # "cuda", etc.
-    species_to_type_name={"H": "myHydrogen", "C": "someCarbonType"}
-)
-```
-```{warning}
-If you are running MD with custom species, please make sure to set the correct masses in ASE.
-```
 
-ASE also enforces a consistent scheme of units (see TODO); `nequip` does not (see [Units](../guide/conventions.md#units)). If your model is not in units of eV and Ångstrom, you must provide conversion factors to bring the model's predictions into ASE's units:
-```python
-calculator = NequIPCalculator.from_deployed_model(
-    model_path="path/to/deployed_model.pth",
+# from checkpoint (not optimized for inference)
+calculator = NequIPCalculator.from_checkpoint_model(
+    ckpt_path="path/to/checkpoint_model.ckpt",
     device="cpu",  # "cuda", etc.
-    energy_units_to_eV: float = 1.0,
-    length_units_to_A: float = 1.0,
 )
 ```
 
-Finally, you may see warnings of the form
-```txt
-Setting the GLOBAL value for ...
+### Mapping types from NequIP to ASE
+As can be seen in the [ASE calculator API](../api/ase.rst), the  `chemical_symbols` argument is optional. ASE models the types of atoms with their atomic numbers, or correspondingly, chemical symbols. The NequIP framework, on the other hand, can handle an arbitrary number of atom types with arbitrary alphanumeric names. If `chemical_symbols` is not specified, by default, `nequip` assumes that the `nequip` model's types (see [nequip.model](../api/model.rst)) are named after chemical symbols, and maps the atoms from ASE accordingly.
+
+If this is not the case, or if you want to silence the warning from not providing `chemical_symbols`, then explicitly provide `chemical_symbols`, either as list of `nequip` type names or the type mapping from chemical species in ASE to the `nequip` type names:
+
+```python
+from nequip.ase import NequIPCalculator
+
+calculator = NequIPCalculator.from_checkpoint_model(
+    ckpt_path="path/to/checkpoint_model.ckpt",
+    device="cpu",  # "cuda", etc.
+    chemical_symbols={"H": "myHydrogen", "C": "someCarbonType"}
+)
 ```
-`nequip` manages a number of global configuration settings of PyTorch and e3nn and correctly restores those values when a deployed model is loaded. These settings, however, must be set at a global level and thus may affect a host application;  for this reason `nequip` by default will warn whenever overriding global configuration options.  If you need to, these warnings can be silenced with `set_global_options=True`.  (Setting `set_global_options=False` is **strongly** discouraged and might lead to strange issues or incorrect numerical results.)
+
+### Units from NequIP to ASE
+The ASE convention uses eV energy units and Å length units while the NequIP framework follows the ([internally consistent](../guide/faq_errors.md#units)) units of the underlying dataset. If it is necessary to account for units conversions, users should specify conversion factors with the arguments `energy_units_to_eV` and `length_units_to_A` (see [ASE calculator API](../api/ase.rst)).
+
+## Example Usage
+The NequIP ASE calculator can then be used for standard ASE operations. Below are a few (nonexhaustive) common examples.
+
+### Energy-Volume Curve
+Here we use the NequIP model trained in the tutorial to compute energies and forces on various structures to create an energy volume curve.
+
+```python
+from ase.build import bulk
+import numpy as np
+import matplotlib.pyplot as plt
+from nequip.ase import NequIPCalculator
+
+# Initialize the nequip calculator
+calculator = NequIPCalculator.from_checkpoint_model(
+    ckpt_path="/content/results/best.ckpt", chemical_symbols=["Si"], device="cpu"
+)
+
+# Range of scaling factors for lattice constant
+scaling_factors = np.linspace(0.95, 1.05, 10)
+volumes = []
+energies = []
+
+# Loop through scaling factors, calculate energy, and collect volumes and energies
+for scale in scaling_factors:
+
+    # Generate the cubic silicon structure with 216 atoms
+    scaled_si = bulk("Si", crystalstructure="diamond", a=5.43 * scale, cubic=True)
+    scaled_si *= (3, 3, 3)  # Make a supercell (3x3x3) to get 216 atoms
+    scaled_si.calc = calculator
+
+    volume = scaled_si.get_volume()
+    energy = scaled_si.get_potential_energy()
+    volumes.append(volume)
+    energies.append(energy)
+
+# Plot the energy-volume curve
+plt.figure(figsize=(8, 6))
+plt.plot(volumes, energies, marker="o", label="E-V Curve")
+plt.xlabel("Volume (Å³)", fontsize=14)
+plt.ylabel("Energy (eV)", fontsize=14)
+plt.title("Energy-Volume Curve for Cubic Silicon", fontsize=16)
+plt.legend(fontsize=12)
+plt.grid()
+plt.show()
+
+```
