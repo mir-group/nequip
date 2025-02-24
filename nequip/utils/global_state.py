@@ -121,6 +121,11 @@ def set_global_state(
         # see https://stackoverflow.com/questions/48250053/pytorchs-dataloader-too-many-open-files-error-when-no-files-should-be-open
         torch.multiprocessing.set_sharing_strategy(_MULTIPROCESSING_SHARING_STRATEGY)
 
+        # === initialize TF32 to False ===
+        if torch.cuda.is_available():
+            torch.backends.cuda.matmul.allow_tf32 = False
+            torch.backends.cudnn.allow_tf32 = False
+
         _GLOBAL_STATE_INITIALIZED = True
 
     # === TF32 ===
