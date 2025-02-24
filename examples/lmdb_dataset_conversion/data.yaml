@@ -32,4 +32,4 @@ lmdb_kwargs:
   write_frequency: 10000  # can increase this from default 1000 to speed up writing of very large datasets
 
 global_options:
-  seed: 123
+  allow_tf32: false

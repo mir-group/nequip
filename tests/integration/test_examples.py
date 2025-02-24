@@ -1,5 +1,7 @@
 import pytest
+import tempfile
 import torch
+from omegaconf import OmegaConf
 from conftest import _check_and_print
 import pathlib
 import subprocess
@@ -53,3 +55,28 @@ def test_parity_plot_example(fake_model_training_session):
         env=env,
     )
     _check_and_print(retcode)
+
+
+def test_lmdb_example():
+    """
+    Tests that the `lmdb` example runs.
+    """
+    path_to_this_file = pathlib.Path(__file__)
+    example_dir = str(path_to_this_file.parents[2] / "examples/lmdb_dataset_conversion")
+    with tempfile.TemporaryDirectory() as tmpdir:
+        config = OmegaConf.load(example_dir + "/data.yaml")
+        config.file_path = f"{tmpdir}/lmdb_example"
+        config = OmegaConf.create(config)
+        OmegaConf.save(config=config, f=tmpdir + "/conf.yaml")
+        retcode = subprocess.run(
+            [
+                "python3",
+                example_dir + "/datamodule_to_lmdb.py",
+                "-cp",
+                tmpdir,
+                "-cn",
+                "conf",
+            ],
+            cwd=tmpdir,
+        )
+        _check_and_print(retcode)

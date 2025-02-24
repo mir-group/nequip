@@ -1,5 +1,5 @@
 from nequip.data.dataset import NequIPLMDBDataset
-from nequip.utils._global_options import _set_global_options
+from nequip.utils.global_state import set_global_state
 from nequip.utils import RankedLogger
 import os
 from tqdm import tqdm
@@ -35,8 +35,8 @@ def main(config: DictConfig):
         "predict": "predict",
     }
 
-    # === global options (important for float64 data) ===
-    _set_global_options(**OmegaConf.to_container(config.global_options, resolve=True))
+    # === global state (important for float64 data) ===
+    set_global_state(**OmegaConf.to_container(config.global_options, resolve=True))
 
     # === instantiate and prepare datamodule ===
     datamodule = hydra.utils.instantiate(config.data, _recursive_=False)
@@ -52,7 +52,7 @@ def main(config: DictConfig):
                 logger.info(
                     f"Constructing LMDB data file for {config.file_path}_{run}_{data_idx} ..."
                 )
-                dloader_kwargs = getattr(datamodule, run + "_dataloader_kwargs").copy()
+                dloader_kwargs = getattr(datamodule, run + "_dataloader_config").copy()
                 dloader_kwargs.update({"batch_size": 1})
                 dloader = datamodule._get_dloader(
                     getattr(datamodule, run + "_dataset"),
