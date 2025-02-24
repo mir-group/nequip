@@ -11,7 +11,7 @@ from nequip.train.lightning import _SOLE_MODEL_KEY
 from nequip.data import AtomicDataDict, compile_utils
 from nequip.utils.logger import RankedLogger
 from nequip.utils.compile import prepare_model_for_compile
-from nequip.utils._global_options import _get_latest_global_options
+from nequip.utils.global_state import set_global_state, get_latest_global_state
 from omegaconf import OmegaConf
 import hydra
 
@@ -129,6 +129,13 @@ def main(args=None):
         default=_SOLE_MODEL_KEY,
     )
 
+    parser.add_argument(
+        "--tf32",
+        help="whether to use TF32 or not",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+    )
+
     # args specific to export
     parser.add_argument(
         "--target",
@@ -186,6 +193,9 @@ def main(args=None):
     )
     args = parser.parse_args(args=args)
 
+    # === initialize global state ===
+    set_global_state(allow_tf32=args.tf32)
+
     # == device ==
     device = args.device
     device = torch.device(device)
@@ -214,16 +224,15 @@ def main(args=None):
     logger.debug("Loading model ...")
     if use_ckpt:
         with override_model_compile_mode(compile_mode=None):
-            model = ModelFromCheckpoint(args.ckpt_path, set_global_options=True)
+            model = ModelFromCheckpoint(args.ckpt_path)
     else:
-        model = ModelFromPackage(args.package_path, set_global_options=True)
+        model = ModelFromPackage(args.package_path)
     model = model[args.model]
     # ^ `ModuleDict` of `GraphModel` is loaded, we then select the desired `GraphModel` (`args.model` defaults to work for single model case)
 
     # === combine model and global options metadata ===
-    global_options_metadata = _get_latest_global_options(only_metadata_related=True)
     metadata = model.metadata.copy()
-    metadata.update(global_options_metadata)
+    metadata.update(get_latest_global_state(only_metadata_related=True))
     # ensure bool -> int for metadata
     metadata = {k: int(v) if isinstance(v, bool) else v for k, v in metadata.items()}
 

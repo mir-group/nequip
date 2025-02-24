@@ -6,7 +6,7 @@ import numpy as np  # noqa: F401
 import torch
 
 from nequip.utils import get_current_code_versions, RankedLogger
-from nequip.utils._global_options import _set_global_options, _get_latest_global_options
+from nequip.utils.global_state import set_global_state, get_latest_global_state
 from nequip.data.datamodule import NequIPDataModule
 from nequip.train import NequIPLightningModule
 
@@ -86,7 +86,7 @@ def main(config: DictConfig) -> None:
     )
 
     logger.debug("Setting global options ...")
-    _set_global_options(**OmegaConf.to_container(config.global_options, resolve=True))
+    set_global_state(**OmegaConf.to_container(config.global_options, resolve=True))
 
     # === instantiate datamodule ===
     logger.info("Building datamodule ...")
@@ -113,7 +113,7 @@ def main(config: DictConfig) -> None:
         "versions": versions,
         "data": data,
         "trainer": trainer_cfg,
-        "global_options": _get_latest_global_options(),
+        "global_options": get_latest_global_state(),
         "runs": runs,
     }
 

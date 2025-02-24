@@ -14,6 +14,7 @@ from nequip.data.compile_utils import data_dict_from_checkpoint
 from nequip.model import ModelFromCheckpoint, override_model_compile_mode
 from nequip.utils.logger import RankedLogger
 from nequip.utils.versions import get_current_code_versions
+from nequip.utils.global_state import set_global_state
 
 from ..__init__ import _DISCOVERED_NEQUIP_EXTENSION
 
@@ -53,12 +54,6 @@ def main(args=None):
     parser.add_argument(
         "--override-model",
         help="add or override model configuration keys from the checkpoint file -- unless you know why you need to, do not use this option.",
-        type=str,
-        default=None,
-    )
-    parser.add_argument(
-        "--override-global-options",
-        help="add or override global_options configuration keys from the checkpoint file -- unless you know why you need to, do not use this option",
         type=str,
         default=None,
     )
@@ -103,10 +98,13 @@ def main(args=None):
         default_flow_style=False,
     )
 
+    # == set global state ==
+    set_global_state()
+
     # == build model from checkpoint ==
     # pickle model without torchscript or torch.compile
     with override_model_compile_mode(compile_mode=None):
-        model = ModelFromCheckpoint(args.ckpt_path, set_global_options=True)
+        model = ModelFromCheckpoint(args.ckpt_path)
 
     # == get example data from checkpoint ==
     # the reason for including it here is that whoever receives the packaged model file does not need to have access to the original data source to do `nequip-compile` on the packaged model (AOT export requires example data)
