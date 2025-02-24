@@ -5,4 +5,3 @@ Developer Guide
 
     contributing
     under_the_hood
-    extending
