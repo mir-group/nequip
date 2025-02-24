@@ -5,4 +5,3 @@ Integrations
 
     lammps
     ase
-    other
