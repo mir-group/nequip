@@ -37,6 +37,7 @@ myst_enable_extensions = [
     "html_admonition",
     "dollarmath",  # "amsmath", # to parse Latex-style math
 ]
+myst_heading_anchors = 3
 
 autodoc_member_order = "bysource"
 autosummary_generate = True
