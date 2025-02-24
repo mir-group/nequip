@@ -8,7 +8,11 @@ from nequip.utils import (
     torch_default_dtype,
     conditional_torchscript_mode,
 )
-from nequip.utils._global_options import _get_latest_global_options
+from nequip.utils.global_state import (
+    global_state_initialized,
+    get_latest_global_state,
+    TF32_KEY,
+)
 
 import functools
 import contextvars
@@ -65,11 +69,14 @@ def model_builder(func):
         try:
             model_cfg = kwargs.copy()
             # === sanity checks ===
+            assert (
+                global_state_initialized()
+            ), "global state must be initialized before building models"
             assert all(
                 key in kwargs for key in ["seed", "model_dtype", "type_names"]
             ), "`seed`, `model_dtype`, and `type_names` are mandatory model arguments."
 
-            if _get_latest_global_options().get("allow_tf32", False):
+            if get_latest_global_state().get(TF32_KEY, False):
                 assert (
                     kwargs["model_dtype"] == "float32"
                 ), "`allow_tf32=True` only works with `model_dtype=float32`"
