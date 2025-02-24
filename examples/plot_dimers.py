@@ -11,7 +11,7 @@ import torch
 from nequip.model import ModelFromCheckpoint
 from nequip.train.lightning import _SOLE_MODEL_KEY
 from nequip.data import AtomicDataDict, from_dict, compute_neighborlist_
-import hydra
+from nequip.utils.global_state import set_global_state
 
 # Parse arguments:
 parser = argparse.ArgumentParser(
@@ -41,6 +41,9 @@ parser.add_argument("--n-samples", default=500, type=int)
 args = parser.parse_args()
 
 print("Loading model... ")
+
+# === set global options ===
+set_global_state()
 
 # === load model and get metadata ===
 model = ModelFromCheckpoint(args.ckpt_path)[args.model]
