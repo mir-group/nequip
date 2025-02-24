@@ -1,22 +1,32 @@
 # Config File
 
-The config file has five main sections -- `run`, `data`, `trainer`, `training_module`, `global_options`. These top level config entries must always be present.
+The config file has five main sections: `run`, `data`, `trainer`, `training_module`, `global_options`. These top level config entries must always be present.
 Before going into what each section entails, users are advised to take note of OmegaConf's [variable interpolation](https://omegaconf.readthedocs.io/en/latest/usage.html#variable-interpolation) utilities, which may be a useful tool for managing runs.
 Interpolation can be particularly useful when multiple locations in the config require the same values to be repeated.
 It can also be used to access information like the run name or output directory of the training using [Hydra's built-in resolvers](https://hydra.cc/docs/1.3/configure_hydra/intro/#resolvers-provided-by-hydra).
 
 ## `run`
 
-`run` allows users to specify an ordered agenda of tasks to run, of which there are four types: `train` (which requires a `train` and at least one `val` dataset), `val` (which requires `val` dataset(s)), `test` (which requires `test` dataset(s)), `predict` (which requires `predict` datasets). 
+`run` allows users to specify an ordered agenda of tasks to run, of which there are three types: `train` (which requires a `train` and at least one `val` dataset), `val` (which requires `val` dataset(s)), and `test` (which requires `test` dataset(s)).
 
-Users can specify one or more of these run types in the config. A common use mode is to perform training, followed immediately by testing (using the best model checkpoint):
+Users can specify one or more of these run types in the config. A common use mode is to perform training, followed immediately by testing:
 ```yaml
 run: [train, test]
 ```
-If you want to see how the untrained model performs on the validation and test datasets at initialization before training, train, and then assess the trained model's performance:
+
+```{important}
+Any `val` or `test` tasks that come after `train` will use the best model checkpoint.
+```
+
+If you want to check how the untrained model performs on the validation and test datasets at initialization before training, train, and then assess the trained model's performance:
 ```yaml
 run: [val, test, train, val, test]
 ```
+
+```{note}
+[Continuing training from a checkpoint file](./workflow.md#restarts) will continue from the last `run` task the checkpoint file was at before stopping. For example, if one uses `run: [test, train, val, test]` and a `nequip-train` run crashed at the `train` step, a run restarted from that checkpoint will continue in the `train` stage (skipping the initial `test` stage that had already been completed in the previously crashed run).
+```
+
 
 ## `data`
 
@@ -51,7 +61,9 @@ The full set of options are found in the documentation of the [underlying object
 
 ## `training_module`
 
-`training_module` defines the `NequIPLightningModule` (or its subclasses). Users are directed to its [API page](../api/lightning_module.rst) to learn how to configure it. It is here that the following parameters are defined.
+`training_module` defines the `NequIPLightningModule` (or its subclasses). Users are directed to its [API page](../api/lightning_module.rst) to learn how to configure it. Often, the `EMALightningModule` is a reliable choice.
+
+It is here that the following parameters are defined.
  
  ### `model`
   It is under `model` that the deep equivariant potential model is configured, which includes the NequIP message-passing graph neural network model or the strictly local Allegro model. Refer to the [model documentation page](../api/model) to learn how to configure this section.
@@ -86,6 +98,8 @@ lr_scheduler:
 
 ## `global_options`
 
-For now, `global_options` is used to specify
- - `seed`, the global seed (in addition to the data seed and model seed)
- - `allow_tf32`, which controls whether TensorFloat-32 is used
+`global_options` is used to specify parameters that affect the global state. Presently, the only option is `allow_tf32` (which is `false` by default). See the [TF32 page](./tf32.md) for more details about TF32 settings.
+```yaml
+global_options:
+  allow_tf32: false
+```
