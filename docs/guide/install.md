@@ -5,7 +5,7 @@
 * PyTorch >= 2.2. PyTorch can be installed following the [instructions from their documentation](https://pytorch.org/get-started/locally/). Note that neither `torchvision` nor `torchaudio`, included in the default install command, are needed for NequIP.
 
 ```{note}
-It is recommended to use the latest stable PyTorch to use `torch.compile` for training. AOT Inductor compilation for use in LAMMPS requires at least PyTorch >= 2.6.
+PyTorch >= 2.6 is required for PyTorch 2.0 compilation utilities including using `torch.compile` for training and AOT Inductor compilation for integrations such as ASE and LAMMPS.
 ```
 
 ## Instructions
@@ -36,10 +36,11 @@ Depending on the choice of [Lightning's loggers](https://lightning.ai/docs/pytor
 
 ## Installation Verification
 
-The easiest way to check if your installation is working is to train a **toy** model:
+The easiest way to check if your installation is working is to train the tutorial model:
 ```bash
 cd configs
-nequip-train -cn minimal.yaml
+python get_tutorial_data.py
+nequip-train -cn tutorial.yaml
 ```
 
 If you suspect something is wrong, encounter errors, or just want to confirm that everything is in working order, you can also run the unit tests:
