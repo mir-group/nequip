@@ -83,7 +83,7 @@ nequip-compile \
 ```{important}
 `nequip-compile` should be called on the device where the compiled model will be used on for the production simulation. While this constraint is not a hard requirement for TorchScript mode compilation, it is necessary for AOT Inductor mode compilation as the models are compiled specifically for a particular device. 
 
-Note also that AOT Inductor mode compilation requires access to compilers (e.g. `gcc`) when doing `nequip-compile`.
+Note also that AOT Inductor mode compilation requires access to compilers (e.g. `gcc`) when running `nequip-compile`. Specifically, C++17 support is required, which requires `gcc` version 8 or higher (preferably >=11 where C++17 is the default), otherwise `filesystem` errors will occur. You can check your `gcc` version with `gcc --version`, and may need to upgrade or load a specific HPC module to get the required version.
 ```
 
 ```{tip}
