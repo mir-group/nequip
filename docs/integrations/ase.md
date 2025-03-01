@@ -7,7 +7,7 @@ The `nequip` package provides seamless integration of NequIP models with the sta
 
 ## Creating an ASE Calculator
 
-The following code block shows how one can built an ASE `NequIPCalculator` from a compiled model file or checkpoint file.
+The following code block shows how one can build an ASE `NequIPCalculator` from a compiled model file or checkpoint file.
 
 ```python
 from nequip.ase import NequIPCalculator
@@ -15,13 +15,13 @@ from nequip.ase import NequIPCalculator
 # from compiled model (optimized for inference)
 calculator = NequIPCalculator.from_compiled_model(
     compile_path="path/to/compiled_model.nequip.pt2",
-    device="cpu",  # "cuda", etc
+    device="cpu",  # "cuda" for GPUs, etc
 )
 
 # from checkpoint (not optimized for inference)
 calculator = NequIPCalculator.from_checkpoint_model(
     ckpt_path="path/to/checkpoint_model.ckpt",
-    device="cpu",  # "cuda", etc.
+    device="cpu",  # "cuda" for GPUs, etc.
 )
 ```
 
@@ -54,11 +54,14 @@ from ase.build import bulk
 import numpy as np
 import matplotlib.pyplot as plt
 from nequip.ase import NequIPCalculator
+import torch
 
 # Initialize the nequip calculator
 calculator = NequIPCalculator.from_checkpoint_model(
-    ckpt_path="/content/results/best.ckpt", chemical_symbols=["Si"], device="cpu"
-)
+    ckpt_path="/content/results/best.ckpt", 
+    chemical_symbols=["Si"], 
+    device="cuda" if torch.cuda.is_available() else "cpu",  
+)  # use GPUs if available
 
 # Range of scaling factors for lattice constant
 scaling_factors = np.linspace(0.95, 1.05, 10)
