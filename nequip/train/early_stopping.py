@@ -74,7 +74,7 @@ class EarlyStopping:
             if minimum is None:
                 self.minimums[key] = value
             elif value >= (minimum - delta):
-                if not self.cumulative_delta and value > minimum:
+                if not self.cumulative_delta and value < minimum:
                     self.minimums[key] = value
                 self.counters[key] += 1
                 debug_args = f"EarlyStopping: {self.counters[key]} / {pat}"
