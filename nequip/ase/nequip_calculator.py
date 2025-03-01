@@ -26,6 +26,8 @@ class NequIPCalculator(Calculator):
     Args:
         model: a model in the NequIP framework, e.g. a NequIP GNN model or an Allegro model, etc
         device (str/torch.device): device for model to evaluate on, e.g. ``cpu`` or ``cuda``
+        energy_units_to_eV (float): energy conversion factor (default ``1.0``)
+        length_units_to_A (float): length units conversion factor (default ``1.0``)
         transforms (List[Callable]): list of data transforms
     """
 
@@ -158,7 +160,7 @@ class NequIPCalculator(Calculator):
             ckpt_path (str): path to checkpoint file
             device (torch.device): the device to use
             chemical_symbols (List[str] or Dict[str, str]): mapping between chemical symbols and model type names
-            allow_tf32 (bool): whether to allow TensorFloat32 operations
+            allow_tf32 (bool): whether to allow TensorFloat32 operations (default ``False``)
         """
         return cls._from_save(
             save_path=ckpt_path,
@@ -186,7 +188,7 @@ class NequIPCalculator(Calculator):
             package_path (str): path to packaged model
             device (torch.device): the device to use
             chemical_symbols (List[str] or Dict[str, str]): mapping between chemical symbols and model type names
-            allow_tf32 (bool): whether to allow TensorFloat32 operations
+            allow_tf32 (bool): whether to allow TensorFloat32 operations (default ``False``)
         """
         return cls._from_save(
             save_path=package_path,
