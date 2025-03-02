@@ -1,5 +1,7 @@
 md_runs/
-simon_configs/
+lightning_logs/
+outputs/
+aspirin_data/
 .idea/
 .vscode/
 *__pycache__*
