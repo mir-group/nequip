@@ -20,34 +20,9 @@ The best way to learn how to use NequIP is through the [Colab Tutorial](https://
 
 ## Usage
 
-This [document](docs/guide/workflow.md) explains the `nequip` workflow.
+This [document](docs/guide/workflow.md) explains the `nequip` workflow, from training and testing models to compiling models for inference in our integrations such as [ASE](docs/integrations/ase.md) and [LAMMPS](docs/integrations/lammps.md).
 
  [`configs/tutorial.yaml`](configs/tutorial.yaml) is a complete configuration file containing all available options along with documenting comments. This file is **for reference**.
-
-### Using models in Python
-
-An ASE calculator is also provided in `nequip.ase`.
-
-### LAMMPS Integration 
-
-NequIP is integrated with the popular Molecular Dynamics code [LAMMPS](https://www.lammps.org/) which allows for MD simulations over large time- and length-scales and gives users access to the full suite of LAMMPS features. 
-
-The interface is implemented as `pair_style nequip`. Using it requires two simple steps: 
-
-1. Deploy a trained NequIP model, as discussed above.
-```
-nequip-deploy build path/to/training/session/ path/to/deployed.pth
-```
-The result is an optimized model file that has no Python dependency and can be used by standalone C++ programs such as LAMMPS.
-
-2. Change the LAMMPS input file to the nequip `pair_style` and point it to the deployed NequIP model:
-
-```
-pair_style	nequip
-pair_coeff	* * deployed.pth <NequIP type for LAMMPS type 1> <NequIP type for LAMMPS type 2> ...
-```
-
-For installation instructions, please see the [`pair_nequip` repository](https://github.com/mir-group/pair_nequip).
 
 ## Plugins / extending `nequip`
 
