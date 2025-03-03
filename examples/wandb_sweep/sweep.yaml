@@ -1,0 +1,31 @@
+project: nequip
+name: tutorial-sweep
+description: Random hyperparameter sweep for nequip
+
+method: random
+
+metric:
+  goal: minimize
+  name: val0_epoch/weighted_sum
+
+command:
+  - "nequip-train"
+  - "-cn"
+  - "tutorial"
+  - ${args_no_hyphens}
+
+parameters:
+
+  cutoff_radius: 
+    min: 4
+    max: 8
+    distribution: int_uniform
+  
+  num_layers:
+    values: [2, 3]
+
+  l_max:
+    values: [2, 3]
+
+  num_features: 
+    values: [32, 64, 128, 256]

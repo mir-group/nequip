@@ -19,6 +19,11 @@ run: [train, test]
 # data and model r_max can be different (model's r_max should be smaller), but we try to make them the same
 cutoff_radius: 5.0
 
+# variable interpolation is convenient for wandb sweeps, see documentation for more details
+num_layers: 4       # number of interaction blocks, we find 3-5 to work best
+l_max: 1            # the maximum irrep order (rotation order) for the network's features, l=1 is a good default, l=2 is more accurate but slower
+num_features: 32    # the multiplicity of the features, 32 is a good default for accurate network, if you want to be more accurate, go larger, if you want to be faster, go lower
+
 # There are two sets of atomic types to keep track of in most applications
 # -- there is the conventional atomic species (e.g. C, H), and a separate `type_names` known to the model.
 # The model only knows types based on a set of zero-based indices and user-given `type_names` argument.
@@ -33,7 +38,6 @@ model_type_names: ${chemical_symbols}
 
 # We want a metric to condition training on (e.g. for best `ModelCheckpoint`, `EarlyStopping`, LR scheduling) which will show up in various places later on, so we set up a "single source of truth" to interpolate
 monitored_metric: val0_epoch/weighted_sum
-
 
 # data is managed by LightningDataModules
 # nequip provides some standard datamodules that can be found in nequip.data.datamodule
@@ -204,10 +208,10 @@ training_module:
     polynomial_cutoff_p: 6        # p-exponent used in polynomial cutoff function, smaller p corresponds to stronger decay with distance
 
     # == convnet layers ==
-    num_layers: 4       # number of interaction blocks, we find 3-5 to work best
-    l_max: 1            # the maximum irrep order (rotation order) for the network's features, l=1 is a good default, l=2 is more accurate but slower
+    num_layers: ${num_layers}       # number of interaction blocks, we find 3-5 to work best
+    l_max: ${l_max}            # the maximum irrep order (rotation order) for the network's features, l=1 is a good default, l=2 is more accurate but slower
     parity: true        # whether to include features with odd mirror parity; often turning parity off gives equally good results but faster networks, so do consider this
-    num_features: 32    # the multiplicity of the features, 32 is a good default for accurate network, if you want to be more accurate, go larger, if you want to be faster, go lower
+    num_features: ${num_features}    # the multiplicity of the features, 32 is a good default for accurate network, if you want to be more accurate, go larger, if you want to be faster, go lower
 
     # == radial network ==
     radial_mlp_depth: 2         # number of radial layers, usually 1-3 works best, smaller is faster
