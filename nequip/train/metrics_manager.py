@@ -19,7 +19,6 @@ _METRICS_MANAGER_INPUT_KEYS: Final[List[str]] = [
 ]
 
 _METRICS_MANAGER_MANDATORY_INPUT_KEYS: Final[List[str]] = [
-    "field",
     "metric",
 ]
 
@@ -75,29 +74,44 @@ class MetricsManager(torch.nn.ModuleDict):
             for mandatory_key in _METRICS_MANAGER_MANDATORY_INPUT_KEYS:
                 assert (
                     mandatory_key in metric_dict.keys()
-                ), f"Each dictionary in `MetricManager`'s `metrics` argument must possess both of the following mandatory keys: {_METRICS_MANAGER_MANDATORY_INPUT_KEYS}"
+                ), f"Each dictionary in `MetricManager`'s `metrics` argument must possess at least the following mandatory keys: {_METRICS_MANAGER_MANDATORY_INPUT_KEYS}"
 
-            # === handle mandatory keys ===
-            # == field ==
-            field = (
-                BaseModifier(metric_dict["field"])
-                if isinstance(metric_dict["field"], str)
-                else metric_dict["field"]
-            )
-            # == metric ==
+            # === field ===
+            # field can be
+            # - str: we will wrap it with `BaseModifier`
+            # - Callable: it should be a subclass of `BaseModifier`
+            # - None: this is a special metric that will have a different code path than the rest
+            field = metric_dict.get("field", None)
+            field = BaseModifier(field) if isinstance(field, str) else field
+            if field is not None:
+                assert isinstance(field, BaseModifier)
+
+            # === metric ===
             metric = metric_dict["metric"]
 
-            # === handle optional keys ===
             # === names ===
             name = metric_dict.get("name", None)
             if name is None:
-                name = "_".join([str(field), str(metric)])
+                name = (
+                    "_".join([str(field), str(metric)])
+                    if field is not None
+                    else str(metric)
+                )
             assert (
                 name != "weighted_sum"
             ), "`weighted_sum` is a specially reserved metric name that should not be configured."
             assert (
                 name not in self.metrics.keys()
             ), f"Repeated names found ({name}) -- names must be unique. It is recommended to give custom names instead of relying on the automatic naming."
+
+            # === sanity check `field=None` case ===
+            if field is None:
+                for key in ("ignore_nan", "per_type"):
+                    assert (
+                        key not in metric_dict
+                    ), f"When field is not provided or `field: None`, `{key}` should not be provided."
+                # NOTE that we still go through the `ignore_nan` and `per_type` handling below so they get the default values
+                # so special metrics will have to handle NaNs on their own, and cannot be used with the automatic `per_type` system
 
             # == ignore Nan ==
             ignore_nan = metric_dict.get("ignore_nan", False)
@@ -128,28 +142,23 @@ class MetricsManager(torch.nn.ModuleDict):
                     ptm_list.append(metric.clone())
                 metric = ptm_list
 
-            # == coeffs ==
-            coeff = metric_dict.get("coeff", None)
-
             # === construct dict entry ===
             self.metrics.update(
                 {
                     name: {
                         "field": field,
+                        "coeff": metric_dict.get("coeff", None),
                         "ignore_nan": ignore_nan,
                         "per_type": per_type,
-                        "coeff": coeff,
                     }
                 }
             )
             self.update({name: metric})
 
-            del field
-            del metric
-            del name
-            del ignore_nan
-            del per_type
-            del coeff
+            # == clean up for safety ==
+            if field is not None:
+                del ignore_nan, per_type
+            del field, metric, name
 
         # === process coefficients ===
         self.do_weighted_sum = False
@@ -177,61 +186,70 @@ class MetricsManager(torch.nn.ModuleDict):
         metric_dict = {}
 
         for metric_name, metric_params in self.metrics.items():
-            field: Callable = metric_params["field"]
-            per_type: bool = metric_params["per_type"]
-            ignore_nan: bool = metric_params["ignore_nan"]
-            coeff: Optional[float] = metric_params["coeff"]
+            field: Optional[Callable] = metric_params["field"]
 
-            preds_field, target_field = field(preds, target)
-            if per_type:
-                metric = 0
-                num_contributing_types = 0
-                for type_idx, type_name in enumerate(self.type_names):
-                    # index out each type
-                    selector = torch.eq(preds[AtomicDataDict.ATOM_TYPE_KEY], type_idx)
-                    per_type_preds = preds_field[selector]
-                    per_type_target = target_field[selector]
+            if field is not None:
+                per_type: bool = metric_params["per_type"]
+                ignore_nan: bool = metric_params["ignore_nan"]
 
+                preds_field, target_field = field(preds, target)
+                if per_type:
+                    metric = 0
+                    num_contributing_types = 0
+                    for type_idx, type_name in enumerate(self.type_names):
+                        # index out each type
+                        selector = torch.eq(
+                            preds[AtomicDataDict.ATOM_TYPE_KEY], type_idx
+                        )
+                        per_type_preds = preds_field[selector]
+                        per_type_target = target_field[selector]
+
+                        # mask out NaNs (based on target)
+                        if ignore_nan:
+                            notnan_mask = ~torch.isnan(per_type_target)
+                            per_type_preds = torch.masked_select(
+                                per_type_preds, notnan_mask
+                            )
+                            per_type_target = torch.masked_select(
+                                per_type_target, notnan_mask
+                            )
+
+                        pt_metric = self[metric_name][type_idx](
+                            per_type_preds, per_type_target
+                        )
+                        pt_metric_name = (
+                            prefix + "_".join([metric_name, type_name]) + suffix
+                        )
+                        metric_dict.update({pt_metric_name: pt_metric})
+                        # account for batches without atom type
+                        assert pt_metric.numel() == 1
+                        if not torch.isnan(pt_metric):
+                            metric = metric + pt_metric
+                            num_contributing_types += 1
+                    assert num_contributing_types <= len(self.type_names)
+                    metric = metric / num_contributing_types
+                else:
                     # mask out NaNs (based on target)
                     if ignore_nan:
-                        notnan_mask = ~torch.isnan(per_type_target)
-                        per_type_preds = torch.masked_select(
-                            per_type_preds, notnan_mask
-                        )
-                        per_type_target = torch.masked_select(
-                            per_type_target, notnan_mask
-                        )
-
-                    pt_metric = self[metric_name][type_idx](
-                        per_type_preds, per_type_target
-                    )
-                    pt_metric_name = (
-                        prefix + "_".join([metric_name, type_name]) + suffix
-                    )
-                    metric_dict.update({pt_metric_name: pt_metric})
-                    # account for batches without atom type
-                    assert pt_metric.numel() == 1
-                    if not torch.isnan(pt_metric):
-                        metric = metric + pt_metric
-                        num_contributing_types += 1
-                assert num_contributing_types <= len(self.type_names)
-                metric = metric / num_contributing_types
+                        notnan_mask = ~torch.isnan(target_field)
+                        preds_field = torch.masked_select(preds_field, notnan_mask)
+                        target_field = torch.masked_select(target_field, notnan_mask)
+                    metric = self[metric_name](preds_field, target_field)
             else:
-                # mask out NaNs (based on target)
-                if ignore_nan:
-                    notnan_mask = ~torch.isnan(target_field)
-                    preds_field = torch.masked_select(preds_field, notnan_mask)
-                    target_field = torch.masked_select(target_field, notnan_mask)
-                metric = self[metric_name](preds_field, target_field)
+                # custom metric that takes in two AtomicDataDict objects
+                metric = self[metric_name](preds, target)
 
             metric_dict.update({prefix + metric_name + suffix: metric})
             self.metrics_values_step.update({metric_name: metric.item()})
 
             if self.do_weighted_sum:
+                coeff: Optional[float] = metric_params["coeff"]
                 if coeff is not None:
                     weighted_sum = weighted_sum + metric * coeff
+
         if self.do_weighted_sum:
             metric_dict.update({prefix + "weighted_sum" + suffix: weighted_sum})
+
         return metric_dict
 
     def compute(self, prefix: str = "", suffix: str = ""):
@@ -243,9 +261,7 @@ class MetricsManager(torch.nn.ModuleDict):
             weighted_sum = 0.0
         metric_dict = {}
         for metric_name, metric_params in self.metrics.items():
-            per_type = metric_params["per_type"]
-            coeff = metric_params["coeff"]
-            if per_type:
+            if metric_params["per_type"]:
                 metric = 0
                 for type_idx, type_name in enumerate(self.type_names):
                     ps_metric = self[metric_name][type_idx].compute()
@@ -260,6 +276,7 @@ class MetricsManager(torch.nn.ModuleDict):
             metric_dict.update({prefix + metric_name + suffix: metric})
             self.metrics_values_epoch.update({metric_name: metric.item()})
             if self.do_weighted_sum:
+                coeff = metric_params["coeff"]
                 if coeff is not None:
                     weighted_sum = weighted_sum + metric * coeff
         if self.do_weighted_sum:
