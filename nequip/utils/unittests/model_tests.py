@@ -86,7 +86,8 @@ class BaseModelTests:
         aux_model.model = PartialForceOutput(module.func)
         out_fields = aux_model.model.irreps_out.keys()
 
-        return aux_model, config, out_fields
+        # partial_model does not output config. Please use `model` fixture for config
+        return aux_model, out_fields
 
     @pytest.fixture(scope="class")
     def model_test_data(self, config, atomic_batch, device):
@@ -587,7 +588,7 @@ class BaseEnergyModelTests(BaseModelTests):
         self, model, partial_model, atomic_batch, device, strict_locality
     ):
         model, _, _ = model
-        partial_model, _, _ = partial_model
+        partial_model, _ = partial_model
 
         data = AtomicDataDict.to_(atomic_batch, device)
         output = model(data)
@@ -637,7 +638,7 @@ class BaseEnergyModelTests(BaseModelTests):
         Tests the PartialForceOutput model by comparing numerical gradients of the partial forces to the analytical gradients.
         """
 
-        partial_model, _, out_fields = partial_model
+        partial_model, out_fields = partial_model
         if AtomicDataDict.PARTIAL_FORCE_KEY not in out_fields:
             pytest.skip()
 
@@ -689,7 +690,7 @@ class BaseEnergyModelTests(BaseModelTests):
         """
         # Initialize the models
         instance, _, out_fields = model
-        partial_instance, _, out_fields_partial = partial_model
+        partial_instance, out_fields_partial = partial_model
 
         # Skip the test if the models do not have the necessary output fields
         if AtomicDataDict.FORCE_KEY not in out_fields:
@@ -755,12 +756,12 @@ class BaseEnergyModelTests(BaseModelTests):
                     torch.zeros_like(forces, device=device, dtype=forces.dtype),
                 ), f"{forces=}"
 
-    def test_partial_force_smoothness(self, partial_model, device, pair_force):
+    def test_partial_force_smoothness(self, model, device, pair_force):
         # NOTE: This test is designed for models that have a variable cutoff radius, though it still applicable with
         # fixed cutoff models. This works on the assumption that the partial energies on the node should not be affected
         # by the presence of a neighbor outside the cutoff radius, thus making the corresponding forces zero.
 
-        _, config, _ = partial_model
+        _, config, _ = model  # Just to get the config
         r_max = config["r_max"]
         type_names = config["type_names"]
 
