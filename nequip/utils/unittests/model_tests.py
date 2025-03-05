@@ -196,12 +196,6 @@ class BaseModelTests:
         from nequip.utils.aot import aot_export_model
         from nequip.scripts.compile import _ASE_FIELDS
 
-        # TODO: sort out the CPU compilation issues
-        if device == "cpu":
-            pytest.skip(
-                "compile tests are skipped for CPU as there are known compilation bugs for both NequIP and Allegro models on CPU"
-            )
-
         # get a single frame, and drop batch fields to take optimized path
         export_data = AtomicDataDict.frame_from_batched(model_test_data.copy(), 0)
         export_data.pop(AtomicDataDict.BATCH_KEY)
