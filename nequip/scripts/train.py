@@ -167,8 +167,11 @@ def main(config: DictConfig) -> None:
             f"Model from checkpoint {config.ckpt_path} will be used -- model details from the config used for this restart will be ignored."
         )
         nequip_module_cfg = OmegaConf.to_container(training_module_cfg, resolve=True)
-
         info_dict.update({"training_module": nequip_module_cfg})
+
+        # make copy and remove `_target_` as an argument
+        nequip_module_cfg = nequip_module_cfg.copy()
+        nequip_module_cfg.pop("_target_")
 
         nequip_module = training_module.load_from_checkpoint(
             config.ckpt_path,
