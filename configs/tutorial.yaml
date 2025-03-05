@@ -9,7 +9,7 @@
 
 
 # the run types will be completed in sequence
-# one can do `train`, `val`, `test`, `predict` run types
+# one can do `train`, `val`, `test` run types
 run: [train, test]
 
 

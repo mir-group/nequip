@@ -44,7 +44,7 @@ def main(config: DictConfig) -> None:
     # determine run types
     assert (
         "run" in config
-    ), "`run` must provided in the config -- it is a list that could include `train`, `val`, `test`, and/or `predict`."
+    ), "`run` must provided in the config -- it is a list that could include `train`, `val`, and/or `test`."
     if isinstance(config.run, ListConfig) or isinstance(config.run, list):
         runs = list(config.run)
     else:
@@ -52,9 +52,8 @@ def main(config: DictConfig) -> None:
     for run_type in runs:
         # don't have to be too safe for the `function` run type since it's advanced usage anyway
         assert (
-            run_type in ["train", "val", "test", "predict"]
-            or "function" in run_type.keys()
-        ), f"`run` list can only contain `train`, `val`, `test`, or `predict`, but found {run_type}"
+            run_type in ["train", "val", "test"] or "function" in run_type.keys()
+        ), f"`run` list can only contain `train`, `val`, or `test`, but found {run_type}"
 
     # ensure only single train at most, to protect restart and checkpointing logic later
     assert (
@@ -243,6 +242,8 @@ def main(config: DictConfig) -> None:
             trainer.test(nequip_module, datamodule=datamodule, ckpt_path=ckpt_path)
             logger.info("TEST RUN END")
         elif run_type == "predict":
+            # TODO: `predict` run type is hidden from users, so we should never go through this path
+            # potentially remove eventually if there's no need for a `predict` functionality, but it's here for now just in case
             logger.info("PREDICT RUN START")
             trainer.predict(nequip_module, datamodule=datamodule, ckpt_path=ckpt_path)
             logger.info("PREDICT RUN END")
