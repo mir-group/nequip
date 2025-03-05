@@ -11,7 +11,7 @@ BASIC_INFO = {
 
 COMMON_CONFIG = {
     "_target_": "nequip.model.NequIPGNNModel",
-    "l_max": 1,
+    "l_max": 2,
     "parity": True,
     "radial_mlp_depth": 1,
     "radial_mlp_width": 8,
