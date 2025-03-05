@@ -6,7 +6,7 @@ from .lightning import NequIPLightningModule
 from nequip.utils import RankedLogger
 
 import warnings
-from typing import Dict, List, Optional, Union, Callable, Any
+from typing import List, Optional, Union, Callable, Any
 
 logger = RankedLogger(__name__, rank_zero_only=True)
 
@@ -21,26 +21,10 @@ class EMALightningModule(NequIPLightningModule):
 
     def __init__(
         self,
-        model: Dict,
-        optimizer: Optional[Dict] = None,
-        lr_scheduler: Optional[Dict] = None,
-        loss: Optional[Dict] = None,
-        train_metrics: Optional[Dict] = None,
-        val_metrics: Optional[Dict] = None,
-        test_metrics: Optional[Dict] = None,
         ema_decay: float = 0.999,
         **kwargs,
     ):
-        super().__init__(
-            model=model,
-            optimizer=optimizer,
-            lr_scheduler=lr_scheduler,
-            loss=loss,
-            train_metrics=train_metrics,
-            val_metrics=val_metrics,
-            test_metrics=test_metrics,
-            **kwargs,
-        )
+        super().__init__(**kwargs)
 
         # set up EMA model and perform initialization copy
         self.ema = EMAWeights(self.model, decay=ema_decay)
