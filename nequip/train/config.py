@@ -15,19 +15,22 @@ class ConFIGLightningModule(NequIPLightningModule):
 
     The arguments for this class are exactly the same as ``NequIPLightningModule``, but the loss coefficients take on a different meaning -- they are now the "b" in the "Ax=b" linear solve (see paper).
 
-    Set ``cpu_lsqr=True`` to perform least squares solve on CPU, as certain devices may not be able to do the (underdetermined) least squares solve.
+    Set ``lsqr=False`` to use the pseudo-inverse of the gradient matrix to determine the update direction (instead of the default least squares method), as certain devices may not be able to do the (underdetermined) least squares solve (e.g. ROCm).
 
     Note:
         Only ``ReduceLROnPlateau`` works with this class. The following warning may be safely ignored.
         ``The lr scheduler dict contains the key(s) ['monitor'], but the keys will be ignored. You need to call `lr_scheduler.step()` manually in manual optimization.``
 
     Note:
-      LR schedulers won't be able to monitor training metrics using this class -- which should not be a problem since LR schedulers should usually be monitoring validation metrics.
+        LR schedulers won't be able to monitor training metrics using this class -- which should not be a problem since LR schedulers should usually be monitoring validation metrics.
+
+    Note:
+        To use gradient clipping in training, the ``gradient_clip_val`` must be provided to this training module and not to ``Trainer``, as automatic gradient clipping is not supported for manual optimization with PyTorch.
 
     Args:
         gradient_clip_val (Union[int, float, None]): gradient clipping value (default: ``None``, which disables gradient clipping)
         gradient_clip_algorithm (Optional[str]): ``value`` to clip by value, or ``norm`` to clip by norm (default: ``norm``)
-        cpu_lsqr (bool): whether to perform least squares solve on CPU (default: ``False``)
+        lsqr (bool): whether to use least squares solve for determining best update direction (default: ``True``)
         norm_eps (float): small value to avoid division by zero during normalization (default: ``1e-8``)
     """
 
@@ -42,7 +45,7 @@ class ConFIGLightningModule(NequIPLightningModule):
         test_metrics: Optional[Dict] = None,
         gradient_clip_val: Optional[float] = None,
         gradient_clip_algorithm: Optional[str] = None,
-        cpu_lsqr: bool = False,
+        lsqr: bool = True,
         norm_eps: float = 1e-8,
         **kwargs,
     ):
@@ -93,7 +96,7 @@ class ConFIGLightningModule(NequIPLightningModule):
 
         # === method specific hyperparameters ===
         self.ConFIG_eps = norm_eps
-        self.ConFIG_cpu_lsqr = cpu_lsqr
+        self.ConFIG_lsqr = lsqr
 
         # temporary narrow solution to accommodate only ReduceLROnPlateau LR scheduling
         if self.lr_scheduler_config is not None:
@@ -236,7 +239,7 @@ class ConFIGLightningModule(NequIPLightningModule):
             torch.tensor(
                 loss_component_coefficients,
                 dtype=A.dtype,
-                device="cpu" if self.ConFIG_cpu_lsqr else A.device,
+                device=A.device,
             ),
             dim=0,
             eps=self.ConFIG_eps,
@@ -244,12 +247,10 @@ class ConFIGLightningModule(NequIPLightningModule):
         # ^ do it here to futureproof for possibility of changing the coeffs over training
 
         # linear solve and normalize
-        # move to CPU for least squares solve if needed
-        if self.ConFIG_cpu_lsqr:
-            A = A.cpu()
-        x = torch.linalg.lstsq(A, b).solution
-        if self.ConFIG_cpu_lsqr:
-            x = x.to(A_raw.device)
+        if self.ConFIG_lsqr:
+            x = torch.linalg.lstsq(A, b).solution
+        else:  # equivalent but slower least-squares solve:
+            x = torch.linalg.pinv(A) @ b
         x = torch.nn.functional.normalize(x, dim=0, eps=self.ConFIG_eps)
 
         # construct the gradient vector
@@ -293,7 +294,7 @@ class EMAConFIGLightningModule(EMALightningModule, ConFIGLightningModule):
     Args:
         gradient_clip_val (Union[int, float, None]): gradient clipping value (default: ``None``, which disables gradient clipping)
         gradient_clip_algorithm (Optional[str]): ``value`` to clip by value, or ``norm`` to clip by norm (default: ``norm``)
-        cpu_lsqr (bool): whether to perform least squares solve on CPU (default: ``False``)
+        lsqr (bool): whether to use least squares solve for determining best update direction (default: ``True``)
         norm_eps (float): small value to avoid division by zero during normalization (default: ``1e-8``)
         ema_decay (float): decay constant for the exponential moving average (EMA) of model weights (default ``0.999``)
     """
@@ -309,7 +310,7 @@ class EMAConFIGLightningModule(EMALightningModule, ConFIGLightningModule):
         test_metrics: Optional[Dict] = None,
         gradient_clip_val: Optional[float] = None,
         gradient_clip_algorithm: Optional[str] = None,
-        cpu_lsqr: bool = False,
+        lsqr: bool = True,
         norm_eps: float = 1e-8,
         ema_decay: float = 0.999,
         **kwargs,
@@ -324,7 +325,7 @@ class EMAConFIGLightningModule(EMALightningModule, ConFIGLightningModule):
             test_metrics=test_metrics,
             gradient_clip_val=gradient_clip_val,
             gradient_clip_algorithm=gradient_clip_algorithm,
-            cpu_lsqr=cpu_lsqr,
+            lsqr=lsqr,
             norm_eps=norm_eps,
             ema_decay=ema_decay,
             **kwargs,
