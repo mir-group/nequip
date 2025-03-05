@@ -36,13 +36,6 @@ class ConFIGLightningModule(NequIPLightningModule):
 
     def __init__(
         self,
-        model: Dict,
-        optimizer: Optional[Dict] = None,
-        lr_scheduler: Optional[Dict] = None,
-        loss: Optional[Dict] = None,
-        train_metrics: Optional[Dict] = None,
-        val_metrics: Optional[Dict] = None,
-        test_metrics: Optional[Dict] = None,
         gradient_clip_val: Optional[float] = None,
         gradient_clip_algorithm: Optional[str] = None,
         lsqr: bool = True,
@@ -57,16 +50,7 @@ class ConFIGLightningModule(NequIPLightningModule):
             # False if a user wants to retain_graph=True for backward.
             torch._functorch.config.donated_buffer = False
 
-        super().__init__(
-            model=model,
-            optimizer=optimizer,
-            lr_scheduler=lr_scheduler,
-            loss=loss,
-            train_metrics=train_metrics,
-            val_metrics=val_metrics,
-            test_metrics=test_metrics,
-            **kwargs,
-        )
+        super().__init__(**kwargs)
         # see https://lightning.ai/docs/pytorch/stable/common/optimization.html#id2
         self.automatic_optimization = False
 
@@ -306,37 +290,8 @@ class EMAConFIGLightningModule(EMALightningModule, ConFIGLightningModule):
         ema_decay (float): decay constant for the exponential moving average (EMA) of model weights (default ``0.999``)
     """
 
-    def __init__(
-        self,
-        model: Dict,
-        optimizer: Optional[Dict] = None,
-        lr_scheduler: Optional[Dict] = None,
-        loss: Optional[Dict] = None,
-        train_metrics: Optional[Dict] = None,
-        val_metrics: Optional[Dict] = None,
-        test_metrics: Optional[Dict] = None,
-        gradient_clip_val: Optional[float] = None,
-        gradient_clip_algorithm: Optional[str] = None,
-        lsqr: bool = True,
-        norm_eps: float = 1e-8,
-        ema_decay: float = 0.999,
-        **kwargs,
-    ):
-        super().__init__(
-            model=model,
-            optimizer=optimizer,
-            lr_scheduler=lr_scheduler,
-            loss=loss,
-            train_metrics=train_metrics,
-            val_metrics=val_metrics,
-            test_metrics=test_metrics,
-            gradient_clip_val=gradient_clip_val,
-            gradient_clip_algorithm=gradient_clip_algorithm,
-            lsqr=lsqr,
-            norm_eps=norm_eps,
-            ema_decay=ema_decay,
-            **kwargs,
-        )
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         # some sanity checks that diamond inheritance worked correctly
         assert not self.automatic_optimization
 
