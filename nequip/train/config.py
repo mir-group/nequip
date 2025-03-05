@@ -218,7 +218,14 @@ class ConFIGLightningModule(NequIPLightningModule):
             # collect gradients and assemble
             # note that grads will be in the highest dtype, i.e. float64 if there are any float64 grad components
             grads = torch.cat(
-                [param_dict[k].grad.flatten() for k in self.ConFIG_model_param_names]
+                [
+                    (
+                        param_dict[k].grad.flatten()
+                        if param_dict[k].grad is not None
+                        else torch.zeros_like(param_dict[k]).flatten()
+                    )
+                    for k in self.ConFIG_model_param_names
+                ]
             )
             loss_component_grads.append(grads)
             del grads  # free some memory
