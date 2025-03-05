@@ -23,6 +23,12 @@
 
   **A**: `float64` precision is used for data (inputs to model and reference labels). Either `float32` or `float64` precision can be used as the `model_dtype` (which is a mandatory hyperparameter of models in the `nequip` framework). If `float32` precision is used for `model_dtype`, the model will cast down from the `float64` inputs (e.g. positions) and cast up the outputs (e.g. energy) to `float64`. A major change in the post-revamp `nequip` framework is that NequIP or Allegro models keep the initial embeddings in `float64` before casting down if `model_dtype=float32` for better numerics.
 
+### Validation metrics are much better than training metrics or loss
+
+  **Q**: The same type of metric (e.g. force MAE) is a lot lower on the validation set than the training set during the course of training. What's happening?
+
+  **A**: This phenomenon is generally observed when using `EMALightningModule` as the training module, where validation (and inference tasks in general) uses an exponential-moving average (EMA) of the weights that vary more rapidly during training. Thus, training and validation happens on a different set of model weights, leading to the differences. The better validation metrics justifies why the EMA approach is useful in practice. The answer would be different if this phenomenon is observed without EMA.
+
 ## Commons Errors
 
 ### `nequip-train config.yaml` fails
