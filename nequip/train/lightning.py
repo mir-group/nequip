@@ -64,8 +64,9 @@ class NequIPLightningModule(lightning.LightningModule):
         train_metrics: Optional[Dict] = None,
         val_metrics: Optional[Dict] = None,
         test_metrics: Optional[Dict] = None,
-        ema_decay: Optional[float] = None,
-        **kwargs,
+        num_datasets: Optional[Dict[str, int]] = None,
+        # for caching training info
+        info_dict: Optional[Dict] = None,
     ):
         super().__init__()
         self.save_hyperparameters()
@@ -109,14 +110,15 @@ class NequIPLightningModule(lightning.LightningModule):
         # === instantiate MetricsManager objects ===
         # must have separate MetricsManagers for each dataloader
         # num_datasets goes in order [train, val, test, predict]
-        self.num_datasets = kwargs.get(
-            "num_datasets",
-            {
+        self.num_datasets = (
+            num_datasets
+            if num_datasets is not None
+            else {
                 "train": 0,
                 "val": 0,
                 "test": 0,
                 "predict": 0,
-            },
+            }
         )
 
         assert (
