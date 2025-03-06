@@ -11,7 +11,9 @@ import packaging.version
 logger = RankedLogger(__name__, rank_zero_only=True)
 
 _TORCH_VERSION = packaging.version.parse(torch.__version__)
-_TORCH_GE_2_6 = _TORCH_VERSION >= packaging.version.parse("2.6")
+_TORCH_GE_2_6 = packaging.version.parse(
+    _TORCH_VERSION.base_version
+) >= packaging.version.parse("2.6")
 
 
 def check_pt2_compile_compatibility():
