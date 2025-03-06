@@ -61,7 +61,7 @@ The command to compile a TorchScript model is as follows.
 ```bash
 nequip-compile \
 --ckpt-path path/to/ckpt_file \
---output-path path/to/packaged_model.nequip.pth \
+--output-path path/to/compiled_model.nequip.pth \
 --device (cpu/cuda) \
 --mode torchscript
 ```
@@ -69,7 +69,7 @@ The command to compile an AOT Inductor model is as follows.
 ```bash
 nequip-compile \
 --ckpt-path path/to/ckpt_file \
---output-path path/to/packaged_model.nequip.pt2 \
+--output-path path/to/compiled_model.nequip.pt2 \
 --device (cpu/cuda) \
 --mode aotinductor \
 --target target_integration
