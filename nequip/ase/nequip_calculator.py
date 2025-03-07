@@ -94,13 +94,13 @@ class NequIPCalculator(Calculator):
             from nequip.utils.versions import check_pt2_compile_compatibility
 
             check_pt2_compile_compatibility()
-            from nequip.scripts.compile import _ASE_FIELDS
+            from nequip.scripts._compile_utils import PAIR_NEQUIP_INPUTS, ASE_OUTPUTS
             from nequip.nn.compile import DictInputOutputWrapper
 
             # == model ==
             compiled_model = torch._inductor.aoti_load_package(compile_path)
             model = DictInputOutputWrapper(
-                compiled_model, _ASE_FIELDS["input"], _ASE_FIELDS["output"]
+                compiled_model, PAIR_NEQUIP_INPUTS, ASE_OUTPUTS
             )
             # == metadata ==
             metadata = compiled_model.get_metadata()
