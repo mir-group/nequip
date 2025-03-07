@@ -99,7 +99,7 @@ def NequIPGNNModel(**kwargs) -> GraphModel:
         polynomial_cutoff_p (int): p-exponent used in polynomial cutoff function, smaller p corresponds to stronger decay with distance (default ``6``)
         avg_num_neighbors (float): used to normalize edge sums for better numerics (default ``None``)
         per_type_energy_scales (float/List[float]): per-atom energy scales, which could be derived from the force RMS of the data (default ``None``)
-        per_type_energy_shifts (float/List[float]): per-atom energy shifts, which should generally be isolated atom reference energies or estimated from average pre-atom energies of the data (default ``None``)
+        per_type_energy_shifts (float/List[float]): per-atom energy shifts, which should generally be isolated atom reference energies or estimated from average per-atom energies of the data (default ``None``)
         per_type_energy_scales_trainable (bool): whether the per-atom energy scales are trainable (default ``False``)
         per_type_energy_shifts_trainable (bool): whether the per-atom energy shifts are trainable (default ``False``)
         pair_potential (torch.nn.Module): additional pair potential term, e.g. ``nequip.nn.pair_potential.ZBL`` (default ``None``)
