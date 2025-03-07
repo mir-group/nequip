@@ -209,7 +209,7 @@ class BaseModelTests:
         from nequip.model import override_model_compile_mode
         from nequip.utils.compile import prepare_model_for_compile
         from nequip.utils.aot import aot_export_model
-        from nequip.scripts.compile import _ASE_FIELDS
+        from nequip.scripts._compile_utils import PAIR_NEQUIP_INPUTS, ASE_OUTPUTS
 
         # get a single frame, and drop batch fields to take optimized path
         export_data = AtomicDataDict.frame_from_batched(model_test_data.copy(), 0)
@@ -231,8 +231,8 @@ class BaseModelTests:
             _ = aot_export_model(
                 model=model,
                 device=device,
-                input_fields=_ASE_FIELDS["input"],
-                output_fields=_ASE_FIELDS["output"],
+                input_fields=PAIR_NEQUIP_INPUTS,
+                output_fields=ASE_OUTPUTS,
                 data=export_data,
                 batch_map=batch_map,
                 output_path=tmpdir + "/export_test.pt2",
