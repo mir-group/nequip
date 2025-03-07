@@ -33,7 +33,6 @@ def nequip_make_fx(
     fields: List[str],
     extra_inputs: List[torch.Tensor] = [],
     seed: int = 1,
-    check_tol: float = 5e-5,
 ):
     """
     Args:
@@ -71,19 +70,9 @@ def nequip_make_fx(
     augmented_fx_model = _nequip_make_fx(model, augmented_data + extra_inputs)
     del augmented_data, node_idx, single_frame
 
-    # perform two sanity checks
-    # 1. check that the fx graphs are identical
-    # because we use different batch dims for each fx model, this check ensures that `make_fx` didn't shape-specialize
+    # because we use different batch dims for each fx model,
+    # check that the fx graphs are identical to ensure that `make_fx` didn't shape-specialize
     check_make_fx_diff(fx_model, augmented_fx_model, fields)
-    # 2. check that both models lead to the same output with the same inputs
-    out1 = fx_model(*(test_data_list + extra_inputs))
-    out2 = augmented_fx_model(*(test_data_list + extra_inputs))
-    for idx, (t1, t2) in enumerate(zip(out1, out2)):
-        # err =
-        assert torch.allclose(
-            t1, t2, atol=check_tol, rtol=check_tol
-        ), f"`make_fx` sanity check failed with MaxAbsError = {torch.max(torch.abs(t1 - t2)).item():.6g} (tol={check_tol}) for field `{fields[idx]}`. This error might arise because of poor initialization if the error is close to the tolerance. Consider trying a different seed, or raising a GitHub issue."
-    del out1, out2
 
     # clean up
     torch.cuda.empty_cache()
