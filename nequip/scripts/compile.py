@@ -2,6 +2,7 @@ import torch
 
 from e3nn.util.jit import script
 
+from ._compile_utils import COMPILE_TARGET_DICT
 from nequip.model import (
     override_model_compile_mode,
     ModelFromPackage,
@@ -27,42 +28,6 @@ logger = RankedLogger(__name__, rank_zero_only=True)
 
 # hardcode a global seed for `nequip-compile`
 _COMPILE_SEED: Final[int] = 1
-
-# === Inputs and Outputs for AOT Compile ===
-# standard sets of input and output fields for specific integrations
-
-_ALLEGRO_INPUTS = [
-    AtomicDataDict.POSITIONS_KEY,
-    AtomicDataDict.EDGE_INDEX_KEY,
-    AtomicDataDict.ATOM_TYPE_KEY,
-]
-_NEQUIP_INPUTS = _ALLEGRO_INPUTS + [
-    AtomicDataDict.CELL_KEY,
-    AtomicDataDict.EDGE_CELL_SHIFT_KEY,
-]
-
-_LMP_OUTPUTS = [
-    AtomicDataDict.PER_ATOM_ENERGY_KEY,
-    AtomicDataDict.FORCE_KEY,
-    AtomicDataDict.VIRIAL_KEY,
-]
-
-_ASE_OUTPUTS = [
-    AtomicDataDict.PER_ATOM_ENERGY_KEY,
-    AtomicDataDict.TOTAL_ENERGY_KEY,
-    AtomicDataDict.FORCE_KEY,
-    AtomicDataDict.STRESS_KEY,
-]
-
-_ALLEGRO_FIELDS = {"input": _ALLEGRO_INPUTS, "output": _LMP_OUTPUTS}
-_NEQUIP_FIELDS = {"input": _NEQUIP_INPUTS, "output": _LMP_OUTPUTS}
-_ASE_FIELDS = {"input": _NEQUIP_INPUTS, "output": _ASE_OUTPUTS}
-
-_TARGET_DICT = {
-    "pair_nequip": _NEQUIP_FIELDS,
-    "pair_allegro": _ALLEGRO_FIELDS,
-    "ase": _ASE_FIELDS,
-}
 
 # === AOT keys ===
 _AOT_METADATA_KEY = "aot_inductor.metadata"
@@ -140,7 +105,7 @@ def main(args=None):
     parser.add_argument(
         "--target",
         help="target application for AOT export (`input-fields` and `output-fields` need not be specified if `target` is specified)",
-        choices=["pair_nequip", "pair_allegro", "ase"],
+        choices=COMPILE_TARGET_DICT.keys(),
         type=str,
         default=None,
     )
@@ -256,6 +221,19 @@ def main(args=None):
         check_pt2_compile_compatibility()
         from nequip.utils.aot import aot_export_model
 
+        # === get data for compilation ===
+        if args.data_path is not None:
+            # we use `torch.jit.load` to future proof for the case where C++ clients like LAMMPS would need to provide data
+            data = {}
+            for k, v in torch.jit.load(args.data_path).state_dict().items():
+                data[k] = v
+        else:
+            if use_ckpt:
+                data = compile_utils.data_dict_from_checkpoint(args.ckpt_path)
+            else:
+                data = compile_utils.data_dict_from_package(args.package_path)
+        data = AtomicDataDict.to_(data, device)
+
         # === parse batch dims range ===
         batch_map = {
             "graph": _parse_bounds_to_Dim("num_frames", args.num_frames),
@@ -263,7 +241,7 @@ def main(args=None):
             "edge": _parse_bounds_to_Dim("num_edges", args.num_edges),
         }
 
-        # === get fields ===
+        # === get target specific settings ===
         if args.target is None:
             assert (
                 args.input_fields is not None and args.output_fields is not None
@@ -271,14 +249,12 @@ def main(args=None):
             input_fields = args.input_fields
             output_fields = args.output_fields
         else:
-            tdict = _TARGET_DICT[args.target]
+            # no checks necessary here as they would have been caught by argparse earlier
+            tdict = COMPILE_TARGET_DICT[args.target]
             input_fields = tdict["input"]
             output_fields = tdict["output"]
-
-            # make num_frames batch dims static
-            # TODO: generalize this?
-            if args.target in ["pair_nequip", "pair_allegro", "ase"]:
-                batch_map["graph"] = torch.export.Dim.STATIC
+            batch_map = tdict["batch_map_settings"](batch_map)
+            data = tdict["data_settings"](data)
 
         logger.debug(
             "Dynamic shapes:\n"
@@ -290,26 +266,6 @@ def main(args=None):
                 ]
             )
         )
-
-        # === get data for compilation ===
-        if args.data_path is not None:
-            data = {}
-            for k, v in torch.jit.load(args.data_path).state_dict().items():
-                data[k] = v
-        else:
-            if use_ckpt:
-                data = compile_utils.data_dict_from_checkpoint(args.ckpt_path)
-            else:
-                data = compile_utils.data_dict_from_package(args.package_path)
-        data = AtomicDataDict.to_(data, device)
-
-        # because of the 0/1 specialization problem,
-        # and the fact that the LAMMPS pair style (and ASE) requires `num_frames=1`
-        # we need to augment to data to remove the `BATCH_KEY` and `NUM_NODES_KEY`
-        # to take more optimized code paths
-        if args.target in ["pair_nequip", "pair_allegro", "ase"]:
-            data.pop(AtomicDataDict.BATCH_KEY)
-            data.pop(AtomicDataDict.NUM_NODES_KEY)
 
         # === inductor configs ===
         inductor_configs = dict(item.split("=") for item in args.inductor_configs)
