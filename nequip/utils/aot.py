@@ -1,12 +1,12 @@
 import torch
 
-from nequip.nn.compile import ListInputOutputWrapper
+from nequip.nn.compile import ListInputOutputWrapper, DictInputOutputWrapper
 from nequip.data import AtomicDataDict
 from nequip.data._key_registry import get_dynamic_shapes
 from .fx import nequip_make_fx
 from .compile import prepare_model_for_compile
 from .versions import check_pt2_compile_compatibility
-from .dtype import floating_point_tolerance
+from .dtype import test_model_output_similarity_by_dtype, _pt2_compile_error_message
 
 from typing import List, Dict, Union, Any
 
@@ -25,9 +25,6 @@ def aot_export_model(
     # === torch version check ===
     check_pt2_compile_compatibility()
 
-    # get tolerance for sanity checks
-    tol = floating_point_tolerance(model.model_dtype)
-
     # defensively refresh the cache
     torch._dynamo.reset()
 
@@ -37,10 +34,9 @@ def aot_export_model(
 
     fx_model = nequip_make_fx(
         model=model_to_trace,
-        data=data,
+        data={k: data[k] for k in input_fields},
         fields=input_fields,
         seed=seed,
-        check_tol=tol,
     )
 
     # === perform export ===
@@ -62,13 +58,19 @@ def aot_export_model(
     assert out_path == output_path
 
     # === sanity check ===
-    aot_model = torch._inductor.aoti_load_package(out_path)
-    aot_out = aot_model([data[k] for k in input_fields])
-    eager_out = model(data)
-    del aot_model, model
-    for idx, field in enumerate(output_fields):
-        assert torch.allclose(
-            aot_out[idx], eager_out[field], rtol=tol, atol=tol
-        ), f"AOT Inductor export eager vs export sanity check failed with MaxAbsError = {torch.max(torch.abs(aot_out[idx] - eager_out[field])).item():.6g} (tol={tol}) for field `{field}`."
-    del aot_out, eager_out
+    aot_model = DictInputOutputWrapper(
+        torch._inductor.aoti_load_package(out_path),
+        input_fields,
+        output_fields,
+    )
+    test_model_output_similarity_by_dtype(
+        aot_model,
+        model,
+        {k: data[k] for k in input_fields},
+        model.model_dtype,
+        fields=output_fields,
+        error_message=_pt2_compile_error_message,
+    )
+    del aot_model
+
     return out_path
