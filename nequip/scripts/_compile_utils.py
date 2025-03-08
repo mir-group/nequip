@@ -41,8 +41,9 @@ def single_frame_data_settings(data):
     # and the fact that the LAMMPS pair style (and ASE) requires `num_frames=1`
     # we need to augment to data to remove the `BATCH_KEY` and `NUM_NODES_KEY`
     # to take more optimized code paths
-    data.pop(AtomicDataDict.BATCH_KEY)
-    data.pop(AtomicDataDict.NUM_NODES_KEY)
+    if AtomicDataDict.BATCH_KEY in data:
+        data.pop(AtomicDataDict.BATCH_KEY)
+        data.pop(AtomicDataDict.NUM_NODES_KEY)
     return data
 
 
