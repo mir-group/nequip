@@ -103,8 +103,8 @@ def test_model_output_similarity_by_dtype(
 
     for k in fields:
         t1, t2 = (
-            torch.mean(torch.cat(out1_list[k], -1), -1),
-            torch.mean(torch.cat(out2_list[k], -1), -1),
+            torch.mean(torch.stack(out1_list[k], -1), -1),
+            torch.mean(torch.stack(out2_list[k], -1), -1),
         )
         err = torch.max(torch.abs(t1 - t2)).item()
         absval = t1.abs().max().item()
