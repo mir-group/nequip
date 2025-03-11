@@ -27,6 +27,10 @@ hydra.core.utils.configure_log(None)
 logger = RankedLogger(__name__, rank_zero_only=True)
 
 
+# `nequip-package` format version index to condition other features upon when loading `nequip-package` from a specific version
+_CURRENT_NEQUIP_PACKAGE_VERSION = 0
+
+
 def main(args=None):
 
     parser = argparse.ArgumentParser(description="Package NequIP ecosystem models.")
@@ -138,6 +142,11 @@ def main(args=None):
             )
             exp.save_text("model", "config.yaml", orig_config)
             exp.save_text("model", "versions.txt", version_info)
+            exp.save_text(
+                "model",
+                "nequip_package_version_id.txt",
+                str(_CURRENT_NEQUIP_PACKAGE_VERSION),
+            )
 
     logger.info(f"Packaged model saved to {args.output_path}")
 
