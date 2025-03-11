@@ -188,10 +188,24 @@ def main(args=None):
     # === set global options and load model ===
     logger.debug("Loading model ...")
     if use_ckpt:
-        with override_model_compile_mode(compile_mode=None):
+        with override_model_compile_mode(
+            compile_mode=args.mode if args.mode == "aotinductor" else None
+        ):
             model = ModelFromCheckpoint(args.ckpt_path)
+
     else:
-        model = ModelFromPackage(args.package_path)
+        # TODO: more robust system that goes down a priority list for packaged models to load
+        # e.g. if doing `aotinductor` compile, look for `aotinductor` model first, but fallback to loading `eager` packaged model for `nequip-compile`
+        from ._package_utils import _EAGER_MODEL_KEY, _AOTINDUCTOR_MODEL_KEY
+
+        model = ModelFromPackage(
+            args.package_path,
+            package_model_type=(
+                _AOTINDUCTOR_MODEL_KEY
+                if args.mode == "aotinductor"
+                else _EAGER_MODEL_KEY
+            ),
+        )
     model = model[args.model]
     # ^ `ModuleDict` of `GraphModel` is loaded, we then select the desired `GraphModel` (`args.model` defaults to work for single model case)
 

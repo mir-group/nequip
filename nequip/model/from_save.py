@@ -1,5 +1,6 @@
 import torch
 from nequip.utils import get_current_code_versions
+from nequip.scripts._package_utils import _PACKAGE_MODEL_TYPE_DICT, _EAGER_MODEL_KEY
 
 import hydra
 import warnings
@@ -52,7 +53,7 @@ def ModelFromCheckpoint(checkpoint_path: str):
     return model
 
 
-def ModelFromPackage(package_path: str):
+def ModelFromPackage(package_path: str, package_model_type: str = _EAGER_MODEL_KEY):
     """Builds model from a NequIP framework packaged zip file constructed with ``nequip-package``.
 
     Args:
@@ -61,6 +62,10 @@ def ModelFromPackage(package_path: str):
     assert str(package_path).endswith(
         ".nequip.zip"
     ), f"NequIP framework packaged files must have the `.nequip.zip` extension but found {str(package_path)}"
+    assert (
+        package_model_type in _PACKAGE_MODEL_TYPE_DICT.keys()
+    ), f"`package_model_type={package_model_type}` unrecognized, only {_PACKAGE_MODEL_TYPE_DICT.keys()} allowed."
+
     with warnings.catch_warnings():
         # suppress torch.package TypedStorage warning
         warnings.filterwarnings(
@@ -70,7 +75,9 @@ def ModelFromPackage(package_path: str):
             module="torch.package.package_importer",
         )
         imp = torch.package.PackageImporter(package_path)
-        model = imp.load_pickle(package="model", resource="model.pkl")
+        model = imp.load_pickle(
+            package="model", resource=f"{package_model_type}_model.pkl"
+        )
 
     # NOTE: model returned is not a GraphModel object tied to the `nequip` in current Python env, but a GraphModel object from the packaged zip file
     return model

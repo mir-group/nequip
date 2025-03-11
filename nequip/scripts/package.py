@@ -16,6 +16,7 @@ from nequip.utils.logger import RankedLogger
 from nequip.utils.versions import get_current_code_versions
 from nequip.utils.global_state import set_global_state
 
+from ._package_utils import _CURRENT_NEQUIP_PACKAGE_VERSION, _PACKAGE_MODEL_TYPE_DICT
 from ..__init__ import _DISCOVERED_NEQUIP_EXTENSION
 
 import os
@@ -25,10 +26,6 @@ import hydra
 # === setup logging ===
 hydra.core.utils.configure_log(None)
 logger = RankedLogger(__name__, rank_zero_only=True)
-
-
-# `nequip-package` format version index to condition other features upon when loading `nequip-package` from a specific version
-_CURRENT_NEQUIP_PACKAGE_VERSION = 0
 
 
 def main(args=None):
@@ -72,7 +69,7 @@ def main(args=None):
     # internal and external modules that we know of
     _INTERNAL_MODULES = ["nequip"] + [ep.value for ep in _DISCOVERED_NEQUIP_EXTENSION]
     # TODO: make e3nn intern eventually (requires refactoring e3nn code)
-    _EXTERNAL_MODULES = ["e3nn", "opt_einsum_fx"] + args.extra_externs
+    _EXTERNAL_MODULES = ["triton", "e3nn", "opt_einsum_fx"] + args.extra_externs
 
     overlap = set(_INTERNAL_MODULES) & set(_EXTERNAL_MODULES)
     assert (
@@ -107,8 +104,14 @@ def main(args=None):
 
     # == build model from checkpoint ==
     # pickle model without torchscript or torch.compile
-    with override_model_compile_mode(compile_mode=None):
-        model = ModelFromCheckpoint(args.ckpt_path)
+    models_to_package = {}
+    for model_type in _PACKAGE_MODEL_TYPE_DICT.keys():
+        logger.info(f"Building {model_type} model for packaging ...")
+        with override_model_compile_mode(
+            compile_mode=_PACKAGE_MODEL_TYPE_DICT[model_type]
+        ):
+            model = ModelFromCheckpoint(args.ckpt_path)
+        models_to_package.update({model_type: model})
 
     # == get example data from checkpoint ==
     # the reason for including it here is that whoever receives the packaged model file does not need to have access to the original data source to do `nequip-compile` on the packaged model (AOT export requires example data)
@@ -128,12 +131,14 @@ def main(args=None):
             exp.extern([f"{pkg}.**" for pkg in _EXTERNAL_MODULES])
             exp.intern([f"{pkg}.**" for pkg in _INTERNAL_MODULES])
 
-            exp.save_pickle(
-                package="model",
-                resource="model.pkl",
-                obj=model,
-                dependencies=True,
-            )
+            for model_type in _PACKAGE_MODEL_TYPE_DICT.keys():
+                exp.save_pickle(
+                    package="model",
+                    resource=f"{model_type}_model.pkl",
+                    obj=models_to_package[model_type],
+                    dependencies=True,
+                )
+
             exp.save_pickle(
                 package="model",
                 resource="example_data.pkl",
