@@ -18,30 +18,46 @@ import functools
 import contextvars
 import contextlib
 
-from typing import Optional
+from typing import Optional, Final
 
 _IS_BUILDING_MODEL = contextvars.ContextVar("_IS_BUILDING_MODEL", default=False)
 
-_OVERRIDE_COMPILE_MODE = contextvars.ContextVar("_OVERRIDE_COMPILE_MODE", default=False)
-_DEFAULT_COMPILE_MODE = contextvars.ContextVar(
-    "_DEFAULT_COMPILE_MODE", default="script"
-)
 
-_COMPILE_MODE_OPTIONS = {"compile", "script", None}
+_TRAIN_TIME_COMPILE_KEY: Final[str] = "compile"
+_TRAIN_TIME_SCRIPT_KEY: Final[str] = "script"
+_COMPILE_TIME_AOTINDUCTOR_KEY: Final[str] = "aotinductor"
+
+_COMPILE_MODE_OPTIONS = {
+    _TRAIN_TIME_COMPILE_KEY,
+    _TRAIN_TIME_SCRIPT_KEY,
+    _COMPILE_TIME_AOTINDUCTOR_KEY,
+    None,  # i.e. eager mode
+}
+
+
+_OVERRIDE_COMPILE_MODE = contextvars.ContextVar("_OVERRIDE_COMPILE_MODE", default=False)
+_CURRENT_COMPILE_MODE = contextvars.ContextVar(
+    "_CURRENT_COMPILE_MODE", default=_TRAIN_TIME_SCRIPT_KEY
+)
 
 
 @contextlib.contextmanager
 def override_model_compile_mode(compile_mode: Optional[str] = None):
     assert compile_mode in _COMPILE_MODE_OPTIONS
     global _OVERRIDE_COMPILE_MODE
-    global _DEFAULT_COMPILE_MODE
+    global _CURRENT_COMPILE_MODE
     init_state = _OVERRIDE_COMPILE_MODE.get()
-    init_mode = _DEFAULT_COMPILE_MODE.get()
+    init_mode = _CURRENT_COMPILE_MODE.get()
     _OVERRIDE_COMPILE_MODE.set(True)
-    _DEFAULT_COMPILE_MODE.set(compile_mode)
+    _CURRENT_COMPILE_MODE.set(compile_mode)
     yield
     _OVERRIDE_COMPILE_MODE.set(init_state)
-    _DEFAULT_COMPILE_MODE.set(init_mode)
+    _CURRENT_COMPILE_MODE.set(init_mode)
+
+
+def get_current_compile_mode():
+    global _CURRENT_COMPILE_MODE
+    return _CURRENT_COMPILE_MODE.get()
 
 
 def model_builder(func):
@@ -58,7 +74,7 @@ def model_builder(func):
 
         # to handle compile modes
         global _OVERRIDE_COMPILE_MODE
-        global _DEFAULT_COMPILE_MODE
+        global _CURRENT_COMPILE_MODE
 
         # this means we're in an inner model, so we shouldn't apply the model builder operations, and just pass the function
         if _IS_BUILDING_MODEL.get():
@@ -92,19 +108,21 @@ def model_builder(func):
             # devs can override it with `override_model_compile_mode`
 
             # always pop because inner models won't need `compile_mode` arg
-            compile_mode = kwargs.pop("compile_mode", _DEFAULT_COMPILE_MODE.get())
+            compile_mode = kwargs.pop("compile_mode", _CURRENT_COMPILE_MODE.get())
             # compile mode overriding logic
             if _OVERRIDE_COMPILE_MODE.get():
-                compile_mode = _DEFAULT_COMPILE_MODE.get()
+                compile_mode = _CURRENT_COMPILE_MODE.get()
             assert (
                 compile_mode in _COMPILE_MODE_OPTIONS
             ), f"`compile_mode` can only be any of {_COMPILE_MODE_OPTIONS}, but `{compile_mode}` found"
             graph_model_module = (
-                CompileGraphModel if compile_mode == "compile" else GraphModel
+                CompileGraphModel
+                if compile_mode == _TRAIN_TIME_COMPILE_KEY
+                else GraphModel
             )
 
             # set torchscript mode -- True if "jit" mode
-            with conditional_torchscript_mode(compile_mode == "script"):
+            with conditional_torchscript_mode(compile_mode == _TRAIN_TIME_SCRIPT_KEY):
                 # set dtype and seed
                 with torch_default_dtype(dtype):
                     with isolate_rng():
