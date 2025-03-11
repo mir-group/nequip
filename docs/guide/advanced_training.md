@@ -53,6 +53,6 @@ Be very careful when reporting validation or test metrics calculated in a DDP se
 ```
 
 ```{tip}
-One might have to define specific environment variables and set up the multi-rank training run differently depending on the cluster, devices, etc. For example, on a SLURM-managed cluster, one should call `srun nequip-train ...`. See Lignting's docs regarding [SLURM-managed clusters](https://lightning.ai/docs/pytorch/stable/clouds/cluster_advanced.html) for details.
+One might have to define specific environment variables and set up the multi-rank training run differently depending on the cluster, devices, etc. For example, on a SLURM-managed cluster, one should call `srun nequip-train ...`. See Lightning's docs regarding [SLURM-managed clusters](https://lightning.ai/docs/pytorch/stable/clouds/cluster_advanced.html) for details.
 
 ```
