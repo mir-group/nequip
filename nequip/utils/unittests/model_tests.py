@@ -217,7 +217,7 @@ class BaseModelTests:
         export_data.pop(AtomicDataDict.NUM_NODES_KEY)
 
         _, config, _ = model
-        with override_model_compile_mode(compile_mode=None):
+        with override_model_compile_mode(compile_mode="aotinductor"):
             model = self.make_model(config, device=device)
         model = prepare_model_for_compile(model, device)
         # export model
