@@ -60,7 +60,7 @@ One can use `nequip.train.callbacks.TestTimeXYZFileWriter` ([see API](../api/cal
 The command to compile a TorchScript model is as follows.
 ```bash
 nequip-compile \
---ckpt-path path/to/ckpt_file \
+--input-path path/to/ckpt_file/or/package_file \
 --output-path path/to/compiled_model.nequip.pth \
 --device (cpu/cuda) \
 --mode torchscript
@@ -68,7 +68,7 @@ nequip-compile \
 The command to compile an AOT Inductor model is as follows.
 ```bash
 nequip-compile \
---ckpt-path path/to/ckpt_file \
+--input-path path/to/ckpt_file/or/package_file \
 --output-path path/to/compiled_model.nequip.pt2 \
 --device (cpu/cuda) \
 --mode aotinductor \

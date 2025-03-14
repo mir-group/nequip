@@ -72,14 +72,8 @@ def main(args=None):
     )
 
     parser.add_argument(
-        "--ckpt-path",
-        help="path to a checkpoint model file",
-        type=pathlib.Path,
-    )
-
-    parser.add_argument(
-        "--package-path",
-        help="path to a packaged model file",
+        "--input-path",
+        help="path to a checkpoint model or packaged model file",
         type=pathlib.Path,
     )
 
@@ -174,16 +168,7 @@ def main(args=None):
     # == device ==
     device = args.device
     device = torch.device(device)
-    logger.debug(f"Using device: {device}")
-
-    # === sanity check ===
-    # == ckpt or package ==
-    if (args.package_path is not None) and (args.ckpt_path is not None):
-        raise RuntimeError(
-            "--ckpt-path and --package-path cannot be simultaneously specified"
-        )
-    # convenience variable
-    use_ckpt = args.ckpt_path is not None
+    logger.info(f"Compiling for device: {device}")
 
     # == output path extension ==
     if args.mode == "torchscript":
@@ -195,9 +180,11 @@ def main(args=None):
             ".nequip.pt2"
         ), "`output-path` must end with the `.nequip.pt2` extension for `aotinductor` compile mode"
 
-    # === set global options and load model ===
-    logger.debug("Loading model ...")
+    # === load model ===
+    # use package load path if extension matches, otherwise assume checkpoint file
+    use_ckpt = not str(args.input_path).endswith(".nequip.zip")
     if use_ckpt:
+        logger.info(f"Loading model from checkpoint file {args.input_path} ...")
         _CKPT_COMPILE_MODE_DICT = {
             "torchscript": None,
             "aotinductor": None if _ALWAYS_COMPILE_FROM_EAGER else "aotinductor",
@@ -205,8 +192,9 @@ def main(args=None):
         with override_model_compile_mode(
             compile_mode=_CKPT_COMPILE_MODE_DICT[args.mode]
         ):
-            model = ModelFromCheckpoint(args.ckpt_path)
+            model = ModelFromCheckpoint(args.input_path)
     else:
+        logger.info(f"Loading model from package file {args.input_path} ...")
         # TODO: more robust system that goes down a priority list for packaged models to load
         # e.g. if doing `aotinductor` compile, look for `aotinductor` model first, but fallback to loading `eager` packaged model for `nequip-compile`
         from ._package_utils import _EAGER_MODEL_KEY, _AOTINDUCTOR_MODEL_KEY
@@ -220,9 +208,10 @@ def main(args=None):
             ),
         }
         model = ModelFromPackage(
-            args.package_path,
+            args.input_path,
             package_model_type=_PKG_MODEL_TYPE_DICT[args.mode],
         )
+
     model = model[args.model]
     # ^ `ModuleDict` of `GraphModel` is loaded, we then select the desired `GraphModel` (`args.model` defaults to work for single model case)
 
@@ -260,9 +249,9 @@ def main(args=None):
                 data[k] = v
         else:
             if use_ckpt:
-                data = compile_utils.data_dict_from_checkpoint(args.ckpt_path)
+                data = compile_utils.data_dict_from_checkpoint(args.input_path)
             else:
-                data = compile_utils.data_dict_from_package(args.package_path)
+                data = compile_utils.data_dict_from_package(args.input_path)
         data = AtomicDataDict.to_(data, device)
 
         # === parse batch dims range ===

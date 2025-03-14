@@ -54,7 +54,7 @@ def test_compile(fake_model_training_session, device, mode):
     retcode = subprocess.run(
         [
             "nequip-compile",
-            "--ckpt-path",
+            "--input-path",
             ckpt_path,
             "--output-path",
             output_path,
