@@ -16,6 +16,7 @@ from nequip.utils.global_state import set_global_state, get_latest_global_state
 from omegaconf import OmegaConf
 import hydra
 
+import os
 import yaml
 import argparse
 import pathlib
@@ -25,6 +26,15 @@ from typing import Final
 # === setup logging ===
 hydra.core.utils.configure_log(None)
 logger = RankedLogger(__name__, rank_zero_only=True)
+
+# === override model to compile ===
+# we default to using the best performance compilation option, e.g. to use a custom kernel with AOT Inductor
+# this env var can be toggled to always compile from eager mode
+_ALWAYS_COMPILE_FROM_EAGER: Final[bool] = bool(
+    int(os.getenv("NEQUIP_ALWAYS_COMPILE_FROM_EAGER", 0))
+)
+if _ALWAYS_COMPILE_FROM_EAGER:
+    logger.info("`NEQUIP_ALWAYS_COMPILE_FROM_EAGER=1` detected")
 
 # hardcode a global seed for `nequip-compile`
 _COMPILE_SEED: Final[int] = 1
@@ -188,23 +198,30 @@ def main(args=None):
     # === set global options and load model ===
     logger.debug("Loading model ...")
     if use_ckpt:
+        _CKPT_COMPILE_MODE_DICT = {
+            "torchscript": None,
+            "aotinductor": None if _ALWAYS_COMPILE_FROM_EAGER else "aotinductor",
+        }
         with override_model_compile_mode(
-            compile_mode=args.mode if args.mode == "aotinductor" else None
+            compile_mode=_CKPT_COMPILE_MODE_DICT[args.mode]
         ):
             model = ModelFromCheckpoint(args.ckpt_path)
-
     else:
         # TODO: more robust system that goes down a priority list for packaged models to load
         # e.g. if doing `aotinductor` compile, look for `aotinductor` model first, but fallback to loading `eager` packaged model for `nequip-compile`
         from ._package_utils import _EAGER_MODEL_KEY, _AOTINDUCTOR_MODEL_KEY
 
+        _PKG_MODEL_TYPE_DICT = {
+            "torchscript": _EAGER_MODEL_KEY,
+            "aotinductor": (
+                _EAGER_MODEL_KEY
+                if _ALWAYS_COMPILE_FROM_EAGER
+                else _AOTINDUCTOR_MODEL_KEY
+            ),
+        }
         model = ModelFromPackage(
             args.package_path,
-            package_model_type=(
-                _AOTINDUCTOR_MODEL_KEY
-                if args.mode == "aotinductor"
-                else _EAGER_MODEL_KEY
-            ),
+            package_model_type=_PKG_MODEL_TYPE_DICT[args.mode],
         )
     model = model[args.model]
     # ^ `ModuleDict` of `GraphModel` is loaded, we then select the desired `GraphModel` (`args.model` defaults to work for single model case)
