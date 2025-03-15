@@ -31,16 +31,22 @@ jobs:
         pip install flake8==7.1.0 Flake8-pyproject black
         flake8 . --count --show-source --statistics
         black . --check
-    - name: Install test dependencies
+    - name: Install PyTorch
       env:
         TORCH: "${{ matrix.torch-version }}"
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        pip install torch==${TORCH} ${{ github.event.repository.private && '' || '-f https://download.pytorch.org/whl/cpu/torch_stable.html' }} --upgrade
-        pip install h5py scikit-learn  # install packages that aren't required dependencies but that the tests do need
+        # use CPU only on GH runner
+        if [ "${{ github.event.repository.private }}" = "true" ]; then
+            pip install torch==${TORCH} --upgrade
+        else
+            pip install torch==${TORCH} --index-url https://download.pytorch.org/whl/cpu --upgrade
+        fi
+    - name: Install test dependencies
+      run: |
+        # install packages that aren't required dependencies but that the tests do need
+        pip install h5py vesin
         pip install --upgrade-strategy only-if-needed .
-        pip install pytest
-        pip install pytest-xdist[psutil]
+        pip install pytest pytest-xdist[psutil]
     - name: Test with pytest
       run: |
         # See https://github.com/pytest-dev/pytest/issues/1075
