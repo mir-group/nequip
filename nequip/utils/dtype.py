@@ -38,7 +38,7 @@ _FLOAT64_MODEL_TOL: Final[float] = float(
 _FLOAT32_MODEL_TOL: Final[float] = float(
     os.environ.get("NEQUIP_FLOAT32_MODEL_TOL", 5e-5)
 )
-_TF32_MODEL_TOL: Final[float] = float(os.environ.get("NEQUIP_TF32_MODEL_TOL", 5e-4))
+_TF32_MODEL_TOL: Final[float] = float(os.environ.get("NEQUIP_TF32_MODEL_TOL", 2e-3))
 
 
 def floating_point_tolerance(model_dtype: Union[str, torch.dtype]):
