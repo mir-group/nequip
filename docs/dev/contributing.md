@@ -1,7 +1,7 @@
 # Contributing to NequIP
 
 ```{note}
-If you want to make a major change, add a new feature, or have any uncertainty about where the change should go or how it should be designed, please reach out to discuss with us first. 
+If you want to make a major change, add a new feature, or have any uncertainty about where the change should go or how it should be designed, please reach out to discuss with us first. Details on contacting the development team can be found in `README.md`. 
 ```
 
 ## Design Philosophy

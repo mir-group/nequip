@@ -10,12 +10,7 @@ readme = "README.md"
 requires-python = ">=3.9"
 license = {file = "LICENSE"}
 authors = [
-    {name = "Simon Batzner"},
-    {name = "Albert Musealian"},
-    {name = "Lixin Sun"},
-    {name = "Anders Johansson"},
-    {name = "Mario Geiger"},
-    {name = "Tess Smidt"},
+    {name = "The NequIP Developers", email = "allegro-nequip@g.harvard.edu"},
 ]
 dependencies = [
     "torch>=2.2.0",
@@ -35,6 +30,7 @@ dependencies = [
 [project.urls]
 Homepage = "https://github.com/mir-group/nequip"
 Repository = "https://github.com/mir-group/nequip.git"
+Documentation = "https://nequip.readthedocs.io/"
 
 [project.scripts]
 nequip-train = "nequip.scripts.train:main"
@@ -43,7 +39,6 @@ nequip-compile = "nequip.scripts.compile:main"
 
 [tool.setuptools]
 packages = {find = {include = ["nequip", "nequip.*"]}}
-zip-safe = true
 
 [tool.setuptools.dynamic]  # get version from nequip/_version.py
 version = {attr = "nequip._version.__version__"}

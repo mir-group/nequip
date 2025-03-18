@@ -1,63 +1,72 @@
+<center>
+
+<img src="./logo.png" width="50%" title="NequIP" alt="NequIP"/> 
+
+<br/>
+
+[![Documentation Status](https://readthedocs.org/projects/nequip/badge/?version=latest)](https://nequip.readthedocs.io/en/latest/?badge=latest)  [![PyPI version](https://img.shields.io/pypi/v/nequip.svg)](https://pypi.python.org/pypi/nequip/)
+
+</center>
+
 # NequIP
 
 NequIP is an open-source code for building E(3)-equivariant interatomic potentials.
+ 
+ - [Installation and usage](#installation-and-usage)
+ - [Tutorial](#tutorial)
+ - [References & citing](#references--citing)
+ - [Authors](#authors)
+ - [Community, contact, questions, and contributing](#community-contact-questions-and-contributing)
 
-**:red_circle: PLEASE NOTE :red_circle:**:  Please note that a major update to this code is in the final stages of development and as a result support for the current release is a lower priority.
+## Installation and usage
 
-[![Documentation Status](https://readthedocs.org/projects/nequip/badge/?version=latest)](https://nequip.readthedocs.io/en/latest/?badge=latest)
-
-![nequip](./logo.png)
-
-**PLEASE NOTE:** the NequIP code is under active development and is still in beta versions 0.x.x. In general changes to the patch version (the third number) indicate backward compatible beta releases, but please be aware that file formats and APIs may change. Bug reports are also welcomed in the GitHub issues!
-
-## Install
-
-Installation instructions can be found [here](docs/guide/install.md).
+Installation instructions and user guides can be found in our [docs](https://nequip.readthedocs.io/en/latest/).
 
 ## Tutorial 
 
 The best way to learn how to use NequIP is through the [Colab Tutorial](https://bit.ly/mrs-nequip). This will run entirely on Google's cloud virtual machine; you do not need to install or run anything locally. 
 
-## Usage
-
-This [document](docs/guide/workflow.md) explains the `nequip` workflow, from training and testing models to compiling models for inference in our integrations such as [ASE](docs/integrations/ase.md) and [LAMMPS](docs/integrations/lammps.md).
-
- [`configs/tutorial.yaml`](configs/tutorial.yaml) is a complete configuration file containing all available options along with documenting comments. This file is **for reference**.
-
-## Plugins / extending `nequip`
-
-`nequip` is a modular framework and extension packages can provide new model components, architectures, etc. The main extension package(s) currently available are:
- - [Allegro](https://github.com/mir-group/allegro): implements the highly parallelizable Allegro model architecture.
-
-Details on writing and using plugins can be found in the [Allegro tutorial](https://colab.research.google.com/drive/1yq2UwnET4loJYg_Fptt9kpklVaZvoHnq) and in [`nequip-example-extension`](https://github.com/mir-group/nequip-example-extension/).
-
 ## References & citing
 
-The theory behind NequIP is described in our [article](https://www.nature.com/articles/s41467-022-29939-5) (1). 
-NequIP's backend builds on [`e3nn`](https://e3nn.org), a general framework for building E(3)-equivariant 
-neural networks (2). If you use this repository in your work, please consider citing `NequIP` (1) and `e3nn` (3):
+**Any and all use of this software, in whole or in part, should clearly acknowledge and link to this repository.**
 
- 1. https://www.nature.com/articles/s41467-022-29939-5
- 2. https://e3nn.org
- 3. https://doi.org/10.5281/zenodo.3724963
+If you use this code in your academic work, please cite:
+
+ 1. The [preprint describing the NequIP software framework](https://arxiv.org/abs/2504.16068):
+    > Chuin Wei Tan, Marc L. Descoteaux, Mit Kotak, Gabriel de Miranda Nascimento, Seán R. Kavanagh, Laura Zichi, Menghang Wang, Aadit Saluja, Yizhong R. Hu, Tess Smidt, Anders Johansson, William C. Witt, Boris Kozinsky, Albert Musaelian. <br/>
+    > "High-performance training and inference for deep equivariant interatomic potentials." <br/>
+    > https://doi.org/10.48550/arXiv.2504.16068
+
+And also consider citing:
+
+ 2. The [original NequIP paper](https://www.nature.com/articles/s41467-022-29939-5)
+    > Simon Batzner, Albert Musaelian, Lixin Sun, Mario Geiger, Jonathan P. Mailoa, Mordechai Kornbluth, Nicola Molinari, Tess E. Smidt, and Boris Kozinsky. <br/>
+    > "E(3)-equivariant graph neural networks for data-efficient and accurate interatomic potentials." <br/>
+    > Nature communications 13, no. 1 (2022): 2453
+
+ 3. The [computational scaling paper](https://dl.acm.org/doi/abs/10.1145/3581784.3627041) that discusses optimized LAMMPS MD 
+    > Albert Musaelian, Anders Johansson, Simon Batzner, and Boris Kozinsky. <br/>
+    > "Scaling the leading accuracy of deep equivariant models to biomolecular simulations of realistic size." <br/>
+    > In Proceedings of the International Conference for High Performance Computing, Networking, Storage and Analysis, pp. 1-12. 2023.
+
+ 4. The `e3nn` equivariant neural network package used by NequIP, through its [preprint](https://arxiv.org/abs/2207.09453) and/or [code](https://github.com/e3nn/e3nn)
+
+**Extension packages like [Allegro](https://github.com/mir-group/allegro) have their own additional relevant citations.**
+
+BibTeX entries for a number of the relevant papers are provided for convenience in [`CITATION.bib`](./CITATION.bib).
 
 ## Authors
 
-NequIP is being developed by:
+Please see [`AUTHORS.md`](./AUTHORS.md).
 
- - Simon Batzner
- - Albert Musaelian
- - Lixin Sun
- - Anders Johansson
- - Mario Geiger
- - Tess Smidt
-
-under the guidance of [Boris Kozinsky at Harvard](https://mir.g.harvard.edu/).
-
-## Contact, questions, and contributing
+## Community, contact, questions, and contributing
 
 If you find a bug or have a proposal for a feature, please post it in the [Issues](https://github.com/mir-group/nequip/issues).
-If you have a question, topic, or issue that isn't obviously one of those, try our [GitHub Discussions](https://github.com/mir-group/nequip/discussions).
+If you have a self-contained question or other discussion topic, try our [GitHub Discussions](https://github.com/mir-group/nequip/discussions).
+
+Active users and interested developers are invited to join us on the NequIP community chat server, which is hosted on the excellent [Zulip](https://zulip.com/) software.
+Zulip is organized a little bit differently than chat software like Slack or Discord that you may be familiar with: please review [their introduction](https://zulip.com/help/introduction-to-topics) before posting.
+[Register for the NequIP community here](https://nequip.zulipchat.com).
 
 If you want to contribute to the code, please read ["Contributing to NequIP"](docs/dev/contributing.md).
 
