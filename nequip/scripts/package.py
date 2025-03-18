@@ -67,9 +67,13 @@ def main(args=None):
 
     # === handle internal and external modules ===
     # internal and external modules that we know of
-    _INTERNAL_MODULES = ["nequip"] + [ep.value for ep in _DISCOVERED_NEQUIP_EXTENSION]
-    # TODO: make e3nn intern eventually (requires refactoring e3nn code)
-    _EXTERNAL_MODULES = ["triton", "e3nn", "opt_einsum_fx"] + args.extra_externs
+    _INTERNAL_MODULES = ["e3nn", "nequip"] + [
+        ep.value for ep in _DISCOVERED_NEQUIP_EXTENSION
+    ]
+    # TODO: ideally we don't have any numpy or matplotlib dependencies, but for now it's here because of e3nn TPs
+    _EXTERNAL_MODULES = ["triton", "io", "opt_einsum_fx", "numpy"] + args.extra_externs
+
+    _MOCK_MODULES = ["matplotlib"]
 
     overlap = set(_INTERNAL_MODULES) & set(_EXTERNAL_MODULES)
     assert (
@@ -128,6 +132,7 @@ def main(args=None):
         )
 
         with torch.package.PackageExporter(args.output_path, debug=True) as exp:
+            exp.mock([f"{pkg}.**" for pkg in _MOCK_MODULES])
             exp.extern([f"{pkg}.**" for pkg in _EXTERNAL_MODULES])
             exp.intern([f"{pkg}.**" for pkg in _INTERNAL_MODULES])
 
