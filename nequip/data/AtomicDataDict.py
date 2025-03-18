@@ -30,7 +30,7 @@ Some standard fields:
 from typing import Dict, Union, Tuple, List, Optional, Any
 
 import torch
-from e3nn import o3
+from e3nn.o3._irreps import Irreps
 
 # Make the keys available in this module
 from ._keys import *  # noqa: F403, F401
@@ -52,10 +52,10 @@ _SPECIAL_IRREPS = [None]
 
 
 def _fix_irreps_dict(d: Dict[str, Any]):
-    return {k: (i if i in _SPECIAL_IRREPS else o3.Irreps(i)) for k, i in d.items()}
+    return {k: (i if i in _SPECIAL_IRREPS else Irreps(i)) for k, i in d.items()}
 
 
-def _irreps_compatible(ir1: Dict[str, o3.Irreps], ir2: Dict[str, o3.Irreps]):
+def _irreps_compatible(ir1: Dict[str, Irreps], ir2: Dict[str, Irreps]):
     return all(ir1[k] == ir2[k] for k in ir1 if k in ir2)
 
 
