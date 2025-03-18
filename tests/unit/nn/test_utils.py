@@ -4,7 +4,7 @@ import numpy as np
 import torch
 
 from nequip.data import AtomicDataDict, compute_neighborlist_, from_ase
-from nequip.nn.embedding import OneHotAtomEncoding
+from nequip.nn.embedding import NodeTypeEmbed
 from nequip.nn.embedding._edge import _process_per_edge_type_cutoff
 from nequip.nn import SequentialGraphNetwork, SaveForOutput, AtomwiseLinear, GraphModel
 from nequip.nn.utils import with_edge_vectors_
@@ -133,17 +133,17 @@ def test_basic(model_dtype):
     type_names = ["A", "B", "C", "D"]
     with torch_default_dtype(dtype_from_name(model_dtype)):
 
-        one_hot = OneHotAtomEncoding(type_names=type_names)
+        node_type = NodeTypeEmbed(type_names=type_names, num_features=13)
         save = SaveForOutput(
             field=AtomicDataDict.NODE_FEATURES_KEY,
             out_field="saved",
-            irreps_in=one_hot.irreps_out,
+            irreps_in=node_type.irreps_out,
         )
         linear = AtomwiseLinear(irreps_in=save.irreps_out)
         model = GraphModel(
             SequentialGraphNetwork(
                 {
-                    "one_hot": one_hot,
+                    "one_hot": node_type,
                     "save": save,
                     "linear": linear,
                 }
@@ -157,5 +157,4 @@ def test_basic(model_dtype):
         }
     )
     saved = out["saved"]
-    assert saved.shape == (5, 4)
-    assert torch.all(saved[0] == torch.as_tensor([1.0, 0.0, 0.0, 0.0]))
+    assert saved.shape == (5, 13)

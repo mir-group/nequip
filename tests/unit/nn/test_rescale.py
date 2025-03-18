@@ -5,7 +5,7 @@ import torch
 from e3nn.util.test import assert_auto_jitable
 
 from nequip.nn import RescaleOutput, GraphModel
-from nequip.nn.embedding import OneHotAtomEncoding
+from nequip.nn.embedding import NodeTypeEmbed
 from nequip.data import AtomicDataDict
 from nequip.utils import dtype_from_name, torch_default_dtype
 from nequip.utils.test import assert_AtomicData_equivariant
@@ -20,8 +20,9 @@ def test_rescale(
     _, data = CH3CHO
     with torch_default_dtype(dtype_from_name(model_dtype)):
         oh = GraphModel(
-            OneHotAtomEncoding(
+            NodeTypeEmbed(
                 type_names=["A", "B", "C"],
+                num_features=13,
             ),
         )
 

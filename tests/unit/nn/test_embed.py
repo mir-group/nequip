@@ -4,24 +4,11 @@ from nequip.utils.test import assert_AtomicData_equivariant
 from nequip.nn import SequentialGraphNetwork, GraphModel
 from nequip.nn.embedding import (
     PolynomialCutoff,
-    OneHotAtomEncoding,
     SphericalHarmonicEdgeAttrs,
     EdgeLengthNormalizer,
     BesselEdgeLengthEncoding,
 )
 from nequip.utils import dtype_from_name, torch_default_dtype
-
-
-def test_onehot(model_dtype, CH3CHO):
-    _, data = CH3CHO
-    mdtype = dtype_from_name(model_dtype)
-    with torch_default_dtype(mdtype):
-        oh = OneHotAtomEncoding(
-            type_names=["A", "B", "C"],
-        )
-        gm = GraphModel(oh)
-    assert_auto_jitable(oh)
-    assert_AtomicData_equivariant(gm, data)
 
 
 def test_spharm(model_dtype, CH3CHO):

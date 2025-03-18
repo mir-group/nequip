@@ -2,18 +2,18 @@ import pytest
 import torch
 
 from nequip.data import AtomicDataDict
-from nequip.nn.embedding import OneHotAtomEncoding
+from nequip.nn.embedding import NodeTypeEmbed
 from nequip.nn import SequentialGraphNetwork, AtomwiseLinear
 
 
 def test_basic():
     type_names = ["A", "B", "C"]
-    one_hot = OneHotAtomEncoding(type_names=type_names)
-    linear = AtomwiseLinear(irreps_in=one_hot.irreps_out)
+    node_type = NodeTypeEmbed(type_names=type_names, num_features=13)
+    linear = AtomwiseLinear(irreps_in=node_type.irreps_out)
 
     sgn = SequentialGraphNetwork(
         {
-            "one_hot": one_hot,
+            "one_hot": node_type,
             "linear": linear,
         }
     )
@@ -27,13 +27,13 @@ def test_basic():
 
 
 def test_append():
-    one_hot = OneHotAtomEncoding(type_names=["A", "B", "C"])
+    node_type = NodeTypeEmbed(type_names=["A", "B", "C"], num_features=13)
     sgn = SequentialGraphNetwork(
-        modules={"one_hot": one_hot},
+        modules={"node_type": node_type},
     )
     sgn.append(
         name="linear",
-        module=AtomwiseLinear(out_field="thing", irreps_in=one_hot.irreps_out),
+        module=AtomwiseLinear(out_field="thing", irreps_in=node_type.irreps_out),
     )
     assert isinstance(sgn.linear, AtomwiseLinear)
     out = sgn(
@@ -48,20 +48,20 @@ def test_append():
 
 @pytest.mark.parametrize("mode", {"before", "after"})
 def test_insert(mode):
-    one_hot = OneHotAtomEncoding(type_names=["A", "B", "C"])
-    linear = AtomwiseLinear(irreps_in=one_hot.irreps_out)
-    sgn = SequentialGraphNetwork({"one_hot": one_hot, "lin2": linear})
-    keys = {"before": "lin2", "after": "one_hot"}
+    node_type = NodeTypeEmbed(type_names=["A", "B", "C"], num_features=13)
+    linear = AtomwiseLinear(irreps_in=node_type.irreps_out)
+    sgn = SequentialGraphNetwork({"node_type": node_type, "lin2": linear})
+    keys = {"before": "lin2", "after": "node_type"}
     sgn.insert(
         name="lin1",
         module=AtomwiseLinear(
-            out_field=AtomicDataDict.NODE_FEATURES_KEY, irreps_in=one_hot.irreps_out
+            out_field=AtomicDataDict.NODE_FEATURES_KEY, irreps_in=node_type.irreps_out
         ),
         **{mode: keys[mode]},
     )
     assert isinstance(sgn.lin1, AtomwiseLinear)
     assert len(sgn) == 3
-    assert sgn[0] is sgn.one_hot
+    assert sgn[0] is sgn.node_type
     assert sgn[1] is sgn.lin1
     assert sgn[2] is sgn.lin2
     out = sgn(

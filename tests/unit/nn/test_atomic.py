@@ -9,9 +9,7 @@ from nequip.nn import (
     SequentialGraphNetwork,
     GraphModel,
 )
-from nequip.nn.embedding import (
-    OneHotAtomEncoding,
-)
+from nequip.nn.embedding import NodeTypeEmbed
 from nequip.utils import dtype_from_name, torch_default_dtype
 
 
@@ -28,11 +26,11 @@ def model(model_dtype, request):
     scales, shifts = request.param
     type_names = ["A", "B", "C"]
     with torch_default_dtype(dtype_from_name(model_dtype)):
-        oh = OneHotAtomEncoding(type_names=type_names)
+        nt = NodeTypeEmbed(type_names=type_names, num_features=13)
         linear = AtomwiseLinear(
             irreps_out="1x0e",
             out_field=AtomicDataDict.PER_ATOM_ENERGY_KEY,
-            irreps_in=oh.irreps_out,
+            irreps_in=nt.irreps_out,
         )
         shift = PerTypeScaleShift(
             type_names=type_names,
@@ -52,7 +50,7 @@ def model(model_dtype, request):
         model = GraphModel(
             SequentialGraphNetwork(
                 {
-                    "one_hot": oh,
+                    "node_type": nt,
                     "linear": linear,
                     "shift": shift,
                     "sum": sum_reduce,
