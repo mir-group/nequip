@@ -1,7 +1,5 @@
 import torch
 
-from e3nn.util._argtools import _get_device
-
 from nequip.data import AtomicDataDict
 from ._graph_mixin import GraphModuleMixin
 
@@ -97,7 +95,3 @@ class GraphModel(GraphModuleMixin, torch.nn.Module):
             if k in data:
                 new_data[k] = data[k]
         return self.model(new_data)
-
-    @torch.jit.unused
-    def get_device(self) -> torch.device:
-        return _get_device(self)
