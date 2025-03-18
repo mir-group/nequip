@@ -1,7 +1,7 @@
 """_key_registry.py: manage information about what kinds of data different keys refer to."""
 
 import torch
-from e3nn.io import CartesianTensor
+from e3nn.io._cartesian_tensor import CartesianTensor
 from . import _keys
 from typing import Dict, Set, Sequence
 
