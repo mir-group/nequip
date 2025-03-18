@@ -1,7 +1,7 @@
 from math import sqrt, prod
 import torch
 
-from e3nn import o3
+from e3nn.o3._irreps import Irreps
 from e3nn.util.jit import compile_mode
 
 from nequip.data import AtomicDataDict
@@ -48,9 +48,7 @@ class ScalarMLP(GraphModuleMixin, torch.nn.Module):
             bias=bias,
             forward_weight_init=forward_weight_init,
         )
-        self.irreps_out[self.out_field] = o3.Irreps(
-            [(self.mlp_module.dims[-1], (0, 1))]
-        )
+        self.irreps_out[self.out_field] = Irreps([(self.mlp_module.dims[-1], (0, 1))])
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
         data[self.out_field] = self.mlp_module(data[self.field])

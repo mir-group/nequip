@@ -1,5 +1,5 @@
 import torch
-from e3nn import o3
+from e3nn.o3._irreps import Irrep, Irreps
 from nequip.data import AtomicDataDict
 from typing import Optional
 
@@ -45,9 +45,9 @@ def scatter(
 
 
 def tp_path_exists(irreps_in1, irreps_in2, ir_out):
-    irreps_in1 = o3.Irreps(irreps_in1).simplify()
-    irreps_in2 = o3.Irreps(irreps_in2).simplify()
-    ir_out = o3.Irrep(ir_out)
+    irreps_in1 = Irreps(irreps_in1).simplify()
+    irreps_in2 = Irreps(irreps_in2).simplify()
+    ir_out = Irrep(ir_out)
 
     for _, ir1 in irreps_in1:
         for _, ir2 in irreps_in2:

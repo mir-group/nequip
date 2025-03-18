@@ -1,7 +1,8 @@
 import torch
 
-from e3nn import o3
-from e3nn.nn import Gate, NormActivation
+from e3nn.o3._irreps import Irreps
+from e3nn.nn._gate import Gate
+from e3nn.nn._normact import NormActivation
 
 from nequip.data import AtomicDataDict
 from ._graph_mixin import GraphModuleMixin
@@ -52,7 +53,7 @@ class ConvNetLayer(GraphModuleMixin, torch.nn.Module):
             -1: nonlinearity_gates["o"],
         }
 
-        self.feature_irreps_hidden = o3.Irreps(feature_irreps_hidden)
+        self.feature_irreps_hidden = Irreps(feature_irreps_hidden)
         self.resnet = resnet
 
         # We'll set irreps_out later when we know them
@@ -64,7 +65,7 @@ class ConvNetLayer(GraphModuleMixin, torch.nn.Module):
         edge_attr_irreps = self.irreps_in[AtomicDataDict.EDGE_ATTRS_KEY]
         irreps_layer_out_prev = self.irreps_in[AtomicDataDict.NODE_FEATURES_KEY]
 
-        irreps_scalars = o3.Irreps(
+        irreps_scalars = Irreps(
             [
                 (mul, ir)
                 for mul, ir in self.feature_irreps_hidden
@@ -73,7 +74,7 @@ class ConvNetLayer(GraphModuleMixin, torch.nn.Module):
             ]
         )
 
-        irreps_gated = o3.Irreps(
+        irreps_gated = Irreps(
             [
                 (mul, ir)
                 for mul, ir in self.feature_irreps_hidden
@@ -90,7 +91,7 @@ class ConvNetLayer(GraphModuleMixin, torch.nn.Module):
                 if tp_path_exists(irreps_layer_out_prev, edge_attr_irreps, "0e")
                 else "0o"
             )
-            irreps_gates = o3.Irreps([(mul, ir) for mul, _ in irreps_gated])
+            irreps_gates = Irreps([(mul, ir) for mul, _ in irreps_gated])
 
             # TO DO, it's not that safe to directly use the
             # dictionary

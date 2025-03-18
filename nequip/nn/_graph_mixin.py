@@ -4,7 +4,7 @@ from collections import OrderedDict
 
 import torch
 
-from e3nn import o3
+from e3nn.o3._irreps import Irreps
 
 from nequip.data import AtomicDataDict
 
@@ -42,11 +42,11 @@ class GraphModuleMixin:
 
         # positions are *always* 1o, and always present
         if AtomicDataDict.POSITIONS_KEY in irreps_in:
-            if irreps_in[AtomicDataDict.POSITIONS_KEY] != o3.Irreps("1x1o"):
+            if irreps_in[AtomicDataDict.POSITIONS_KEY] != Irreps("1x1o"):
                 raise ValueError(
                     f"Positions must have irreps 1o, got instead `{irreps_in[AtomicDataDict.POSITIONS_KEY]}`"
                 )
-        irreps_in[AtomicDataDict.POSITIONS_KEY] = o3.Irreps("1o")
+        irreps_in[AtomicDataDict.POSITIONS_KEY] = Irreps("1o")
 
         # edges are also always present
         if AtomicDataDict.EDGE_INDEX_KEY in irreps_in:

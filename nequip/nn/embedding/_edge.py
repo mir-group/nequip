@@ -1,6 +1,7 @@
 import torch
 
-from e3nn import o3
+from e3nn.o3._irreps import Irreps
+from e3nn.o3._spherical_harmonics import SphericalHarmonics
 from e3nn.util.jit import compile_mode
 
 from nequip.utils.global_dtype import _GLOBAL_DTYPE
@@ -68,7 +69,7 @@ class EdgeLengthNormalizer(GraphModuleMixin, torch.nn.Module):
             rmax_recip = torch.as_tensor(1.0 / self.r_max, dtype=_GLOBAL_DTYPE)
         self.register_buffer("_rmax_recip", rmax_recip)
 
-        irreps_out = {self.norm_length_field: o3.Irreps([(1, (0, 1))])}
+        irreps_out = {self.norm_length_field: Irreps([(1, (0, 1))])}
         if self._per_edge_type:
             irreps_out.update({self.edge_type_field: None})
 
@@ -146,7 +147,7 @@ class BesselEdgeLengthEncoding(GraphModuleMixin, torch.nn.Module):
         self._init_irreps(
             irreps_in=irreps_in,
             irreps_out={
-                self.edge_invariant_field: o3.Irreps([(self.num_bessels, (0, 1))]),
+                self.edge_invariant_field: Irreps([(self.num_bessels, (0, 1))]),
                 AtomicDataDict.EDGE_CUTOFF_KEY: "0e",
             },
         )
@@ -190,7 +191,7 @@ class SphericalHarmonicEdgeAttrs(GraphModuleMixin, torch.nn.Module):
 
     def __init__(
         self,
-        irreps_edge_sh: Union[int, str, o3.Irreps],
+        irreps_edge_sh: Union[int, str, Irreps],
         edge_sh_normalization: str = "component",
         edge_sh_normalize: bool = True,
         irreps_in=None,
@@ -200,14 +201,14 @@ class SphericalHarmonicEdgeAttrs(GraphModuleMixin, torch.nn.Module):
         self.out_field = out_field
 
         if isinstance(irreps_edge_sh, int):
-            self.irreps_edge_sh = o3.Irreps.spherical_harmonics(irreps_edge_sh)
+            self.irreps_edge_sh = Irreps.spherical_harmonics(irreps_edge_sh)
         else:
-            self.irreps_edge_sh = o3.Irreps(irreps_edge_sh)
+            self.irreps_edge_sh = Irreps(irreps_edge_sh)
         self._init_irreps(
             irreps_in=irreps_in,
             irreps_out={out_field: self.irreps_edge_sh},
         )
-        self.sh = o3.SphericalHarmonics(
+        self.sh = SphericalHarmonics(
             self.irreps_edge_sh, edge_sh_normalize, edge_sh_normalization
         )
         # i.e. `model_dtype`

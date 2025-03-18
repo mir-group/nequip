@@ -1,7 +1,7 @@
 import torch
 import torch.nn.functional
 
-from e3nn.o3 import Linear
+from e3nn.o3._linear import Linear
 
 from nequip.data import AtomicDataDict
 from nequip.data._key_registry import get_field_type

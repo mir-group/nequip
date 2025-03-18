@@ -4,8 +4,10 @@ from typing import Optional
 
 import torch
 
-from e3nn import o3
-from e3nn.o3 import TensorProduct, Linear, FullyConnectedTensorProduct
+from e3nn.o3._irreps import Irreps
+from e3nn.o3._linear import Linear
+from e3nn.o3._tensor_product._tensor_product import TensorProduct
+from e3nn.o3._tensor_product._sub import FullyConnectedTensorProduct
 
 from nequip.data import AtomicDataDict
 from .mlp import ScalarMLPFunction
@@ -47,7 +49,7 @@ class InteractionBlock(GraphModuleMixin, torch.nn.Module):
                 AtomicDataDict.NODE_ATTRS_KEY,
             ],
             my_irreps_in={
-                AtomicDataDict.EDGE_EMBEDDING_KEY: o3.Irreps(
+                AtomicDataDict.EDGE_EMBEDDING_KEY: Irreps(
                     [
                         (
                             irreps_in[AtomicDataDict.EDGE_EMBEDDING_KEY].num_irreps,
@@ -87,7 +89,7 @@ class InteractionBlock(GraphModuleMixin, torch.nn.Module):
 
         # We sort the output irreps of the tensor product so that we can simplify them
         # when they are provided to the second o3.Linear
-        irreps_mid = o3.Irreps(irreps_mid)
+        irreps_mid = Irreps(irreps_mid)
         irreps_mid, p, _ = irreps_mid.sort()
 
         # Permute the output indexes of the instructions to match the sorted irreps:
