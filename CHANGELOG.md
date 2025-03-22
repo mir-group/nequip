@@ -10,6 +10,12 @@ Most recent change on the bottom.
 ## Unreleased
 
 
+## [0.6.2] - 2025-3-22
+
+### Fixed
+ - Fixed early stopping bug
+ - Fixed PyTorch version bug
+
 ## [0.6.1] - 2024-7-9
 ### Added
 - add support for equivariance testing of arbitrary Cartesian tensor outputs
