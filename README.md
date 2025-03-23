@@ -63,7 +63,7 @@ If a GPU is present, the unit tests will use it.
 
 ## Tutorial 
 
-The best way to learn how to use NequIP is through the [Colab Tutorial](https://bit.ly/mrs-nequip). This will run entirely on Google's cloud virtual machine; you do not need to install or run anything locally. 
+The best way to learn how to use NequIP is through the [Colab Tutorial](https://colab.research.google.com/drive/1yq2UwnET4loJYg_Fptt9kpklVaZvoHnq). This will run entirely on Google's cloud virtual machine; you do not need to install or run anything locally. 
 
 ## Usage
 
