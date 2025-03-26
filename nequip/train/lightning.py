@@ -4,7 +4,6 @@ from lightning.pytorch.utilities.warnings import PossibleUserWarning
 from hydra.utils import instantiate
 from hydra.utils import get_method
 from nequip.data import AtomicDataDict
-from nequip.nn import GraphModel
 from nequip.utils import RankedLogger
 
 import warnings
@@ -79,15 +78,18 @@ class NequIPLightningModule(lightning.LightningModule):
         # - for multiple models, they must be in the form of a `ModuleDict` of `GraphModel`s
         # - if a single `GraphModel` is provided, we wrap it in a `ModuleDict`
         # - all models must have the same `type_names`
-        assert isinstance(model_object, torch.nn.ModuleDict) or isinstance(
-            model_object, GraphModel
+
+        # the reason for `hasattr(x, "is_graph_model")` and not just `isinstance(x, GraphModel)`
+        # is to support `GraphModel` from a `nequip-package`d model (see https://pytorch.org/docs/stable/package.html#torch-package-sharp-edges)
+        assert isinstance(model_object, torch.nn.ModuleDict) or hasattr(
+            model_object, "is_graph_model"
         )
-        if isinstance(model_object, GraphModel):
+        if not isinstance(model_object, torch.nn.ModuleDict):
             model_object = torch.nn.ModuleDict({_SOLE_MODEL_KEY: model_object})
         self.model = model_object
         type_names_list = []
         for k, v in self.model.items():
-            assert isinstance(v, GraphModel)
+            assert hasattr(v, "is_graph_model")
             type_names_list.append(v.type_names)
             logger.debug(f"Built Model Details ({k}):\n{str(v)}")
         assert all(

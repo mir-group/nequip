@@ -46,6 +46,8 @@ class GraphModel(GraphModuleMixin, torch.nn.Module):
     """
 
     model_input_fields: List[str]
+    is_graph_model: Final[bool] = True
+    # ^ to identify `GraphModel` types from `nequip-package`d models (see https://pytorch.org/docs/stable/package.html#torch-package-sharp-edges)
 
     def __init__(
         self,
