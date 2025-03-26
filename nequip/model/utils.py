@@ -118,11 +118,14 @@ def model_builder(func):
             ), f"`compile_mode` can only be any of {_COMPILE_MODE_OPTIONS}, but `{compile_mode}` found"
 
             # use `CompileGraphModel` if doing train-time compile build
-            graph_model_module = (
-                CompileGraphModel
-                if compile_mode == _TRAIN_TIME_COMPILE_KEY
-                else GraphModel
-            )
+            if compile_mode == _TRAIN_TIME_COMPILE_KEY:
+                # === torch version check ===
+                from nequip.utils.versions import check_pt2_compile_compatibility
+
+                check_pt2_compile_compatibility()
+                graph_model_module = CompileGraphModel
+            else:
+                graph_model_module = GraphModel
 
             # set torchscript mode -- True if "jit" mode
             with conditional_torchscript_mode(compile_mode == _TRAIN_TIME_SCRIPT_KEY):

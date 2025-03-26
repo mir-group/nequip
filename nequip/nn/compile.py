@@ -9,7 +9,7 @@ from nequip.utils.dtype import (
     _pt2_compile_error_message,
 )
 from nequip.utils.fx import nequip_make_fx
-from nequip.utils import dtype_to_name
+from nequip.utils.dtype import dtype_to_name
 from typing import Dict, Sequence, List, Optional, Any
 
 
@@ -102,11 +102,6 @@ class CompileGraphModel(GraphModel):
         model_config: Optional[Dict[str, str]] = None,
         model_input_fields: Dict[str, Any] = {},
     ) -> None:
-        # === torch version check ===
-        from nequip.utils.versions import check_pt2_compile_compatibility
-
-        check_pt2_compile_compatibility()
-
         super().__init__(model, model_config, model_input_fields)
         # save model param and buffer names
         self.weight_names = [n for n, _ in self.model.named_parameters()]
