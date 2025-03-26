@@ -4,7 +4,6 @@ from e3nn.util.jit import script
 
 from ._workflow_utils import set_workflow_state
 from ._compile_utils import COMPILE_TARGET_DICT
-from ._workflow_utils import set_workflow_state
 from nequip.model.utils import _EAGER_MODEL_KEY, _COMPILE_TIME_AOTINDUCTOR_KEY
 from nequip.model.from_save import ModelFromPackage, ModelFromCheckpoint
 from nequip.train.lightning import _SOLE_MODEL_KEY
@@ -182,36 +181,25 @@ def main(args=None):
         ), "`output-path` must end with the `.nequip.pt2` extension for `aotinductor` compile mode"
 
     # === load model ===
+    # get relevant model build types (used by both checkpoint and package logic paths)
+    model_compile_mode = {
+        "torchscript": _EAGER_MODEL_KEY,
+        "aotinductor": (
+            _EAGER_MODEL_KEY
+            if _ALWAYS_COMPILE_FROM_EAGER
+            else _COMPILE_TIME_AOTINDUCTOR_KEY
+        ),
+    }[args.mode]
+    logger.info(f"Loading model for compilation from {args.input_path} ...")
     # use package load path if extension matches, otherwise assume checkpoint file
     use_ckpt = not str(args.input_path).endswith(".nequip.zip")
     if use_ckpt:
-        logger.info(f"Loading model from checkpoint file {args.input_path} ...")
-        _CKPT_COMPILE_MODE_DICT = {
-            "torchscript": None,
-            "aotinductor": None if _ALWAYS_COMPILE_FROM_EAGER else "aotinductor",
-        }
-        with override_model_compile_mode(
-            compile_mode=_CKPT_COMPILE_MODE_DICT[args.mode]
-        ):
-            model = ModelFromCheckpoint(args.input_path)
+        model = ModelFromCheckpoint(args.input_path, compile_mode=model_compile_mode)
     else:
-        logger.info(f"Loading model from package file {args.input_path} ...")
-        # TODO: more robust system that goes down a priority list for packaged models to load
+        # TODO: (maybe) more robust system that goes down a priority list for packaged models to load
         # e.g. if doing `aotinductor` compile, look for `aotinductor` model first, but fallback to loading `eager` packaged model for `nequip-compile`
-        from ._package_utils import _EAGER_MODEL_KEY, _AOTINDUCTOR_MODEL_KEY
-
-        _PKG_MODEL_TYPE_DICT = {
-            "torchscript": _EAGER_MODEL_KEY,
-            "aotinductor": (
-                _EAGER_MODEL_KEY
-                if _ALWAYS_COMPILE_FROM_EAGER
-                else _AOTINDUCTOR_MODEL_KEY
-            ),
-        }
-        model = ModelFromPackage(
-            args.input_path,
-            package_model_type=_PKG_MODEL_TYPE_DICT[args.mode],
-        )
+        # for now we just use the same `model_compile_mode`
+        model = ModelFromPackage(args.input_path, compile_mode=model_compile_mode)
 
     model = model[args.model]
     # ^ `ModuleDict` of `GraphModel` is loaded, we then select the desired `GraphModel` (`args.model` defaults to work for single model case)

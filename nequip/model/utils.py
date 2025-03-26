@@ -44,21 +44,38 @@ _CURRENT_COMPILE_MODE = contextvars.ContextVar(
 
 @contextlib.contextmanager
 def override_model_compile_mode(compile_mode: Optional[str]):
+    """
+    Overrides the ``compile_mode`` for model building.
+    If several of these context managers are nested, the outermost one will be prioritized while the inner ones are ignored.
+    The intended client is `ModelFromCheckpoint`.
+    Anybody using this function should be warned that the behavior is designed for loading models from checkpoints and packages correctly.
+    """
     assert compile_mode in _COMPILE_MODE_OPTIONS
     global _OVERRIDE_COMPILE_MODE
     global _CURRENT_COMPILE_MODE
     init_state = _OVERRIDE_COMPILE_MODE.get()
-    init_mode = _CURRENT_COMPILE_MODE.get()
-    _OVERRIDE_COMPILE_MODE.set(True)
-    _CURRENT_COMPILE_MODE.set(compile_mode)
-    yield
-    _OVERRIDE_COMPILE_MODE.set(init_state)
-    _CURRENT_COMPILE_MODE.set(init_mode)
+    # in the case of nested overrides, we prioritize the outermost context manager
+    if init_state:
+        yield
+    else:
+        init_mode = _CURRENT_COMPILE_MODE.get()
+        _OVERRIDE_COMPILE_MODE.set(True)
+        _CURRENT_COMPILE_MODE.set(compile_mode)
+        try:
+            yield
+        finally:
+            _OVERRIDE_COMPILE_MODE.set(init_state)
+            _CURRENT_COMPILE_MODE.set(init_mode)
 
 
-def get_current_compile_mode():
+def get_current_compile_mode(return_override: bool = False):
+    # returns tuple of (whether compile mode is overriden, compile mode)
     global _CURRENT_COMPILE_MODE
-    return _CURRENT_COMPILE_MODE.get()
+    if return_override:
+        global _OVERRIDE_COMPILE_MODE
+        return _CURRENT_COMPILE_MODE.get(), _OVERRIDE_COMPILE_MODE.get()
+    else:
+        _CURRENT_COMPILE_MODE.get()
 
 
 def model_builder(func):
