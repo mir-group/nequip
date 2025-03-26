@@ -206,7 +206,10 @@ class BaseModelTests:
         """
         if not _TORCH_GE_2_6:
             pytest.skip("PT2 compile tests skipped for torch < 2.6")
-        from nequip.model import override_model_compile_mode
+        from nequip.model.utils import (
+            override_model_compile_mode,
+            _COMPILE_TIME_AOTINDUCTOR_KEY,
+        )
         from nequip.utils.compile import prepare_model_for_compile
         from nequip.utils.aot import aot_export_model
         from nequip.scripts._compile_utils import PAIR_NEQUIP_INPUTS, LMP_OUTPUTS
@@ -217,7 +220,7 @@ class BaseModelTests:
         export_data.pop(AtomicDataDict.NUM_NODES_KEY)
 
         _, config, _ = model
-        with override_model_compile_mode(compile_mode="aotinductor"):
+        with override_model_compile_mode(compile_mode=_COMPILE_TIME_AOTINDUCTOR_KEY):
             model = self.make_model(config, device=device)
         model = prepare_model_for_compile(model, device)
         # export model
