@@ -22,16 +22,17 @@ from typing import Optional, Final
 
 _IS_BUILDING_MODEL = contextvars.ContextVar("_IS_BUILDING_MODEL", default=False)
 
-
-_TRAIN_TIME_COMPILE_KEY: Final[str] = "compile"
+# the following is the set of model build types for specific purposes
+_EAGER_MODEL_KEY = "eager"
 _TRAIN_TIME_SCRIPT_KEY: Final[str] = "script"
+_TRAIN_TIME_COMPILE_KEY: Final[str] = "compile"
 _COMPILE_TIME_AOTINDUCTOR_KEY: Final[str] = "aotinductor"
 
 _COMPILE_MODE_OPTIONS = {
-    _TRAIN_TIME_COMPILE_KEY,
+    _EAGER_MODEL_KEY,
     _TRAIN_TIME_SCRIPT_KEY,
+    _TRAIN_TIME_COMPILE_KEY,
     _COMPILE_TIME_AOTINDUCTOR_KEY,
-    None,  # i.e. eager mode
 }
 
 
@@ -42,7 +43,7 @@ _CURRENT_COMPILE_MODE = contextvars.ContextVar(
 
 
 @contextlib.contextmanager
-def override_model_compile_mode(compile_mode: Optional[str] = None):
+def override_model_compile_mode(compile_mode: Optional[str]):
     assert compile_mode in _COMPILE_MODE_OPTIONS
     global _OVERRIDE_COMPILE_MODE
     global _CURRENT_COMPILE_MODE
@@ -103,7 +104,7 @@ def model_builder(func):
             dtype = dtype_from_name(model_dtype)
 
             # === compilation options ===
-            # `compile_mode` dictates the optimization path chosen, either `None`, `script`, or `compile`
+            # `compile_mode` dictates the optimization path chosen
             # users can set this with the `compile_mode` arg to the model builder
             # devs can override it with `override_model_compile_mode`
 
@@ -115,6 +116,8 @@ def model_builder(func):
             assert (
                 compile_mode in _COMPILE_MODE_OPTIONS
             ), f"`compile_mode` can only be any of {_COMPILE_MODE_OPTIONS}, but `{compile_mode}` found"
+
+            # use `CompileGraphModel` if doing train-time compile build
             graph_model_module = (
                 CompileGraphModel
                 if compile_mode == _TRAIN_TIME_COMPILE_KEY
