@@ -17,14 +17,18 @@ from nequip.utils.global_state import set_global_state, TF32_KEY
 
 
 class NequIPCalculator(Calculator):
-    """NequIP ASE Calculator.
+    """NequIP framework ASE Calculator.
+
+    This ASE Calculator is compatible with models from the NequIP framework, including NequIP and Allegro models.
+
+    The recommended way to use this Calculator is with a compiled model, i.e. ``nequip-compile`` the model and load it into the Calculator with ``NequIPCalculator.from_compiled_model(...)``. If one uses ``--mode aotinductor`` during ``nequip-compile``, it is important to use the flag ``--target ase`` for the compiled model file to work with this ASE Calculator.
 
     .. warning::
 
         If you are running MD with custom species, please make sure to set the correct masses for ASE.
 
     Args:
-        model: a model in the NequIP framework, e.g. a NequIP GNN model or an Allegro model, etc
+        model: a model in the NequIP framework
         device (str/torch.device): device for model to evaluate on, e.g. ``cpu`` or ``cuda``
         energy_units_to_eV (float): energy conversion factor (default ``1.0``)
         length_units_to_A (float): length units conversion factor (default ``1.0``)
@@ -67,7 +71,7 @@ class NequIPCalculator(Calculator):
         chemical_symbols: Optional[Union[List[str], Dict[str, str]]] = None,
         **kwargs,
     ):
-        """Creates a NequIPCalculator from a compiled model file.
+        """Creates a ``NequIPCalculator`` from a compiled model file.
 
         Args:
             compile_path (str): path to compiled model file
@@ -154,7 +158,7 @@ class NequIPCalculator(Calculator):
         model_name: str = _SOLE_MODEL_KEY,
         **kwargs,
     ):
-        """Creates a NequIPCalculator from a checkpoint file.
+        """Creates a ``NequIPCalculator`` from a checkpoint file.
 
         Args:
             ckpt_path (str): path to checkpoint file
@@ -182,7 +186,7 @@ class NequIPCalculator(Calculator):
         model_name: str = _SOLE_MODEL_KEY,
         **kwargs,
     ):
-        """Creates a NequIPCalculator from a package file.
+        """Creates a ``NequIPCalculator`` from a package file.
 
         Args:
             package_path (str): path to packaged model
