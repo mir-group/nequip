@@ -2,12 +2,11 @@ import torch
 
 from e3nn.util.jit import script
 
+from ._workflow_utils import set_workflow_state
 from ._compile_utils import COMPILE_TARGET_DICT
-from nequip.model import (
-    override_model_compile_mode,
-    ModelFromPackage,
-    ModelFromCheckpoint,
-)
+from ._workflow_utils import set_workflow_state
+from nequip.model.utils import _EAGER_MODEL_KEY, _COMPILE_TIME_AOTINDUCTOR_KEY
+from nequip.model.from_save import ModelFromPackage, ModelFromCheckpoint
 from nequip.train.lightning import _SOLE_MODEL_KEY
 from nequip.data import AtomicDataDict, compile_utils
 from nequip.utils.logger import RankedLogger
@@ -162,6 +161,8 @@ def main(args=None):
     )
     args = parser.parse_args(args=args)
 
+    set_workflow_state("compile")
+
     # === initialize global state ===
     set_global_state(allow_tf32=args.tf32)
 
@@ -230,6 +231,7 @@ def main(args=None):
         script_model = script(model)
         torch.jit.save(script_model, args.output_path, _extra_files=metadata)
         logger.info(f"TorchScript model saved to {args.output_path}")
+        set_workflow_state(None)
         return
 
     # === AOT Inductor ===
@@ -319,6 +321,7 @@ def main(args=None):
             seed=_COMPILE_SEED,
         )
         logger.info(f"Exported model saved to {args.output_path}")
+        set_workflow_state(None)
         return
 
 

@@ -5,6 +5,7 @@
 import numpy as np  # noqa: F401
 import torch
 
+from ._workflow_utils import set_workflow_state
 from nequip.utils import get_current_code_versions, RankedLogger
 from nequip.utils.global_state import set_global_state, get_latest_global_state
 from nequip.data.datamodule import NequIPDataModule
@@ -31,6 +32,7 @@ _REQUIRED_CONFIG_SECTIONS: Final[List[str]] = [
 
 @hydra.main(version_base=None, config_path=os.getcwd(), config_name="config")
 def main(config: DictConfig) -> None:
+    set_workflow_state("train")
     # === sanity checks ===
 
     # check that all base sections are present
@@ -259,6 +261,8 @@ def main(config: DictConfig) -> None:
         # update `run_index` and update it in `nequip_module`'s state dict
         run_index += 1
         nequip_module.run_stage[0] = run_index
+
+    set_workflow_state(None)
     return
 
 
