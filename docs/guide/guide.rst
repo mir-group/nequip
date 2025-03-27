@@ -5,6 +5,7 @@ User Guide
 
     install
     workflow
+    files
     config
     model
     faq_errors
