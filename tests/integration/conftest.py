@@ -17,7 +17,7 @@ def _check_and_print(retcode):
         retcode.check_returncode()
 
 
-def _training_session(conffile, training_module, model_dtype, BENCHMARK_ROOT):
+def _training_session(conffile, training_module, model_dtype, extra_train_from_save):
     path_to_this_file = pathlib.Path(__file__)
     config_path = path_to_this_file.parents[0] / conffile
     config = OmegaConf.load(config_path)
@@ -48,7 +48,56 @@ def _training_session(conffile, training_module, model_dtype, BENCHMARK_ROOT):
                 stderr=subprocess.PIPE,
             )
             _check_and_print(retcode)
+
             yield config, tmpdir, env
+
+            if extra_train_from_save is not None:
+                with tempfile.TemporaryDirectory() as new_tmpdir:
+                    new_config = config.copy()
+                    with open_dict(config):
+                        config["hydra"] = {"run": {"dir": new_tmpdir}}
+                    if extra_train_from_save == "checkpoint":
+                        with open_dict(new_config):
+                            new_config["training_module"]["model"] = {
+                                "_target_": "nequip.model.ModelFromCheckpoint",
+                                "checkpoint_path": f"{tmpdir}/last.ckpt",
+                            }
+                    elif extra_train_from_save == "package":
+                        # package model
+                        package_path = f"{new_tmpdir}/orig_package_model.nequip.zip"
+                        retcode = subprocess.run(
+                            [
+                                "nequip-package",
+                                "--ckpt-path",
+                                f"{tmpdir}/last.ckpt",
+                                "--output-path",
+                                package_path,
+                            ],
+                            cwd=new_tmpdir,
+                            env=env,
+                        )
+                        _check_and_print(retcode)
+                        assert pathlib.Path(
+                            package_path
+                        ).is_file(), "`nequip-package` didn't create file"
+                        # update config
+                        with open_dict(new_config):
+                            new_config["training_module"]["model"] = {
+                                "_target_": "nequip.model.ModelFromPackage",
+                                "package_path": package_path,
+                            }
+                    new_config = OmegaConf.create(new_config)
+                    config_path = f"{new_tmpdir}/conf.yaml"
+                    OmegaConf.save(config=new_config, f=config_path)
+                    retcode = subprocess.run(
+                        ["nequip-train", "-cn", "conf"],
+                        cwd=new_tmpdir,
+                        env=env,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                    )
+                    _check_and_print(retcode)
+                    yield new_config, new_tmpdir, env
 
 
 @pytest.fixture(
@@ -73,9 +122,21 @@ def training_module(request):
     return request.param
 
 
+@pytest.fixture(scope="session", params=[None, "checkpoint", "package"])
+def extra_train_from_save(request):
+    """
+    Whether the checkpoints for the tests come from a fresh model, `ModelFromCheckpoint`, or `ModelFromPackage`.
+    """
+    return request.param
+
+
 @pytest.fixture(scope="session")
-def fake_model_training_session(BENCHMARK_ROOT, conffile, training_module, model_dtype):
-    session = _training_session(conffile, training_module, model_dtype, BENCHMARK_ROOT)
+def fake_model_training_session(
+    conffile, training_module, model_dtype, extra_train_from_save
+):
+    session = _training_session(
+        conffile, training_module, model_dtype, extra_train_from_save
+    )
     config, tmpdir, env = next(session)
-    yield config, tmpdir, env
+    yield config, tmpdir, env, model_dtype
     del session

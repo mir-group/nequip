@@ -32,13 +32,13 @@ def test_compile(fake_model_training_session, device, mode):
             "compile tests are skipped for CPU as there are known compilation bugs for both NequIP and Allegro models on CPU"
         )
 
-    config, tmpdir, env = fake_model_training_session
+    config, tmpdir, env, model_dtype = fake_model_training_session
 
     # just in case
     assert torch.get_default_dtype() == torch.float64
 
     # atol on MODEL dtype, since a mostly float32 model still has float32 variation
-    tol = {"float32": 1e-5, "float64": 1e-10}[config.training_module.model.model_dtype]
+    tol = {"float32": 1e-5, "float64": 1e-10}[model_dtype]
 
     # === test nequip-package ===
     # !! NOTE: we use the `best.ckpt` because val, test metrics were computed with `best.ckpt` in the `test` run stages !!

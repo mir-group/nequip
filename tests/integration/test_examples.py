@@ -14,7 +14,7 @@ def test_dimer_plot_example(fake_model_training_session, device):
     """
     Tests that the `plot_dimers` example runs.
     """
-    _, tmpdir, env = fake_model_training_session
+    _, tmpdir, env, _ = fake_model_training_session
     path_to_this_file = pathlib.Path(__file__)
     script_path = path_to_this_file.parents[2] / "examples/plot_dimers.py"
     ckpt_path = pathlib.Path(f"{tmpdir}/last.ckpt")
@@ -39,7 +39,7 @@ def test_parity_plot_example(fake_model_training_session):
     """
     Tests that the `parity_plot` example runs.
     """
-    _, tmpdir, env = fake_model_training_session
+    _, tmpdir, env, _ = fake_model_training_session
     path_to_this_file = pathlib.Path(__file__)
     script_path = path_to_this_file.parents[2] / "examples/parity_plot.py"
     xyz_path = pathlib.Path(f"{tmpdir}/test_dataset0.xyz")
