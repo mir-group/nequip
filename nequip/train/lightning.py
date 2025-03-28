@@ -3,6 +3,7 @@ import lightning
 from lightning.pytorch.utilities.warnings import PossibleUserWarning
 from hydra.utils import instantiate
 from hydra.utils import get_method
+from nequip.model.from_save import ModelFromCheckpoint
 from nequip.data import AtomicDataDict
 from nequip.utils import RankedLogger
 
@@ -68,7 +69,22 @@ class NequIPLightningModule(lightning.LightningModule):
         info_dict: Optional[Dict] = None,
     ):
         super().__init__()
+
+        # save arguments to instantiate LightningModule from checkpoint automatically
         self.save_hyperparameters()
+
+        # === prevent `ModelFromCheckpoint` chaining ===
+        # replace the `model` hparams (currently `ModelFromCheckpoint`) with the `model` hparams from the checkpoint
+        # `LightningModule.load_from_checkpoint(ckpt)` will then instantiate the `LightningModule` with the original `model`
+        # instead of `ModelFromCheckpoint` (which is the cause for `ModelFromCheckpoint` chaining)
+        # NOTE: this forges a contract with `ModelFromCheckpoint` API, though it only assumes a form like `ModelFromCheckpoint(checkpoint_path, ...)`
+        if get_method(model["_target_"]) == ModelFromCheckpoint:
+            assert "checkpoint_path" in model
+            self.hparams["model"] = torch.load(
+                model["checkpoint_path"], map_location="cpu", weights_only=False
+            )["hyper_parameters"]["model"]
+            # ^ https://github.com/Lightning-AI/pytorch-lightning/blob/df5dee674243e124a2bf34d9975dd586ff008d4b/src/lightning/pytorch/core/mixins/hparams_mixin.py#L154
+            # "The collection of hyperparameters saved with :meth:`save_hyperparameters`. It is mutable by the user. For the frozen set of initial hyperparameters, use :attr:`hparams_initial`."
 
         # === instantiate model ===
         model_object = self._build_model(model)
