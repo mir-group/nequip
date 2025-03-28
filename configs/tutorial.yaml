@@ -1,4 +1,4 @@
-# The config file is divided into 4 sections -- `data`, `train`, `model`, and `global_options`
+# The config file is divided into 5 sections -- `run`, `data`, `trainer`, `training_module`, and `global_options`
 # The config system relies on omegaconf (https://omegaconf.readthedocs.io/en/2.3_branch/index.html)
 # and hydra (https://hydra.cc/docs/intro/) functionalities, such as
 # - omegaconf's variable interpolation (https://omegaconf.readthedocs.io/en/2.3_branch/usage.html#variable-interpolation)
@@ -7,41 +7,50 @@
 # With hydra's instantiation (notice the `_target_`s everywhere), the config file (almost) directly corresponds to instantiating objects as one would normally do in Python.
 # Much of the infrastructure is based on PyTorch Lightning (https://lightning.ai/docs/pytorch/stable/), such as the use of Lightning's Trainer, DataModule, LightningModule, Callback objects.
 
-
+# ===========
+#     RUN
+# ===========
 # the run types will be completed in sequence
 # one can do `train`, `val`, `test` run types
 run: [train, test]
 
 
-# the following parameters (cutoff_radius, chemical_symbols, model_type_names, monitored_metric) are not used direcly by the code
-# parameters that take thier values show up multiple times in the config, so this allows us to use variable interpolation to keep their multiple instances consistent
+# the following parameters (cutoff_radius, chemical_symbols, model_type_names, monitored_metric) are not used directly by the config parser
+# but parameters that should share the same values are present in different parts of the config
+# thus, we use variable interpolation to keep their multiple instances consistent
+# i.e. we only ever have to change the values here instead of everywhere it's necessary to
 
 # data and model r_max can be different (model's r_max should be smaller), but we try to make them the same
 cutoff_radius: 5.0
 
 # variable interpolation is convenient for wandb sweeps, see documentation for more details
+# the following are NequIP model hyperparameters that can be sweeped over
 num_layers: 4       # number of interaction blocks, we find 3-5 to work best
 l_max: 1            # the maximum irrep order (rotation order) for the network's features, l=1 is a good default, l=2 is more accurate but slower
 num_features: 32    # the multiplicity of the features, 32 is a good default for accurate network, if you want to be more accurate, go larger, if you want to be faster, go lower
 
-# There are two sets of atomic types to keep track of in most applications
-# -- there is the conventional atomic species (e.g. C, H), and a separate `type_names` known to the model.
+# There are two sets of atomic types to keep track of in most applications.
+# There is the conventional atomic species (e.g. C, H), and a separate `type_names` known to the model.
 # The model only knows types based on a set of zero-based indices and user-given `type_names` argument.
 # An example where this distinction is necessary include datasets with the same atomic species with different charge states:
 # we could define `chemical_symbols: [C, C]` and model `type_names: [C3, C4]` for +3 and +4 charge states.
 # There could also be instances such as coarse graining we only care about the model's `type_names` (no need to define chemical species).
 # Because of this distinction, these variables show up as arguments across different categories, including, data, model, metrics and even callbacks.
 # In this case, we fix both to be the same, so we define a single set of each here and use variable interpolation to retrieve them below.
-# This ensures a single location where the values are set to reduce the chances of mis-configuring runs.
+# This ensures a single location where the values are set to reduce the chances of misconfiguring runs.
 chemical_symbols: [C, H, O, Cu] 
 model_type_names: ${chemical_symbols}
 
-# We want a metric to condition training on (e.g. for best `ModelCheckpoint`, `EarlyStopping`, LR scheduling) which will show up in various places later on, so we set up a "single source of truth" to interpolate
+# We want a metric to condition training on (e.g. for best `ModelCheckpoint`, `EarlyStopping`, LR scheduling) which will show up in various places later on, so we set up a "single source of truth" to interpolate over
 monitored_metric: val0_epoch/weighted_sum
 
-# data is managed by LightningDataModules
-# nequip provides some standard datamodules that can be found in nequip.data.datamodule
-# users are free to define and use their own datamodules that subclass nequip.data.datamodule.NequIPDataModule
+
+# ============
+#     DATA
+# ============
+# `data` is managed by `LightningDataModule`s
+# NequIP provides some standard datamodules that can be found in `nequip.data.datamodule`
+# Users are free to define and use their own datamodules that subclass nequip.data.datamodule.NequIPDataModule
 data:
   _target_: nequip.data.datamodule.ASEDataModule
   seed: 456             # dataset seed for reproducibility
@@ -97,7 +106,11 @@ data:
     # so we interpolate the "central source of truth" model type names from above
     type_names: ${model_type_names}
 
-# `trainer` (mandatory) is a Lightning.Trainer object (https://lightning.ai/docs/pytorch/stable/common/trainer.html#trainer-class-api)
+
+# =============
+#    TRAINER
+# =============
+# `trainer` is a `Lightning.Trainer` object (https://lightning.ai/docs/pytorch/stable/common/trainer.html#trainer-class-api)
 trainer:
   _target_: lightning.Trainer
   accelerator: gpu
@@ -118,7 +131,6 @@ trainer:
   # use any Lightning callbacks https://lightning.ai/docs/pytorch/stable/api_references.html#callbacks
   # and any custom callbakcs that subclass Lightning's Callback parent class
   callbacks:
-    # Common callbacks used in ML
 
     # stop training when some criterion is met
     - _target_: lightning.pytorch.callbacks.EarlyStopping
@@ -132,17 +144,20 @@ trainer:
       dirpath: ${hydra:runtime.output_dir}    # use hydra output directory
       filename: best                          # best.ckpt is the checkpoint name
       save_last: true                         # last.ckpt will be saved
-      
+
     # log learning rate, e.g. to monitor what the learning rate scheduler is doing
     - _target_: lightning.pytorch.callbacks.LearningRateMonitor
       logging_interval: epoch
 
 
-# training_module refers to a NequIPLightningModule or its subclass
+# =====================
+#    TRAINING MODULE
+# =====================
+# training_module refers to a `NequIPLightningModule` or its subclass
 # here we use the subclass that holds an exponential moving average of the base model's weights (an EMA model)
 # one could also use the base `NequIPLightningModule` here if one does not want to use an EMA model
 # EMA allows for smoother validation curves and thus more reliable metrics for monitoring
-  # Loading from a checkpoint for use in the `nequip.ase.NequIPCalculator` or during `nequip-compile` and `nequip-package` will always load the EMA model if it's present
+# Loading from a checkpoint for use in the `nequip.ase.NequIPCalculator` or during `nequip-compile` and `nequip-package` will always load the EMA model if it's present
 training_module:
   _target_: nequip.train.EMALightningModule
 
@@ -166,8 +181,7 @@ training_module:
     coeffs:
       total_energy_mae: 1.0
       forces_mae: 1.0
-      # keys `total_energy_rmse` and `forces_rmse`, `per_atom_energy_rmse`
-      # and `per_atom_energy_mae` are also available
+      # keys `total_energy_rmse` and `forces_rmse`, `per_atom_energy_rmse` and `per_atom_energy_mae` are also available
 
   # we could have train_metrics and test_metrics be different from val_metrics, but it makes sense to have them be the same
   train_metrics: ${training_module.val_metrics}  # use variable interpolation
@@ -208,18 +222,18 @@ training_module:
     polynomial_cutoff_p: 6        # p-exponent used in polynomial cutoff function, smaller p corresponds to stronger decay with distance
 
     # == convnet layers ==
-    num_layers: ${num_layers}       # number of interaction blocks, we find 3-5 to work best
-    l_max: ${l_max}            # the maximum irrep order (rotation order) for the network's features, l=1 is a good default, l=2 is more accurate but slower
-    parity: true        # whether to include features with odd mirror parity; often turning parity off gives equally good results but faster networks, so do consider this
-    num_features: ${num_features}    # the multiplicity of the features, 32 is a good default for accurate network, if you want to be more accurate, go larger, if you want to be faster, go lower
+    num_layers: ${num_layers}      # number of interaction blocks, we find 3-5 to work best
+    l_max: ${l_max}                # the maximum irrep order (rotation order) for the network's features, l=1 is a good default, l=2 is more accurate but slower
+    parity: true                   # whether to include features with odd mirror parity; often turning parity off gives equally good results but faster networks, so do consider this
+    num_features: ${num_features}  # the multiplicity of the features, 32 is a good default for accurate network, if you want to be more accurate, go larger, if you want to be faster, go lower
 
     # == radial network ==
-    radial_mlp_depth: 2         # number of radial layers, usually 1-3 works best, smaller is faster
-    radial_mlp_width: 64        # number of hidden neurons in radial function, smaller is faster
+    radial_mlp_depth: 2            # number of radial layers, usually 1-3 works best, smaller is faster
+    radial_mlp_width: 64           # number of hidden neurons in radial function, smaller is faster
 
     # dataset statistics used to inform the model's initial parameters for normalization, shifting and rescaling
     # we use omegaconf's resolvers (https://omegaconf.readthedocs.io/en/2.3_branch/usage.html#resolvers)
-    # to facilitate getting the dataset statistics from the DataStatisticsManager
+    # to facilitate getting the dataset statistics from the `DataStatisticsManager`
     
     # average number of neighbors for edge sum normalization
     avg_num_neighbors: ${training_data_stats:num_neighbors_mean}
@@ -231,11 +245,17 @@ training_module:
     per_type_energy_shifts_trainable: false
 
     # == ZBL pair potential ==
+    # useful as a prior for core repulsion to mitigate MD failure modes associated with atoms getting too close
     pair_potential:
       _target_: nequip.nn.pair_potential.ZBL
       units: metal     # Ang and kcal/mol, LAMMPS unit names;  allowed values "metal" and "real"
       chemical_species: ${chemical_symbols}   # must tell ZBL the chemical species of the various model atom types
 
-# global options
+
+# ====================
+#    GLOBAL OPTIONS   
+# ====================
 global_options:
+  # whether to use TensorFloat32, which will be faster on GPUs with tensor cores at the cost of precision loss
+  # see "Advanced Usage" section of the docs for more details
   allow_tf32: false
