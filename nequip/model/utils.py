@@ -75,7 +75,7 @@ def get_current_compile_mode(return_override: bool = False):
         global _OVERRIDE_COMPILE_MODE
         return _CURRENT_COMPILE_MODE.get(), _OVERRIDE_COMPILE_MODE.get()
     else:
-        _CURRENT_COMPILE_MODE.get()
+        return _CURRENT_COMPILE_MODE.get()
 
 
 def model_builder(func):
