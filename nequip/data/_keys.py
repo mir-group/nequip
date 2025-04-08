@@ -1,3 +1,4 @@
+# This file is a part of the `nequip` package. Please see LICENSE and README at the root for information on using it.
 """Keys for dictionaries/AtomicData objects.
 
 This is a seperate module to compensate for a TorchScript bug that can only recognize constants when they are accessed as attributes of an imported module.

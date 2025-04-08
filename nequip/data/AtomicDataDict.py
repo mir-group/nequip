@@ -1,3 +1,4 @@
+# This file is a part of the `nequip` package. Please see LICENSE and README at the root for information on using it.
 """AtomicDataDict
 
 A "static class" (set of functions) operating on `Dict[str, torch.Tensor]`,

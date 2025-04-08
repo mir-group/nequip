@@ -1,3 +1,4 @@
+# This file is a part of the `nequip` package. Please see LICENSE and README at the root for information on using it.
 from ._base_datamodule import NequIPDataModule
 from nequip.utils import download_url, extract_zip, extract_tar
 from nequip.utils.logger import RankedLogger

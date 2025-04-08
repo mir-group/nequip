@@ -1,3 +1,4 @@
+# This file is a part of the `nequip` package. Please see LICENSE and README at the root for information on using it.
 import random
 from typing import Dict, Any, Sequence, Union, Optional
 from collections import OrderedDict

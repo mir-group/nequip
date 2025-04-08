@@ -1,3 +1,4 @@
+# This file is a part of the `nequip` package. Please see LICENSE and README at the root for information on using it.
 from ._base_datasets import AtomicDataset
 from .lmdb_dataset import NequIPLMDBDataset
 from ._ase_dataset import ASEDataset

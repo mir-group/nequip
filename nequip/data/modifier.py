@@ -1,3 +1,4 @@
+# This file is a part of the `nequip` package. Please see LICENSE and README at the root for information on using it.
 """
 Data statistics and metrics managers work with BaseModifier, its subclasses (and perhaps classes that mimic their behavior) under the hood.
 The action of a modifier:

@@ -1,3 +1,4 @@
+# This file is a part of the `nequip` package. Please see LICENSE and README at the root for information on using it.
 from nequip.data.datamodule import ASEDataModule
 from nequip.utils import download_url, extract_zip
 from nequip.utils.logger import RankedLogger

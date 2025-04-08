@@ -1,3 +1,4 @@
+# This file is a part of the `nequip` package. Please see LICENSE and README at the root for information on using it.
 """_key_registry.py: manage information about what kinds of data different keys refer to."""
 
 import torch

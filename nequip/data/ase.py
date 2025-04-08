@@ -1,3 +1,4 @@
+# This file is a part of the `nequip` package. Please see LICENSE and README at the root for information on using it.
 from copy import deepcopy
 import warnings
 import numpy as np

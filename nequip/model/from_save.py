@@ -1,3 +1,4 @@
+# This file is a part of the `nequip` package. Please see LICENSE and README at the root for information on using it.
 """
 The functions in this script handle loading from saved formats, i.e. checkpoint files and package files (`.nequip.zip` files).
 There are three main types of clients for these functions

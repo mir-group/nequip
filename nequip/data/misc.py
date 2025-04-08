@@ -1,3 +1,4 @@
+# This file is a part of the `nequip` package. Please see LICENSE and README at the root for information on using it.
 """
 Relevant chunk from ASE
 https://gitlab.com/ase/ase/-/blob/master/ase/data/__init__.py

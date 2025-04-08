@@ -1,3 +1,4 @@
+# This file is a part of the `nequip` package. Please see LICENSE and README at the root for information on using it.
 from ._base_datamodule import NequIPDataModule
 from .sgdml_datamodule import sGDML_CCSD_DataModule
 from ._3bpa_datamodule import NequIP3BPADataModule

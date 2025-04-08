@@ -1,3 +1,4 @@
+# This file is a part of the `nequip` package. Please see LICENSE and README at the root for information on using it.
 from .modules import find_first_of_type
 from .dtype import (
     dtype_to_name,
