@@ -113,23 +113,24 @@ class CompileGraphModel(GraphModel):
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
 
+        # short-circuit if one of the batch dims is 1 (0 would be an error)
+        # this is related to the 0/1 specialization problem
+        # see https://docs.google.com/document/d/16VPOa3d-Liikf48teAOmxLc92rgvJdfosIy-yoT38Io/edit?fbclid=IwAR3HNwmmexcitV0pbZm_x1a4ykdXZ9th_eJWK-3hBtVgKnrkmemz6Pm5jRQ&tab=t.0#heading=h.ez923tomjvyk
+        # we just need something that doesn't have a batch dim of 1 to `make_fx` or else it'll shape specialize
+        # the models compiled for more batch_size > 1 data cannot be used for batch_size=1 data
+        # (under specific cases related to the `PerTypeScaleShift` module)
+        # for now we just make sure to always use the eager model when the data has any batch dims of 1
+        if (
+            AtomicDataDict.num_nodes(data) < 2
+            or AtomicDataDict.num_frames(data) < 2
+            or AtomicDataDict.num_edges(data) < 2
+        ):
+            # use parent class's forward
+            return super().forward(data)
+
         # === compile ===
         # compilation happens on the first data pass when there are at least two atoms (hard to pre-emp pathological data)
         if not self._compiled_model:
-            # short-circuit if one of the batch dims is 1 (0 would be an error)
-            # this is related to the 0/1 specialization problem
-            # see https://docs.google.com/document/d/16VPOa3d-Liikf48teAOmxLc92rgvJdfosIy-yoT38Io/edit?fbclid=IwAR3HNwmmexcitV0pbZm_x1a4ykdXZ9th_eJWK-3hBtVgKnrkmemz6Pm5jRQ&tab=t.0#heading=h.ez923tomjvyk
-            # we just need something that doesn't have a batch dim of 1 to `make_fx` or else it'll shape specialize
-            # after the first `make_fx` -> `export` -> `compile`, the compiled code can run on `batch_size=1` data
-            # (it just needs to recompile for a while, but we don't have to fear the 0/1 specialization problem then)
-            if (
-                AtomicDataDict.num_nodes(data) < 2
-                or AtomicDataDict.num_frames(data) < 2
-                or AtomicDataDict.num_edges(data) < 2
-            ):
-                # use parent class's forward
-                return super().forward(data)
-
             # == get input and output fields ==
             # use intersection of data keys and GraphModel input/outputs, which assumes
             # - correctness of irreps registration system
