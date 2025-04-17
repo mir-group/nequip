@@ -121,10 +121,15 @@ def main(config: DictConfig) -> None:
     # `run_index` is used to restore the run stage from a checkpoint if restarting from one
     run_index = 0
     if "ckpt_path" in config:
+
+        logger.info(
+            f"`training_module` (and `model`) from the checkpoint file `{config.ckpt_path}` will be used, and the `training_module` details from the config used for this restart will be ignored. If you wish to alter training hyperparameters or anything in the config, start a new training run and use the `ModelFromCheckpoint` builder to load a pretrained model instead. There can be various obscure errors that arise during checkpoint state restoration when restarting with an altered config file."
+        )
+
         # === instantiate from checkpoint file ===
         # dataset statistics need not be recalculated
         logger.info(
-            f"Building model and training_module from checkpoint file {config.ckpt_path} ..."
+            f"Building `training_module` from checkpoint file {config.ckpt_path} ..."
         )
         # only the original model's config is used (with the dataset statistics already-computed)
         # everything else can be overriden
@@ -149,40 +154,24 @@ def main(config: DictConfig) -> None:
         # "run_stage" is registered as a buffer in NequIPLightningModule to preserve run state
         run_index = checkpoint["state_dict"]["run_stage"].item()
 
-        # get model info from checkpoint
-        ckpt_training_module = checkpoint["hyper_parameters"]["info_dict"][
-            "training_module"
-        ]["_target_"]
-        model_cfg = checkpoint["hyper_parameters"]["model"]
-
-        # check if the same LightningModule is used
-        if config.training_module._target_ != ckpt_training_module:
-            logger.info(
-                f"Checkpoint training module ({ckpt_training_module} differs from training module provided in config for restart ({config.training_module._target_}) -- latter will be used"
-            )
-
-        # replace model details in config with the ones from the checkpoint
-        training_module_cfg = config.training_module
-        OmegaConf.update(training_module_cfg, "model", model_cfg)
-        logger.info(
-            f"Model from checkpoint {config.ckpt_path} will be used -- model details from the config used for this restart will be ignored."
+        # === load lightning module ===
+        training_module = hydra.utils.get_class(
+            checkpoint["hyper_parameters"]["info_dict"]["training_module"]["_target_"]
         )
-        nequip_module_cfg = OmegaConf.to_container(training_module_cfg, resolve=True)
-        info_dict.update({"training_module": nequip_module_cfg})
-
-        # make copy and remove `_target_` as an argument
-        nequip_module_cfg = nequip_module_cfg.copy()
-        nequip_module_cfg.pop("_target_")
-
+        # propagate info dict
+        info_dict.update(
+            {
+                "training_module": checkpoint["hyper_parameters"]["info_dict"][
+                    "training_module"
+                ]
+            }
+        )
+        # TODO: consider allowing override of compile mode when continuing interrupted runs
         nequip_module = training_module.load_from_checkpoint(
             config.ckpt_path,
-            strict=False,
             num_datasets=datamodule.num_datasets,
             info_dict=info_dict,
-            **nequip_module_cfg,
         )
-        # `strict=False` above and the next line required to override metrics, etc
-        nequip_module.strict_loading = False
     else:
         # === compute dataset statistics use resolver to get dataset statistics to model config ===
         stats_dict = datamodule.get_statistics(dataset="train")
