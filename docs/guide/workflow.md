@@ -39,9 +39,7 @@ nequip-train -cp full/path/to/config/directory -cn config_name.yaml ++ckpt_path=
 where we have used Hydra's [override syntax](https://hydra.cc/docs/advanced/override_grammar/basic/) (`++`). Note how one must still specify the config file used. Training from a checkpoint will always use the model from the checkpoint file, but other training hyperparameters (dataset, loss, metrics, callbacks, etc) is determined by the config file passed in the restart `nequip-train` (and can therefore be different from that of the original config used to generate the checkpoint). The restart will also resume from the last `run` stage (i.e. `train`, `val`, `test`, etc) that was running before the interruption.
 
 ```{warning}
-In general, the config should not be modified between restarts.  There are no safety checks to guard against nonsensical changes to the config used for restarts. It is the user's responsibility to ensure that any changes made are intended and reasonable. Users are advised to have a working understanding of how [checkpointing](https://lightning.ai/docs/pytorch/stable/common/checkpointing_basic.html) works under the hood with a sense of what training states are preserved upon restarting from checkpoints if one seeks to restart a run with an altered config file. 
-
-In general, it is safest to restart without changes to the original config. If one seeks to train a model from a checkpoint file with very different training hyperparameters or datasets (e.g. for fine-tuning), one can use the `ModelFromCheckpoint` [model loader](../api/save_model).
+DO NOT MODIFY THE CONFIG BETWEEN RESTARTS. There are no safety checks to guard against nonsensical changes to the config used for restarts, which can cause various problems during state restoration. It is safest to restart without changes to the original config. If one seeks to train a model from a checkpoint file with different training hyperparameters or datasets (e.g. for fine-tuning), one can use the `ModelFromCheckpoint` [model loader](../api/save_model).
 ```
 
 ```{tip}
