@@ -251,6 +251,12 @@ def CommonDataStatisticsManager(
             "metric": Mean(),
         },
         {
+            "name": "per_type_num_neighbors_mean",
+            "field": NumNeighbors(),
+            "metric": Mean(),
+            "per_type": True,
+        },
+        {
             "name": "per_atom_energy_mean",
             "field": PerAtomModifier(AtomicDataDict.TOTAL_ENERGY_KEY),
             "metric": Mean(),
