@@ -2,7 +2,7 @@ import torch
 import lightning
 from lightning.pytorch.utilities.warnings import PossibleUserWarning
 from hydra.utils import instantiate
-from hydra.utils import get_method
+from hydra.utils import get_method, get_class
 from nequip.model.from_save import ModelFromCheckpoint
 from nequip.data import AtomicDataDict
 from nequip.utils import RankedLogger
@@ -206,7 +206,14 @@ class NequIPLightningModule(lightning.LightningModule):
         # currently support 1 optimizer and 1 scheduler
         # potentially support N optimzier and N scheduler
         # (see https://lightning.ai/docs/pytorch/stable/api/lightning.pytorch.core.LightningModule.html#lightning.pytorch.core.LightningModule.configure_optimizers)
-        optim = instantiate(self.optimizer_config, params=self.model.parameters())
+        optimizer_config = self.optimizer_config.copy()
+        param_groups = optimizer_config.pop(
+            "param_groups",
+            {"_target_": "nequip.train.lightning._default_param_group_factory"},
+        )
+        param_groups = instantiate(param_groups, model=self.model)
+        optimizer_class = optimizer_config.pop("_target_")
+        optim = get_class(optimizer_class)(params=param_groups, **optimizer_config)
         if self.lr_scheduler_config is not None:
             # instantiate lr scheduler object separately to pass the optimizer to it during instantiation
             lr_scheduler_config = dict(self.lr_scheduler_config.copy())
@@ -336,3 +343,7 @@ class NequIPLightningModule(lightning.LightningModule):
             )
             self.log_dict(metric_dict)
             metrics.reset()
+
+
+def _default_param_group_factory(model):
+    return model.parameters()
