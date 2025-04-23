@@ -19,7 +19,7 @@ NequIP is an open-source code for building E(3)-equivariant interatomic potentia
  - [Community, contact, questions, and contributing](#community-contact-questions-and-contributing)
 
 > [!IMPORTANT]
-> A [major backwards-incompatible update](./docs/guide/upgrading.md) to the `nequip` package was released on April 23rd 2025 as version v0.7.0. The previous version v0.6.2 can still be found for use with existing config files in the GitHub Releases as and on PyPI.
+> A [major backwards-incompatible update](./docs/guide/upgrading.md) to the `nequip` package was released on April 23rd 2025 as version v0.7.0. The previous version v0.6.2 can still be found for use with existing config files in the GitHub Releases and on PyPI.
 
 ## Installation and usage
 
@@ -27,7 +27,7 @@ Installation instructions and user guides can be found in our [docs](https://neq
 
 ## Tutorial 
 
-The best way to learn how to use NequIP is through the [Colab Tutorial](https://bit.ly/mrs-nequip). This will run entirely on Google's cloud virtual machine; you do not need to install or run anything locally. 
+The best way to learn how to use NequIP is through the [tutorial notebook](https://colab.research.google.com/github/mir-group/nequip-tutorial/blob/main/NequIP_Tutorial.ipynb). This will run entirely on Google Colab's cloud virtual machine; you do not need to install or run anything locally.
 
 ## References & citing
 
