@@ -4,57 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-Most recent change on the bottom.
+Most recent change on the top.
 
-## Unreleased - 0.7.0
+## Unreleased
 
-### Added
- - migrate to `Lightning`, `torchmetrics` and `hydra` (and `omegaconf`) based infrastructure
- - `NequIPLightningModule` and its subclasses facilitate training
- - `LightningDataModule`s for dataset management
- - `rMD17DataModule` for working with the [revised MD17 dataset](https://figshare.com/articles/dataset/Revised_MD17_dataset_rMD17_/12672038).
- - dataset statistics managed by a `DataStatisticsManager`
- - simplified `CommonDataStatisticsManager` as a `DataStatisticsManager` wrapper
- - error metrics managed by a `MetricsManager`
- - simplified `EnergyForceLoss`, `EnergyForceStressLoss`, `EnergyForceMetrics`, `EnergyForceStressMetrics` as `MetricsManager` wrappers
- - `torchmetrics` based metrics for both dataset statistics and error metrics
- - multi-GPU training
- - `HuberLoss` and `StratifiedHuberForceLoss` loss metric classes
-  - `Lightning` based callbacks
-
-### Changed
- - [Breaking] migrate existing callbacks (loss weight scheduler and SoftAdapt) to `Lightning`'s callbacks systems
- - replace example configs with new `hydra` based ones
- - NequIP model computes initial embeddings in dataset dtype (usually the global default dtype float64)
- - [Breaking] first convnet layer in the NequIP GNN model has `use_sc=False` by default to ensure zero per-atom energies from the NequIPGNNEnergyModel for isolated atoms
- - [Breaking] type embedding implementation based on one-hot + linear replaced by `torch.nn.Embedding`
-
-### Removed
- - [Breaking] `nequip-evaluate` (functionality can be achieved in `nequip-train`)
- - [Breaking] `nequip-benchmark`
- - [Breaking] `AtomicDataset.rdf` and `examples/rdf.py` and `AtomicInMemoryDataset`
- - [Breaking] `dataset_per_species_*` statistics
- - [Breaking] `NpzDataset`
- - [Breaking] NequIP's `Trainer`, `Loss`, `Metrics`
- - [Breaking] most remaining `torch.geometric` code, except for some utility functions 
- - [Breaking] removed `ForceOutput` (use `StressForceOutput` instead)
- - [Breaking] minimum `torch` version bumped to `2.2.0`
-
-## Unreleased - Stale
-### Added
-- `--override` now supported as a `nequip-train` flag (similar to its use in `nequip-deploy`)
-- add SoftAdapt (https://arxiv.org/abs/2403.18122) callback option
-- float64 versions of edge vectors and edge lengths are now provided in AtomicDataDict for modules that require higher precision inputs
-
-### Changed
-- [Breaking] training restart behavior altered: file-wise consistency checks performed between original config and config passed to `nequip-train` on restart (instead of checking the config dicts)
-- [Breaking] config format for callbacks changed (see `configs/full.yaml` for an example)
-- [Breaking] positions and cell inputs are now expected to be `float64` always, rather than matching `model_dtype`
-- [Breaking] default for `allow_tf32` is now `False`
-- [Breaking] fresh start in training will now forbid `default_dtype=float32`
-
-### Fixed
-- fixed `wandb_watch` bug
+## [0.7.0]
+A major backwards-incompatible update with breaking changes throughout the code.
 
 ## [0.6.2] - 2025-3-22
 
