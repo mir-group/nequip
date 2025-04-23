@@ -18,6 +18,9 @@ NequIP is an open-source code for building E(3)-equivariant interatomic potentia
  - [Authors](#authors)
  - [Community, contact, questions, and contributing](#community-contact-questions-and-contributing)
 
+> [!IMPORTANT]
+> A [major backwards-incompatible update](https://arxiv.org/abs/2504.16068) to the `nequip` package was released on April 23rd 2025 as version v0.7.0. The previous version v0.6.2 can still be found for use with existing config files in the GitHub Releases as and on PyPI.
+
 ## Installation and usage
 
 Installation instructions and user guides can be found in our [docs](https://nequip.readthedocs.io/en/latest/).
