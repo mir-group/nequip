@@ -19,7 +19,7 @@ jobs:
         torch-version: [2.2.0, "2.*"]
     container:
       image: nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
-      options: --gpus all
+      options: ${{ github.event.repository.private && '--gpus all' || ' ' }}
     steps:
     - uses: actions/checkout@v4
     - name: Install Python
