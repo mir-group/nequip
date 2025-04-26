@@ -16,7 +16,7 @@ def test_dimer_plot_example(fake_model_training_session, device):
     """
     _, tmpdir, env, _ = fake_model_training_session
     path_to_this_file = pathlib.Path(__file__)
-    script_path = path_to_this_file.parents[2] / "examples/plot_dimers.py"
+    script_path = path_to_this_file.parents[2] / "misc/plot_dimers.py"
     ckpt_path = pathlib.Path(f"{tmpdir}/last.ckpt")
     retcode = subprocess.run(
         [
@@ -41,7 +41,7 @@ def test_parity_plot_example(fake_model_training_session):
     """
     _, tmpdir, env, _ = fake_model_training_session
     path_to_this_file = pathlib.Path(__file__)
-    script_path = path_to_this_file.parents[2] / "examples/parity_plot.py"
+    script_path = path_to_this_file.parents[2] / "misc/parity_plot.py"
     xyz_path = pathlib.Path(f"{tmpdir}/test_dataset0.xyz")
     retcode = subprocess.run(
         [
@@ -62,7 +62,7 @@ def test_lmdb_example():
     Tests that the `lmdb` example runs.
     """
     path_to_this_file = pathlib.Path(__file__)
-    example_dir = str(path_to_this_file.parents[2] / "examples/lmdb_dataset_conversion")
+    example_dir = str(path_to_this_file.parents[2] / "misc/lmdb_dataset_conversion")
     with tempfile.TemporaryDirectory() as tmpdir:
         config = OmegaConf.load(example_dir + "/data.yaml")
         config.file_path = f"{tmpdir}/lmdb_example"
