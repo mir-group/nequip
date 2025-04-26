@@ -641,3 +641,11 @@ class TestMetricsManagerBuilders:
         MSE = torch.mean((pred[property_key] - ref[property_key]) ** 2)
         RMSE = torch.sqrt(MSE)
         return RMSE
+
+    def test_invalid_EF_coeff_key_triggers_assert(self):
+        with pytest.raises(AssertionError):
+            EnergyForceMetrics(coeffs={"bad_key": 0.5})
+
+    def test_invalid_EFS_coeff_key_triggers_assert(self):
+        with pytest.raises(AssertionError):
+            EnergyForceStressMetrics(coeffs={"bad_key": 0.5})
