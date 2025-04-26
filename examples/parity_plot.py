@@ -1,4 +1,4 @@
-"""Example script to make a parity plot from the results of `nequip-evaluate`.
+"""Example script to make a parity plot from the results of using `nequip.train.callbacks.TestTimeXYZFileWriter`.
 
 Thanks to Hongyu Yu for useful input: https://github.com/mir-group/nequip/discussions/223#discussioncomment-4923323
 """
@@ -12,7 +12,7 @@ import ase.io
 
 # Parse arguments:
 parser = argparse.ArgumentParser(
-    description="Make a parity plot from the results of `nequip-evaluate`."
+    description="Make a parity plot from the results of using `nequip.train.callbacks.TestTimeXYZFileWriter`."
 )
 parser.add_argument(
     "xyzoutput",
