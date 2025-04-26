@@ -546,47 +546,48 @@ class BaseEnergyModelTests(BaseModelTests):
         Tests the ForceStressOutput model by comparing numerical gradients of the forces to the analytical gradients.
         """
         model, _, out_fields = model
-        if AtomicDataDict.FORCE_KEY not in out_fields:
-            pytest.skip()
+        # proceed with tests only if forces are available
+        if AtomicDataDict.FORCE_KEY in out_fields:
+            # physical predictions (energy, forces, etc) will be converted to default_dtype (float64) before comparing
+            data = AtomicDataDict.to_(atomic_batch, device)
+            output = model(data)
+            forces = output[AtomicDataDict.FORCE_KEY]
+            epsilon = 1e-3
 
-        # physical predictions (energy, forces, etc) will be converted to default_dtype (float64) before comparing
-        data = AtomicDataDict.to_(atomic_batch, device)
-        output = model(data)
-        forces = output[AtomicDataDict.FORCE_KEY]
-        epsilon = 1e-3
+            # Compute numerical gradients for each atom and direction and compare to analytical gradients
+            for iatom in range(len(data[AtomicDataDict.POSITIONS_KEY])):
+                for idir in range(3):
+                    # Shift `iatom` an `epsilon` in the `idir` direction
+                    pos = data[AtomicDataDict.POSITIONS_KEY][iatom, idir]
+                    data[AtomicDataDict.POSITIONS_KEY][iatom, idir] = pos + epsilon
+                    output = model(data)
+                    e_plus = (
+                        output[AtomicDataDict.TOTAL_ENERGY_KEY]
+                        .sum()
+                        .to(torch.get_default_dtype())
+                    )
 
-        # Compute numerical gradients for each atom and direction and compare to analytical gradients
-        for iatom in range(len(data[AtomicDataDict.POSITIONS_KEY])):
-            for idir in range(3):
-                # Shift `iatom` an `epsilon` in the `idir` direction
-                pos = data[AtomicDataDict.POSITIONS_KEY][iatom, idir]
-                data[AtomicDataDict.POSITIONS_KEY][iatom, idir] = pos + epsilon
-                output = model(data)
-                e_plus = (
-                    output[AtomicDataDict.TOTAL_ENERGY_KEY]
-                    .sum()
-                    .to(torch.get_default_dtype())
-                )
+                    # Shift `iatom` an `epsilon` in the negative `idir` direction
+                    data[AtomicDataDict.POSITIONS_KEY][iatom, idir] -= epsilon * 2
+                    output = model(data)
+                    e_minus = (
+                        output[AtomicDataDict.TOTAL_ENERGY_KEY]
+                        .sum()
+                        .to(torch.get_default_dtype())
+                    )
 
-                # Shift `iatom` an `epsilon` in the negative `idir` direction
-                data[AtomicDataDict.POSITIONS_KEY][iatom, idir] -= epsilon * 2
-                output = model(data)
-                e_minus = (
-                    output[AtomicDataDict.TOTAL_ENERGY_KEY]
-                    .sum()
-                    .to(torch.get_default_dtype())
-                )
+                    # Symmetric difference to get the partial forces to all the atoms
+                    numeric = -(e_plus - e_minus) / (epsilon * 2)
+                    analytical = forces[iatom, idir].to(torch.get_default_dtype())
 
-                # Symmetric difference to get the partial forces to all the atoms
-                numeric = -(e_plus - e_minus) / (epsilon * 2)
-                analytical = forces[iatom, idir].to(torch.get_default_dtype())
+                    assert torch.isclose(
+                        numeric, analytical, atol=2e-2
+                    ) or torch.isclose(
+                        numeric, analytical, rtol=5e-3
+                    ), f"numeric: {numeric.item()}, analytical: {analytical.item()}"
 
-                assert torch.isclose(numeric, analytical, atol=2e-2) or torch.isclose(
-                    numeric, analytical, rtol=5e-3
-                ), f"numeric: {numeric.item()}, analytical: {analytical.item()}"
-
-                # Reset the position
-                data[AtomicDataDict.POSITIONS_KEY][iatom, idir] += epsilon
+                    # Reset the position
+                    data[AtomicDataDict.POSITIONS_KEY][iatom, idir] += epsilon
 
     def test_partial_forces(
         self, model, partial_model, atomic_batch, device, strict_locality
@@ -643,49 +644,50 @@ class BaseEnergyModelTests(BaseModelTests):
         """
 
         partial_model, out_fields = partial_model
-        if AtomicDataDict.PARTIAL_FORCE_KEY not in out_fields:
-            pytest.skip()
+        # proceed with tests only is partial forces are available
+        if AtomicDataDict.PARTIAL_FORCE_KEY in out_fields:
+            # physical predictions (energy, forces, etc) will be converted to default_dtype (float64) before comparing
+            data = AtomicDataDict.to_(atomic_batch, device)
+            output = partial_model(data)
+            partial_forces = output[AtomicDataDict.PARTIAL_FORCE_KEY]
+            epsilon = 1e-3
 
-        # physical predictions (energy, forces, etc) will be converted to default_dtype (float64) before comparing
-        data = AtomicDataDict.to_(atomic_batch, device)
-        output = partial_model(data)
-        partial_forces = output[AtomicDataDict.PARTIAL_FORCE_KEY]
-        epsilon = 1e-3
+            # Compute numerical gradients for each atom and direction and compare to analytical gradients
+            for iatom in range(len(data[AtomicDataDict.POSITIONS_KEY])):
+                for idir in range(3):
+                    # Shift `iatom` an `epsilon` in the `idir` direction
+                    pos = data[AtomicDataDict.POSITIONS_KEY][iatom, idir]
+                    data[AtomicDataDict.POSITIONS_KEY][iatom, idir] = pos + epsilon
+                    output = partial_model(data)
+                    e_plus = (
+                        output[AtomicDataDict.PER_ATOM_ENERGY_KEY]
+                        .to(torch.get_default_dtype())
+                        .flatten()
+                    )
 
-        # Compute numerical gradients for each atom and direction and compare to analytical gradients
-        for iatom in range(len(data[AtomicDataDict.POSITIONS_KEY])):
-            for idir in range(3):
-                # Shift `iatom` an `epsilon` in the `idir` direction
-                pos = data[AtomicDataDict.POSITIONS_KEY][iatom, idir]
-                data[AtomicDataDict.POSITIONS_KEY][iatom, idir] = pos + epsilon
-                output = partial_model(data)
-                e_plus = (
-                    output[AtomicDataDict.PER_ATOM_ENERGY_KEY]
-                    .to(torch.get_default_dtype())
-                    .flatten()
-                )
+                    # Shift `iatom` an `epsilon` in the negative `idir` direction
+                    data[AtomicDataDict.POSITIONS_KEY][iatom, idir] -= epsilon * 2
+                    output = partial_model(data)
+                    e_minus = (
+                        output[AtomicDataDict.PER_ATOM_ENERGY_KEY]
+                        .to(torch.get_default_dtype())
+                        .flatten()
+                    )
 
-                # Shift `iatom` an `epsilon` in the negative `idir` direction
-                data[AtomicDataDict.POSITIONS_KEY][iatom, idir] -= epsilon * 2
-                output = partial_model(data)
-                e_minus = (
-                    output[AtomicDataDict.PER_ATOM_ENERGY_KEY]
-                    .to(torch.get_default_dtype())
-                    .flatten()
-                )
+                    # Symmetric difference
+                    numeric = -(e_plus - e_minus) / (epsilon * 2)
+                    analytical = partial_forces[:, iatom, idir].to(
+                        torch.get_default_dtype()
+                    )
 
-                # Symmetric difference
-                numeric = -(e_plus - e_minus) / (epsilon * 2)
-                analytical = partial_forces[:, iatom, idir].to(
-                    torch.get_default_dtype()
-                )
+                    assert torch.allclose(
+                        numeric, analytical, atol=2e-2
+                    ) or torch.allclose(
+                        numeric, analytical, rtol=5e-2
+                    ), f"numeric: {numeric.item()}, analytical: {analytical.item()}"
 
-                assert torch.allclose(numeric, analytical, atol=2e-2) or torch.allclose(
-                    numeric, analytical, rtol=5e-2
-                ), f"numeric: {numeric.item()}, analytical: {analytical.item()}"
-
-                # Reset the position
-                data[AtomicDataDict.POSITIONS_KEY][iatom, idir] += epsilon
+                    # Reset the position
+                    data[AtomicDataDict.POSITIONS_KEY][iatom, idir] += epsilon
 
     @pytest.fixture(scope="class")
     def pair_force(self, model, partial_model, device):
@@ -728,37 +730,34 @@ class BaseEnergyModelTests(BaseModelTests):
         type_names = config["type_names"]
         num_types = len(type_names)
 
-        # Whether the cutoff radius is specified per edge type
-        per_edge_type_cutoff = config.get("per_edge_type_cutoff")
-        if per_edge_type_cutoff is not None:
-            pytest.skip("Test not implemented for models with per-edge-type cutoffs")
+        # don't test if model is using per-edge-type-cutoffs
+        if "per_edge_type_cutoff" not in config:
+            for node_idx in range(num_types):
+                for nbor_idx in range(num_types):
 
-        for node_idx in range(num_types):
-            for nbor_idx in range(num_types):
+                    # Control group: force is non-zero within the cutoff radius
+                    forces = pair_force(node_idx, nbor_idx, 0.5 * r_max, 1.5 * r_max)
+                    # expect some nonzero terms on the two connected atoms
+                    # NOTE: sometimes it can be zero if the model has so little features such that the nonlinearity causes the activation to be ~0
+                    assert forces.abs().sum() > 1e-4, f"{forces=}"
 
-                # Control group: force is non-zero within the cutoff radius
-                forces = pair_force(node_idx, nbor_idx, 0.5 * r_max, 1.5 * r_max)
-                # expect some nonzero terms on the two connected atoms
-                # NOTE: sometimes it can be zero if the model has so little features such that the nonlinearity causes the activation to be ~0
-                assert forces.abs().sum() > 1e-4, f"{forces=}"
+                    # For Test 1 and 2:
+                    # No need to enforce `strictly_local`. Message passing models such as NequiIP should not receive information from beyond the cutoff radius.
+                    # In fact, checking that message-passing models still have zero force at the cutoff radius is a good test of locality.
 
-                # For Test 1 and 2:
-                # No need to enforce `strictly_local`. Message passing models such as NequiIP should not receive information from beyond the cutoff radius.
-                # In fact, checking that message-passing models still have zero force at the cutoff radius is a good test of locality.
+                    # Test 1: force is zero at the cutoff radius
+                    forces = pair_force(node_idx, nbor_idx, r_max, 1.5 * r_max)
+                    assert torch.allclose(
+                        forces,
+                        torch.zeros_like(forces, device=device, dtype=forces.dtype),
+                    ), f"{forces=}"
 
-                # Test 1: force is zero at the cutoff radius
-                forces = pair_force(node_idx, nbor_idx, r_max, 1.5 * r_max)
-                assert torch.allclose(
-                    forces,
-                    torch.zeros_like(forces, device=device, dtype=forces.dtype),
-                ), f"{forces=}"
-
-                # Test 2: force is zero outside of the cutoff radius
-                forces = pair_force(node_idx, nbor_idx, 1.1 * r_max, 1.5 * r_max)
-                assert torch.allclose(
-                    forces,
-                    torch.zeros_like(forces, device=device, dtype=forces.dtype),
-                ), f"{forces=}"
+                    # Test 2: force is zero outside of the cutoff radius
+                    forces = pair_force(node_idx, nbor_idx, 1.1 * r_max, 1.5 * r_max)
+                    assert torch.allclose(
+                        forces,
+                        torch.zeros_like(forces, device=device, dtype=forces.dtype),
+                    ), f"{forces=}"
 
     def test_partial_force_smoothness(self, model, device, pair_force):
         # NOTE: This test is designed for models that have a variable cutoff radius, though it still applicable with
@@ -835,29 +834,28 @@ class BaseEnergyModelTests(BaseModelTests):
         """Checks that isolated atom energies provided for the per-atom shifts are restored for isolated atoms."""
         instance, config, _ = model
 
-        if "per_type_energy_shifts" not in config:
-            pytest.skip()
+        # skip if no per-type energy shifts
+        if "per_type_energy_shifts" in config:
+            # get the isolated atom energies
+            isolated_energies = torch.tensor(
+                config["per_type_energy_shifts"], device=device
+            )
 
-        # get the isolated atom energies
-        isolated_energies = torch.tensor(
-            config["per_type_energy_shifts"], device=device
-        )
-
-        # make a synthetic data consisting of three isolated atom frames
-        data_list = []
-        for type_idx in range(3):
-            data = {
-                "atom_types": np.array([type_idx]),
-                "pos": np.array([[0.0, 0.0, 0.0]]),
-            }
-            data_list.append(from_dict(data))
-        data = AtomicDataDict.to_(
-            compute_neighborlist_(
-                AtomicDataDict.batched_from_list(data_list), r_max=config["r_max"]
-            ),
-            device,
-        )
-        out = instance(data)
-        assert torch.allclose(
-            out[AtomicDataDict.TOTAL_ENERGY_KEY], isolated_energies.reshape(3, 1)
-        )
+            # make a synthetic data consisting of three isolated atom frames
+            data_list = []
+            for type_idx in range(3):
+                data = {
+                    "atom_types": np.array([type_idx]),
+                    "pos": np.array([[0.0, 0.0, 0.0]]),
+                }
+                data_list.append(from_dict(data))
+            data = AtomicDataDict.to_(
+                compute_neighborlist_(
+                    AtomicDataDict.batched_from_list(data_list), r_max=config["r_max"]
+                ),
+                device,
+            )
+            out = instance(data)
+            assert torch.allclose(
+                out[AtomicDataDict.TOTAL_ENERGY_KEY], isolated_energies.reshape(3, 1)
+            )
