@@ -4,7 +4,7 @@ Broadly, data statistics, loss functions, and metrics can be configured in simil
 
 ## Data Statistics
 
-There are two key reasons why one would use the automatic data statistics utlities during `nequip-train`: for inspection to get a feel for the data distribution, and to use specific data statistics as[model parameters](model.md/#dataset-statistics-as-parameters) during model initialization.
+There are two key reasons why one would use the automatic data statistics utlities during `nequip-train`: for inspection to get a feel for the data distribution, and to use specific data statistics as [model parameters](model.md/#dataset-statistics-as-parameters) during model initialization.
 
 Data statistics is configured by setting the `stats_manager` argument of the [DataModules](../api/datamodule.rst) used (under the `data` [block of the config](config.md/#data)). 
 The `stats_manager` refers to a `DataStatisticsManager` object (see docs [here](../api/data_stats.rst)).
