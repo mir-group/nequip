@@ -489,7 +489,7 @@ def EnergyForceStressLoss(
           _target_: nequip.train.NequIPLightningModule
 
           loss:
-            _target_: nequip.train.EnergyForceLoss
+            _target_: nequip.train.EnergyForceStressLoss
             per_atom_energy: true
             coeffs:
               total_energy: 1.0
@@ -550,7 +550,7 @@ def EnergyForceStressMetrics(
           _target_: nequip.train.NequIPLightningModule
 
           val_metrics:
-            _target_: nequip.train.EnergyForceMetrics
+            _target_: nequip.train.EnergyForceStressMetrics
             coeffs:
               total_energy_rmse: 1.0
               per_atom_energy_rmse: null
