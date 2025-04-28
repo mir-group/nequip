@@ -1,4 +1,4 @@
-# The NequIP workflow
+# The NequIP Workflow
 
 ## Overview
 
