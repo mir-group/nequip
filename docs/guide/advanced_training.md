@@ -32,9 +32,34 @@ We advise using train-time compilation with GPUs. As of PyTorch 2.6.0, there are
 
 As of `nequip-0.7.0`, the NequIP training infrastructure is built upon PyTorch Lightning's abstractions. One feature we benefit from is thus their API for enabling distributed data parallel (DDP) training. There are two ways of setting up multi-rank training runs.
 
-1. If train-time compilation is not used, one can use PyTorch Lightning's `DDPStrategy`. See [Lightning's docs](https://lightning.ai/docs/pytorch/stable/accelerators/gpu_intermediate.html#distributed-data-parallel) for how to set it up through Lightning's `Trainer`. In general, one can refer to PyTorch Lightning's docs and other Lightning-based references to set up multi-rank training with Lightning's ``DDPStrategy``.
+1. If train-time compilation is not used, one can use PyTorch Lightning's [DDPStrategy](https://lightning.ai/docs/pytorch/stable/api/lightning.pytorch.strategies.DDPStrategy.html#lightning.pytorch.strategies.DDPStrategy).
+See [Lightning's docs](https://lightning.ai/docs/pytorch/stable/accelerators/gpu_intermediate.html#distributed-data-parallel) for how to set it up through Lightning's [Trainer](https://lightning.ai/docs/pytorch/stable/common/trainer.html#trainer-class-api).
+**NOTE** that it is usually not necessary to explicitly set the [DDPStrategy](https://lightning.ai/docs/pytorch/stable/api/lightning.pytorch.strategies.DDPStrategy.html#lightning.pytorch.strategies.DDPStrategy) as an input to the Lightning [Trainer](https://lightning.ai/docs/pytorch/stable/common/trainer.html#trainer-class-api) if the cluster environment is set up to facilitate Lightning's automatic detection of cluster variables, and the main aspect that deserves user attention is configuring the job submission script and the relevant `Trainer` arguments (`num_nodes` and sometimes `devices`) correctly.
+In general, one can refer to PyTorch Lightning's docs and other Lightning-based references to set up multi-rank training with Lightning's `DDPStrategy`.
+It is likely that one may need to set cluster-specific environment variables and set up the multi-rank training run differently depending on the cluster, devices, etc.
+A useful resource for SLURM-managed clusters is PyTorch Lightning's [docs for SLURM-managed clusters](https://lightning.ai/docs/pytorch/stable/clouds/cluster_advanced.html), which details, for instance the need to use `srun nequip-train ...`, and which SLURM variables correspond to arguments in the `trainer` section of the config file.
+A minimal SLURM example for doing DDP training with 2 nodes with 4 GPUs per node (8 GPUs in total) is shown as follows.
 
-2. If train-time compilation is used, one **must** use NequIP's custom ``nequip.train.SimpleDDPStrategy`` in place of PyTorch Lightning's strategy (API docs [here](../../api/ddp)). ``nequip.train.SimpleDDPStrategy`` can also be used if train-time compilation is not used. Here's an example of how one can use this strategy in the config file.
+```bash
+#!/bin/bash
+#SBATCH --nodes=2
+#SBATCH --ntasks-per-node=4
+#SBATCH --gres=gpu:4
+#SBATCH --cpus-per-task=8
+... other slurm variables
+
+# ... set up (e.g. module load, activate Python env, etc)
+
+# ... cluster specific set up such as network interface 
+# (e.g. MASTER_PORT, MASTER_ADDR, NCCL_SOCKET_IFNAME)
+
+srun nequip-train -cn config.yaml ++trainer.num_nodes=${SLURM_NNODES}
+```
+
+2. If train-time compilation is used, one **must** use NequIP's custom ``nequip.train.SimpleDDPStrategy`` ([API docs](../../api/ddp)) in place of PyTorch Lightning's [DDPStrategy](https://lightning.ai/docs/pytorch/stable/api/lightning.pytorch.strategies.DDPStrategy.html#lightning.pytorch.strategies.DDPStrategy).
+``nequip.train.SimpleDDPStrategy`` shares the same interface as Lightning's [DDPStrategy](https://lightning.ai/docs/pytorch/stable/api/lightning.pytorch.strategies.DDPStrategy.html#lightning.pytorch.strategies.DDPStrategy), so Lightning's docs are relevant if there is ever a need to set its arguments (which is typically not necessary, but may be useful for certain clusters).
+``nequip.train.SimpleDDPStrategy`` can also be used if train-time compilation is not used.
+Here's an example of how one can use this strategy in the config file.
 
 ```bash
 trainer:
@@ -50,9 +75,4 @@ The main difference is that NequIP's custom ``nequip.train.SimpleDDPStrategy`` o
 
 ```{warning}
 Be very careful when reporting validation or test metrics calculated in a DDP setting. The [``DistributedSampler``](https://pytorch.org/docs/stable/data.html#torch.utils.data.distributed.DistributedSampler) may duplicate data samples on some devices to make sure all devices have the same batch size if the number of frames in the dataset cannot be evenly distributed to all devices. Either ensure that the data samples can be evenly distributed to all ranks, or perform validation/testing on a single rank. See [Lightning's docs](https://lightning.ai/docs/pytorch/stable/common/lightning_module.html#test-loop) for similar advice.
-```
-
-```{tip}
-One might have to define specific environment variables and set up the multi-rank training run differently depending on the cluster, devices, etc. For example, on a SLURM-managed cluster, one should call `srun nequip-train ...`. See Lightning's docs regarding [SLURM-managed clusters](https://lightning.ai/docs/pytorch/stable/clouds/cluster_advanced.html) for details.
-
 ```
