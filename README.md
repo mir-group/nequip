@@ -1,12 +1,12 @@
-<center>
-
-<img src="./logo.png" width="50%" title="NequIP" alt="NequIP"/> 
+<p align="center">
+  <img src="./logo.png" width="50%" title="NequIP" alt="NequIP"/>
+</p>
 
 <br/>
 
 [![Documentation Status](https://readthedocs.org/projects/nequip/badge/?version=latest)](https://nequip.readthedocs.io/en/latest/?badge=latest)  [![PyPI version](https://img.shields.io/pypi/v/nequip.svg)](https://pypi.python.org/pypi/nequip/)
 
-</center>
+
 
 # NequIP
 
@@ -69,7 +69,7 @@ If you have a self-contained question or other discussion topic, try our [GitHub
 
 Active users and interested developers are invited to join us on the NequIP community chat server, which is hosted on the excellent [Zulip](https://zulip.com/) software.
 Zulip is organized a little bit differently than chat software like Slack or Discord that you may be familiar with: please review [their introduction](https://zulip.com/help/introduction-to-topics) before posting.
-[Register for the NequIP community here](https://nequip.zulipchat.com).
+[Fill out the interest form for the NequIP community here](https://forms.gle/mEuonVCHdsgTtLXy7).
 
 If you want to contribute to the code, please read ["Contributing to NequIP"](docs/dev/contributing.md).
 
