@@ -339,7 +339,9 @@ def EnergyForceLoss(
     per_atom_energy: bool = True,
     type_names=None,
 ):
-    """Simplified ``MetricsManager`` wrapper for a **loss** term containing energy and forces MSEs.
+    """Simplified ``MetricsManager`` wrapper for a **loss** term containing energy and forces mean squared errors (MSEs).
+
+    The loss component names are ``per_atom_energy_mse`` OR `total_energy_mse` (depending on whether ``per_atom_energy`` is ``True`` or ``False``), and `forces_mse`, which are the names to refer to when neeeded, e.g. when scheduling loss component coefficients.
 
     Example usage in config:
     ::
@@ -406,7 +408,7 @@ def EnergyForceMetrics(
     },
     type_names=None,
 ):
-    """Simplified ``MetricsManager`` wrapper for a **metric** term containing energy and force MAEs and RMSEs.
+    """Simplified ``MetricsManager`` wrapper for a **metric** term containing energy and force mean absolute errors (MAEs) and root mean squared errors (RMSEs).
 
     Example usage in config:
     ::
@@ -480,7 +482,9 @@ def EnergyForceStressLoss(
     per_atom_energy: bool = True,
     type_names=None,
 ):
-    """Simplified ``MetricsManager`` wrapper for a **loss** term containing energy, forces and stress MSEs.
+    """Simplified ``MetricsManager`` wrapper for a **loss** term containing energy, forces and stress mean squared errors (MSEs).
+
+    The loss component names are ``per_atom_energy_mse`` OR ``total_energy_mse`` (depending on whether ``per_atom_energy`` is ``True`` or ``False``), ``forces_mse``, and ``stress_mse``, which are the names to refer to when neeeded, e.g. when scheduling loss component coefficients.
 
     Example usage in config:
     ::
@@ -541,7 +545,7 @@ def EnergyForceStressMetrics(
     },
     type_names=None,
 ):
-    """Simplified ``MetricsManager`` wrapper for a **metric** term containing energy, force and stress MAEs and RMSEs.
+    """Simplified ``MetricsManager`` wrapper for a **metric** term containing energy, force and stress mean absolute errors (MAEs) and root mean squared errors (RMSEs).
 
     Example usage in config:
     ::
