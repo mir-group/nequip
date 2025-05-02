@@ -14,6 +14,13 @@ A simplified and less verbose wrapper is provided through the `CommonDataStatist
 
 ## Loss and Metrics
 
-Both the loss function and metrics used for validation and testing are configured through `MetricsManager` objects (see docs [here](../api/metrics.rst)), as argument to the `training_module` [block in the config](config.md/#training_module).
-Details are provided in the `MetricsManager` [docs page](../api/metrics.rst).
+All loss components and metrics are in the physcial units associated with the dataset. Note that this behavior of the loss is different from `nequip < 0.7.0`, where the loss would have a different scale. In `nequip >= 0.7.0`, the loss components are all in physical units. For example, if the dataset uses force units of eV/Å, a force mean-squared error (MSE) would have units of (eV/Å)².
+  
+Both the loss function and metrics used for validation and testing are configured through `MetricsManager` objects, as argument to the `training_module` [block in the config](config.md/#training_module).
+Details are provided in the `MetricsManager` [API page](../api/metrics.rst).
 Simplified wrappers are provided for typical use cases, i.e. the `EnergyForceLoss` and `EnergyForceStressLoss` loss function wrappers, and the `EnergyForceMetrics` and `EnergyForceStressMetrics` metrics wrappers.
+
+In addition to the metrics configured in the `MetricsManager`, it also computes a `weighted_sum` based on the `coeff` (coefficient) for each metric.
+For loss functions, this quantity is used as the loss function as a weighted sum of specified loss componenets.
+For metrics, the weighted sum could be useful for accounting for energy-force(-stress) balancing for monitoring.
+For example, `val0_epoch/weighted_sum` can be monitored and used to condition the behavior of learning rate scheduling or early stopping.
