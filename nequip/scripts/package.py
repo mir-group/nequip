@@ -63,13 +63,6 @@ def main(args=None):
         type=str,
         default=[],
     )
-    # TODO: enable overriding logic when a use case arises
-    parser.add_argument(
-        "--override-model",
-        help="add or override model configuration keys from the checkpoint file -- unless you know why you need to, do not use this option.",
-        type=str,
-        default=None,
-    )
 
     args = parser.parse_args(args=args)
 
