@@ -181,23 +181,25 @@ class BaseModelTests:
         # if compilation was successful, internal checks would have ensured consistency of base and compiled model predictions
         # here, we check that backward pass of the model works for training
 
-        if not any([p.requires_grad for p in compile_model.parameters()]):
-            pytest.skip("no trainable weights")
+        # test backwards pass if there are trainable weights
+        if any([p.requires_grad for p in compile_model.parameters()]):
+            compile_loss = compile_out[AtomicDataDict.TOTAL_ENERGY_KEY].square().sum()
+            compile_loss.backward()
 
-        compile_loss = compile_out[AtomicDataDict.TOTAL_ENERGY_KEY].square().sum()
-        compile_loss.backward()
+            # compute base model predictions
+            out = instance(model_test_data.copy())  # shallow copy
+            loss = out[AtomicDataDict.TOTAL_ENERGY_KEY].square().sum()
+            loss.backward()
+            compile_params = dict(compile_model.named_parameters())
+            for k, v in instance.named_parameters():
+                err = torch.max(torch.abs(v.grad - compile_params[k].grad))
+                assert torch.allclose(
+                    v.grad, compile_params[k].grad, atol=tol, rtol=tol
+                ), err
 
-        # compute base model predictions
-        out = instance(model_test_data.copy())  # shallow copy
-        loss = out[AtomicDataDict.TOTAL_ENERGY_KEY].square().sum()
-        loss.backward()
-        compile_params = dict(compile_model.named_parameters())
-        for k, v in instance.named_parameters():
-            err = torch.max(torch.abs(v.grad - compile_params[k].grad))
-            assert torch.allclose(
-                v.grad, compile_params[k].grad, atol=tol, rtol=tol
-            ), err
-
+    @pytest.mark.skipif(
+        not _TORCH_GE_2_6, reason="PT2 compile tests skipped for torch < 2.6"
+    )
     @override_irreps_debug(False)
     def test_aot_export(self, model, model_test_data, device):
         """
@@ -205,8 +207,6 @@ class BaseModelTests:
 
         For now, we only test the unbatched case, i.e. a single frame, relevant for ase, pair-nequip, and pair-allegro.
         """
-        if not _TORCH_GE_2_6:
-            pytest.skip("PT2 compile tests skipped for torch < 2.6")
         from nequip.model.utils import (
             override_model_compile_mode,
             _COMPILE_TIME_AOTINDUCTOR_KEY,
