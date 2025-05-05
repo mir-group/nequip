@@ -4,13 +4,14 @@ import torch
 from lightning.pytorch import seed_everything
 
 import e3nn
-import e3nn.util.jit
 
 from .global_dtype import _GLOBAL_DTYPE
 
 import warnings
 import os
 from typing import List, Dict, Tuple, Union, Final
+
+from .resolvers import _register_resolvers
 
 # for multiprocessing, we need to keep track of our latest global state so
 # that we can reload/reset them in worker processes. While we could be more careful here,
@@ -76,6 +77,9 @@ def set_global_state(
     if not _GLOBAL_STATE_INITIALIZED:
         # === set global seed ===
         seed_everything(123, workers=True, verbose=False)
+
+        # === register default omegaconf resolvers ===
+        _register_resolvers()
 
         # === set global dtype ===
         torch.set_default_dtype(_GLOBAL_DTYPE)

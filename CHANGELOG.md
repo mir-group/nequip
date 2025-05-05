@@ -16,6 +16,7 @@ Most recent change on the top.
 ### Added
 - Increase docs coverage
 - `StressSignFlipTransform` as a data transform to flip the sign of datasets that come with the opposite stress sign convention as used in the NequIP framework
+- `int_div` and `int_mul` resolvers for integer arithmetic in config files, e.g. `half_width: ${int_div:${width},2}`
 
 ### Changed
 - Renamed `examples` -> `misc` directory
