@@ -74,5 +74,19 @@ trainer:
 The main difference is that NequIP's custom ``nequip.train.SimpleDDPStrategy`` only performs weight gradient syncing once after the complete backwards pass on each rank, while PyTorch Lightning's ``DDPStrategy`` uses [``torch.nn.parallel.DistributedDataParallel``](https://pytorch.org/docs/stable/notes/ddp.html), which has more logic to sync the gradients in buckets.
 
 ```{warning}
+NOTE that the `batch_size` configured under the dataloaders in the `data` [section of the config](config.md/#data) refers to the per-rank batch size, so using multiple ranks will lead to an effective batch size that is the per-rank batch size times the number of ranks.
+
+As increasing the number of ranks (while holding the per-rank batch size constant) increases the effective batch size, one should consider adjusting other hyperparameters that one would typically adjust when raising the batch size, such as the learning rate (see [Lightning's docs](https://lightning.ai/docs/pytorch/stable/accelerators/gpu_faq.html#how-should-i-adjust-the-learning-rate-when-using-multiple-devices) for similar advice).
+
+It may be helpful to use a combination of OmegaConf's [variable interpolation](https://omegaconf.readthedocs.io/en/latest/usage.html#variable-interpolation), [environment variable resolver](https://omegaconf.readthedocs.io/en/latest/custom_resolvers.html#oc-env) and NequIP's custom arithmetic resolver `int_div` to dynamically configure these parameters based on the runtime environment. 
+For example, to get the world size as a SLURM environment variable and set the per-rank batch size as the desired effective global batch size divided by the world size, one can use something like
+
+`batch_size: ${int_div:${effective_global_batch_size},${oc.env:SLURM_NTASKS}}` 
+
+where `effective_global_batch_size` is set elsewhere and is interpolated here.
+```
+
+
+```{warning}
 Be very careful when reporting validation or test metrics calculated in a DDP setting. The [``DistributedSampler``](https://pytorch.org/docs/stable/data.html#torch.utils.data.distributed.DistributedSampler) may duplicate data samples on some devices to make sure all devices have the same batch size if the number of frames in the dataset cannot be evenly distributed to all devices. Either ensure that the data samples can be evenly distributed to all ranks, or perform validation/testing on a single rank. See [Lightning's docs](https://lightning.ai/docs/pytorch/stable/common/lightning_module.html#test-loop) for similar advice.
 ```

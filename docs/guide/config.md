@@ -1,9 +1,16 @@
 # Config File
 
 The config file has five main sections: `run`, `data`, `trainer`, `training_module`, `global_options`. These top level config entries must always be present.
+
 Before going into what each section entails, users are advised to take note of OmegaConf's [variable interpolation](https://omegaconf.readthedocs.io/en/latest/usage.html#variable-interpolation) utilities, which may be a useful tool for managing runs.
 Interpolation can be particularly useful when multiple locations in the config require the same values to be repeated.
 It can also be used to access information like the run name or output directory of the training using [Hydra's built-in resolvers](https://hydra.cc/docs/1.3/configure_hydra/intro/#resolvers-provided-by-hydra).
+
+NequIP also registers a number of custom resolvers to allow users to do basic integer arithmetic directly in the config file:
+- Integer multiplication: `area: ${int_mul:${width},${height}}`
+- Integer division: `half_width: ${int_div:${width},2}`
+These resolvers will throw errors if the inputs are not integers or if division is not exact.
+
 
 ## `run`
 
