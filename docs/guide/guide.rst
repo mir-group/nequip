@@ -9,6 +9,7 @@ User Guide
     config
     model
     stats_metrics
+    troubleshoot
     faq_errors
     conventions
     upgrading
