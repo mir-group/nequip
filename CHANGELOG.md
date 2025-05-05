@@ -8,6 +8,19 @@ Most recent change on the top.
 
 ## Unreleased
 
+## [0.7.1]
+
+### Fixed
+- Update outdated descriptions for `parity_plot.py`
+
+### Added
+- Increase docs coverage
+- `StressSignFlipTransform` as a data transform to flip the sign of datasets that come with the opposite stress sign convention as used in the NequIP framework
+
+### Changed
+- Renamed `examples` -> `misc` directory
+
+
 ## [0.7.0]
 A major backwards-incompatible update with breaking changes throughout the code.
 
