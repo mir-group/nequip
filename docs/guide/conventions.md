@@ -2,8 +2,6 @@
 
 ## Data Format Conventions
  - Cells vectors are given in ASE style as the **rows** of the cell matrix
- - The first index in an edge tuple (``edge_index[0]``) is the center atom, and the second (``edge_index[1]``) is the neighbor
-
 
 ## Pressure / stress / virials
 
@@ -13,14 +11,14 @@
 Training labels for stress in the original dataset must be pre-processed by the user to be in consistent units.
 ```
 
-Stress also includes an arbitrary sign convention, for which we adopt the choice that `virial = -stress x volume  <=>  stress = (-1/volume) * virial`. This is the most common sign convention in the literature (e.g. adopted by `ASE`), but notably differs from that used by VASP (see [here](https://www.vasp.at/wiki/index.php/ISIF)). In the sign convention used by `nequip`, stress is defined as the derivative of the energy $E$ with respect to the strain tensor $\eta_{ji}$:
+Stress also includes an arbitrary sign convention, for which we adopt the choice that `virial = -stress x volume  <=>  stress = (-1/volume) * virial`.
+This is the most common sign convention in the literature (e.g. adopted by `ASE`), but notably differs from that used by VASP (see [here](https://www.vasp.at/wiki/index.php/ISIF)).
+In the NequIP convention, stress is defined as the derivative of the energy $E$ with respect to the strain tensor $\eta_{ji}$, divided by the volume $\Omega$:
 
-$$\sigma_{ij} = \frac{\delta E} {\delta \eta_{ji}}$$
+$$\sigma_{ij} = \frac{1}{\Omega} \frac{\delta E} {\delta \eta_{ji}}$$
 
-such that a positive in the diagonals implies the system is _under tensile strain_ and wants to compress, while a negative value implies the system is _under compressive strain_ and wants to expand. When VASP results are parsed by `ASE`, the sign is flipped to match the `nequip` convention.
+Positive diagonal entries of the stress tensor imply that the system is _under tensile strain_ and wants to compress, while negative values imply that the system is _under compressive strain_ and wants to expand. When VASP results are parsed by `ASE`, the sign is flipped to match the `nequip` convention.
 
-```{warning}
-Training labels for stress in the original dataset must be pre-processed by the user to be in **this sign convention**, which they may or may not already be depending on their origin.
-```
+If your dataset uses the opposite sign convention, either preprocess the dataset to be in the NequIP stress sign convention, or use the `StressSignFlipTransform` data transform (see [API](../api/data_transforms.rst)).
 
 Users that have data with virials but seek to train on stress can use the data transform `nequip.data.transforms.VirialToStressTransform`.
