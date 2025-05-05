@@ -11,3 +11,6 @@ Data transforms convert the raw data from the ``Dataset`` to include information
 
  .. autoclass:: nequip.data.transforms.VirialToStressTransform
     :members:
+
+ .. autoclass:: nequip.data.transforms.StressSignFlipTransform
+    :members:
