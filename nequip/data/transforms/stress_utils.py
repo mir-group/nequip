@@ -27,3 +27,19 @@ class VirialToStressTransform:
         stress = virials.neg().div(vol.view(-1, 1, 1))  # (num_frames, 3, 3)
         data[AtomicDataDict.STRESS_KEY] = stress
         return data
+
+
+class StressSignFlipTransform:
+    r"""Flips the sign of stress in the ``AtomicDataDict``.
+
+    In the NequIP convention, positive diagonal components of the stress tensor implies that the system is under tensile strain and wants to compress, while a negative value implies that the system is under compressive strain and wants to expand.
+    This transform can be applied to datasets that follow the opposite sign convention, so that the necessary sign flip happens on-the-fly during training and users can avoid having to generate a copy of the dataset with NequIP stress sign conventions.
+    """
+
+    def __init__(self):
+        pass
+
+    def __call__(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
+        # see discussion in https://github.com/libAtoms/QUIP/issues/227 about sign convention
+        data[AtomicDataDict.STRESS_KEY] = data[AtomicDataDict.STRESS_KEY].neg()
+        return data
