@@ -3,7 +3,6 @@ import torch
 
 import tempfile
 import subprocess
-import os
 from omegaconf import OmegaConf, open_dict
 import hydra
 
@@ -48,7 +47,6 @@ def test_batch_invariance(fake_model_training_session):
         OmegaConf.save(config=new_config, f=config_path)
 
         # == Train model ==
-        env = dict(os.environ)
         retcode = subprocess.run(
             ["nequip-train", "-cn", "newconf"],
             cwd=new_tmpdir,
@@ -88,7 +86,7 @@ def test_batch_invariance(fake_model_training_session):
 
 # TODO: will fail if train dataloader has shuffle=True
 def test_restarts(fake_model_training_session):
-    config, tmpdir, _, model_dtype = fake_model_training_session
+    config, tmpdir, env, model_dtype = fake_model_training_session
     tol = {"float32": 1e-5, "float64": 1e-8}[model_dtype]
     orig_max_epochs = config.trainer.max_epochs
     new_max_epochs = orig_max_epochs + 5
@@ -110,7 +108,7 @@ def test_restarts(fake_model_training_session):
                 f"++ckpt_path='{tmpdir}/last.ckpt'",
             ],
             cwd=new_tmpdir_1,
-            env=dict(os.environ),
+            env=env,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
@@ -133,7 +131,7 @@ def test_restarts(fake_model_training_session):
             retcode = subprocess.run(
                 ["nequip-train", "-cn", "newconf"],
                 cwd=new_tmpdir_2,
-                env=dict(os.environ),
+                env=env,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
             )

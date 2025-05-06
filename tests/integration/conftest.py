@@ -40,6 +40,7 @@ def _training_session(conffile, training_module, model_dtype, extra_train_from_s
 
             # == Train model ==
             env = dict(os.environ)
+            env.update({"TEST_VAL_TWO": "2"})
             retcode = subprocess.run(
                 ["nequip-train", "-cn", "conf"],
                 cwd=tmpdir,

@@ -5,10 +5,19 @@
 from omegaconf import OmegaConf
 
 
+def _sanitize_int(x, client: str):
+    err_msg = f"`{client} resolver accepts nonnegative integer inputs, but found {x}"
+    if isinstance(x, str):
+        assert x.isdigit(), err_msg
+        x = int(x)
+    assert isinstance(x, int), err_msg
+    return x
+
+
 def int_div(a, b):
     """Integer division resolver for OmegaConf."""
-    if not isinstance(a, int) or not isinstance(b, int):
-        raise ValueError(f"`int_div` requires integer inputs, got {a} and {b}")
+    a = _sanitize_int(a, "int_div")
+    b = _sanitize_int(b, "int_div")
 
     if a % b != 0:
         raise ValueError(
@@ -20,8 +29,8 @@ def int_div(a, b):
 
 def int_mul(a, b):
     """Integer multiplication resolver for OmegaConf."""
-    if not isinstance(a, int) or not isinstance(b, int):
-        raise ValueError(f"`int_mul` requires integer inputs, got {a} and {b}")
+    a = _sanitize_int(a, "int_mul")
+    b = _sanitize_int(b, "int_mul")
     return a * b
 
 
