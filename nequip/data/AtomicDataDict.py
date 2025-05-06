@@ -93,9 +93,14 @@ def batched_from_list(data_list: List[Type]) -> Type:
     # now every data entry should have BATCH_KEY and NUM_NODES_KEY
     # check for inconsistent keys over the AtomicDataDicts in the list
     dict_keys = data_list[0].keys()
-    assert all(
-        [dict_keys == data_list[i].keys() for i in range(len(data_list))]
-    ), "Found inconsistent keys across AtomicDataDict list to be batched."
+    for idx in range(1, len(data_list)):
+        if dict_keys != data_list[idx].keys():
+            missing = dict_keys - data_list[idx].keys()
+            extra = data_list[idx].keys() - dict_keys
+            diff = list(extra if len(missing) == 0 else missing)
+            raise RuntimeError(
+                f"Found inconsistent keys: {diff} across an AtomicDataDict list to be batched. Note that this inconsistency is for one specific pair of AtomicDataDicts, there could be others not reported in this error. Ensure data consistency by preprocessing the data or using relevant NequIP data transforms before trying again."
+            )
 
     # == Batching Procedure ==
     out = {}
