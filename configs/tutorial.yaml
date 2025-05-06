@@ -7,6 +7,11 @@
 # With hydra's instantiation (notice the `_target_`s everywhere), the config file (almost) directly corresponds to instantiating objects as one would normally do in Python.
 # Much of the infrastructure is based on PyTorch Lightning (https://lightning.ai/docs/pytorch/stable/), such as the use of Lightning's Trainer, DataModule, LightningModule, Callback objects.
 
+# NequIP also registers a number of custom resolvers to allow users to do basic integer arithmetic directly in the config file:
+# - Integer multiplication: `area: ${int_mul:${width},${height}}`
+# - Integer division: `half_width: ${int_div:${width},2}`
+# These resolvers will throw errors if the inputs are not integers or if division is not exact.
+
 # ===========
 #     RUN
 # ===========
@@ -235,6 +240,9 @@ training_module:
     # == radial network ==
     radial_mlp_depth: 2            # number of radial layers, usually 1-3 works best, smaller is faster
     radial_mlp_width: 64           # number of hidden neurons in radial function, smaller is faster
+    #^ we could have programatically set `radial_mlp_width` to be twice `num_features` using NequIP's built in `int_mul` resolver, e.g.
+    # radial_mlp_width: ${int_mul:${num_features},2}
+    # the NequIP framework implements `int_mul` and `int_div`
 
     # see https://nequip.readthedocs.io/en/latest/guide/model.html to understand the following hyperparameters
 
