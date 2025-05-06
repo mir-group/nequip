@@ -98,7 +98,8 @@ training_module:
     num_layers: 3
     num_features: ${num_features}
     radial_mlp_depth: 1
-    radial_mlp_width: ${int_div:${num_features},2}
+    # !! test `int_div` resolver !!
+    radial_mlp_width: ${int_div:${num_features},${oc.env:TEST_VAL_TWO}}
     # data-dependent model params
     per_type_energy_shifts: ${training_data_stats:per_atom_energy_mean}
     per_type_energy_scales: ${training_data_stats:forces_rms}
