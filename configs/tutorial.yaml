@@ -210,6 +210,11 @@ training_module:
   model:
     _target_: nequip.model.NequIPGNNModel
 
+    # If you have PyTorch >= 2.6.0 installed, and are training on GPUs, the following line uses torch.compile to speed up training
+    # for more details, see https://nequip.readthedocs.io/en/latest/guide/advanced_training.html#pytorch-2-0-compiled-training
+    compile_mode: compile
+    # ^ if you're using PyTorch <= 2.6.0, an error will be thrown -- comment out the line to avoid it
+
     # == basic model params ==
     seed: 456
     model_dtype: float32
@@ -230,6 +235,8 @@ training_module:
     # == radial network ==
     radial_mlp_depth: 2            # number of radial layers, usually 1-3 works best, smaller is faster
     radial_mlp_width: 64           # number of hidden neurons in radial function, smaller is faster
+
+    # see https://nequip.readthedocs.io/en/latest/guide/model.html to understand the following hyperparameters
 
     # dataset statistics used to inform the model's initial parameters for normalization, shifting and rescaling
     # we use omegaconf's resolvers (https://omegaconf.readthedocs.io/en/2.3_branch/usage.html#resolvers)
