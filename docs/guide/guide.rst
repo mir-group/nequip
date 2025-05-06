@@ -10,7 +10,7 @@ User Guide
     model
     stats_metrics
     troubleshoot
-    faq_errors
+    faq
     conventions
     upgrading
     advanced
