@@ -2,7 +2,8 @@
 
 ## PyTorch 2.0 Compiled Training
 
-As of `nequip-0.7.0`, PyTorch 2.0 compilation utilities are supported to accelerate training. To use `torch.compile` to accelerate training, one has to set `compile_mode: compile` under the `model` section in `training_module` of the config file. For example,
+As of `nequip-0.7.0`, PyTorch 2.0 compilation utilities are supported to accelerate training **provided PyTorch >= 2.6.0 is installed**.
+To use `torch.compile` to accelerate training, one has to set `compile_mode: compile` under the `model` section in `training_module` of the config file. For example,
 ```
 model:
     _target_: nequip.model.NequIPGNNModel
