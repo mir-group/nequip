@@ -41,7 +41,7 @@ calculator = NequIPCalculator.from_checkpoint_model(
 ```
 
 ### Units from NequIP to ASE
-The ASE convention uses eV energy units and Å length units while the NequIP framework follows the ([internally consistent](../guide/faq_errors.md#units)) units of the underlying dataset. If it is necessary to account for units conversions, users should specify conversion factors with the arguments `energy_units_to_eV` and `length_units_to_A` (see [ASE calculator API](../api/ase.rst)).
+The ASE convention uses eV energy units and Å length units while the NequIP framework follows the ([internally consistent](../guide/faq.md/#units)) units of the underlying dataset. If it is necessary to account for units conversions, users should specify conversion factors with the arguments `energy_units_to_eV` and `length_units_to_A` (see [ASE calculator API](../api/ase.rst)).
 
 ## Example Usage
 The NequIP ASE calculator can then be used for standard ASE operations. Below are a few (nonexhaustive) common examples.
