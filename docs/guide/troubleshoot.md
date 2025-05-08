@@ -25,3 +25,32 @@ nequip-train config.yaml
 ```bash
 nequip-train -cn config.yaml
 ```
+
+### Compilation with `nequip-compile` fails in AOT Inductor Mode
+
+  **Problem**: Trying to run `nequip-compile` as follows, fails:
+  ```bash
+  nequip-compile \
+  --input-path path/to/ckpt_file/or/package_file \
+  --output-path path/to/compiled_model.nequip.pt2 \
+  --device (cpu/cuda) \
+  --mode aotinductor \
+  --target target_integration
+  ```
+
+  with an error like this:
+  ```bash
+  torch._inductor.exc.CppCompileError: C++ compile error
+  ```
+  or like this:
+  ```bash
+  allegro_torch27/lib/python3.10/site-packages/torch/include/torch/csrc/inductor/aoti_include/common.h:4:10: fatal error: filesystem: No such file or directory
+  #include <filesystem>
+          ^~~~~~~~~~~~
+  compilation terminated.
+  ```
+  
+  **Solution**: Use newer GCC Version
+  It's likely your GCC version does not support C++17. Try a GCC version >= 11 that supports C++17 by default: https://gcc.gnu.org/projects/cxx-status.html#cxx17 
+
+  On HPC clusters, you can usually `module load` to a newer version of GCC.
