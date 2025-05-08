@@ -26,9 +26,9 @@ nequip-train config.yaml
 nequip-train -cn config.yaml
 ```
 
-### Compilation with `nequip-compile` fails
+### Compilation with `nequip-compile` fails in AOT Inductor Mode
 
-  **Problem**: Trying to run `nequip-compile` as follows fails (showing example with AOT Inductor mode, but you may also see this when compiling for TorchScript mode):
+  **Problem**: Trying to run `nequip-compile` as follows, fails:
   ```bash
   nequip-compile \
   --input-path path/to/ckpt_file/or/package_file \
@@ -53,7 +53,4 @@ nequip-train -cn config.yaml
   **Solution**: Use newer GCC Version
   It's likely your GCC version does not support C++17. Try a GCC version >= 11 that supports C++17 by default: https://gcc.gnu.org/projects/cxx-status.html#cxx17 
 
-  For example on FRONTIER, use the amd/6.X.Y where X.Y match your ROCM version, and then load in the gcc-native-mixed/14.2 module. 
-  ```bash
-  module load amd/6.3.1 gcc-native-mixed/14.2
-  ```
+  On HPC clusters, you can usually `module load` to a newer version of GCC.
