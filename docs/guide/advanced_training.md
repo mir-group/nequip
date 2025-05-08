@@ -17,9 +17,8 @@ model:
     compile_mode: compile
     # other model hyperparameters    
 ```
-Note that `compile_mode` can only be `compile` (use `torch.compile`), `script` (use TorchScript), or `null` (no compilation used). If `compile_mode` is unspecified, it defaults to `script`. 
-
-The startup time for `torch.compile` is longer than TorchScript, but the speed-ups are usually better. 
+Note that `compile_mode` can only be `compile` (use `torch.compile`), or `eager` (no compilation used). If `compile_mode` is unspecified, it defaults to `eager`.
+It will take a bit of time (around a minute or more) for the model to be compiled with `torch.compile` before training proceeds, but the speed-ups are worth it.
 
 ```{warning}
 Train-time compilation will not work if any of the batch dimensions are all never >=2 over all batches. Batch dimensions include the number of frames, atoms, and edges. It is unlikely for this to happen for the "atom" or "edge" batch dimension, but a practical scenario where it could happen for the "frame" batch dimension is when one trains with both `train` and `val` `batch_size: 1` (perhaps for a dataset where each frame contains many atoms). For those interested, this limitation is related to the [0/1 specialization problem](https://docs.google.com/document/d/16VPOa3d-Liikf48teAOmxLc92rgvJdfosIy-yoT38Io/edit?fbclid=IwAR3HNwmmexcitV0pbZm_x1a4ykdXZ9th_eJWK-3hBtVgKnrkmemz6Pm5jRQ&tab=t.0#heading=h.ez923tomjvyk).

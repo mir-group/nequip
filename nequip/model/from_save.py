@@ -14,7 +14,6 @@ from .utils import (
     get_current_compile_mode,
     _COMPILE_MODE_OPTIONS,
     _EAGER_MODEL_KEY,
-    _TRAIN_TIME_SCRIPT_KEY,
     _COMPILE_TIME_AOTINDUCTOR_KEY,
 )
 from nequip.scripts._workflow_utils import get_workflow_state
@@ -48,11 +47,11 @@ def ModelFromCheckpoint(checkpoint_path: str, compile_mode: str = _EAGER_MODEL_K
       model:
         _target_: nequip.model.ModelFromCheckpoint
         checkpoint_path: path/to/ckpt
-        compile_mode: eager/script/compile
+        compile_mode: eager/compile
 
     Args:
         checkpoint_path (str): path to a ``nequip`` framework checkpoint file
-        compile_mode (str): ``eager``, ``script``, or ``compile`` allowed for training (note that ``script`` is not allowed if the checkpoint originates from a ``ModelFromPackage``)
+        compile_mode (str): ``eager`` or ``compile`` allowed for training
     """
     # ^ there are other `compile_mode` options for internal use that are hidden from users
     exclude_modes = (
@@ -117,7 +116,7 @@ def ModelFromPackage(package_path: str, compile_mode: str = _EAGER_MODEL_KEY):
         compile_mode: eager/compile
 
     .. warning::
-        Refrain from moving the package file if this model loader is used for training. Any process that loads a checkpoint produced from training runs originating from a package file will look for the original package file at the location specified during training.
+        DO NOT MOVE the package file if this model loader is used for training. Any process that loads a checkpoint produced from training runs originating from a package file will look for the original package file at the location specified during training.
 
     Args:
         package_path (str): path to NequIP framework packaged model with the ``.nequip.zip`` extension (an error will be thrown if the file has a different extension)
@@ -139,7 +138,6 @@ def ModelFromPackage(package_path: str, compile_mode: str = _EAGER_MODEL_KEY):
 
     # === sanity check compile modes ===
     exclude_modes = [_COMPILE_TIME_AOTINDUCTOR_KEY] if workflow_state == "train" else []
-    exclude_modes += [_TRAIN_TIME_SCRIPT_KEY]
     _check_compile_mode(compile_mode, "ModelFromPackage", exclude_modes)
 
     # === load model ===

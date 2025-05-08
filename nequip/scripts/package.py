@@ -16,7 +16,6 @@ from nequip.model import ModelFromCheckpoint
 from nequip.model.utils import (
     _COMPILE_MODE_OPTIONS,
     _EAGER_MODEL_KEY,
-    _TRAIN_TIME_SCRIPT_KEY,
 )
 from nequip.utils.logger import RankedLogger
 from nequip.utils.versions import get_current_code_versions, _TORCH_GE_2_6
@@ -139,11 +138,9 @@ def main(args=None):
     eager_model = ModelFromCheckpoint(args.ckpt_path, compile_mode=_EAGER_MODEL_KEY)
 
     if _TORCH_GE_2_6:
-        # exclude train-time torchscript model (and eager since we've already loaded it)
+        # exclude eager since we've already loaded it
         package_compile_modes = {
-            mode
-            for mode in _COMPILE_MODE_OPTIONS
-            if mode not in [_EAGER_MODEL_KEY, _TRAIN_TIME_SCRIPT_KEY]
+            mode for mode in _COMPILE_MODE_OPTIONS if mode not in [_EAGER_MODEL_KEY]
         }
     else:
         # only allow eager model if not torch>=2.6

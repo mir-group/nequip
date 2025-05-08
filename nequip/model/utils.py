@@ -25,13 +25,11 @@ _IS_BUILDING_MODEL = contextvars.ContextVar("_IS_BUILDING_MODEL", default=False)
 
 # the following is the set of model build types for specific purposes
 _EAGER_MODEL_KEY = "eager"
-_TRAIN_TIME_SCRIPT_KEY: Final[str] = "script"
 _TRAIN_TIME_COMPILE_KEY: Final[str] = "compile"
 _COMPILE_TIME_AOTINDUCTOR_KEY: Final[str] = "aotinductor"
 
 _COMPILE_MODE_OPTIONS = {
     _EAGER_MODEL_KEY,
-    _TRAIN_TIME_SCRIPT_KEY,
     _TRAIN_TIME_COMPILE_KEY,
     _COMPILE_TIME_AOTINDUCTOR_KEY,
 }
@@ -39,7 +37,7 @@ _COMPILE_MODE_OPTIONS = {
 
 _OVERRIDE_COMPILE_MODE = contextvars.ContextVar("_OVERRIDE_COMPILE_MODE", default=False)
 _CURRENT_COMPILE_MODE = contextvars.ContextVar(
-    "_CURRENT_COMPILE_MODE", default=_TRAIN_TIME_SCRIPT_KEY
+    "_CURRENT_COMPILE_MODE", default=_EAGER_MODEL_KEY
 )
 
 
@@ -145,8 +143,8 @@ def model_builder(func):
             else:
                 graph_model_module = GraphModel
 
-            # set torchscript mode -- True if "jit" mode
-            with conditional_torchscript_mode(compile_mode == _TRAIN_TIME_SCRIPT_KEY):
+            # never script
+            with conditional_torchscript_mode(False):
                 # set dtype and seed
                 with torch_default_dtype(dtype):
                     with isolate_rng():

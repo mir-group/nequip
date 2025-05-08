@@ -8,6 +8,12 @@ Most recent change on the top.
 
 ## Unreleased
 
+
+## [0.8.0]
+
+### Removed
+- [Breaking] train-time TorchScript
+
 ## [0.7.1]
 
 ### Fixed
