@@ -49,6 +49,9 @@ def ModelFromCheckpoint(checkpoint_path: str, compile_mode: str = _EAGER_MODEL_K
         checkpoint_path: path/to/ckpt
         compile_mode: eager/compile
 
+    .. warning::
+        DO NOT CHANGE the directory structure or location of the checkpoint file if this model loader is used for training. Any process that loads a checkpoint produced from training runs originating from a package file will look for the original package file at the location specified during training. It is also recommended to use full paths (instead or relative paths) to avoid potential errors.
+
     Args:
         checkpoint_path (str): path to a ``nequip`` framework checkpoint file
         compile_mode (str): ``eager`` or ``compile`` allowed for training
@@ -116,7 +119,7 @@ def ModelFromPackage(package_path: str, compile_mode: str = _EAGER_MODEL_KEY):
         compile_mode: eager/compile
 
     .. warning::
-        DO NOT MOVE the package file if this model loader is used for training. Any process that loads a checkpoint produced from training runs originating from a package file will look for the original package file at the location specified during training.
+        DO NOT CHANGE the directory structure or location of the package file if this model loader is used for training. Any process that loads a checkpoint produced from training runs originating from a package file will look for the original package file at the location specified during training. It is also recommended to use full paths (instead or relative paths) to avoid potential errors.
 
     Args:
         package_path (str): path to NequIP framework packaged model with the ``.nequip.zip`` extension (an error will be thrown if the file has a different extension)
