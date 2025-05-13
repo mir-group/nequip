@@ -20,6 +20,7 @@ from nequip.scripts._workflow_utils import get_workflow_state
 from nequip.utils import get_current_code_versions
 from nequip.utils.logger import RankedLogger
 
+import yaml
 import hydra
 import os
 import warnings
@@ -123,6 +124,17 @@ def _get_packaged_models():
     return _PACKAGED_MODELS
 
 
+def _get_package_metadata(imp):
+    """Load packaged model metadata."""
+    pkg_metadata: Dict[str, Any] = yaml.safe_load(
+        imp.load_text(package="model", resource="package_metadata.txt")
+    )
+    assert int(pkg_metadata["package_version_id"]) > 0
+    # ^ extra sanity check since saving metadata in txt files was implemented in packaging version 1
+
+    return pkg_metadata
+
+
 def ModelFromPackage(package_path: str, compile_mode: str = _EAGER_MODEL_KEY):
     """Builds model from a NequIP framework packaged zip file constructed with ``nequip-package``.
 
@@ -170,15 +182,13 @@ def ModelFromPackage(package_path: str, compile_mode: str = _EAGER_MODEL_KEY):
         )
         imp = torch.package.PackageImporter(package_path)
 
-        # load packaging metadata that can be used to condition loading logic
-        pkg_metadata: Dict[str, Any] = imp.load_pickle(
-            package="model", resource="package_metadata.pkl"
-        )
+        pkg_metadata = _get_package_metadata(imp)
         available_models = pkg_metadata["available_models"]
+
         # throw warning if desired `compile_mode` is not available, and default to eager
         if compile_mode not in available_models:
             warnings.warn(
-                f"Requested `{compile_mode}` model is not present in the package file ({package_path}). `nequip-{workflow_state}` task will default to using the `_EAGER_MODEL_KEY` model."
+                f"Requested `{compile_mode}` model is not present in the package file ({package_path}). `nequip-{workflow_state}` task will default to using the `{_EAGER_MODEL_KEY}` model."
             )
             compile_mode = _EAGER_MODEL_KEY
 
