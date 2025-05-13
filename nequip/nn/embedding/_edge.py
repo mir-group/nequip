@@ -118,17 +118,15 @@ class BesselEdgeLengthEncoding(GraphModuleMixin, torch.nn.Module):
         trainable: bool = False,
         # bookkeeping
         edge_invariant_field: str = AtomicDataDict.EDGE_EMBEDDING_KEY,
-        edge_type_field: str = AtomicDataDict.EDGE_TYPE_KEY,
         norm_length_field: str = AtomicDataDict.NORM_LENGTH_KEY,
         irreps_in=None,
     ):
         super().__init__()
         # === process inputs ===
+        self.cutoff = conditional_torchscript_jit(cutoff)
         self.num_bessels = num_bessels
         self.trainable = trainable
-        self.cutoff = conditional_torchscript_jit(cutoff)
         self.edge_invariant_field = edge_invariant_field
-        self.edge_type_field = edge_type_field
         self.norm_length_field = norm_length_field
 
         # === bessel weights ===
