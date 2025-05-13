@@ -21,6 +21,7 @@ from nequip.utils import get_current_code_versions
 from nequip.utils.logger import RankedLogger
 
 import hydra
+import os
 import warnings
 from typing import List, Dict, Union, Any
 
@@ -36,6 +37,19 @@ def _check_compile_mode(compile_mode: str, client: str, exclude_keys: List[str] 
     assert (
         compile_mode in allowed_options
     ), f"`compile_mode={compile_mode}` is not recognized for `{client}`, only the following are supported: {allowed_options}"
+
+
+def _check_file_exists(file_path: str, file_type: str):
+    if not os.path.isfile(file_path):
+        assert file_type in ("checkpoint", "package")
+        client = (
+            "`ModelFromCheckpoint`"
+            if file_type == "checkpoint"
+            else "`ModelFromPackage`"
+        )
+        raise RuntimeError(
+            f"{file_type} file provided at `{file_path}` is not found. NOTE: Any process that loads a checkpoint produced from training runs based on {client} will look for the original {file_type} file at the location specified during training. It is also recommended to use full paths (instead or relative paths) to avoid potential errors."
+        )
 
 
 def ModelFromCheckpoint(checkpoint_path: str, compile_mode: str = _EAGER_MODEL_KEY):
@@ -56,6 +70,8 @@ def ModelFromCheckpoint(checkpoint_path: str, compile_mode: str = _EAGER_MODEL_K
         checkpoint_path (str): path to a ``nequip`` framework checkpoint file
         compile_mode (str): ``eager`` or ``compile`` allowed for training
     """
+    _check_file_exists(file_path=checkpoint_path, file_type="checkpoint")
+
     # ^ there are other `compile_mode` options for internal use that are hidden from users
     exclude_modes = (
         [_COMPILE_TIME_AOTINDUCTOR_KEY] if get_workflow_state() == "train" else []
@@ -125,10 +141,8 @@ def ModelFromPackage(package_path: str, compile_mode: str = _EAGER_MODEL_KEY):
         package_path (str): path to NequIP framework packaged model with the ``.nequip.zip`` extension (an error will be thrown if the file has a different extension)
         compile_mode (str): ``eager`` or ``compile`` allowed for training
     """
-    # ^ there are other `compile_mode` options for internal use that are hidden from users
-    workflow_state = get_workflow_state()
-
-    # === sanity check file extension ===
+    # === sanity checks ===
+    _check_file_exists(file_path=package_path, file_type="package")
     assert str(package_path).endswith(
         ".nequip.zip"
     ), f"NequIP framework packaged files must have the `.nequip.zip` extension but found {str(package_path)}"
@@ -140,6 +154,7 @@ def ModelFromPackage(package_path: str, compile_mode: str = _EAGER_MODEL_KEY):
     compile_mode = cm if override else compile_mode
 
     # === sanity check compile modes ===
+    workflow_state = get_workflow_state()
     exclude_modes = [_COMPILE_TIME_AOTINDUCTOR_KEY] if workflow_state == "train" else []
     _check_compile_mode(compile_mode, "ModelFromPackage", exclude_modes)
 
