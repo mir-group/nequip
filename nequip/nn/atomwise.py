@@ -8,9 +8,11 @@ from nequip.data import AtomicDataDict
 from nequip.data._key_registry import get_field_type
 from ._graph_mixin import GraphModuleMixin
 from .utils import scatter
+from .model_modifier_utils import model_modifier, replace_submodules
 from nequip.utils.global_dtype import _GLOBAL_DTYPE
 
-from typing import Optional, List, Union
+from typing import Optional, List, Dict, Union
+import warnings
 
 
 class AtomwiseOperation(GraphModuleMixin, torch.nn.Module):
@@ -134,8 +136,8 @@ class PerTypeScaleShift(GraphModuleMixin, torch.nn.Module):
         type_names: List[str],
         field: str,
         out_field: Optional[str] = None,
-        scales: Optional[Union[float, List[float]]] = None,
-        shifts: Optional[Union[float, List[float]]] = None,
+        scales: Optional[Union[float, Dict[str, float]]] = None,
+        shifts: Optional[Union[float, Dict[str, float]]] = None,
         scales_trainable: bool = False,
         shifts_trainable: bool = False,
         irreps_in={},
@@ -160,10 +162,33 @@ class PerTypeScaleShift(GraphModuleMixin, torch.nn.Module):
         self.out_dtype = _GLOBAL_DTYPE
 
         # === preprocess scales and shifts ===
-        if isinstance(scales, float):
+        # we only accept single values or dicts
+        # but we previously accepted lists, so we maintain backwards compatibility for a while
+        # TODO: strictly enforce only floats and dicts when the time comes
+        # for now, we throw a warning to get people to migrate
+        if isinstance(scales, list) or isinstance(shifts, list):
+            warnings.warn(
+                "\n\n!!IMPORTANT WARNING!! \nWe will stop supporting the use of lists for per-type energy scales and shifts in the next few releases. Please begin migrating to the use of dicts that map from the model's `type_names` as keys to the relevant scale or shift values. For example, the following\n\n  per_type_energy_shifts: [1, 2, 3]\n\nshould be changed to\n\n  per_type_energy_shifts:\n    C: 1\n    H: 2\n    O: 3\n\n"
+            )
+
+        # single valued case
+        if isinstance(scales, float) or isinstance(scales, int):
             scales = [scales]
-        if isinstance(shifts, float):
+        if isinstance(shifts, float) or isinstance(shifts, int):
             shifts = [shifts]
+
+        # dict case
+        if isinstance(scales, dict):
+            assert set(self.type_names) == set(scales.keys())
+            scales = [scales[name] for name in self.type_names]
+        if isinstance(shifts, dict):
+            assert set(self.type_names) == set(shifts.keys())
+            shifts = [shifts[name] for name in self.type_names]
+
+        # we convert everything to lists at this point for conversion into `torch.Tensor`s
+        for sc_vars in (scales, shifts):
+            if sc_vars is not None:
+                assert isinstance(sc_vars, list)
 
         # === scales ===
         self.has_scales = scales is not None
@@ -206,6 +231,7 @@ class PerTypeScaleShift(GraphModuleMixin, torch.nn.Module):
         self.shifts_shortcut = self.shifts.numel() == 1
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
+        """"""
         # shortcut if no scales or shifts found (only dtype promotion performed)
         if not (self.has_scales or self.has_shifts):
             data[self.out_field] = data[self.field].to(self.out_dtype)
@@ -251,6 +277,72 @@ class PerTypeScaleShift(GraphModuleMixin, torch.nn.Module):
 
         data[self.out_field] = in_field
         return data
+
+    @model_modifier(persistent=True)
+    @classmethod
+    def modify_PerTypeScaleShift(
+        cls,
+        model,
+        scales: Optional[Union[float, Dict[str, float]]] = None,
+        shifts: Optional[Union[float, Dict[str, float]]] = None,
+        scales_trainable: bool = False,
+        shifts_trainable: bool = False,
+    ):
+        """Modify per-type scales and shifts of a model.
+
+        The new ``scales`` and ``shifts`` should be provided as dicts.
+        The keys must correspond to the ``type_names`` registered in the model being modified, and may not include all the possible ``type_names`` of the original model.
+        For example, if one uses a pretrained model with 50 atom types, and seeks to only modify 3 per-atom shifts to be consistent with a fine-tuning dataset's DFT settings, one could use
+        ::
+
+            shifts:
+              C: 1.23
+              H: 0.12
+              O: 2.13
+
+        In this case, the per-type atomic energy shifts of the original model will be used for every other atom type, except for atom types with the new shifts specified.
+
+        Args:
+            scales: the new per-type atomic energy scales
+            shifts: the new per-type atomic energy shifts (e.g. isolated atom energies of a dataset used for fine-tuning)
+            scales_trainable (bool): whether the new scales are trainable
+            shifts_trainable (bool): whether the new shifts are trainable
+        """
+
+        def _helper(sc_var, vname, old):
+            # get original dict values
+            orig_sc_var = getattr(old, vname).detach().cpu().tolist()
+            # handle special case of single-valued shortcut
+            if len(orig_sc_var) != len(old.type_names):
+                assert len(orig_sc_var) == 1
+                orig_sc_var = orig_sc_var * len(old.type_names)
+            new_sc_var = {name: val for name, val in zip(old.type_names, orig_sc_var)}
+            if sc_var is not None:
+                # preprocess to list if single number
+                if isinstance(sc_var, float) or isinstance(sc_var, int):
+                    sc_var = {name: sc_var for name in old.type_names}
+                assert isinstance(sc_var, dict)
+                assert all(
+                    k in old.type_names for k in sc_var.keys()
+                ), f"Provided `{vname}` dict keys ({sc_var.keys()}) do not match the expected type names of the model ({old.type_names})."
+                # update original model's dict with new dict entries
+                new_sc_var.update(sc_var)
+            # if no new values provided, we default to the original model's dict entries
+            return new_sc_var
+
+        def factory(old):
+            return cls(
+                type_names=old.type_names,
+                field=old.field,
+                out_field=old.out_field,
+                scales=_helper(scales, "scales", old),
+                shifts=_helper(shifts, "shifts", old),
+                scales_trainable=scales_trainable,
+                shifts_trainable=shifts_trainable,
+                irreps_in=old.irreps_in,
+            )
+
+        return replace_submodules(model, cls, factory)
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__} \n  scales: {_format_type_vals(self.scales.tolist(), self.type_names)}\n  shifts: {_format_type_vals(self.shifts.tolist(), self.type_names)}"
