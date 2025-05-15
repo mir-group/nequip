@@ -51,6 +51,6 @@ nequip-train -cn config.yaml
   ```
   
   **Solution**: Use newer GCC Version
-  It's likely your GCC version does not support C++17. Try a GCC version >= 11 that supports C++17 by default: https://gcc.gnu.org/projects/cxx-status.html#cxx17 
+  It's likely your GCC version does not support C++17. Try a GCC version >= 11 that supports C++17 by default (see [https://gcc.gnu.org/projects/cxx-status.html#cxx17](https://gcc.gnu.org/projects/cxx-status.html#cxx17)) 
 
   On HPC clusters, you can usually `module load` to a newer version of GCC.
