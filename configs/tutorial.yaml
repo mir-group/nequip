@@ -256,6 +256,13 @@ training_module:
     # == per-type per-atom scales and shifts ==
     per_type_energy_scales: ${training_data_stats:per_type_forces_rms}
     per_type_energy_shifts: ${training_data_stats:per_atom_energy_mean}
+    # ^ this should typically be the isolated atom energies for your dataset
+    #   provided as a dict, e.g.
+    # per_type_energy_shifts: 
+    #   C: 1.234
+    #   H: 2.345
+    #   O: 3.456
+    #   Cu: 4.567
     per_type_energy_scales_trainable: false
     per_type_energy_shifts_trainable: false
 
