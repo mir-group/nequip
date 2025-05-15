@@ -165,11 +165,11 @@ class DataStatisticsManager(torch.nn.ModuleList):
         for idx in range(self.num_metrics):
             if self.per_type[idx]:
                 field_type = self.fields[idx].type
-                pt_stats = []
+                pt_stats = {}
                 if field_type == "node":
                     for type_idx, type_name in enumerate(self.type_names):
                         pt_stat = self[idx][type_idx].compute()
-                        pt_stats.append(pt_stat.item())
+                        pt_stats[type_name] = pt_stat.item()
                         pt_stat_name = "_".join([self.names[idx], type_name])
                         self.stats_dict.update({pt_stat_name: pt_stat})
                         logger.info(f"{pt_stat_name}: {pt_stat}")
@@ -180,7 +180,9 @@ class DataStatisticsManager(torch.nn.ModuleList):
                                 center_idx + len(self.type_names) * neigh_idx
                             )
                             pt_stat = self[idx][type_pair_idx].compute()
-                            pt_stats.append(pt_stat.item())
+                            pt_stats["_".join([center_type, neigh_type])] = (
+                                pt_stat.item()
+                            )
                             pt_stat_name = "_".join(
                                 [self.names[idx], center_type + neigh_type]
                             )
