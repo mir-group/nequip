@@ -196,6 +196,10 @@ def main(args=None):
         logger.info(f"Building `{_EAGER_MODEL_KEY}` model for packaging ...")
         eager_model = ModelFromCheckpoint(args.ckpt_path, compile_mode=_EAGER_MODEL_KEY)
 
+        # it's a `ModuleDict`, so we just reach into one of the models to get `type_names`
+        # we expect all models to have the same `type_names` (see init of base Lightning module in `nequip/train/lightning.py`)
+        type_names = list(eager_model.values())[0].type_names
+
         if _TORCH_GE_2_6:
             # exclude eager since we've already loaded it
             package_compile_modes = {
@@ -264,6 +268,7 @@ def main(args=None):
                     "versions": code_versions,
                     "package_version_id": _CURRENT_NEQUIP_PACKAGE_VERSION,
                     "available_models": list(models_to_package.keys()),
+                    "atom_types": {idx: name for idx, name in enumerate(type_names)},
                 }
                 pkg_metadata = yaml.dump(
                     pkg_metadata,
