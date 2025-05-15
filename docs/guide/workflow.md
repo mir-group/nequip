@@ -59,10 +59,16 @@ One can use `nequip.train.callbacks.TestTimeXYZFileWriter` ([see API](../api/cal
 
 ## Packaging
 
-The recommended way to archive a trained model is to `package` it.
+The recommended way to archive a trained model is to `package` it with the `build` option of `nequip-package`.
 
 ```bash
-nequip-package --ckpt-path path/to/ckpt_file --output-path path/to/packaged_model.nequip.zip
+nequip-package build --ckpt-path path/to/ckpt_file --output-path path/to/packaged_model.nequip.zip
+```
+
+One can inspect the metadata of the packaged model by using the `info` option.
+
+```bash
+nequip-package info path/to/pkg_file
 ```
 
 ```{warning}
@@ -70,7 +76,7 @@ The output path MUST have the extension `.nequip.zip`.
 ```
 
 ```{tip}
-To see command line options, one can use `nequip-package -h`
+To see command line options, one can use `nequip-package -h`. There are two options `build` and `info`, so one can get more detailed information with `nequip-package build -h` and `nequip-package info -h`.
 ```
 
 While checkpoint files are unlikely to survive breaking changes across code versions, the packaging infrastructure was designed to ensure that packaged models will continue to be usable as code versions change.
