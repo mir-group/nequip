@@ -38,6 +38,7 @@ def test_state_restoration(fake_model_training_session, device):
     retcode = subprocess.run(
         [
             "nequip-package",
+            "build",
             "--ckpt-path",
             f"{str(ckpt_path)}",
             "--output-path",

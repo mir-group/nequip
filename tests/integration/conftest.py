@@ -69,6 +69,7 @@ def _training_session(conffile, training_module, model_dtype, extra_train_from_s
                         retcode = subprocess.run(
                             [
                                 "nequip-package",
+                                "build",
                                 "--ckpt-path",
                                 f"{tmpdir}/last.ckpt",
                                 "--output-path",
