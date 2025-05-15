@@ -12,12 +12,16 @@ import numpy as np  # noqa: F401
 import torch
 
 from nequip.data.compile_utils import data_dict_from_checkpoint
-from nequip.model.from_save import _get_package_metadata, ModelFromCheckpoint
+from nequip.model.from_save import (
+    _get_shared_importer,
+    _get_package_metadata,
+    ModelFromCheckpoint,
+)
 from nequip.model.utils import (
     _COMPILE_MODE_OPTIONS,
     _EAGER_MODEL_KEY,
 )
-from nequip.model.modify_utils import get_all_modifiers
+from nequip.model.modify_utils import get_all_modifiers, only_apply_persistent_modifiers
 from nequip.utils.logger import RankedLogger
 from nequip.utils.versions import get_current_code_versions, _TORCH_GE_2_6
 from nequip.utils.global_state import set_global_state
@@ -182,59 +186,56 @@ def main(args=None):
         # we then need to include the importer in the exporter for repackaging
         # see https://pytorch.org/docs/stable/package.html#re-export-an-imported-object
         # the reason for the present solution is due to the following constraints
-        # 1. we need every model (eager, compile, aotinductor) to come from the same importer, which is used for constructing the exporter (we won't be able to save models coming from different importers, even if we pass all the importers during exporter construction)
+        # 1. we need every model to come from the same importer, which is used for constructing the exporter (we won't be able to save models coming from different importers, even if we pass all the importers during exporter construction)
         # 2. we need to use `ModelFromPackage` in a manner consistent with the API of fresh model building or `ModelFromCheckpoint` to ensure correct state restoration when loading the model from checkpoint (note that `nequip-package` is always loading a model from checkpoint with `ModelFromCheckpoint`)
 
         # the present solution is to first load an eager model from checkpoint,
         # which tells us whether the model originates from a package or not
         # if it's not from a package, we just instantiate all model build types and package
-        # if it's from a package, we query a dict populated during `ModelFromPackage` (called by `ModelFromCheckpoints`) to get the `Importer` and the models [this ensures that all models come from the same `Importer`]
-        # we also have to copy the state dict of the original eager model loaded (which should have its state restored correctly by the checkpoint load) into the other models in the dict
+        # if it's from a package, we have logic in `ModelFromPackage` to reuse the same `Importer` as the one used to load the eager model [this ensures that all models come from the same `Importer`]
+        # we use `ModelFromCheckpoint` to load the other models to make sure the relevant modifiers are applied and the states are restored correctly by the checkpoint load
 
         # == get eager model ==
-        # if the origin is `ModelFromPackage`, this call would have populated a dict with the relevant information to repackage
+        # if the origin is `ModelFromPackage`, this call would have populated a variable that we can query later
         logger.info(f"Building `{_EAGER_MODEL_KEY}` model for packaging ...")
-        eager_model = ModelFromCheckpoint(args.ckpt_path, compile_mode=_EAGER_MODEL_KEY)
+        with only_apply_persistent_modifiers(persistent_only=True):
+            eager_model = ModelFromCheckpoint(
+                args.ckpt_path, compile_mode=_EAGER_MODEL_KEY
+            )
 
         # it's a `ModuleDict`, so we just reach into one of the models to get `type_names`
         # we expect all models to have the same `type_names` (see init of base Lightning module in `nequip/train/lightning.py`)
         type_names = list(eager_model.values())[0].type_names
 
-        if _TORCH_GE_2_6:
-            # exclude eager since we've already loaded it
-            package_compile_modes = {
-                mode for mode in _COMPILE_MODE_OPTIONS if mode not in [_EAGER_MODEL_KEY]
-            }
-        else:
-            # only allow eager model if not torch>=2.6
-            package_compile_modes = [_EAGER_MODEL_KEY]
-
         # == load models ==
         importers = (torch.package.importer.sys_importer,)
         models_to_package = {_EAGER_MODEL_KEY: eager_model}
-        from nequip.model.from_save import _get_packaged_models
 
-        pkg_models = _get_packaged_models()
-        if not pkg_models:
-            # the origin is not `ModelFromPackage`, so we just load the models one-by-one
-            for compile_mode in package_compile_modes:
-                logger.info(f"Building `{compile_mode}` model for packaging ...")
-                model = ModelFromCheckpoint(args.ckpt_path, compile_mode=compile_mode)
-                models_to_package.update({compile_mode: model})
-        else:
+        # this variable is None if the origin is not a package
+        imp = _get_shared_importer()
+        if imp is not None:
             # the origin is `ModelFromPackage`
             # first update the `importers`
-            importers = (pkg_models.pop("importer"),) + importers
-            # then get the remaining models from the `pkg_models` dict and load the eager model's state dict into the other models
-            # note that we use `pkg_models.keys()` instead of `package_compile_modes`
-            # because the package may not have everything in `package_compile_modes`
-            # e.g. if the original package was made with torch<2.6, and we're doing the current packaging with torch>=2.6
-            pkg_modes = list(pkg_models.keys())
-            for compile_mode in pkg_modes:
-                logger.info(f"Building `{compile_mode}` model for packaging ...")
-                model = pkg_models.pop(compile_mode)
-                model.load_state_dict(eager_model.state_dict())
-                models_to_package.update({compile_mode: model})
+            importers = (imp,) + importers
+            # we only repackage what's in the package
+            # e.g. if the original package was made with torch<2.6, and we're doing the current packaging with torch>=2.6, we'll miss the `compile` model, but there's nothing we can do about it
+            package_compile_modes = _get_package_metadata(imp)["available_models"]
+        else:
+            if _TORCH_GE_2_6:
+                # allow everything (including compile models)
+                package_compile_modes = _COMPILE_MODE_OPTIONS.copy()
+            else:
+                # only allow eager model if not torch>=2.6
+                package_compile_modes = [_EAGER_MODEL_KEY]
+
+        # remove eager model since we already built it
+        package_compile_modes.remove(_EAGER_MODEL_KEY)
+
+        for compile_mode in package_compile_modes:
+            logger.info(f"Building `{compile_mode}` model for packaging ...")
+            with only_apply_persistent_modifiers(persistent_only=True):
+                model = ModelFromCheckpoint(args.ckpt_path, compile_mode=compile_mode)
+            models_to_package.update({compile_mode: model})
 
         # == package ==
         with warnings.catch_warnings():

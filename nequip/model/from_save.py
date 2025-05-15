@@ -24,7 +24,7 @@ import yaml
 import hydra
 import os
 import warnings
-from typing import List, Dict, Union, Any
+from typing import List, Dict, Any
 
 # === setup logging ===
 logger = RankedLogger(__name__, rank_zero_only=True)
@@ -114,14 +114,14 @@ def ModelFromCheckpoint(checkpoint_path: str, compile_mode: str = _EAGER_MODEL_K
 
 # most of the complexity for `ModelFromPackage` is due to the need to keep track of the `Importer` if we ever repackage
 # see `nequip/scripts/package.py` to get the full picture of how they interact
+# we expect the following variable to only be used during `nequip-package`
 
-# main client `nequip-package` is expected to manipulate this dict via `_get_packaged_models`
-_PACKAGED_MODELS: Dict[str, Union[torch.nn.Module, torch.package.PackageImporter]] = {}
+_PACKAGE_TIME_SHARED_IMPORTER = None
 
 
-def _get_packaged_models():
-    global _PACKAGED_MODELS
-    return _PACKAGED_MODELS
+def _get_shared_importer():
+    global _PACKAGE_TIME_SHARED_IMPORTER
+    return _PACKAGE_TIME_SHARED_IMPORTER
 
 
 def _get_package_metadata(imp):
@@ -180,11 +180,24 @@ def ModelFromPackage(package_path: str, compile_mode: str = _EAGER_MODEL_KEY):
             category=UserWarning,
             module="torch.package.package_importer",
         )
-        imp = torch.package.PackageImporter(package_path)
 
+        # during `nequip-package`, we need to use the same importer for all the models for successful repackaging
+        # see https://pytorch.org/docs/stable/package.html#re-export-an-imported-object
+        if workflow_state == "package":
+            global _PACKAGE_TIME_SHARED_IMPORTER
+            imp = _PACKAGE_TIME_SHARED_IMPORTER
+            # we load the importer from `package_path` for the first time
+            if imp is None:
+                imp = torch.package.PackageImporter(package_path)
+                _PACKAGE_TIME_SHARED_IMPORTER = imp
+            # if it's not `None`, it means we've previously loaded a model during `nequip-package` and should keep using the same importer
+        else:
+            # if not doing `nequip-package`, we just load a new importer every time `ModelFromPackage` is called
+            imp = torch.package.PackageImporter(package_path)
+
+        # do sanity checking with available models
         pkg_metadata = _get_package_metadata(imp)
         available_models = pkg_metadata["available_models"]
-
         # throw warning if desired `compile_mode` is not available, and default to eager
         if compile_mode not in available_models:
             warnings.warn(
@@ -192,29 +205,11 @@ def ModelFromPackage(package_path: str, compile_mode: str = _EAGER_MODEL_KEY):
             )
             compile_mode = _EAGER_MODEL_KEY
 
-        # if we're loading for `nequip-package` (through `ModelFromCheckpoint`)
-        # we load every model type and save it, along with the importer
-        # `nequip-package` will query `_PACKAGED_MODELS` and handle the necessary logic including
-        # 1. loading the state dict of the model returned by this function (that will get updated by the checkpoint), into the other model types
-        # 2. handle the repackaging logic (https://pytorch.org/docs/stable/package.html#re-export-an-imported-object)
-        if workflow_state == "package":
-            global _PACKAGED_MODELS
-            _PACKAGED_MODELS.update({"importer": imp})
-            # note that the loop is over `available_models`
-            for mode in available_models:
-                model = imp.load_pickle(
-                    package="model",
-                    resource=f"{mode}_model.pkl",
-                    map_location="cpu",
-                )
-                _PACKAGED_MODELS.update({mode: model})
-            model = _PACKAGED_MODELS[compile_mode]
-        else:
-            model = imp.load_pickle(
-                package="model",
-                resource=f"{compile_mode}_model.pkl",
-                map_location="cpu",
-            )
+        model = imp.load_pickle(
+            package="model",
+            resource=f"{compile_mode}_model.pkl",
+            map_location="cpu",
+        )
 
     # NOTE: model returned is not a GraphModel object tied to the `nequip` in current Python env, but a GraphModel object from the packaged zip file
     return model
