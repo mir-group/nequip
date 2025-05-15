@@ -26,12 +26,10 @@ _IS_BUILDING_MODEL = contextvars.ContextVar("_IS_BUILDING_MODEL", default=False)
 # the following is the set of model build types for specific purposes
 _EAGER_MODEL_KEY = "eager"
 _TRAIN_TIME_COMPILE_KEY: Final[str] = "compile"
-_COMPILE_TIME_AOTINDUCTOR_KEY: Final[str] = "aotinductor"
 
 _COMPILE_MODE_OPTIONS = {
     _EAGER_MODEL_KEY,
     _TRAIN_TIME_COMPILE_KEY,
-    _COMPILE_TIME_AOTINDUCTOR_KEY,
 }
 
 

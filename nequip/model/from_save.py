@@ -14,7 +14,6 @@ from .utils import (
     get_current_compile_mode,
     _COMPILE_MODE_OPTIONS,
     _EAGER_MODEL_KEY,
-    _COMPILE_TIME_AOTINDUCTOR_KEY,
 )
 from nequip.scripts._workflow_utils import get_workflow_state
 from nequip.utils import get_current_code_versions
@@ -71,13 +70,9 @@ def ModelFromCheckpoint(checkpoint_path: str, compile_mode: str = _EAGER_MODEL_K
         checkpoint_path (str): path to a ``nequip`` framework checkpoint file
         compile_mode (str): ``eager`` or ``compile`` allowed for training
     """
+    # === sanity checks ===
     _check_file_exists(file_path=checkpoint_path, file_type="checkpoint")
-
-    # ^ there are other `compile_mode` options for internal use that are hidden from users
-    exclude_modes = (
-        [_COMPILE_TIME_AOTINDUCTOR_KEY] if get_workflow_state() == "train" else []
-    )
-    _check_compile_mode(compile_mode, "ModelFromCheckpoint", exclude_modes)
+    _check_compile_mode(compile_mode, "ModelFromCheckpoint")
     logger.info(f"Loading model from checkpoint file: {checkpoint_path} ...")
 
     # === load checkpoint and extract info ===
@@ -167,8 +162,7 @@ def ModelFromPackage(package_path: str, compile_mode: str = _EAGER_MODEL_KEY):
 
     # === sanity check compile modes ===
     workflow_state = get_workflow_state()
-    exclude_modes = [_COMPILE_TIME_AOTINDUCTOR_KEY] if workflow_state == "train" else []
-    _check_compile_mode(compile_mode, "ModelFromPackage", exclude_modes)
+    _check_compile_mode(compile_mode, "ModelFromPackage")
 
     # === load model ===
     logger.info(f"Loading model from package file: {package_path} ...")

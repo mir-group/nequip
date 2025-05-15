@@ -207,10 +207,7 @@ class BaseModelTests:
 
         For now, we only test the unbatched case, i.e. a single frame, relevant for ase, pair-nequip, and pair-allegro.
         """
-        from nequip.model.utils import (
-            override_model_compile_mode,
-            _COMPILE_TIME_AOTINDUCTOR_KEY,
-        )
+        from nequip.model.utils import override_model_compile_mode, _EAGER_MODEL_KEY
         from nequip.utils.compile import prepare_model_for_compile
         from nequip.utils.aot import aot_export_model
         from nequip.scripts._compile_utils import PAIR_NEQUIP_INPUTS, LMP_OUTPUTS
@@ -221,7 +218,7 @@ class BaseModelTests:
         export_data.pop(AtomicDataDict.NUM_NODES_KEY)
 
         _, config, _ = model
-        with override_model_compile_mode(compile_mode=_COMPILE_TIME_AOTINDUCTOR_KEY):
+        with override_model_compile_mode(compile_mode=_EAGER_MODEL_KEY):
             model = self.make_model(config, device=device)
         model = prepare_model_for_compile(model, device)
         # export model

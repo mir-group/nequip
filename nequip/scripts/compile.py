@@ -5,7 +5,7 @@ from e3nn.util.jit import script
 
 from ._workflow_utils import set_workflow_state
 from ._compile_utils import COMPILE_TARGET_DICT
-from nequip.model.utils import _EAGER_MODEL_KEY, _COMPILE_TIME_AOTINDUCTOR_KEY
+from nequip.model.utils import _EAGER_MODEL_KEY
 from nequip.model.from_save import ModelFromPackage, ModelFromCheckpoint
 from nequip.train.lightning import _SOLE_MODEL_KEY
 from nequip.data import AtomicDataDict, compile_utils
@@ -15,7 +15,6 @@ from nequip.utils.global_state import set_global_state, get_latest_global_state
 from omegaconf import OmegaConf
 import hydra
 
-import os
 import yaml
 import argparse
 import pathlib
@@ -25,15 +24,6 @@ from typing import Final
 # === setup logging ===
 hydra.core.utils.configure_log(None)
 logger = RankedLogger(__name__, rank_zero_only=True)
-
-# === override model to compile ===
-# we default to using the best performance compilation option, e.g. to use a custom kernel with AOT Inductor
-# this env var can be toggled to always compile from eager mode
-_ALWAYS_COMPILE_FROM_EAGER: Final[bool] = bool(
-    int(os.getenv("NEQUIP_ALWAYS_COMPILE_FROM_EAGER", 0))
-)
-if _ALWAYS_COMPILE_FROM_EAGER:
-    logger.info("`NEQUIP_ALWAYS_COMPILE_FROM_EAGER=1` detected")
 
 # hardcode a global seed for `nequip-compile`
 _COMPILE_SEED: Final[int] = 1
@@ -185,11 +175,7 @@ def main(args=None):
     # get relevant model build types (used by both checkpoint and package logic paths)
     model_compile_mode = {
         "torchscript": _EAGER_MODEL_KEY,
-        "aotinductor": (
-            _EAGER_MODEL_KEY
-            if _ALWAYS_COMPILE_FROM_EAGER
-            else _COMPILE_TIME_AOTINDUCTOR_KEY
-        ),
+        "aotinductor": _EAGER_MODEL_KEY,
     }[args.mode]
     logger.info(f"Loading model for compilation from {args.input_path} ...")
     # use package load path if extension matches, otherwise assume checkpoint file
