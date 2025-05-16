@@ -39,7 +39,15 @@ def scatter(
             size[dim] = 0
         else:
             size[dim] = int(index.max()) + 1
-        out = torch.zeros(size, dtype=src.dtype, device=src.device)
+        out = torch.zeros(
+            size,
+            dtype=(
+                torch.float32
+                if src.dtype not in (torch.float32, torch.float64)
+                else src.dtype
+            ),
+            device=src.device,
+        )
         return out.scatter_add_(dim, index, src)
     else:
         return out.scatter_add_(dim, index, src)
