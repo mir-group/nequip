@@ -54,7 +54,7 @@ def get_all_modifiers(
 
 
 def modify(
-    model: Dict,
+    model: Union[Dict, torch.nn.Module],
     modifiers: Union[List[Dict], Dict[str, List[Dict]]],
 ) -> Any:
     """Applies a sequence of model modifier functions to a model."""
@@ -62,10 +62,12 @@ def modify(
     global _ONLY_APPLY_PERSISTENT
     persistent_only: bool = _ONLY_APPLY_PERSISTENT.get()
 
-    # build inner model first
-    model = model.copy()
-    model_fn = get_method(model.pop("_target_"))
-    model = model_fn(**model)
+    # build inner model if not already built
+    if not isinstance(model, torch.nn.Module):
+        # don't use `hydra.utils.instantiate` because it may lead to a hydra dependency during packaging
+        model = model.copy()
+        model_fn = get_method(model.pop("_target_"))
+        model = model_fn(**model)
     assert isinstance(model, torch.nn.ModuleDict)
 
     # because `model` is actually a `ModuleDict`, we make the modifiers flexible while keeping a simple default for the more common single-model use case
@@ -89,5 +91,5 @@ def modify(
             is_persistent = is_persistent_model_modifier(modifier_fn)
             # only skip if doing `persistent_only` and modifier is non-persistent, otherwise always apply
             if not (persistent_only and not is_persistent):
-                model = modifier_fn(submodel, **modifier_cfg)
+                submodel = modifier_fn(submodel, **modifier_cfg)
     return model
