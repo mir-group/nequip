@@ -1,33 +1,35 @@
 # This file is a part of the `nequip` package. Please see LICENSE and README at the root for information on using it.
 """Interaction Block"""
 
-from typing import Optional
-
+from math import sqrt
 import torch
 
 from e3nn.o3._irreps import Irreps
 from e3nn.o3._linear import Linear
-from e3nn.o3._tensor_product._tensor_product import TensorProduct
 from e3nn.o3._tensor_product._sub import FullyConnectedTensorProduct
 
 from nequip.data import AtomicDataDict
+
+from ._tp_scatter_base import TensorProductScatter
 from .mlp import ScalarMLPFunction
 from ._graph_mixin import GraphModuleMixin
-from .utils import scatter
+
+
+from typing import Optional
 
 
 class InteractionBlock(GraphModuleMixin, torch.nn.Module):
-    avg_num_neighbors: Optional[float]
+
     use_sc: bool
 
     def __init__(
         self,
         irreps_in,
         irreps_out,
-        radial_mlp_depth=1,
-        radial_mlp_width=8,
-        avg_num_neighbors=None,
-        use_sc=True,
+        radial_mlp_depth: int = 1,
+        radial_mlp_width: int = 8,
+        avg_num_neighbors: Optional[float] = None,
+        use_sc: bool = True,
     ) -> None:
         """InteractionBlock.
 
@@ -62,7 +64,11 @@ class InteractionBlock(GraphModuleMixin, torch.nn.Module):
             irreps_out={AtomicDataDict.NODE_FEATURES_KEY: irreps_out},
         )
 
-        self.avg_num_neighbors = avg_num_neighbors
+        # === normalization ===
+        self.scatter_norm_factor: Optional[float] = None
+        if avg_num_neighbors is not None:
+            self.scatter_norm_factor = 1.0 / sqrt(avg_num_neighbors)
+
         self.use_sc = use_sc
 
         feature_irreps_in = self.irreps_in[AtomicDataDict.NODE_FEATURES_KEY]
@@ -99,27 +105,23 @@ class InteractionBlock(GraphModuleMixin, torch.nn.Module):
             for i_in1, i_in2, i_out, mode, train in instructions
         ]
 
-        tp = TensorProduct(
+        self.tp_scatter = TensorProductScatter(
             feature_irreps_in,
             irreps_edge_attr,
             irreps_mid,
             instructions,
-            shared_weights=False,
-            internal_weights=False,
         )
 
         # init_irreps already confirmed that the edge embeddding is all invariant scalars
         self.edge_mlp = ScalarMLPFunction(
             input_dim=self.irreps_in[AtomicDataDict.EDGE_EMBEDDING_KEY].num_irreps,
-            output_dim=tp.weight_numel,
+            output_dim=self.tp_scatter.tp.weight_numel,
             hidden_layers_depth=radial_mlp_depth,
             hidden_layers_width=radial_mlp_width,
             nonlinearity="silu",  # hardcode SiLU
             bias=False,
             forward_weight_init=True,
         )
-
-        self.tp = tp
 
         self.linear_2 = Linear(
             # irreps_mid has uncoallesed irreps because of the uvu instructions,
@@ -141,8 +143,6 @@ class InteractionBlock(GraphModuleMixin, torch.nn.Module):
             )
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
-        weight = self.edge_mlp(data[AtomicDataDict.EDGE_EMBEDDING_KEY])
-
         x = data[AtomicDataDict.NODE_FEATURES_KEY]
         edge_src = data[AtomicDataDict.EDGE_INDEX_KEY][1]
         edge_dst = data[AtomicDataDict.EDGE_INDEX_KEY][0]
@@ -151,16 +151,18 @@ class InteractionBlock(GraphModuleMixin, torch.nn.Module):
             sc = self.sc(x, data[AtomicDataDict.NODE_ATTRS_KEY])
 
         x = self.linear_1(x)
-        edge_features = self.tp(
-            x[edge_src], data[AtomicDataDict.EDGE_ATTRS_KEY], weight
+
+        # normalize before TP-scatter
+        # necessary to get TorchScript to be able to type infer when its not None
+        alpha: Optional[float] = self.scatter_norm_factor
+        if alpha is not None:
+            x = alpha * x
+
+        edge_weight = self.edge_mlp(data[AtomicDataDict.EDGE_EMBEDDING_KEY])
+
+        x = self.tp_scatter(
+            x, data[AtomicDataDict.EDGE_ATTRS_KEY], edge_weight, edge_dst, edge_src
         )
-        # divide first for numerics, scatter is linear
-        # Necessary to get TorchScript to be able to type infer when its not None
-        avg_num_neigh: Optional[float] = self.avg_num_neighbors
-        if avg_num_neigh is not None:
-            edge_features = edge_features.div(avg_num_neigh**0.5)
-        # now scatter down
-        x = scatter(edge_features, edge_dst, dim=0, dim_size=x.size(0))
 
         x = self.linear_2(x)
 
