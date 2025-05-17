@@ -3,6 +3,20 @@
 This page covers how one can troubleshoot a variety of issues when using the NequIP framework, and will be continuously improved based on user feedback.
 You are also encouraged to look through past [GitHub issues](https://github.com/mir-group/nequip/issues), [GitHub discussions](https://github.com/mir-group/nequip/discussions), and our [FAQ page](faq.md).
 
+
+## Codebase changes break my checkpoints
+
+While we strive for stability, there are times when breaking changes are necessary to enable new features and capabilities.
+Checkpoint files are unlikely to survive such breaking changes, i.e. one may no longer be able to load a checkpoint file to continue training or `nequip-compile` the model when upgrading versions.
+
+The NequIP framework's proposed solution is to [package](workflow.md/#packaging) the model with `nequip-package`, which produces a packaged model file that contains a snapshot of the code (from the code version at package-time) associated with a model.
+Packaged models can be compiled with `nequip-compile` for inference and/or used as pretrained models for fine-tuning (with the possibility of repackaging the model with `nequip-package` again).
+Packaged models are more reliable in allowing for old models to be used across version changes of the NequIP codebase.
+While packaged models guard against breaking changes in model code, they may no be compatible if there are fundamental changes to the code that performs packaging and loads packaged models.
+Changes like this should be rare, and we will refrain from making such changes unless absolutely necessary.
+
+More information can be found in the docs on [packaging](workflow.md/#packaging) and on the different [file types](files.md).
+
 ## Poor Training Behavior
 
 If you're model doesn't seem like it's learning, the reasons could range from problematic model hyperparameters, to problematic training hyperparameters, to data-side problems.
