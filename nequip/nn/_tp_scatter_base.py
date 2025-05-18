@@ -3,6 +3,8 @@
 import torch
 from e3nn.o3._tensor_product._tensor_product import TensorProduct
 from .utils import scatter
+from .model_modifier_utils import replace_submodules, model_modifier
+from nequip.utils.dtype import torch_default_dtype
 
 
 class TensorProductScatter(torch.nn.Module):
@@ -16,6 +18,11 @@ class TensorProductScatter(torch.nn.Module):
     ) -> None:
         super().__init__()
 
+        self.feature_irreps_in = feature_irreps_in
+        self.irreps_edge_attr = irreps_edge_attr
+        self.irreps_mid = irreps_mid
+        self.instructions = instructions
+
         self.tp = TensorProduct(
             feature_irreps_in,
             irreps_edge_attr,
@@ -25,7 +32,28 @@ class TensorProductScatter(torch.nn.Module):
             internal_weights=False,
         )
 
+        self.model_dtype = torch.get_default_dtype()
+
     def forward(self, x, edge_attr, edge_weight, edge_dst, edge_src):
         edge_features = self.tp(x[edge_src], edge_attr, edge_weight)
         x = scatter(edge_features, edge_dst, dim=0, dim_size=x.size(0))
         return x
+
+    @model_modifier(persistent=False)
+    @classmethod
+    def enable_OpenEquivariance(cls, model):
+        """Enable OpenEquivariance tensor product kernel for accelerated NequIP training and inference."""
+
+        from ._tp_scatter_oeq import OpenEquivarianceTensorProductScatter
+
+        def factory(old):
+            with torch_default_dtype(old.model_dtype):
+                new = OpenEquivarianceTensorProductScatter(
+                    feature_irreps_in=old.feature_irreps_in,
+                    irreps_edge_attr=old.irreps_edge_attr,
+                    irreps_mid=old.irreps_mid,
+                    instructions=old.instructions,
+                )
+            return new
+
+        return replace_submodules(model, cls, factory)
