@@ -7,7 +7,7 @@ from nequip.data._key_registry import get_dynamic_shapes
 from .fx import nequip_make_fx
 from .compile import prepare_model_for_compile
 from .versions import check_pt2_compile_compatibility
-from .dtype import test_model_output_similarity_by_dtype, _pt2_compile_error_message
+from nequip.model.utils import test_model_output_similarity_by_dtype, _pt2_compile_error_message
 
 from typing import List, Dict, Union, Any
 
