@@ -5,7 +5,7 @@ from nequip.data import AtomicDataDict
 from nequip.data._key_registry import get_dynamic_shapes
 from .graph_model import GraphModel
 from ._graph_mixin import GraphModuleMixin
-from nequip.utils.model_similarity import (
+from nequip.utils.dtype import (
     test_model_output_similarity_by_dtype,
     _pt2_compile_error_message,
 )
