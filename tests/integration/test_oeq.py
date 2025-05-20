@@ -39,10 +39,12 @@ def test_oeq_training(fake_model_training_session):
             new_config["hydra"] = {"run": {"dir": new_tmpdir}}
 
             training_module = new_config["training_module"]
-            original_target = training_module["model"]["_target_"]
-            training_module["model"]["_target_"] = "nequip.model.modify"
-            training_module["model"]["modifiers"] = {"modifier": "enable_OpenEquivariance"}
-            training_module["model"]["model"] = {"_target_": original_target}
+            original_model = training_module["model"]
+            training_module["model"] = {
+                "_target_": "nequip.model.modify",
+                "modifiers": {"modifier": "enable_OpenEquivariance"},
+                "model": original_model,
+            }
 
         new_config = OmegaConf.create(new_config)
         config_path = new_tmpdir + "/newconf.yaml"
