@@ -4,7 +4,6 @@ import torch
 from e3nn.o3._tensor_product._tensor_product import TensorProduct
 from .utils import scatter
 from .model_modifier_utils import replace_submodules, model_modifier
-from nequip.utils.dtype import torch_default_dtype
 
 
 class TensorProductScatter(torch.nn.Module):
@@ -45,6 +44,7 @@ class TensorProductScatter(torch.nn.Module):
         """Enable OpenEquivariance tensor product kernel for accelerated NequIP training and inference."""
 
         from ._tp_scatter_oeq import OpenEquivarianceTensorProductScatter
+        from nequip.utils.dtype import torch_default_dtype
 
         def factory(old):
             with torch_default_dtype(old.model_dtype):

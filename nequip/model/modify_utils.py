@@ -68,28 +68,43 @@ def modify(
         model = model.copy()
         model_fn = get_method(model.pop("_target_"))
         model = model_fn(**model)
-    assert isinstance(model, torch.nn.ModuleDict)
 
-    # because `model` is actually a `ModuleDict`, we make the modifiers flexible while keeping a simple default for the more common single-model use case
-    # a single list of modifiers is given, we assume it'll be uniformly applied to everything
-    if isinstance(modifiers, list):
-        modifiers = {model_name: modifiers.copy() for model_name in model.keys()}
-    # ^ the above allows us to use a common loop over individual sub-models and apply the relevant model-specific modifiers
+    def _apply_modifier(
+        avail_modifiers: Dict[str, callable],
+        modifier_cfg: Dict[str, Any],
+        this_model: torch.nn.Module,
+    ) -> None:
+        modifier_cfg = modifier_cfg.copy()
+        modifier_name = modifier_cfg.pop("modifier")
+        if modifier_name not in avail_modifiers.keys():
+            avail_names = list(avail_modifiers.keys())
+            raise RuntimeError(
+                f"`{modifier_name}` is not a registered model modifier. The following are registered model modifiers: {avail_names}"
+            )
+        modifier_fn = avail_modifiers[modifier_name]
+        is_persistent = is_persistent_model_modifier(modifier_fn)
+        # only skip if doing `persistent_only` and modifier is non-persistent, otherwise always apply
+        if not (persistent_only and not is_persistent):
+            this_model = modifier_fn(this_model, **modifier_cfg)
 
-    for model_name, submodel in model.items():
-        avail_modifiers: Dict[str, callable] = get_all_modifiers(submodel)
+    if isinstance(model, torch.nn.ModuleDict):
+        # because `model` is actually a `ModuleDict`, we make the modifiers flexible while keeping a simple default for the more common single-model use case
+        # a single list of modifiers is given, we assume it'll be uniformly applied to everything
+        if isinstance(modifiers, list):
+            modifiers = {model_name: modifiers.copy() for model_name in model.keys()}
+        # ^ the above allows us to use a common loop over individual sub-models and apply the relevant model-specific modifiers
 
-        for modifier_cfg in modifiers[model_name]:
-            modifier_cfg = modifier_cfg.copy()
-            modifier_name = modifier_cfg.pop("modifier")
-            if modifier_name not in avail_modifiers.keys():
-                avail_names = list(avail_modifiers.keys())
-                raise RuntimeError(
-                    f"`{modifier_name}` is not a registered model modifier. The following are registered model modifiers: {avail_names}"
-                )
-            modifier_fn = avail_modifiers[modifier_name]
-            is_persistent = is_persistent_model_modifier(modifier_fn)
-            # only skip if doing `persistent_only` and modifier is non-persistent, otherwise always apply
-            if not (persistent_only and not is_persistent):
-                submodel = modifier_fn(submodel, **modifier_cfg)
+        for model_name, submodel in model.items():
+            avail_modifiers: Dict[str, callable] = get_all_modifiers(submodel)
+            for modifier in modifiers[model_name]:
+                _apply_modifier(avail_modifiers, modifier, submodel)
+
+    elif isinstance(model, torch.nn.Module):
+        assert isinstance(modifiers, list)
+        avail_modifiers: Dict[str, callable] = get_all_modifiers(model)
+        for modifier in modifiers:
+            _apply_modifier(avail_modifiers, modifier, model)
+    else:
+        raise RuntimeError("Unrecognized model object found.")
+
     return model
