@@ -42,7 +42,7 @@ def test_oeq_training(fake_model_training_session):
             original_model = training_module["model"]
             training_module["model"] = {
                 "_target_": "nequip.model.modify",
-                "modifiers": {"modifier": "enable_OpenEquivariance"},
+                "modifiers": [{"modifier": "enable_OpenEquivariance"}],
                 "model": original_model,
             }
 
