@@ -21,6 +21,7 @@ from nequip.model.utils import (
     _COMPILE_MODE_OPTIONS,
     _EAGER_MODEL_KEY,
 )
+from nequip.nn.model_modifier_utils import is_persistent_model_modifier
 from nequip.model.modify_utils import get_all_modifiers, only_apply_persistent_modifiers
 from nequip.utils.logger import RankedLogger
 from nequip.utils.versions import get_current_code_versions, _TORCH_GE_2_6
@@ -121,8 +122,12 @@ def main(args=None):
                 )
                 modifiers = get_all_modifiers(model)
                 for idx, (name, modifier) in enumerate(modifiers.items()):
-                    print(f"{idx + 1}. {name}\n")
-                    print("\t" + modifier.__doc__ + "\n")
+                    persistent_flag = (
+                        "" if is_persistent_model_modifier(modifier) else "non-"
+                    )
+                    print(f"{idx + 1}. {name}\t({persistent_flag}persistent)\n")
+                    if hasattr(modifier, "__doc__"):
+                        print("\t" + modifier.__doc__ + "\n")
 
         return
 
