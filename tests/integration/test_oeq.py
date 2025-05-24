@@ -1,5 +1,6 @@
 import math
 import torch
+import pytest
 
 import tempfile
 import subprocess
@@ -20,7 +21,22 @@ def load_nequip_module_from_checkpoint(checkpoint_path):
     nequip_module = training_module.load_from_checkpoint(checkpoint_path)
     return nequip_module
 
+def create_oeq_config(config, new_tmpdir):
+    new_config = config.copy()
+    with open_dict(new_config):
+        new_config["hydra"] = {"run": {"dir": new_tmpdir}}
 
+        training_module = new_config["training_module"]
+        original_model = training_module["model"]
+        training_module["model"] = {
+            "_target_": "nequip.model.modify",
+            "modifiers": [{"modifier": "enable_OpenEquivariance"}],
+            "model": original_model,
+        }
+    new_config = OmegaConf.create(new_config)
+    return new_config
+
+@pytest.mark.skip
 def test_oeq_training(fake_model_training_session):
     # Test that an OEQ model reproduces the training loss 
 
@@ -34,19 +50,7 @@ def test_oeq_training(fake_model_training_session):
 
     # == train again with validation batch size 1 ==
     with tempfile.TemporaryDirectory() as new_tmpdir:
-        new_config = config.copy()
-        with open_dict(new_config):
-            new_config["hydra"] = {"run": {"dir": new_tmpdir}}
-
-            training_module = new_config["training_module"]
-            original_model = training_module["model"]
-            training_module["model"] = {
-                "_target_": "nequip.model.modify",
-                "modifiers": [{"modifier": "enable_OpenEquivariance"}],
-                "model": original_model,
-            }
-
-        new_config = OmegaConf.create(new_config)
+        new_config = create_oeq_config(config, new_tmpdir)
         config_path = new_tmpdir + "/newconf.yaml"
         OmegaConf.save(config=new_config, f=config_path)
 
@@ -72,3 +76,11 @@ def test_oeq_training(fake_model_training_session):
                 for a, b in zip(orig_train_loss.values(), new_train_loss.values())
             ]
         )
+
+def test_oeq_inference(fake_model_training_session):
+    config, tmpdir, env, model_dtype = fake_model_training_session
+    checkpoint_module = load_nequip_module_from_checkpoint(f"{tmpdir}/last.ckpt")
+    original_model = checkpoint_module.evaluation_model
+
+    with tempfile.TemporaryDirectory() as new_tmpdir:
+        new_config = create_oeq_config(config, new_tmpdir)

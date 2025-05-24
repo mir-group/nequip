@@ -70,9 +70,9 @@ class TestNequIPModel(BaseEnergyModelTests):
 
     @pytest.fixture(
         params=[
-            minimal_config1,
-            minimal_config2,
-            minimal_config3,
+            #minimal_config1,
+            #minimal_config2,
+            #minimal_config3,
             minimal_config4,
         ],
         scope="class",

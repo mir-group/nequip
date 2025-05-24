@@ -11,9 +11,9 @@ def _check_and_print(retcode):
     __tracebackhide__ = True
     if retcode.returncode:
         if retcode.stdout is not None and len(retcode.stdout) > 0:
-            print(retcode.stdout.decode("ascii"))
+            print(retcode.stdout.decode("ascii", errors='replace'))
         if retcode.stderr is not None and len(retcode.stderr) > 0:
-            print(retcode.stderr.decode("ascii"), file=sys.stderr)
+            print(retcode.stderr.decode("ascii", errors='replace'), file=sys.stderr)
         retcode.check_returncode()
 
 
@@ -131,14 +131,18 @@ def extra_train_from_save(request):
     """
     return request.param
 
+@pytest.fixture(scope="session", params=["float32", "float64"])
+def model_dtype2(request):
+    return request.param
+
 
 @pytest.fixture(scope="session")
 def fake_model_training_session(
-    conffile, training_module, model_dtype, extra_train_from_save
+    conffile, training_module, model_dtype2, extra_train_from_save
 ):
     session = _training_session(
-        conffile, training_module, model_dtype, extra_train_from_save
+        conffile, training_module, model_dtype2, extra_train_from_save
     )
     config, tmpdir, env = next(session)
-    yield config, tmpdir, env, model_dtype
+    yield config, tmpdir, env, model_dtype2
     del session
