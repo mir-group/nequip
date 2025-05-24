@@ -36,7 +36,6 @@ def create_oeq_config(config, new_tmpdir):
     new_config = OmegaConf.create(new_config)
     return new_config
 
-@pytest.mark.skip
 def test_oeq_training(fake_model_training_session):
     # Test that an OEQ model reproduces the training loss 
 
@@ -69,6 +68,7 @@ def test_oeq_training(fake_model_training_session):
         new_train_loss = nequip_module.loss.metrics_values_epoch
         print(orig_train_loss)
         print(new_train_loss)
+
         assert len(orig_train_loss) == len(new_train_loss)
         assert all(
             [
@@ -76,11 +76,3 @@ def test_oeq_training(fake_model_training_session):
                 for a, b in zip(orig_train_loss.values(), new_train_loss.values())
             ]
         )
-
-def test_oeq_inference(fake_model_training_session):
-    config, tmpdir, env, model_dtype = fake_model_training_session
-    checkpoint_module = load_nequip_module_from_checkpoint(f"{tmpdir}/last.ckpt")
-    original_model = checkpoint_module.evaluation_model
-
-    with tempfile.TemporaryDirectory() as new_tmpdir:
-        new_config = create_oeq_config(config, new_tmpdir)

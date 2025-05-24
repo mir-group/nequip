@@ -131,18 +131,13 @@ def extra_train_from_save(request):
     """
     return request.param
 
-@pytest.fixture(scope="session", params=["float32", "float64"])
-def model_dtype2(request):
-    return request.param
-
-
 @pytest.fixture(scope="session")
 def fake_model_training_session(
-    conffile, training_module, model_dtype2, extra_train_from_save
+    conffile, training_module, model_dtype, extra_train_from_save
 ):
     session = _training_session(
-        conffile, training_module, model_dtype2, extra_train_from_save
+        conffile, training_module, model_dtype, extra_train_from_save
     )
     config, tmpdir, env = next(session)
-    yield config, tmpdir, env, model_dtype2
+    yield config, tmpdir, env, model_dtype
     del session
