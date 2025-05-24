@@ -11,9 +11,9 @@ def _check_and_print(retcode):
     __tracebackhide__ = True
     if retcode.returncode:
         if retcode.stdout is not None and len(retcode.stdout) > 0:
-            print(retcode.stdout.decode("ascii"))
+            print(retcode.stdout.decode("ascii", errors='replace'))
         if retcode.stderr is not None and len(retcode.stderr) > 0:
-            print(retcode.stderr.decode("ascii"), file=sys.stderr)
+            print(retcode.stderr.decode("ascii", errors='replace'), file=sys.stderr)
         retcode.check_returncode()
 
 
@@ -130,7 +130,6 @@ def extra_train_from_save(request):
     Whether the checkpoints for the tests come from a fresh model, `ModelFromCheckpoint`, or `ModelFromPackage`.
     """
     return request.param
-
 
 @pytest.fixture(scope="session")
 def fake_model_training_session(
