@@ -148,7 +148,7 @@ import hydra, math, torch
 
 class TrainingInvarianceBaseTest:
     def modify_model_config(self, original_config):
-        raise NotImplementedError("Implement in subclass test.")
+        raise NotImplementedError
 
     def map_location(self):
         return "cpu"
