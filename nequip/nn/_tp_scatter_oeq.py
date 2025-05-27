@@ -1,6 +1,11 @@
 import torch
 from ._tp_scatter_base import TensorProductScatter
-from openequivariance import TensorProduct, TensorProductConv, TPProblem, torch_to_oeq_dtype
+from openequivariance import (
+    TensorProduct,
+    TensorProductConv,
+    TPProblem,
+    torch_to_oeq_dtype,
+)
 
 
 class OpenEquivarianceTensorProductScatter(TensorProductScatter):
@@ -32,7 +37,7 @@ class OpenEquivarianceTensorProductScatter(TensorProductScatter):
             irrep_dtype=torch_to_oeq_dtype(default_dtype),
             weight_dtype=torch_to_oeq_dtype(default_dtype),
             shared_weights=False,
-            internal_weights=False
+            internal_weights=False,
         )
         self.tp_conv = TensorProductConv(tpp, torch_op=True, deterministic=False)
 

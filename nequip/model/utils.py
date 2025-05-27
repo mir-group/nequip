@@ -19,7 +19,7 @@ import functools
 import contextvars
 import contextlib
 
-from typing import Optional, Final, Callable, Union, List
+from typing import Optional, Final
 
 _IS_BUILDING_MODEL = contextvars.ContextVar("_IS_BUILDING_MODEL", default=False)
 

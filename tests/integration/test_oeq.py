@@ -1,5 +1,5 @@
 from nequip.utils.unittests.model_tests import BaseModelTests
-from conftest import TrainingInvarianceBaseTest 
+from conftest import TrainingInvarianceBaseTest
 import pytest
 import torch
 
@@ -68,6 +68,7 @@ minimal_config4 = dict(
     **COMMON_FULL_CONFIG,
 )
 
+
 class TestOEQUnit(BaseModelTests):
     @pytest.fixture
     def strict_locality(self):
@@ -126,9 +127,7 @@ class TestOEQUnit(BaseModelTests):
     @override_irreps_debug(False)
     def test_oeq(self, model, model_test_data, device):
         if device == "cpu":
-            pytest.skip(
-                "OEQ tests skipped for CPU" 
-            )
+            pytest.skip("OEQ tests skipped for CPU")
 
         instance, config, _ = model
         # get tolerance based on model_dtype
@@ -141,8 +140,8 @@ class TestOEQUnit(BaseModelTests):
         config = {
             "_target_": "nequip.model.modify",
             "modifiers": [{"modifier": "enable_OpenEquivariance"}],
-            "model": config.copy()
-        } 
+            "model": config.copy(),
+        }
         oeq_model = self.make_model(config, device=device)
 
         self.compare_output_and_gradients(
@@ -150,11 +149,12 @@ class TestOEQUnit(BaseModelTests):
             modelB=oeq_model,
             model_test_data=model_test_data,
             tol=tol,
-            compare_outputs=False # Internal checks guarantee that outputs are the same 
+            compare_outputs=False,  # Internal checks guarantee that outputs are the same
         )
-    
+
 
 # =================== Integration tests ==========================
+
 
 class TestOEQTrainingInvariance(TrainingInvarianceBaseTest):
     def modify_model_config(self, original_config):
@@ -167,6 +167,6 @@ class TestOEQTrainingInvariance(TrainingInvarianceBaseTest):
             "model": original_model,
         }
         return new_config
-    
+
     def map_location(self):
         return "cuda"

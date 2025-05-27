@@ -11,9 +11,9 @@ def _check_and_print(retcode):
     __tracebackhide__ = True
     if retcode.returncode:
         if retcode.stdout is not None and len(retcode.stdout) > 0:
-            print(retcode.stdout.decode("ascii", errors='replace'))
+            print(retcode.stdout.decode("ascii", errors="replace"))
         if retcode.stderr is not None and len(retcode.stderr) > 0:
-            print(retcode.stderr.decode("ascii", errors='replace'), file=sys.stderr)
+            print(retcode.stderr.decode("ascii", errors="replace"), file=sys.stderr)
         retcode.check_returncode()
 
 
@@ -131,6 +131,7 @@ def extra_train_from_save(request):
     """
     return request.param
 
+
 @pytest.fixture(scope="session")
 def fake_model_training_session(
     conffile, training_module, model_dtype, extra_train_from_save
@@ -143,8 +144,9 @@ def fake_model_training_session(
     del session
 
 
-# TODO: Move these imports when this class gets moved to the correct file. 
-import hydra, math, torch 
+# TODO: Move these imports when this class gets moved to the correct file.
+import hydra, math, torch
+
 
 class TrainingInvarianceBaseTest:
     def modify_model_config(self, original_config):
@@ -164,7 +166,6 @@ class TrainingInvarianceBaseTest:
         )
         nequip_module = training_module.load_from_checkpoint(checkpoint_path)
         return nequip_module
-
 
     def test_batch_invariance(self, fake_model_training_session):
         # This actually tests two features:
@@ -200,7 +201,9 @@ class TrainingInvarianceBaseTest:
                 stderr=subprocess.PIPE,
             )
             _check_and_print(retcode)
-            nequip_module = self.load_nequip_module_from_checkpoint(f"{new_tmpdir}/last.ckpt")
+            nequip_module = self.load_nequip_module_from_checkpoint(
+                f"{new_tmpdir}/last.ckpt"
+            )
 
             # == test training loss reproduced ==
             new_train_loss = nequip_module.loss.metrics_values_epoch
@@ -227,7 +230,6 @@ class TrainingInvarianceBaseTest:
                     )
                 ]
             )
-
 
     # TODO: will fail if train dataloader has shuffle=True
     def test_restarts(self, fake_model_training_session):
@@ -259,7 +261,9 @@ class TrainingInvarianceBaseTest:
             )
             _check_and_print(retcode)
 
-            nequip_module = self.load_nequip_module_from_checkpoint(f"{new_tmpdir_1}/last.ckpt")
+            nequip_module = self.load_nequip_module_from_checkpoint(
+                f"{new_tmpdir_1}/last.ckpt"
+            )
             restart_val_metrics = nequip_module.val_metrics[0].metrics_values_epoch
 
             # == retrain from scratch up to new_max_epochs ==

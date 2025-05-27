@@ -150,18 +150,15 @@ class BaseModelTests:
                     atol=atol,
                 ), f"JIT didn't repro save-and-loaded JIT on field {out_field} with max error {(out_script[out_field] - out_load[out_field]).abs().max().item()}"
 
-    def compare_output_and_gradients(self, 
-                                     modelA, 
-                                     modelB, 
-                                     model_test_data, 
-                                     tol, 
-                                     compare_outputs=True):
+    def compare_output_and_gradients(
+        self, modelA, modelB, model_test_data, tol, compare_outputs=True
+    ):
         A_out = modelA(model_test_data.copy())
-        B_out = modelB(model_test_data.copy()) 
+        B_out = modelB(model_test_data.copy())
 
-        if compare_outputs: 
+        if compare_outputs:
             for key in ["atomic_energy", "total_energy", "forces", "virial"]:
-                assert(torch.allclose(A_out[key], B_out[key], atol=tol))
+                assert torch.allclose(A_out[key], B_out[key], atol=tol)
 
         # test backwards pass if there are trainable weights
         if any([p.requires_grad for p in modelB.parameters()]):
@@ -208,7 +205,7 @@ class BaseModelTests:
             modelB=compile_model,
             model_test_data=model_test_data,
             tol=tol,
-            compare_outputs=False # Internal checks guarantee that outputs are the same 
+            compare_outputs=False,  # Internal checks guarantee that outputs are the same
         )
 
     @pytest.mark.skipif(
