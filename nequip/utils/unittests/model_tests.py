@@ -19,7 +19,12 @@ from nequip.data import (
     _EDGE_FIELDS,
 )
 from nequip.data.transforms import ChemicalSpeciesToAtomTypeMapper
-from nequip.nn import GraphModuleMixin, ForceStressOutput, PartialForceOutput
+from nequip.nn import (
+    GraphModuleMixin,
+    ForceStressOutput,
+    PartialForceOutput,
+    PerTypeScaleShift,
+)
 from nequip.utils import dtype_to_name, find_first_of_type
 from nequip.utils.versions import _TORCH_GE_2_6
 from nequip.utils.test import (
@@ -844,29 +849,26 @@ class BaseEnergyModelTests(BaseModelTests):
     def test_isolated_atom_energies(self, model, device):
         """Checks that isolated atom energies provided for the per-atom shifts are restored for isolated atoms."""
         instance, config, _ = model
+        scale_shift_module = find_first_of_type(instance, PerTypeScaleShift)
 
-        # skip if no per-type energy shifts
-        if "per_type_energy_shifts" in config:
-            # get the isolated atom energies
-            isolated_energies = torch.tensor(
-                config["per_type_energy_shifts"], device=device
-            )
-
-            # make a synthetic data consisting of three isolated atom frames
-            data_list = []
-            for type_idx in range(3):
-                data = {
-                    "atom_types": np.array([type_idx]),
-                    "pos": np.array([[0.0, 0.0, 0.0]]),
-                }
-                data_list.append(from_dict(data))
-            data = AtomicDataDict.to_(
-                compute_neighborlist_(
-                    AtomicDataDict.batched_from_list(data_list), r_max=config["r_max"]
-                ),
-                device,
-            )
-            out = instance(data)
-            assert torch.allclose(
-                out[AtomicDataDict.TOTAL_ENERGY_KEY], isolated_energies.reshape(3, 1)
-            )
+        if scale_shift_module is not None:
+            if scale_shift_module.has_shifts:
+                # make a synthetic data consisting of three isolated atom frames
+                data_list = []
+                for type_idx in range(3):
+                    data = {
+                        "atom_types": np.array([type_idx]),
+                        "pos": np.array([[0.0, 0.0, 0.0]]),
+                    }
+                    data_list.append(from_dict(data))
+                data = AtomicDataDict.to_(
+                    compute_neighborlist_(
+                        AtomicDataDict.batched_from_list(data_list),
+                        r_max=config["r_max"],
+                    ),
+                    device,
+                )
+                energies = instance(data)[AtomicDataDict.TOTAL_ENERGY_KEY]
+                assert torch.allclose(
+                    energies, scale_shift_module.shifts.reshape(energies.shape)
+                )
