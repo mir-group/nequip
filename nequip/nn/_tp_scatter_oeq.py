@@ -27,7 +27,7 @@ class OpenEquivarianceTensorProductScatter(TensorProductScatter):
         # even though `self.tp` is not used, having its (persistent) buffers always around ensures state dict compatibility when adding on or removing this subclass module
 
         default_dtype = torch.get_default_dtype()
-        
+
         # OEQ
         tpp = TPProblem(
             feature_irreps_in,
