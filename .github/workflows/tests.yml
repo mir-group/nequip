@@ -10,9 +10,15 @@ on:
       - main
       - develop
 
+concurrency:
+  # github.workflow will be the name of the workflow, e.g. "Run Tests"
+  # github.ref will be the branch or tag ref, e.g. "refs/heads/main" or, for a PR, "refs/pull/123/merge"
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
 
-  build:
+  run-tests:
     runs-on: ${{ github.event.repository.private && 'self-hosted' || 'ubuntu-latest' }}
     strategy:
       matrix:
