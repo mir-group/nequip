@@ -1,26 +1,15 @@
-md_runs/
 lightning_logs/
-outputs/
-aspirin_data/
 .idea/
 .vscode/
-*__pycache__*
 *wandb/
-*.npz
 results/
-experiments/
 nequip.egg-info/
-saved_models/
 cov*.xml
 .coverage
-analysis/
 *.icloud
 benchmark_data/
-log.*
-saved_model/
 *.ipynb_checkpoints/
-tutorial/results/
-tutorial/tutorial_data/
+outputs/
 .DS_store/
 .python-version
 
