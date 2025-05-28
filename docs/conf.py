@@ -52,6 +52,7 @@ intersphinx_mapping = {
     'ase': ('https://wiki.fysik.dtu.dk/ase/', None),
     'numpy': ('https://numpy.org/doc/stable/', None),
     'e3nn': ('https://docs.e3nn.org/en/stable/', None),
+    'torchmetrics': ('https://lightning.ai/docs/torchmetrics/stable/', None),
 }
 
 # Add any paths that contain templates here, relative to this directory.

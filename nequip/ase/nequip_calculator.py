@@ -72,7 +72,7 @@ class NequIPCalculator(Calculator):
         chemical_symbols: Optional[Union[List[str], Dict[str, str]]] = None,
         **kwargs,
     ):
-        """Creates a ``NequIPCalculator`` from a compiled model file.
+        """Creates a :class:`~nequip.ase.NequIPCalculator` from a compiled model file.
 
         Args:
             compile_path (str): path to compiled model file
@@ -159,7 +159,7 @@ class NequIPCalculator(Calculator):
         model_name: str = _SOLE_MODEL_KEY,
         **kwargs,
     ):
-        """Creates a ``NequIPCalculator`` from a checkpoint file.
+        """Creates a :class:`~nequip.ase.NequIPCalculator` from a checkpoint file.
 
         Args:
             ckpt_path (str): path to checkpoint file
@@ -187,7 +187,7 @@ class NequIPCalculator(Calculator):
         model_name: str = _SOLE_MODEL_KEY,
         **kwargs,
     ):
-        """Creates a ``NequIPCalculator`` from a package file.
+        """Creates a :class:`~nequip.ase.NequIPCalculator` from a package file.
 
         Args:
             package_path (str): path to packaged model

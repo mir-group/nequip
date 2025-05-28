@@ -8,7 +8,7 @@ from typing import Union, List, Callable, Optional, Dict
 class ASEDataModule(NequIPDataModule):
     """LightningDataModule for `ASE <https://wiki.fysik.dtu.dk/ase/ase/io/io.html>`_-readable datasets.
 
-    Interface similar to ``nequip.data.datamodule.NequIPDataModule``, except that all the datasets are given in terms of paths to relevant ASE-readable files.
+    Interface similar to :class:`~nequip.data.datamodule.NequIPDataModule`, except that all the datasets are given in terms of paths to relevant ASE-readable files.
 
     Args:
         seed (int): data seed for reproducibility

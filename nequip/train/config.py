@@ -14,19 +14,19 @@ class ConFIGLightningModule(NequIPLightningModule):
     """
     Conflict-free inverse gradient (ConFIG) approach to multitask learning. See https://arxiv.org/abs/2408.11104.
 
-    The arguments for this class are exactly the same as ``NequIPLightningModule``, but the loss coefficients take on a different meaning -- they are now the "b" in the "Ax=b" linear solve (see paper).
+    The arguments for this class are exactly the same as :class:`~nequip.train.NequIPLightningModule`, but the loss coefficients take on a different meaning -- they are now the "b" in the "Ax=b" linear solve (see paper).
 
     Set ``lsqr=False`` to use the pseudo-inverse of the gradient matrix to determine the update direction (instead of the default least squares method), as certain devices may not be able to do the (underdetermined) least squares solve (e.g. ROCm).
 
     Note:
-        Only ``ReduceLROnPlateau`` works with this class. The following warning may be safely ignored.
+        Only :class:`~torch.optim.lr_scheduler.ReduceLROnPlateau` works with this class. The following warning may be safely ignored.
         ``The lr scheduler dict contains the key(s) ['monitor'], but the keys will be ignored. You need to call `lr_scheduler.step()` manually in manual optimization.``
 
     Note:
         LR schedulers won't be able to monitor training metrics using this class -- which should not be a problem since LR schedulers should usually be monitoring validation metrics.
 
     Note:
-        To use gradient clipping in training, the ``gradient_clip_val`` must be provided to this training module and not to ``Trainer``, as automatic gradient clipping is not supported for manual optimization with PyTorch.
+        To use gradient clipping in training, the ``gradient_clip_val`` must be provided to this training module and not to :class:`~lightning.pytorch.Trainer`, as automatic gradient clipping is not supported for manual optimization with PyTorch.
 
     Args:
         gradient_clip_val (Union[int, float, None]): gradient clipping value (default: ``None``, which disables gradient clipping)
@@ -281,7 +281,7 @@ class ConFIGLightningModule(NequIPLightningModule):
 
 # note the inheritance order -- this means `EMALightningModule` takes precedence over `ConFIGLightningModule` as a parent
 class EMAConFIGLightningModule(EMALightningModule, ConFIGLightningModule):
-    """Composition of ``ConFIGLightningModule`` and ``EMALightningModule``
+    """Composition of :class:`~nequip.train.ConFIGLightningModule` and :class:`~nequip.train.EMALightningModule`
 
     Args:
         gradient_clip_val (Union[int, float, None]): gradient clipping value (default: ``None``, which disables gradient clipping)

@@ -9,7 +9,7 @@ from typing import Iterable, List, Callable, Union
 
 
 class NequIPLMDBDataset(AtomicDataset):
-    r"""``AtomicDataset`` for `LMDB <https://lmdb.readthedocs.io/en/release/>`_ data.
+    """:class:`~nequip.data.dataset.AtomicDataset` for `LMDB <https://lmdb.readthedocs.io/en/release/>`_ data.
 
     The ``NequIPLMDBDataset`` is the recommended solution for managing large datasets within the NequIP software ecosystem. One can convert existing datasets into LMDB formated data with helper functions from this class.
 

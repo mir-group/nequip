@@ -10,7 +10,7 @@ from typing import Union, Dict, List, Callable
 
 
 class NPZDataset(AtomicDataset):
-    """``AtomicDataset`` that loads data from an NPZ file following `sGDML <https://www.sgdml.org/#datasets>`_ conventions.
+    """:class:`~nequip.data.dataset.AtomicDataset` that loads data from an NPZ file following `sGDML <https://www.sgdml.org/#datasets>`_ conventions.
     It is also compatible with other datasets such as rMD-17, with a change in ``key_mapping``
     (the default ``key_mapping`` is set to be compatible with sGDML datasets).
 

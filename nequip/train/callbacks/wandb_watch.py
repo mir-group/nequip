@@ -7,9 +7,9 @@ from nequip.train import NequIPLightningModule
 
 
 class WandbWatch(Callback):
-    """Monitor and log weights and gradients during training with PyTorch Lightning's ``WandbLogger``.
+    """Monitor and log weights and gradients during training with PyTorch Lightning's :class:`~lightning.pytorch.loggers.WandbLogger`.
 
-    This class provides a way to call https://docs.wandb.ai/ref/python/watch/ when using a ``WandbLogger`` for monitoring weights and gradients over the course of training.
+    This class provides a way to call https://docs.wandb.ai/ref/python/watch/ when using a :class:`~lightning.pytorch.loggers.WandbLogger` for monitoring weights and gradients over the course of training.
 
     Args:
         log_freq (int): frequency (in batches) to log gradients and parameters

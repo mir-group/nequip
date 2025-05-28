@@ -13,13 +13,13 @@ from typing import Union, Dict, List, Optional, Callable, Any
 
 
 class ASEDataset(AtomicDataset):
-    r"""``AtomicDataset`` for `ASE <https://wiki.fysik.dtu.dk/ase/ase/io/io.html>`_-readable file formats.
+    """:class:`~nequip.data.dataset.AtomicDataset` for `ASE <https://wiki.fysik.dtu.dk/ase/ase/io/io.html>`_-readable file formats.
 
     Args:
         file_path (str): path to ASE-readable file
         transforms (List[Callable]): list of data transforms
-        ase_args (Dict[str, Any]): arguments for ``ase.io.iread`` (see `here <https://wiki.fysik.dtu.dk/ase/ase/io/io.html#ase.io.iread>`_)
-        include_keys (List[str]): the keys that needs to be parsed into dataset in addition to standard keys. The data stored in ``ase.atoms.Atoms.array`` has the lowest priority, and it will be overrided by data in ``ase.atoms.Atoms.info`` and ``ase.atoms.Atoms.calc.results``
+        ase_args (Dict[str, Any]): arguments for :func:`ase.io.iread` (see `here <https://wiki.fysik.dtu.dk/ase/ase/io/io.html#ase.io.iread>`_)
+        include_keys (List[str]): the keys that needs to be parsed into dataset in addition to standard keys. The data stored in :attr:`ase.atoms.Atoms.array` has the lowest priority, and it will be overrided by data in :attr:`ase.atoms.Atoms.info` and :attr:`ase.atoms.Atoms.calc.results`
         exclude_keys (List[str]): list of keys that may be present in the ASE-readable file but the user wishes to exclude
         key_mapping (Dict[str, str]): mapping of ``ase`` keys to ``AtomicDataDict`` keys
     """

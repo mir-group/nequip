@@ -23,8 +23,8 @@ class DataStatisticsManager(torch.nn.ModuleList):
 
          - a ``str`` for a ``nequip`` defined field (e.g. ``total_energy``, ``forces``, ``stress``), or
          - a ``Callable`` that performs some additional operations before returning a ``torch.Tensor``
-           for metric computation (e.g. ``nequip.data.PerAtomModifier``).
-      - ``metric`` is a ``nequip`` data metric object (a subclass of ``torchmetrics.Metric``).
+           for metric computation (e.g. :class:`~nequip.data.PerAtomModifier`).
+      - ``metric`` is a ``nequip`` data metric object (a subclass of :class:`torchmetrics.Metric`).
 
     The remaining keys are optional.
 
@@ -36,7 +36,7 @@ class DataStatisticsManager(torch.nn.ModuleList):
 
     Args:
         metrics (list): list of dictionaries with keys ``field``, ``metric``, ``per_type``, ``ignore_nan``, and ``name``
-        dataloader_kwargs (dict): arguments of `torch.utils.data.DataLoader <https://pytorch.org/docs/stable/data.html#torch.utils.data.DataLoader>`_ for dataset statitstics computation (ideally, the ``batch_size`` should be as large as possible without triggering OOM)
+        dataloader_kwargs (dict): arguments of :class:`torch.utils.data.DataLoader` for dataset statitstics computation (ideally, the ``batch_size`` should be as large as possible without triggering OOM)
         type_names (list): required for ``per_type`` metrics (this must match the ``type_names`` argument of the model, it is advisable to use variable interpolation in the config file to make sure they are consistent)
     """
 
@@ -225,7 +225,7 @@ def CommonDataStatisticsManager(
     dataloader_kwargs: Dict = {},
     type_names: List[str] = None,
 ):
-    """``DataStatisticsManager`` wrapper that implements common dataset statistics.
+    """:class:`~nequip.data.DataStatisticsManager` wrapper that implements common dataset statistics.
 
     The dataset statistics computed by using this wrapper include ``num_neighbors_mean``, ``per_atom_energy_mean``, ``forces_rms``, and ``per_type_forces_rms``, which are variables that can be interpolated for in the ``model`` section of the config file.
 

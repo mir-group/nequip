@@ -35,7 +35,7 @@ class NequIPDataModule(lightning.LightningDataModule):
         val_dataloader (Dict): validation ``DataLoader`` configuration dictionary
         test_dataloader (Dict): testing ``DataLoader`` configuration dictionary
         predict_dataloader (Dict): prediction ``DataLoader`` configuration dictionary
-        stats_manager (Dict): dictionary that can be instantiated into a ``nequip.data.DataStatisticsManager`` object
+        stats_manager (Dict): dictionary that can be instantiated into a :class:`~nequip.data.DataStatisticsManager` object
     """
 
     def __init__(

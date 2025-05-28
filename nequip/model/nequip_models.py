@@ -103,7 +103,7 @@ def NequIPGNNModel(**kwargs) -> GraphModel:
         per_type_energy_shifts (float/List[float]): per-atom energy shifts, which should generally be isolated atom reference energies or estimated from average per-atom energies of the data (default ``None``)
         per_type_energy_scales_trainable (bool): whether the per-atom energy scales are trainable (default ``False``)
         per_type_energy_shifts_trainable (bool): whether the per-atom energy shifts are trainable (default ``False``)
-        pair_potential (torch.nn.Module): additional pair potential term, e.g. ``nequip.nn.pair_potential.ZBL`` (default ``None``)
+        pair_potential (torch.nn.Module): additional pair potential term, e.g. :class:`~nequip.nn.pair_potential.ZBL` (default ``None``)
     """
     return ForceStressOutput(func=NequIPGNNEnergyModel(**kwargs))
 

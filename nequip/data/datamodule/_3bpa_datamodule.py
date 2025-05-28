@@ -25,7 +25,7 @@ class NequIP3BPADataModule(ASEDataModule):
     ``train_set`` -- either ``300K`` or ``mixedT`` is allowed.
 
     The ``train_val_split`` argument is required to split the ``train_set`` chosen into separate training and
-    validation datasets, as in ``nequip.data.NequIPDataModule``.
+    validation datasets, as in :class:`~nequip.data.datamodule.NequIPDataModule`.
 
     There are several test datasets to choose from, including ``300K``, ``600K``, ``1200K``,
     ``dih_beta120``, ``dih_beta150``, and ``dih_beta180``. All are automatically included in the

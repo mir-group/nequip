@@ -14,7 +14,7 @@ logger = RankedLogger(__name__, rank_zero_only=True)
 
 class EMALightningModule(NequIPLightningModule):
     """
-    An exponential moving average (EMA) of the model weights are maintained. Validation and test metrics will be that of the EMA weight model. If EMA is used, models loaded from checkpoint files (except during restarts) will always be the model with EMA weights. Specifically, the EMA models will be the ones loaded in the ``NequIPCalculator``, compiled with ``nequip-compile``, or packaged with ``nequip-package``.
+    An exponential moving average (EMA) of the model weights are maintained. Validation and test metrics will be that of the EMA weight model. If EMA is used, models loaded from checkpoint files (except during restarts) will always be the model with EMA weights. Specifically, the EMA models will be the ones loaded in the :class:`~nequip.ase.NequIPCalculator`, compiled with ``nequip-compile``, or packaged with ``nequip-package``.
 
     Args:
         ema_decay (float): decay constant for the exponential moving average (EMA) of model weights (default ``0.999``)
@@ -109,7 +109,7 @@ class EMAWeights(torch.nn.Module):
     All methods of this module assume that the base model weights and the EMA weights are on the same device.
 
     Args:
-        model (torch.nn.Module): base model (this module will make copies of its weights)
+        model (:class:`torch.nn.Module`): base model (this module will make copies of its weights)
         decay (float): the EMA decay factor
     """
 
@@ -155,7 +155,7 @@ class EMAWeights(torch.nn.Module):
         This function swaps the EMA and base model parameters. This function can be used at the start and end of validation or test epoch such that the EMA model is used for validation and testing, and the weight swapping occurs minimally. The reason for wanting to use the base model instead of this EMA model is because the base model may be optimized via TorchScript or ``torch.compile`` so we just transfer the EMA weights to the base model to take advantage of its compilation.
 
         Args:
-            model (torch.nn.Module): base model
+            model (:class:`torch.nn.Module`): base model
         """
         with torch.no_grad():
             for p_self, p_model in zip(self.ema_weights, model.parameters()):
@@ -173,7 +173,7 @@ class EMAWeights(torch.nn.Module):
         """Update model parameters.
 
         Args:
-            model (torch.nn.Module): base model
+            model (:class:`torch.nn.Module`): base model
         """
         assert (
             self.is_holding_ema_weights

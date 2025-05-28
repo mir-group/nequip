@@ -4,10 +4,10 @@ from lightning.pytorch.strategies import DDPStrategy
 
 
 class SimpleDDPStrategy(DDPStrategy):
-    """Effectively Lightning's ``DDPStrategy``, but doing manual gradient syncs instead of using PyTorch's ``DistributedDataParallel`` wrapper.
+    """Effectively Lightning's :class:`~lightning.pytorch.strategies.DDPStrategy`, but doing manual gradient syncs instead of using PyTorch's :class:`~torch.nn.parallel.DistributedDataParallel` wrapper.
 
     .. note::
-        To use train-time compilation with multi-rank training, this strategy must be used in place of PyTorch Lightning's ``DDPStrategy``.
+        To use train-time compilation with multi-rank training, this strategy must be used in place of PyTorch Lightning's :class:`~lightning.pytorch.strategies.DDPStrategy`.
 
     Example use in the config file::
 

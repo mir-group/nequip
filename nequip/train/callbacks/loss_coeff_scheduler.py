@@ -12,7 +12,7 @@ class LossCoefficientScheduler(Callback):
 
     When the trainer's epoch counter matches any of the keys (representing epochs), the loss coefficients will be changed to the values (representing the coefficients for each loss term).
 
-    The coefficients will be normalized to sum up to 1 in line with the convention of ``MetricsManager``.
+    The coefficients will be normalized to sum up to 1 in line with the convention of :class:`~nequip.train.MetricsManager`.
 
     Example usage in config where there are two loss contributions:
     ::

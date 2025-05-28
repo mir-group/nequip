@@ -8,7 +8,7 @@ class SubsetByRandomSlice(torch.utils.data.Subset):
     """Subset of dataset by slicing a random permutation of the dataset.
 
     Args:
-        dataset (Dataset): ``torch.utils.data.Dataset`` to get subset of
+        dataset (Dataset): :class:`torch.utils.data.Dataset` to get subset of
         start (int): starting index for the slice
         length (int): number of samples to slice from ``start``
         seed (int): seed for reproducibility of the random permutation of indices

@@ -9,7 +9,7 @@ from ._base_datasets import AtomicDataset
 
 
 class HDF5Dataset(AtomicDataset):
-    """``AtomicDataset`` that loads data from a HDF5 file.
+    """:class:`~nequip.data.dataset.AtomicDataset` that loads data from a HDF5 file.
 
     This class is useful for very large datasets that cannot fit in memory. It
     efficiently loads data from disk as needed without everything needing to be

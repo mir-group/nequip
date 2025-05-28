@@ -34,9 +34,9 @@ class MetricsManager(torch.nn.ModuleDict):
       - ``field`` refers to the quantity of interest for metric computation. It has two formats.
 
          - a ``str`` for a ``nequip`` defined field (e.g. ``total_energy``, ``forces``, ``stress``), or
-         - a ``Callable`` that performs some additional operations before returning a ``torch.Tensor``
-           for metric computation (e.g. ``nequip.data.PerAtomModifier``).
-      - ``metric`` is a ``torchmetrics.Metric``. Users are expected to mostly use ``nequip.train.MeanSquaredError`` and ``nequip.train.MeanAbsoluteError`` for MSEs (for loss), RMSEs, and MAEs (for monitoring).
+         - a ``Callable`` that performs some additional operations before returning a :class:`torch.Tensor`
+           for metric computation (e.g. :class:`~nequip.data.PerAtomModifier`).
+      - ``metric`` is a :class:`torchmetrics.Metric`. Users are expected to mostly use :class:`~nequip.train.MeanSquaredError` and :class:`~nequip.train.MeanAbsoluteError` for MSEs (for loss), RMSEs, and MAEs (for monitoring).
 
     The remaining keys are optional.
 
@@ -50,7 +50,7 @@ class MetricsManager(torch.nn.ModuleDict):
 
     Args:
         metrics (list): list of dictionaries with keys ``field``, ``metric``, ``per_type``, ``coeff``, ``ignore_nan``, and ``name``
-        type_names (list): required for ``per_type`` metrics (if this class is instantiated in ``nequip.train.NequIPLightningModule``, which is the case if one uses ``nequip-train``, this is automatically handled such that users need not explicitly fill in this field in the config)
+        type_names (list): required for ``per_type`` metrics (if this class is instantiated in :class:`~nequip.train.NequIPLightningModule`, which is the case if one uses ``nequip-train``, this is automatically handled such that users need not explicitly fill in this field in the config)
     """
 
     def __init__(

@@ -26,7 +26,7 @@ _SOLE_MODEL_KEY = "sole_model"
 
 
 class NequIPLightningModule(lightning.LightningModule):
-    """LightningModule for training, validating, testing and predicting with models constructed in the NequIP ecosystem.
+    """:class:`~lightning.pytorch.core.LightningModule` for training, validating, testing and predicting with models constructed in the NequIP ecosystem.
 
     **Data**
 
