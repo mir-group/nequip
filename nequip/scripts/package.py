@@ -112,7 +112,9 @@ def main(args=None):
                     {
                         "name": name,
                         "persistent": is_persistent_model_modifier(modifier),
-                        "doc": modifier.__doc__.strip(),
+                        "doc": (
+                            modifier.__doc__ if modifier.__doc__ is not None else ""
+                        ).strip(),
                     }
                     for name, modifier in get_all_modifiers(model).items()
                 ]
