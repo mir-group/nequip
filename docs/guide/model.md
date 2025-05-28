@@ -50,7 +50,27 @@ $E_i = \alpha^{t_i} \tilde{E}_i + E_{0}^{t_i}$
 
 where $t_i$ refers to the type or species of atom $i$, $E_{0}^{t_i}$ represents the `per_type_energy_shifts` argument, and $\alpha^{t_i}$ represents the `per_type_energy_scales` argument.
 
-NequIP and Allegro models are physically constrained to ensure that $E_i = E_0^{t_i}$ in the absence of neighboring atoms. Often, it is reasonable to use isolated atom energies (computed by the same reference method as the training data) as the `per_type_energy_shifts`, especially if one requires the model to perform well in the dissociation limit. Other common options is to use the mean per-atom energy, and to perform least squares regression to fit a dataset for per-type energies.
+NequIP and Allegro models are physically constrained to ensure that $E_i = E_0^{t_i}$ in the absence of neighboring atoms, that is, the per-atom energies approach the provided (and potentially trained) per-atom shifts in the dissociation limit.
+It is recommended to use isolated atom energies (computed by the same reference method as the training data) as the `per_type_energy_shifts`, especially if one requires the model to perform well in the dissociation limit, e.g.
+```
+  model:
+    _target_: nequip.model.NequIPGNNModel
+    # other args
+    per_type_energy_shifts: 
+      C: 1.234
+      H: 2.345
+      O: 3.456
+```
+
+In the absence of isolated atom energies, a common fallback is to use the mean per-atom energy, provided automatically by the dataset statistics utilities, i.e.
+```
+  per_type_energy_shifts: ${training_data_stats:per_atom_energy_mean}
+```
+
+```{warning}
+Using the automatically computed mean per-atom energy as the `per_type_energy_shifts` is often a cause of poor training, especially when the isolated atom energies (computed from the method used to construct the training data) of the different atom types vary in scale while the per-atom energy mean is a single value.
+Even if the shifts are trainable, it is unlikely for the shifts to change rapidly enough over the course of training to approach the expected isolated atom energies.
+```
 
 As for scales, it is common to use the root mean square forces (which could be on a per-type basis) for `per_type_energy_scales`. For energy-only datasets, one could use total energy standard deviations.
 

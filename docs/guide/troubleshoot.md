@@ -21,9 +21,11 @@ More information can be found in the docs on [packaging](workflow.md/#packaging)
 
 If you're model doesn't seem like it's learning, the reasons could range from problematic model hyperparameters, to problematic training hyperparameters, to data-side problems.
 
-As a start, ensure that the data format conforms to [NequIP conventions](conventions.md). For example, a common failure mode is when a dataset uses the opposite sign convention for stress.
+**Data Conventions**. As a start, ensure that the data format conforms to [NequIP conventions](conventions.md). For example, a common failure mode is when a dataset uses the opposite sign convention for stress.
 
-In terms, of training hyperparameters, NequIP models tend to learn with learning rates of around 0.01, while Allegro models are better with learning rates of around 0.001.
+**Isolated Atom Energies**. A common cause of poor training is not using the isolated atom energies computed at the same level of theory as the dataset as the `per_type_energy_shifts` of the model. More details cna be found on the [Energy Shifts & Scales](model.md/#energy-shifts--scales) docs.
+
+**Learning Rate**. In terms, of training hyperparameters, NequIP models tend to learn with learning rates of around 0.01, while Allegro models are better with learning rates of around 0.001.
 One can always try to lower the learning rate to test if the problem could lie with a large learning rate causing large jumps in the loss landscape.
 
 
