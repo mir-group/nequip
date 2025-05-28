@@ -3,7 +3,6 @@ import argparse
 
 import pathlib
 import yaml
-import warnings
 
 # TODO: check if we still need this?
 # This is a weird hack to avoid Intel MKL issues on the cluster when this is called as a subprocess of a process that has itself initialized PyTorch.
@@ -15,6 +14,7 @@ from nequip.data.compile_utils import data_dict_from_checkpoint
 from nequip.model.saved_models.package import (
     _get_shared_importer,
     _get_package_metadata,
+    _suppress_package_importer_warnings,
 )
 from nequip.model.saved_models import ModelFromCheckpoint
 from nequip.model.utils import (
@@ -94,14 +94,7 @@ def main(args=None):
             ".nequip.zip"
         ), "packed model file to inspect must end with the `.nequip.zip` extension"
 
-        with warnings.catch_warnings():
-            # suppress torch.package TypedStorage warning
-            warnings.filterwarnings(
-                "ignore",
-                message="TypedStorage is deprecated.*",
-                category=UserWarning,
-                module="torch.package.package_importer",
-            )
+        with _suppress_package_importer_warnings():
             imp = torch.package.PackageImporter(args.pkg_path)
             pkg_metadata = _get_package_metadata(imp)
             print("Package Metadata")
@@ -243,14 +236,7 @@ def main(args=None):
             models_to_package.update({compile_mode: model})
 
         # == package ==
-        with warnings.catch_warnings():
-            # suppress torch.package TypedStorage warning
-            warnings.filterwarnings(
-                "ignore",
-                message="TypedStorage is deprecated.*",
-                category=UserWarning,
-                module="torch.package.package_exporter",
-            )
+        with _suppress_package_importer_warnings():
 
             with torch.package.PackageExporter(
                 args.output_path, importer=importers, debug=True

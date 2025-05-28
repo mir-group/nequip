@@ -6,6 +6,7 @@ Functions for loading models from package files.
 import torch
 import yaml
 import warnings
+import contextlib
 from typing import Dict, Any
 
 from nequip.model.utils import (
@@ -33,8 +34,8 @@ def _get_shared_importer():
     return _PACKAGE_TIME_SHARED_IMPORTER
 
 
-def _get_package_metadata(imp):
-    """Load packaged model metadata."""
+def _get_package_metadata(imp) -> Dict[str, Any]:
+    """Load packaged model metadata from an existing PackageImporter."""
     pkg_metadata: Dict[str, Any] = yaml.safe_load(
         imp.load_text(package="model", resource="package_metadata.txt")
     )
@@ -42,6 +43,20 @@ def _get_package_metadata(imp):
     # ^ extra sanity check since saving metadata in txt files was implemented in packaging version 1
 
     return pkg_metadata
+
+
+@contextlib.contextmanager
+def _suppress_package_importer_warnings():
+    # Ideally this ceases to exist or becomes a no-op in future versions of PyTorch
+    with warnings.catch_warnings():
+        # suppress torch.package TypedStorage warning
+        warnings.filterwarnings(
+            "ignore",
+            message="TypedStorage is deprecated.*",
+            category=UserWarning,
+            module="torch.package.package_importer",
+        )
+        yield
 
 
 def ModelFromPackage(package_path: str, compile_mode: str = _EAGER_MODEL_KEY):
@@ -80,15 +95,7 @@ def ModelFromPackage(package_path: str, compile_mode: str = _EAGER_MODEL_KEY):
 
     # === load model ===
     logger.info(f"Loading model from package file: {package_path} ...")
-    with warnings.catch_warnings():
-        # suppress torch.package TypedStorage warning
-        warnings.filterwarnings(
-            "ignore",
-            message="TypedStorage is deprecated.*",
-            category=UserWarning,
-            module="torch.package.package_importer",
-        )
-
+    with _suppress_package_importer_warnings():
         # during `nequip-package`, we need to use the same importer for all the models for successful repackaging
         # see https://pytorch.org/docs/stable/package.html#re-export-an-imported-object
         if workflow_state == "package":

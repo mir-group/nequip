@@ -2,10 +2,10 @@
 import torch
 
 from . import AtomicDataDict
+from nequip.model.saved_models.package import _suppress_package_importer_warnings
 from nequip.utils import torch_default_dtype
 from nequip.utils.global_dtype import _GLOBAL_DTYPE
 
-import warnings
 from hydra.utils import instantiate
 
 
@@ -53,14 +53,7 @@ def data_dict_from_checkpoint(ckpt_path: str) -> AtomicDataDict.Type:
 
 
 def data_dict_from_package(package_path: str) -> AtomicDataDict.Type:
-    with warnings.catch_warnings():
-        # suppress torch.package TypedStorage warning
-        warnings.filterwarnings(
-            "ignore",
-            message="TypedStorage is deprecated.*",
-            category=UserWarning,
-            module="torch.package.package_importer",
-        )
+    with _suppress_package_importer_warnings():
         imp = torch.package.PackageImporter(package_path)
         data = imp.load_pickle(package="model", resource="example_data.pkl")
     return data
