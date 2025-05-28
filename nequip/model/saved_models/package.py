@@ -9,6 +9,7 @@ import warnings
 import contextlib
 from typing import Dict, Any
 
+from nequip.data import AtomicDataDict
 from nequip.model.utils import (
     get_current_compile_mode,
     _EAGER_MODEL_KEY,
@@ -128,3 +129,11 @@ def ModelFromPackage(package_path: str, compile_mode: str = _EAGER_MODEL_KEY):
 
     # NOTE: model returned is not a GraphModel object tied to the `nequip` in current Python env, but a GraphModel object from the packaged zip file
     return model
+
+
+def data_dict_from_package(package_path: str) -> AtomicDataDict.Type:
+    """Load example data from a .nequip.zip package file."""
+    with _suppress_package_importer_warnings():
+        imp = torch.package.PackageImporter(package_path)
+        data = imp.load_pickle(package="model", resource="example_data.pkl")
+    return data

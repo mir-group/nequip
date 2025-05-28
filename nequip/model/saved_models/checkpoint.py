@@ -11,7 +11,9 @@ from nequip.model.utils import (
     override_model_compile_mode,
     _EAGER_MODEL_KEY,
 )
-from nequip.utils import get_current_code_versions
+from nequip.data import AtomicDataDict
+from nequip.utils import get_current_code_versions, torch_default_dtype
+from nequip.utils.global_dtype import _GLOBAL_DTYPE
 from nequip.utils.logger import RankedLogger
 
 from ._utils import _check_compile_mode, _check_file_exists
@@ -73,3 +75,46 @@ def ModelFromCheckpoint(checkpoint_path: str, compile_mode: str = _EAGER_MODEL_K
 
     model = lightning_module.evaluation_model
     return model
+
+
+def data_dict_from_checkpoint(ckpt_path: str) -> AtomicDataDict.Type:
+    with torch_default_dtype(_GLOBAL_DTYPE):
+        # === get data from checkpoint ===
+        checkpoint = torch.load(
+            ckpt_path,
+            map_location="cpu",
+            weights_only=False,
+        )
+        data_config = checkpoint["hyper_parameters"]["info_dict"]["data"].copy()
+        if "train_dataloader" not in data_config:
+            data_config["train_dataloader"] = {"_target_: torch.utils.data.DataLoader"}
+        data_config["train_dataloader"]["batch_size"] = 1
+        datamodule = hydra.utils.instantiate(data_config, _recursive_=False)
+        # TODO: better way of doing this?
+        # instantiate the datamodule, dataset, and get train dataloader
+        try:
+            datamodule.prepare_data()
+            # instantiate train dataset
+            datamodule.setup(stage="fit")
+            dloader = datamodule.train_dataloader()
+            for data in dloader:
+                if AtomicDataDict.num_nodes(data) > 3:
+                    break
+        finally:
+            datamodule.teardown(stage="fit")
+
+        # === sanitize data ===
+        if AtomicDataDict.CELL_KEY not in data:
+            data[AtomicDataDict.CELL_KEY] = 1e5 * torch.eye(
+                3,
+                dtype=_GLOBAL_DTYPE,
+                device=data[AtomicDataDict.POSITIONS_KEY].device,
+            ).unsqueeze(0)
+
+            data[AtomicDataDict.EDGE_CELL_SHIFT_KEY] = torch.zeros(
+                (data[AtomicDataDict.EDGE_INDEX_KEY].size(1), 3),
+                dtype=_GLOBAL_DTYPE,
+                device=data[AtomicDataDict.POSITIONS_KEY].device,
+            )
+
+    return data

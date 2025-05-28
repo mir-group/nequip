@@ -9,7 +9,9 @@ from nequip.model.utils import _EAGER_MODEL_KEY
 from nequip.model.saved_models import ModelFromPackage, ModelFromCheckpoint
 from nequip.model.modify_utils import modify, only_apply_persistent_modifiers
 from nequip.train.lightning import _SOLE_MODEL_KEY
-from nequip.data import AtomicDataDict, compile_utils
+from nequip.data import AtomicDataDict
+from nequip.model.saved_models.checkpoint import data_dict_from_checkpoint
+from nequip.model.saved_models.package import data_dict_from_package
 from nequip.utils.logger import RankedLogger
 from nequip.utils.compile import prepare_model_for_compile
 from nequip.utils.global_state import set_global_state, get_latest_global_state
@@ -237,9 +239,9 @@ def main(args=None):
                 data[k] = v
         else:
             if use_ckpt:
-                data = compile_utils.data_dict_from_checkpoint(args.input_path)
+                data = data_dict_from_checkpoint(args.input_path)
             else:
-                data = compile_utils.data_dict_from_package(args.input_path)
+                data = data_dict_from_package(args.input_path)
         data = AtomicDataDict.to_(data, device)
 
         # === parse batch dims range ===

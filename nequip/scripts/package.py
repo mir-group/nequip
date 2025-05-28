@@ -10,7 +10,7 @@ import yaml
 import numpy as np  # noqa: F401
 import torch
 
-from nequip.data.compile_utils import data_dict_from_checkpoint
+from nequip.model.saved_models.checkpoint import data_dict_from_checkpoint
 from nequip.model.saved_models.package import (
     _get_shared_importer,
     _get_package_metadata,
