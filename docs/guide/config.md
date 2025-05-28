@@ -4,7 +4,7 @@ The config file has five main sections: `run`, `data`, `trainer`, `training_modu
 
 ## Variable interpolation
 
-NequIP uses the [Hydra library](https://hydra.cc/) for configurations, which is built on top of the [OmegaConf](https://omegaconf.readthedocs.io) YAML configuration library. OmegaConf offers a powerful [variable interpolation](https://omegaconf.readthedocs.io/en/latest/usage.html#variable-interpolation) feature, which includes special "functions" that can be called in variable interpolation expressions.  These "functions" are called ["resolvers"](https://omegaconf.readthedocs.io/en/2.3_branch/usage.html#resolvers).
+NequIP uses the [Hydra library](https://hydra.cc/) for configurations, which is built on top of the {mod}`omegaconf` YAML configuration library. OmegaConf offers a powerful [variable interpolation](https://omegaconf.readthedocs.io/en/latest/usage.html#variable-interpolation) feature, which includes special "functions" that can be called in variable interpolation expressions.  These "functions" are called ["resolvers"](https://omegaconf.readthedocs.io/en/2.3_branch/usage.html#resolvers).
 Hydra provides [built-in resolvers](https://hydra.cc/docs/1.3/configure_hydra/intro/#resolvers-provided-by-hydra) that allow you to interpolate the run name or output directory into the config.
 
 NequIP also registers a number of custom resolvers to allow users to do basic integer arithmetic directly in the config file:
@@ -32,21 +32,21 @@ run: [val, test, train, val, test]
 ```
 
 ```{note}
-[Continuing training from a checkpoint file](./workflow.md#restarts) will continue from the last `run` task the checkpoint file was at before stopping. For example, if one uses `run: [test, train, val, test]` and a `nequip-train` run crashed at the `train` step, a run restarted from that checkpoint will continue in the `train` stage (skipping the initial `test` stage that had already been completed in the previously crashed run).
+[Continuing training from a checkpoint file](./workflow.md#saving-and-restarting) will continue from the last `run` task the checkpoint file was at before stopping. For example, if one uses `run: [test, train, val, test]` and a `nequip-train` run crashed at the `train` step, a run restarted from that checkpoint will continue in the `train` stage (skipping the initial `test` stage that had already been completed in the previously crashed run).
 ```
 
 
 ## `data`
 
-`data` defines the `DataModule` object, which manages the train, validation, and test datasets. Users are directed to the [API page](../api/datamodule.rst) of `nequip.data.datamodule` for the API of the `DataModule` classes that `nequip` provides. Custom datamodules that subclass from `nequip.data.datamodule.NequIPDataModule` can also be used.
+`data` defines the {class}`~nequip.data.datamodule.NequIPDataModule` object, which manages the train, validation, and test datasets. Users are directed to the [API page](../api/datamodule.rst) of {mod}`nequip.data.datamodule` for the API of the `DataModule` classes that `nequip` provides. Custom datamodules that subclass from {class}`~nequip.data.datamodule.NequIPDataModule` can also be used.
 
 
 ## `trainer`
 
-The `trainer` specifies arguments to instantiate a `lightning.Trainer` object. To understand how to configure it, users are directed to `lightning.Trainer`'s [page](https://lightning.ai/docs/pytorch/stable/common/trainer.html). The sections on trainer [flags](https://lightning.ai/docs/pytorch/stable/common/trainer.html#trainer-flags) and its [API](https://lightning.ai/docs/pytorch/stable/common/trainer.html#trainer-class-api) are especially important.
+The `trainer` specifies arguments to instantiate a {class}`~lightning.pytorch.trainer.trainer.Trainer` object. To understand how to configure it, users are directed to {class}`~lightning.pytorch.trainer.trainer.Trainer`. The sections on trainer [flags](https://lightning.ai/docs/pytorch/stable/common/trainer.html#trainer-flags) and its [API](https://lightning.ai/docs/pytorch/stable/common/trainer.html#trainer-class-api) are especially important.
 
 ```{tip}
-It is in the `lightning.Trainer` that users can specify [callbacks](https://lightning.ai/docs/pytorch/stable/api_references.html#callbacks) used to influence the course of training. This includes the very important [ModelCheckpoint](https://lightning.ai/docs/pytorch/stable/api/lightning.pytorch.callbacks.ModelCheckpoint.html#lightning.pytorch.callbacks.ModelCheckpoint) callback that should be configured to save checkpoint files in the way the user so pleases. `nequip`'s own [callbacks](../api/callbacks.rst) can also be used here.
+It is in the {class}`~lightning.pytorch.trainer.trainer.Trainer` that users can specify [callbacks](https://lightning.ai/docs/pytorch/stable/api_references.html#callbacks) used to influence the course of training. This includes the very important {class}`~lightning.pytorch.callbacks.ModelCheckpoint` callback that should be configured to save checkpoint files in the way the user so pleases. `nequip`'s own [callbacks](../api/callbacks.rst) can also be used here.
 ```
 
 ### Logging
@@ -69,7 +69,7 @@ The full set of options are found in the documentation of the [underlying object
 
 ## `training_module`
 
-`training_module` defines the `NequIPLightningModule` (or its subclasses). Users are directed to its [API page](../api/lightning_module.rst) to learn how to configure it. Usually the `EMALightningModule` is the right choice.
+`training_module` defines the {class}`~nequip.train.NequIPLightningModule` (or its subclasses). Users are directed to its [API page](../api/lightning_module.rst) to learn how to configure it. Usually the {class}`~nequip.train.EMALightningModule` is the right choice.
 
 The following important objects are configured as part of the `training_module`:
  
@@ -81,13 +81,13 @@ The following important objects are configured as part of the `training_module`:
 
  ### `optimizer` and `lr_scheduler`
 
-  The `optimizer` can be any PyTorch-compatible optimizer. Options from PyTorch can be found [here](https://pytorch.org/docs/stable/optim.html#algorithms). The [Adam](https://pytorch.org/docs/stable/generated/torch.optim.Adam.html#torch.optim.Adam) optimizer, for example, can be configured as follows: 
+  The `optimizer` can be any PyTorch-compatible optimizer. Options from PyTorch can be found in {mod}`torch.optim`. The {class}`~torch.optim.Adam` optimizer, for example, can be configured as follows: 
 ```yaml
 optimizer:
   _target_: torch.optim.Adam
   lr: 0.01
 ```
-  The `lr_scheduler` is configured according to PyTorch Lightning's `lr_scheduler_config` (see [here](https://lightning.ai/docs/pytorch/stable/api/lightning.pytorch.core.LightningModule.html#lightning.pytorch.core.LightningModule.configure_optimizers) for the full range of options). Consider the following use of `ReduceLROnPlateau` as an example.
+  The `lr_scheduler` is configured according to PyTorch Lightning's `lr_scheduler_config` (see {meth}`~lightning.pytorch.core.LightningModule.configure_optimizers` for the full range of options). Consider the following use of {class}`~torch.optim.lr_scheduler.ReduceLROnPlateau` as an example.
 ```yaml
 lr_scheduler:
   scheduler:
@@ -100,7 +100,7 @@ lr_scheduler:
   interval: epoch
   frequency: 1
 ```
-  The `scheduler` is a PyTorch-compatible learning rate scheduler. Options from PyTorch can be found [here](https://pytorch.org/docs/stable/optim.html#how-to-adjust-learning-rate).
+  The `scheduler` is a PyTorch-compatible learning rate scheduler. Options from PyTorch can be found in {mod}`torch.optim.lr_scheduler`.
 
 ## `global_options`
 

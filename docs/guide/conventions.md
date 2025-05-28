@@ -19,6 +19,6 @@ $$\sigma_{ij} = \frac{1}{\Omega} \frac{\delta E} {\delta \eta_{ji}}$$
 
 Positive diagonal entries of the stress tensor imply that the system is _under tensile strain_ and wants to compress, while negative values imply that the system is _under compressive strain_ and wants to expand. When VASP results are parsed by `ASE`, the sign is flipped to match the `nequip` convention.
 
-If your dataset uses the opposite sign convention, either preprocess the dataset to be in the NequIP stress sign convention, or use the `StressSignFlipTransform` data transform (see [API](../api/data_transforms.rst)).
+If your dataset uses the opposite sign convention, either preprocess the dataset to be in the NequIP stress sign convention, or use the {class}`~nequip.data.transforms.StressSignFlipTransform` data transform.
 
-Users that have data with virials but seek to train on stress can use the data transform `nequip.data.transforms.VirialToStressTransform`.
+Users that have data with virials but seek to train on stress can use the data transform {class}`~nequip.data.transforms.VirialToStressTransform`.

@@ -32,7 +32,7 @@ After installing `torch`, NequIP can be installed in the following ways.
     pip install . 
     ```
 
-If you want to track your training runs with third-party services, like Weights and Biases, that are supported by [PyTorch Lightning's loggers](https://lightning.ai/docs/pytorch/stable/extensions/logging.html), you may need to install extra packages. For example, one needs to `pip install wandb` to use Lightning's [WandbLogger](https://lightning.ai/docs/pytorch/stable/extensions/generated/lightning.pytorch.loggers.WandbLogger.html#lightning.pytorch.loggers.WandbLogger).
+If you want to track your training runs with third-party services, like Weights and Biases, that are supported by [PyTorch Lightning's loggers](https://lightning.ai/docs/pytorch/stable/extensions/logging.html), you may need to install extra packages. For example, one needs to `pip install wandb` to use Lightning's {class}`~lightning.pytorch.loggers.WandbLogger`.
 
 ## Checking your installation
 

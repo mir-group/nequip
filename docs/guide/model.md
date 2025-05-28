@@ -8,11 +8,11 @@ model:
     hyperparam2: 123
     # ...
 ```
-To see the documentation for individual hyperparameters, look at the Python API documentation for the model builder function (`nequip.model.NequIPGNNModel` in this example).  Model builders are usually in the `.model` subpackage of `nequip` or a `nequip` extension package.
+To see the documentation for individual hyperparameters, look at the Python API documentation for the model builder function ({func}`~nequip.model.NequIPGNNModel` in this example).  Model builders are usually in the `.model` subpackage of `nequip` or a `nequip` extension package.
 
 ## Training data statistics as hyperparameters
 
-Sometimes we may want to derive certain hyperparameters from the statistics of the data used for training. For example, it is reasonable to use the average number of neighbors around a central atom to normalize a sum over edge features. Users are able to configure specific types of dataset statistics to compute with the `stats_manager` argument of the `DataModule` used under the `data` section of the config file. Consider the following example:
+Sometimes we may want to derive certain hyperparameters from the statistics of the data used for training. For example, it is reasonable to use the average number of neighbors around a central atom to normalize a sum over edge features. Users are able to configure specific types of dataset statistics to compute with the `stats_manager` argument of the {class}`~nequip.data.datamodule.NequIPDataModule` used under the `data` section of the config file. Consider the following example:
 
 ```yaml
 data:
@@ -26,7 +26,7 @@ data:
     dataloader_kwargs:
       batch_size: 10
 ```
-In the above example, we call `nequip.data.CommonDataStatisticsManager`, which will automatically compute the following dataset statistics: `num_neighbors_mean`, `per_atom_energy_mean`, `forces_rms`, and `per_type_forces_rms`. (One could also configure custom dataset statistics with the [`nequip.data.DataStatisticsManager`](../../api/data_stats).) We are then able to refer to these dataset statistics variables when configuring the model hyperparameters in the `model` section of the config file:
+In the above example, we call {class}`~nequip.data.CommonDataStatisticsManager`, which will automatically compute the following dataset statistics: `num_neighbors_mean`, `per_atom_energy_mean`, `forces_rms`, and `per_type_forces_rms`. (One could also configure custom dataset statistics with the [{class}`~nequip.data.DataStatisticsManager`](../api/data_stats).) We are then able to refer to these dataset statistics variables when configuring the model hyperparameters in the `model` section of the config file:
 ```yaml
 training_module:
   _target_: nequip.train.EMALightningModule
@@ -42,7 +42,7 @@ training_module:
     per_type_energy_shifts: ${training_data_stats:per_atom_energy_mean}
     per_type_energy_scales: ${training_data_stats:per_type_forces_rms}
 ```
-Note the special syntax `${training_data_stats:name_of_dataset_statistic}` that resembles variable interpolation (it's actually an `omegaconf` [resolver](https://omegaconf.readthedocs.io/en/latest/custom_resolvers.html)). Under the hood, it tells the NequIP infrastructure to look for the dataset statistics computed by the `stats_manager` and copy their values into the `model` configuration dictionary.
+Note the special syntax `${training_data_stats:name_of_dataset_statistic}` that resembles variable interpolation (it's actually an {mod}`omegaconf` [resolver](https://omegaconf.readthedocs.io/en/latest/custom_resolvers.html)). Under the hood, it tells the NequIP infrastructure to look for the dataset statistics computed by the `stats_manager` and copy their values into the `model` configuration dictionary.
 
 ```{tip}
 The `name` of the dataset statistic is customizable, but the same `name` must be used when referring to it from the `model` section of the config file. For example, if you call the dataset statistic `name: my_custom_stat`, the model part of the config should use `${training_data_stats:my_custom_stat}`.
@@ -93,7 +93,7 @@ Users may also consider toggling the `per_type_energy_shifts_trainable` and `per
 
 ## Ziegler-Biersack-Littmark (ZBL) Potential
 
-For practical molecular dynamics simulations, it may be favorable to train models with a strong prior for repulsion at close atomic distances. One can add the Ziegler-Biersack-Littmark (ZBL) screened nuclear repulsion term as a `pair_potential` in NequIP and Allegro models. This section of the config file could look something like
+For practical molecular dynamics simulations, it may be favorable to train models with a strong prior for repulsion at close atomic distances. One can add the Ziegler-Biersack-Littmark (ZBL) screened nuclear repulsion term as a `pair_potential` in NequIP and {mod}`allegro` models. This section of the config file could look something like
 
 ```yaml
 training_module:

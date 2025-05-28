@@ -3,11 +3,11 @@
 ## Introduction
 The [Atomic Simulation Environment (ASE)](https://wiki.fysik.dtu.dk/ase/) is a popular Python package providing a framework for working with atomic data, reading and writing common formats, and running various simulations and calculations.
 
-The `nequip` package provides seamless integration of NequIP models with the standard ASE interface through an [ASE Calculator](https://wiki.fysik.dtu.dk/ase/ase/calculators/calculators.html). The `NequIPCalculator` can be constructed from a model [compiled](../guide/workflow.md#compilation) with `nequip-compile` as detailed in the [ASE calculator API](../api/ase.rst). Other options include using a model from a checkpoint file or one that has been [packaged](../guide/workflow.md#packaging), but it is strongly recommended to use compiled models as they are optimized for inference.
+The `nequip` package provides seamless integration of NequIP models with the standard ASE interface through an [ASE Calculator](https://wiki.fysik.dtu.dk/ase/ase/calculators/calculators.html). The {class}`~nequip.ase.NequIPCalculator` can be constructed from a model [compiled](../guide/workflow.md#compilation) with `nequip-compile` as detailed in the [ASE calculator API](../api/ase.rst). Other options include using a model from a checkpoint file or one that has been [packaged](../guide/workflow.md#packaging), but it is strongly recommended to use compiled models as they are optimized for inference.
 
 ## Creating an ASE Calculator
 
-The following code block shows how one can build an ASE `NequIPCalculator` from a compiled model file or checkpoint file.
+The following code block shows how one can build an ASE {class}`~nequip.ase.NequIPCalculator` from a compiled model file or checkpoint file.
 
 ```python
 from nequip.ase import NequIPCalculator

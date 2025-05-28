@@ -4,7 +4,7 @@
 
   **Q**: How does logging work? How do I use Tensorboard or Weights and Biases?
 
-  **A**: Logging is configured under the `trainer` section of the config file by specifying the `logger` argument of the `lightning.Trainer` (see [API](https://lightning.ai/docs/pytorch/stable/common/trainer.html#trainer-class-api)). Compatible loggers are found [here](https://lightning.ai/docs/pytorch/stable/api_references.html#loggers). Read the [Config](config.md) docs for a more complete description.
+  **A**: Logging is configured under the `trainer` section of the config file by specifying the `logger` argument of the {class}`~lightning.pytorch.trainer.trainer.Trainer` (see [API](https://lightning.ai/docs/pytorch/stable/common/trainer.html#trainer-class-api)). Compatible loggers are found [here](https://lightning.ai/docs/pytorch/stable/api_references.html#loggers). Read the [Config](config.md) docs for a more complete description.
 
 ## Units
   **Q**: What units do `nequip` framework models use?
@@ -25,7 +25,7 @@
 
   **Q**: The same type of metric (e.g. force MAE) is a lot lower on the validation set than the training set during the course of training. What's happening?
 
-  **A**: This phenomenon is generally observed when using `EMALightningModule` as the training module, where validation (and inference tasks in general) uses an exponential-moving average (EMA) of the weights that vary more rapidly during training. Thus, training and validation happens on a different set of model weights, leading to the differences. The better validation metrics justifies why the EMA approach is useful in practice. The answer would be different if this phenomenon is observed without EMA.
+  **A**: This phenomenon is generally observed when using {class}`~nequip.train.EMALightningModule` as the training module, where validation (and inference tasks in general) uses an exponential-moving average (EMA) of the weights that vary more rapidly during training. Thus, training and validation happens on a different set of model weights, leading to the differences. The better validation metrics justifies why the EMA approach is useful in practice. The answer would be different if this phenomenon is observed without EMA.
 
 ## Distributed Training
 
@@ -41,11 +41,11 @@ Importing, restarting, or migrating models or training runs from pre-0.7.0 versi
 
   **Q**: What replaces `nequip-evaluate`, which was removed?
 
-  **A**: `nequip-evaluate` is replaced by using the `test` [run type](config.md#run) with `nequip-train` with the `TestTimeXYZFileWriter` [callback](../api/callbacks.rst)
+  **A**: `nequip-evaluate` is replaced by using the `test` [run type](config.md#run) with `nequip-train` with the {class}`~nequip.train.callbacks.TestTimeXYZFileWriter` [callback](../api/callbacks.rst)
 
   **Q**: What replaces `nequip-deploy`, which was removed?
 
-  **A**: `nequip-deploy` (which previously generates a TorchScript `.pth` file) is replaced by `nequip-compile` (see [compilation docs](workflow.md#compilation)) that can produce either a TorchScript `.nequip.pth` file or an AOT Inductor `.nequip.pt2` file to be used for inference tasks in our [integrations](../integrations/all.rst) such as [ASE](../integrations/ase.md) and [LAMMPS](../integrations/lammps.md).
+  **A**: `nequip-deploy` (which previously generates a TorchScript `.pth` file) is replaced by `nequip-compile` (see [compilation docs](workflow.md#compilation)) that can produce either a TorchScript `.nequip.pth` file or an AOT Inductor `.nequip.pt2` file to be used for inference tasks in our [integrations](../integrations/all.rst) such as ASE and [LAMMPS](../integrations/lammps.md).
  
   **Q**: What replaces `nequip-benchmark`, which been removed?
 
