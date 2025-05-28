@@ -1,110 +1,24 @@
 # This file is a part of the `nequip` package. Please see LICENSE and README at the root for information on using it.
 """
-The functions in this script handle loading from saved formats, i.e. checkpoint files and package files (`.nequip.zip` files).
-There are three main types of clients for these functions
-1. users can interact with them through the config to load models
-2. Python inference codes (e.g. ASE Calculator)
-3. internal workflows, i.e. `nequip-package` and `nequip-compile`
+Functions for loading models from package files.
 """
 
 import torch
+import yaml
+import warnings
+from typing import Dict, Any
 
-from .utils import (
-    override_model_compile_mode,
+from nequip.model.utils import (
     get_current_compile_mode,
-    _COMPILE_MODE_OPTIONS,
     _EAGER_MODEL_KEY,
 )
 from nequip.scripts._workflow_utils import get_workflow_state
-from nequip.utils import get_current_code_versions
 from nequip.utils.logger import RankedLogger
 
-import yaml
-import hydra
-import os
-import warnings
-from typing import List, Dict, Any
+from ._utils import _check_compile_mode, _check_file_exists
 
 # === setup logging ===
 logger = RankedLogger(__name__, rank_zero_only=True)
-
-
-def _check_compile_mode(compile_mode: str, client: str, exclude_keys: List[str] = []):
-    # helper function for checking input arguments
-    allowed_options = [
-        mode for mode in _COMPILE_MODE_OPTIONS if mode not in exclude_keys
-    ]
-    assert (
-        compile_mode in allowed_options
-    ), f"`compile_mode={compile_mode}` is not recognized for `{client}`, only the following are supported: {allowed_options}"
-
-
-def _check_file_exists(file_path: str, file_type: str):
-    if not os.path.isfile(file_path):
-        assert file_type in ("checkpoint", "package")
-        client = (
-            "`ModelFromCheckpoint`"
-            if file_type == "checkpoint"
-            else "`ModelFromPackage`"
-        )
-        raise RuntimeError(
-            f"{file_type} file provided at `{file_path}` is not found. NOTE: Any process that loads a checkpoint produced from training runs based on {client} will look for the original {file_type} file at the location specified during training. It is also recommended to use full paths (instead or relative paths) to avoid potential errors."
-        )
-
-
-def ModelFromCheckpoint(checkpoint_path: str, compile_mode: str = _EAGER_MODEL_KEY):
-    """Builds model from a NequIP framework checkpoint file.
-
-    This function can be used in the config file as follows.
-    ::
-
-      model:
-        _target_: nequip.model.ModelFromCheckpoint
-        checkpoint_path: path/to/ckpt
-        compile_mode: eager/compile
-
-    .. warning::
-        DO NOT CHANGE the directory structure or location of the checkpoint file if this model loader is used for training. Any process that loads a checkpoint produced from training runs originating from a package file will look for the original package file at the location specified during training. It is also recommended to use full paths (instead or relative paths) to avoid potential errors.
-
-    Args:
-        checkpoint_path (str): path to a ``nequip`` framework checkpoint file
-        compile_mode (str): ``eager`` or ``compile`` allowed for training
-    """
-    # === sanity checks ===
-    _check_file_exists(file_path=checkpoint_path, file_type="checkpoint")
-    _check_compile_mode(compile_mode, "ModelFromCheckpoint")
-    logger.info(f"Loading model from checkpoint file: {checkpoint_path} ...")
-
-    # === load checkpoint and extract info ===
-    checkpoint = torch.load(
-        checkpoint_path,
-        map_location="cpu",
-        weights_only=False,
-    )
-
-    # === versions ===
-    ckpt_versions = checkpoint["hyper_parameters"]["info_dict"]["versions"]
-    session_versions = get_current_code_versions(verbose=False)
-
-    for code, session_version in session_versions.items():
-        if code in ckpt_versions:
-            ckpt_version = ckpt_versions[code]
-            # sanity check that versions for current build matches versions from ckpt
-            if ckpt_version != session_version:
-                warnings.warn(
-                    f"`{code}` versions differ between the checkpoint file ({ckpt_version}) and the current run ({session_version}) -- `ModelFromCheckpoint` will be built with the current run's versions, but please check that this decision is as intended."
-                )
-
-    # === load model via lightning module ===
-    training_module = hydra.utils.get_class(
-        checkpoint["hyper_parameters"]["info_dict"]["training_module"]["_target_"]
-    )
-    # ensure that model is built with correct `compile_mode`
-    with override_model_compile_mode(compile_mode):
-        lightning_module = training_module.load_from_checkpoint(checkpoint_path)
-
-    model = lightning_module.evaluation_model
-    return model
 
 
 # most of the complexity for `ModelFromPackage` is due to the need to keep track of the `Importer` if we ever repackage
@@ -137,7 +51,7 @@ def ModelFromPackage(package_path: str, compile_mode: str = _EAGER_MODEL_KEY):
     ::
 
       model:
-        _target_: nequip.model.ModelFromPackage
+        _target_: nequip.model.saved_models.ModelFromPackage
         checkpoint_path: path/to/pkg
         compile_mode: eager/compile
 

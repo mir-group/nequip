@@ -8,7 +8,7 @@ from ase.stress import full_3x3_to_voigt_6_stress
 
 from nequip.train.lightning import _SOLE_MODEL_KEY
 from nequip.nn import graph_model
-from nequip.model.from_save import ModelFromCheckpoint, ModelFromPackage
+from nequip.model.saved_models import ModelFromCheckpoint, ModelFromPackage
 from nequip.data import AtomicDataDict, from_ase
 from nequip.data.transforms import (
     ChemicalSpeciesToAtomTypeMapper,

@@ -6,7 +6,7 @@ from e3nn.util.jit import script
 from ._workflow_utils import set_workflow_state
 from ._compile_utils import COMPILE_TARGET_DICT
 from nequip.model.utils import _EAGER_MODEL_KEY
-from nequip.model.from_save import ModelFromPackage, ModelFromCheckpoint
+from nequip.model.saved_models import ModelFromPackage, ModelFromCheckpoint
 from nequip.model.modify_utils import modify, only_apply_persistent_modifiers
 from nequip.train.lightning import _SOLE_MODEL_KEY
 from nequip.data import AtomicDataDict, compile_utils
