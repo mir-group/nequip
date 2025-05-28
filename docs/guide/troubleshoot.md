@@ -42,7 +42,7 @@ nequip-train config.yaml
 nequip-train -cn config.yaml
 ```
 
-### Compilation with `nequip-compile` fails in AOT Inductor Mode
+### Compilation with `nequip-compile` fails in AOTInductor Mode
 
   **Problem**: Trying to run `nequip-compile` as follows, fails:
   ```bash

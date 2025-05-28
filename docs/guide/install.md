@@ -5,7 +5,7 @@
 * PyTorch >= 2.2. PyTorch can be installed following the [instructions from their documentation](https://pytorch.org/get-started/locally/). Note that neither `torchvision` nor `torchaudio`, included in the default install command, are needed for NequIP.
 
 ```{note}
-PyTorch >= 2.6 is required for PyTorch 2.0 compilation utilities including using `torch.compile` for training and AOT Inductor compilation for integrations such as ASE and LAMMPS.
+PyTorch >= 2.6 is required for PyTorch 2.0 compilation utilities including using `torch.compile` for training and AOTInductor compilation for integrations such as ASE and LAMMPS.
 ```
 
 ## Instructions

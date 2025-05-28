@@ -154,7 +154,7 @@ def main(args=None):
     )
     parser.add_argument(
         "--inductor-configs",
-        help="options for AOT Inductor (default: {})",
+        help="options for AOTInductor (default: {})",
         nargs="+",
         type=str,
         default=[],
@@ -221,7 +221,7 @@ def main(args=None):
         set_workflow_state(None)
         return
 
-    # === AOT Inductor ===
+    # === AOTInductor ===
     if args.mode == "aotinductor":
 
         # === sanity check and guarded imports ===

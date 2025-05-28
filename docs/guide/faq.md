@@ -45,7 +45,7 @@ Importing, restarting, or migrating models or training runs from pre-0.7.0 versi
 
   **Q**: What replaces `nequip-deploy`, which was removed?
 
-  **A**: `nequip-deploy` (which previously generates a TorchScript `.pth` file) is replaced by `nequip-compile` (see [compilation docs](workflow.md#compilation)) that can produce either a TorchScript `.nequip.pth` file or an AOT Inductor `.nequip.pt2` file to be used for inference tasks in our [integrations](../integrations/all.rst) such as ASE and [LAMMPS](../integrations/lammps.md).
+  **A**: `nequip-deploy` (which previously generates a TorchScript `.pth` file) is replaced by `nequip-compile` (see [compilation docs](workflow.md#compilation)) that can produce either a TorchScript `.nequip.pth` file or an AOTInductor `.nequip.pt2` file to be used for inference tasks in our [integrations](../integrations/all.rst) such as ASE and [LAMMPS](../integrations/lammps.md).
  
   **Q**: What replaces `nequip-benchmark`, which been removed?
 
