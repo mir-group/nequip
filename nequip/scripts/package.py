@@ -86,6 +86,11 @@ def main(args=None):
         help="print all available model modifiers in the package file",
         action="store_true",
     )
+    info_parser.add_argument(
+        "--yaml",
+        help="output in YAML format",
+        action="store_true",
+    )
 
     args = parser.parse_args(args=args)
 
@@ -97,30 +102,49 @@ def main(args=None):
         with _suppress_package_importer_warnings():
             imp = torch.package.PackageImporter(args.pkg_path)
             pkg_metadata = _get_package_metadata(imp)
-            print("Package Metadata")
-            print("================")
-            print(
-                yaml.dump(
-                    pkg_metadata,
-                    default_flow_style=False,
-                )
-            )
+
+            # Load and process modifiers if requested
+            modifiers_info = None
             if args.get_modifiers:
-                print("Available Modifiers")
-                print("===================")
                 model = imp.load_pickle(
                     package="model",
                     resource=f"{_EAGER_MODEL_KEY}_model.pkl",
                     map_location="cpu",
                 )
-                modifiers = get_all_modifiers(model)
-                for idx, (name, modifier) in enumerate(modifiers.items()):
-                    persistent_flag = (
-                        "" if is_persistent_model_modifier(modifier) else "non-"
+                modifiers_info = [
+                    {
+                        "name": name,
+                        "persistent": is_persistent_model_modifier(modifier),
+                        "doc": modifier.__doc__.strip(),
+                    }
+                    for name, modifier in get_all_modifiers(model).items()
+                ]
+
+            # Print output
+            if args.yaml:
+                output_data = {"package_metadata": pkg_metadata}
+                if modifiers_info is not None:
+                    output_data["modifiers"] = modifiers_info
+                print(yaml.dump(output_data))
+            else:
+                print("Package Metadata")
+                print("================")
+                print(
+                    yaml.dump(
+                        pkg_metadata,
+                        default_flow_style=False,
                     )
-                    print(f"{idx + 1}. {name}\t({persistent_flag}persistent)\n")
-                    if hasattr(modifier, "__doc__"):
-                        print("\t" + modifier.__doc__ + "\n")
+                )
+                if modifiers_info is not None:
+                    print("Available Modifiers")
+                    print("===================")
+                    for idx, modifier_info in enumerate(modifiers_info):
+                        persistent_flag = "" if modifier_info["persistent"] else "non-"
+                        print(
+                            f"{idx + 1}. {modifier_info['name']}\t({persistent_flag}persistent)\n"
+                        )
+                        if "doc" in modifier_info:
+                            print(f"\t{modifier_info['doc']}\n")
 
         return
 
