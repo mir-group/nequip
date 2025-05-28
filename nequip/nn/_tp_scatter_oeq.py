@@ -1,7 +1,6 @@
 import torch
 from ._tp_scatter_base import TensorProductScatter
 from openequivariance import (
-    TensorProduct,
     TensorProductConv,
     TPProblem,
     torch_to_oeq_dtype,

@@ -4,6 +4,9 @@ import pathlib
 import subprocess
 import os
 import sys
+import hydra
+import math
+import torch
 from omegaconf import OmegaConf, open_dict
 
 
@@ -142,10 +145,6 @@ def fake_model_training_session(
     config, tmpdir, env = next(session)
     yield config, tmpdir, env, model_dtype
     del session
-
-
-# TODO: Move these imports when this class gets moved to the correct file.
-import hydra, math, torch
 
 
 class TrainingInvarianceBaseTest:

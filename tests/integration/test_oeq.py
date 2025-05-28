@@ -2,7 +2,7 @@ from conftest import TrainingInvarianceBaseTest
 import pytest
 
 try:
-    import openequivariance
+    import openequivariance  # noqa: F401
 
     OEQ_AVAILABLE = True
 except ImportError:

@@ -4,7 +4,7 @@ from nequip.utils.unittests.model_tests import BaseEnergyModelTests
 from nequip.utils.test import override_irreps_debug
 
 try:
-    import openequivariance
+    import openequivariance  # noqa: F401
 
     OEQ_AVAILABLE = True
 except ImportError:
