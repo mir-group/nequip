@@ -18,8 +18,8 @@
 # -- Project information -----------------------------------------------------
 
 project = "NequIP"
-copyright = "2021, MIR"
-author = "MIR"
+copyright = "2025 The NequIP Developers"
+author = "The NequIP Developers"
 
 
 # -- General configuration ---------------------------------------------------

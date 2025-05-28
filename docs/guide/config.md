@@ -2,9 +2,10 @@
 
 The config file has five main sections: `run`, `data`, `trainer`, `training_module`, `global_options`. These top level config entries must always be present.
 
-Before going into what each section entails, users are advised to take note of OmegaConf's [variable interpolation](https://omegaconf.readthedocs.io/en/latest/usage.html#variable-interpolation) utilities, which may be a useful tool for managing runs.
-Interpolation can be particularly useful when multiple locations in the config require the same values to be repeated.
-It can also be used to access information like the run name or output directory of the training using [Hydra's built-in resolvers](https://hydra.cc/docs/1.3/configure_hydra/intro/#resolvers-provided-by-hydra).
+## Variable interpolation
+
+NequIP uses the [Hydra library](https://hydra.cc/) for configurations, which is built on top of the [OmegaConf](https://omegaconf.readthedocs.io) YAML configuration library. OmegaConf offers a powerful [variable interpolation](https://omegaconf.readthedocs.io/en/latest/usage.html#variable-interpolation) feature, which includes special "functions" that can be called in variable interpolation expressions.  These "functions" are called ["resolvers"](https://omegaconf.readthedocs.io/en/2.3_branch/usage.html#resolvers).
+Hydra provides [built-in resolvers](https://hydra.cc/docs/1.3/configure_hydra/intro/#resolvers-provided-by-hydra) that allow you to interpolate the run name or output directory into the config.
 
 NequIP also registers a number of custom resolvers to allow users to do basic integer arithmetic directly in the config file:
 - Integer multiplication: `area: ${int_mul:${width},${height}}`
@@ -14,15 +15,15 @@ These resolvers will throw errors if the inputs are not integers or if division 
 
 ## `run`
 
-`run` allows users to specify an ordered agenda of tasks to run, of which there are three types: `train` (which requires a `train` and at least one `val` dataset), `val` (which requires `val` dataset(s)), and `test` (which requires `test` dataset(s)).
+`run` allows users to specify an ordered agenda of tasks that `nequip-train` will run, of which there are three types: `train` (which requires a `train` and at least one `val` dataset), `val` (which requires one or more `val` datasets), and `test` (which requires one or more `test` datasets).
 
-Users can specify one or more of these run types in the config. A common use mode is to perform training, followed immediately by testing:
+Users can specify one or more of these run types in the config. A common pattern is to perform training followed immediately by testing:
 ```yaml
 run: [train, test]
 ```
 
 ```{important}
-Any `val` or `test` tasks that come after `train` will use the best model checkpoint.
+Any `val` or `test` tasks that come after `train` will use the **best** model checkpoint.
 ```
 
 If you want to check how the untrained model performs on the validation and test datasets at initialization before training, train, and then assess the trained model's performance:
@@ -37,12 +38,12 @@ run: [val, test, train, val, test]
 
 ## `data`
 
-`data` is the `DataModule` object to be used. Users are directed to the [API page](../api/datamodule.rst) of `nequip.data.datamodule` for the `nequip` supported `DataModule` classes. Custom datamodules that subclass from `nequip.data.datamodule.NequIPDataModule` can also be used.
+`data` defines the `DataModule` object, which manages the train, validation, and test datasets. Users are directed to the [API page](../api/datamodule.rst) of `nequip.data.datamodule` for the API of the `DataModule` classes that `nequip` provides. Custom datamodules that subclass from `nequip.data.datamodule.NequIPDataModule` can also be used.
 
 
 ## `trainer`
 
-The `trainer` is meant to instantiate a `lightning.Trainer` object. To understand how to configure it, users are directed to `lightning.Trainer`'s [page](https://lightning.ai/docs/pytorch/stable/common/trainer.html). The sections on trainer [flags](https://lightning.ai/docs/pytorch/stable/common/trainer.html#trainer-flags) and its [API](https://lightning.ai/docs/pytorch/stable/common/trainer.html#trainer-class-api) are especially important.
+The `trainer` specifies arguments to instantiate a `lightning.Trainer` object. To understand how to configure it, users are directed to `lightning.Trainer`'s [page](https://lightning.ai/docs/pytorch/stable/common/trainer.html). The sections on trainer [flags](https://lightning.ai/docs/pytorch/stable/common/trainer.html#trainer-flags) and its [API](https://lightning.ai/docs/pytorch/stable/common/trainer.html#trainer-class-api) are especially important.
 
 ```{tip}
 It is in the `lightning.Trainer` that users can specify [callbacks](https://lightning.ai/docs/pytorch/stable/api_references.html#callbacks) used to influence the course of training. This includes the very important [ModelCheckpoint](https://lightning.ai/docs/pytorch/stable/api/lightning.pytorch.callbacks.ModelCheckpoint.html#lightning.pytorch.callbacks.ModelCheckpoint) callback that should be configured to save checkpoint files in the way the user so pleases. `nequip`'s own [callbacks](../api/callbacks.rst) can also be used here.
@@ -68,12 +69,12 @@ The full set of options are found in the documentation of the [underlying object
 
 ## `training_module`
 
-`training_module` defines the `NequIPLightningModule` (or its subclasses). Users are directed to its [API page](../api/lightning_module.rst) to learn how to configure it. Often, the `EMALightningModule` is a reliable choice.
+`training_module` defines the `NequIPLightningModule` (or its subclasses). Users are directed to its [API page](../api/lightning_module.rst) to learn how to configure it. Usually the `EMALightningModule` is the right choice.
 
-It is here that the following parameters are defined.
+The following important objects are configured as part of the `training_module`:
  
  ### `model`
-  It is under `model` that the deep equivariant potential model is configured, which includes the NequIP message-passing graph neural network model or the strictly local Allegro model. Refer to the [model documentation page](../api/model) to learn how to configure this section.
+  This section configures the model itself, including hyperparameters and the choice of architecture (for example, the NequIP message-passing E(3)-equivariant GNN, or the Allegro architecture). Refer to the [model documentation page](../api/model) to learn how to configure this section.
 
  ### `loss` and `metrics`
   Loss functions and metrics to monitor training progress are configured here in the `training_module`. Refer to the [Loss and Metrics](stats_metrics.md/#loss-and-metrics) docs for more information.
@@ -103,7 +104,7 @@ lr_scheduler:
 
 ## `global_options`
 
-`global_options` is used to specify parameters that affect the global state. Presently, the only option is `allow_tf32` (which is `false` by default). See the [TF32 page](./tf32.md) for more details about TF32 settings.
+`global_options` is used to specify options that affect the global state of the entire `nequip-train` process. Currently, the only option is `allow_tf32` (which is `false` by default). See the [TF32 page](./tf32.md) for more details about TF32 settings.
 ```yaml
 global_options:
   allow_tf32: false

@@ -32,3 +32,25 @@
   **Q**: How do I train with multiple GPUs?
 
   **A**: Read our [Distributed Data Parallel training docs](advanced_training.md/#distributed-data-parallel-training).
+
+## Upgrading from pre-`0.7.0` `nequip`
+
+```{warning}
+Importing, restarting, or migrating models or training runs from pre-0.7.0 versions of `nequip` is not supported.  Please use Python environment management to maintain separate installations of older `nequip` versions to keep working with that data, if necessary.
+```
+
+  **Q**: What replaces `nequip-evaluate`, which was removed?
+
+  **A**: `nequip-evaluate` is replaced by using the `test` [run type](config.md#run) with `nequip-train` with the `TestTimeXYZFileWriter` [callback](../api/callbacks.rst)
+
+  **Q**: What replaces `nequip-deploy`, which was removed?
+
+  **A**: `nequip-deploy` (which previously generates a TorchScript `.pth` file) is replaced by `nequip-compile` (see [compilation docs](workflow.md#compilation)) that can produce either a TorchScript `.nequip.pth` file or an AOT Inductor `.nequip.pt2` file to be used for inference tasks in our [integrations](../integrations/all.rst) such as [ASE](../integrations/ase.md) and [LAMMPS](../integrations/lammps.md).
+ 
+  **Q**: What replaces `nequip-benchmark`, which been removed?
+
+  **A**: No direct substitute exists, but the NequIP ASE calculator can be used to similarly run a model from Python on a single static frame.
+
+  **Q**: Are losses still sometimes in normalized internal units?
+
+  **A**: No, in `nequip >= 0.7.0`, the loss components are all in physical units.
