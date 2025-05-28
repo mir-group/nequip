@@ -56,23 +56,22 @@ def main(args=None):
     )
 
     parser.add_argument(
-        "--mode",
-        help="whether to use `torchscript` or `aotinductor` to compile the model",
-        choices=["torchscript", "aotinductor"],
-        type=str,
-        required=True,
-    )
-
-    parser.add_argument(
-        "--input-path",
+        "input_path",
         help="path to a checkpoint model or packaged model file",
         type=pathlib.Path,
     )
 
     parser.add_argument(
-        "--output-path",
+        "output_path",
         help="path to write compiled model file. NOTE: a `.nequip.pth` extension is required if `--mode torchscript` is used and a `.nequip.pt2` extension is required if `--mode aotinductor` is used",
         type=pathlib.Path,
+    )
+
+    parser.add_argument(
+        "--mode",
+        help="whether to use `torchscript` or `aotinductor` to compile the model",
+        choices=["torchscript", "aotinductor"],
+        type=str,
         required=True,
     )
 

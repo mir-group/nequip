@@ -45,8 +45,8 @@ nequip-train -cn config.yaml
   **Problem**: Trying to run `nequip-compile` as follows, fails:
   ```bash
   nequip-compile \
-  --input-path path/to/ckpt_file/or/package_file \
-  --output-path path/to/compiled_model.nequip.pt2 \
+  path/to/ckpt_file/or/package_file \
+  path/to/compiled_model.nequip.pt2 \
   --device (cpu/cuda) \
   --mode aotinductor \
   --target target_integration

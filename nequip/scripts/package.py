@@ -30,7 +30,6 @@ from nequip.utils.global_state import set_global_state
 from ..__init__ import _DISCOVERED_NEQUIP_EXTENSION
 from ._workflow_utils import set_workflow_state
 
-import os
 from omegaconf import OmegaConf
 import hydra
 
@@ -53,16 +52,14 @@ def main(args=None):
 
     build_parser = subparsers.add_parser("build", help="build a packaged model file")
     build_parser.add_argument(
-        "--ckpt-path",
+        "ckpt_path",
         help="path to checkpoint file",
         type=str,
-        required=True,
     )
     build_parser.add_argument(
-        "--output-path",
+        "output_path",
         help="output path to save the packaged model. NOTE: a `.nequip.zip` extension is mandatory",
         type=pathlib.Path,
-        default=os.getcwd() + "/packaged_model.nequip.zip",
     )
     build_parser.add_argument(
         "--extra-externs",
@@ -154,7 +151,7 @@ def main(args=None):
 
         assert str(args.output_path).endswith(
             ".nequip.zip"
-        ), "`output-path` must end with the `.nequip.zip` extension"
+        ), "output path must end with the `.nequip.zip` extension"
 
         # === handle internal and external modules ===
         # internal and external modules that we know of

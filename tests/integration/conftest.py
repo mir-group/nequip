@@ -70,9 +70,7 @@ def _training_session(conffile, training_module, model_dtype, extra_train_from_s
                             [
                                 "nequip-package",
                                 "build",
-                                "--ckpt-path",
                                 f"{tmpdir}/last.ckpt",
-                                "--output-path",
                                 package_path,
                             ],
                             cwd=new_tmpdir,

@@ -62,7 +62,7 @@ One can use `nequip.train.callbacks.TestTimeXYZFileWriter` ([see API](../api/cal
 The recommended way to archive a trained model is to `package` it with the `build` option of `nequip-package`.
 
 ```bash
-nequip-package build --ckpt-path path/to/ckpt_file --output-path path/to/packaged_model.nequip.zip
+nequip-package build path/to/ckpt_file path/to/packaged_model.nequip.zip
 ```
 
 One can inspect the metadata of the packaged model by using the `info` option.
@@ -92,8 +92,8 @@ The command to compile a TorchScript model is as follows.
 
 ```bash
 nequip-compile \
---input-path path/to/ckpt_file/or/package_file \
---output-path path/to/compiled_model.nequip.pth \
+path/to/ckpt_file/or/package_file \
+path/to/compiled_model.nequip.pth \
 --device (cpu/cuda) \
 --mode torchscript
 ```
@@ -102,16 +102,16 @@ The command to compile an AOT Inductor model is as follows.
 
 ```bash
 nequip-compile \
---input-path path/to/ckpt_file/or/package_file \
---output-path path/to/compiled_model.nequip.pt2 \
+path/to/ckpt_file/or/package_file \
+path/to/compiled_model.nequip.pt2 \
 --device (cpu/cuda) \
 --mode aotinductor \
 --target target_integration
 ```
 
 ```{warning}
-`--mode torchscript` imposes that the `--output-path` ends with a `.nequip.pth` extension.\
-`--mode aotinductor` imposes that the `--output-path` ends with a `.nequip.pt2` extension.
+`--mode torchscript` imposes that the output path ends with a `.nequip.pth` extension.\
+`--mode aotinductor` imposes that the output path ends with a `.nequip.pt2` extension.
 ```
 
 ```{tip}
