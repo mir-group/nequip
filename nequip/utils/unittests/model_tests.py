@@ -155,6 +155,30 @@ class BaseModelTests:
                     atol=atol,
                 ), f"JIT didn't repro save-and-loaded JIT on field {out_field} with max error {(out_script[out_field] - out_load[out_field]).abs().max().item()}"
 
+    def compare_output_and_gradients(
+        self, modelA, modelB, model_test_data, tol, compare_outputs=True
+    ):
+        A_out = modelA(model_test_data.copy())
+        B_out = modelB(model_test_data.copy())
+
+        if compare_outputs:
+            for key in ["atomic_energy", "total_energy", "forces", "virial"]:
+                assert torch.allclose(A_out[key], B_out[key], atol=tol)
+
+        # test backwards pass if there are trainable weights
+        if any([p.requires_grad for p in modelB.parameters()]):
+            B_loss = B_out[AtomicDataDict.TOTAL_ENERGY_KEY].square().sum()
+            B_loss.backward()
+
+            A_loss = A_out[AtomicDataDict.TOTAL_ENERGY_KEY].square().sum()
+            A_loss.backward()
+            compile_params = dict(modelB.named_parameters())
+            for k, v in modelB.named_parameters():
+                err = torch.max(torch.abs(v.grad - compile_params[k].grad))
+                assert torch.allclose(
+                    v.grad, compile_params[k].grad, atol=tol, rtol=tol
+                ), err
+
     @override_irreps_debug(False)
     def test_compile(self, model, model_test_data, device):
         """
@@ -181,26 +205,13 @@ class BaseModelTests:
         config["compile_mode"] = "compile"
         compile_model = self.make_model(config, device=device)
 
-        compile_out = compile_model(model_test_data.copy())  # shallow copy
-        assert compile_model._compiled_model, "compilation unsuccessful"
-        # if compilation was successful, internal checks would have ensured consistency of base and compiled model predictions
-        # here, we check that backward pass of the model works for training
-
-        # test backwards pass if there are trainable weights
-        if any([p.requires_grad for p in compile_model.parameters()]):
-            compile_loss = compile_out[AtomicDataDict.TOTAL_ENERGY_KEY].square().sum()
-            compile_loss.backward()
-
-            # compute base model predictions
-            out = instance(model_test_data.copy())  # shallow copy
-            loss = out[AtomicDataDict.TOTAL_ENERGY_KEY].square().sum()
-            loss.backward()
-            compile_params = dict(compile_model.named_parameters())
-            for k, v in instance.named_parameters():
-                err = torch.max(torch.abs(v.grad - compile_params[k].grad))
-                assert torch.allclose(
-                    v.grad, compile_params[k].grad, atol=tol, rtol=tol
-                ), err
+        self.compare_output_and_gradients(
+            modelA=instance,
+            modelB=compile_model,
+            model_test_data=model_test_data,
+            tol=tol,
+            compare_outputs=False,  # Internal checks guarantee that outputs are the same
+        )
 
     @pytest.mark.skipif(
         not _TORCH_GE_2_6, reason="PT2 compile tests skipped for torch < 2.6"
