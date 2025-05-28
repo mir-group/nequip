@@ -1,14 +1,14 @@
 Dataset Statistics
 ##################
 
-The following ``nequip.data.CommonDataStatisticsManager`` can generally be used for common force field training scenarios.
+The following :class:`~nequip.data.CommonDataStatisticsManager` can generally be used for common force field training scenarios.
 
  .. autofunction:: nequip.data.CommonDataStatisticsManager
 
 For users who seek to configure their own custom dataset statistics, the following API is offered.
 
-As an example, we show how one can configure the full ``nequip.data.DataStatisticsManager`` to have behavior equivalent to using
-``nequip.data.CommonDataStatisticsManager`` as follows::
+As an example, we show how one can configure the full :class:`~nequip.data.DataStatisticsManager` to have behavior equivalent to using
+:class:`~nequip.data.CommonDataStatisticsManager` as follows::
 
    stats_manager:
      _target_: nequip.data.DataStatisticsManager
