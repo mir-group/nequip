@@ -7,7 +7,7 @@ from nequip.data import AtomicDataDict
 from nequip.data._key_registry import get_dynamic_shapes
 from .fx import nequip_make_fx
 from .compile import prepare_model_for_compile
-from .versions import check_pt2_compile_compatibility
+from .versions import check_pt2_compile_compatibility, _TORCH_GE_2_8
 from .dtype import test_model_output_similarity_by_dtype, _pt2_compile_error_message
 
 from typing import List, Dict, Union, Any
@@ -29,6 +29,18 @@ def aot_export_model(
 
     # defensively refresh the cache
     torch._dynamo.reset()
+
+    # === preprocess `inductor_configs` ===
+    inductor_configs = inductor_configs.copy()
+    # NOTE: fails for torch 2.7 but should work for 2.8
+    # see https://github.com/pytorch/pytorch/issues/152067
+    # unless users explicitly set it, we always default aoti constant folding to True
+    # if torch >= 2.8
+    if (
+        _TORCH_GE_2_8
+        and "aot_inductor.use_runtime_constant_folding" not in inductor_configs
+    ):
+        inductor_configs["aot_inductor.use_runtime_constant_folding"] = True
 
     # === preprocess model and make_fx ===
     model_to_trace = ListInputOutputWrapper(model, input_fields, output_fields)
