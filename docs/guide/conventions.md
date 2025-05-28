@@ -1,7 +1,7 @@
 # Conventions
 
 ## Data Format Conventions
- - Cells vectors are given in ASE style as the **rows** of the cell matrix
+ - Cell vectors are given in ASE style as the **rows** of the cell matrix
 
 ## Pressure / stress / virials
 

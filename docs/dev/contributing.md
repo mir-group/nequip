@@ -12,9 +12,9 @@ If you want to make a major change, add a new feature, or have any uncertainty a
 
 ## Code Standards
 
-### Unittests
+### Unit tests
 
-For new features, write a **unittest** that covers it wherever possible. If it is a significant change to the training workflow, updating the integrations tests might be required.
+For new features, write a **unit test** that covers it wherever possible. If it is a significant change to the training workflow, updating the integrations tests might be required.
 
 All additions should support CUDA/GPU. If possible, please test your changes on a GPU -- the CI tests on GitHub actions do not have GPU resources available.
 

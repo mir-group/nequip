@@ -12,7 +12,7 @@ Checkpoint files are unlikely to survive such breaking changes, i.e. one may no 
 The NequIP framework's proposed solution is to [package](workflow.md/#packaging) the model with `nequip-package`, which produces a packaged model file that contains a snapshot of the code (from the code version at package-time) associated with a model.
 Packaged models can be compiled with `nequip-compile` for inference and/or used as pretrained models for fine-tuning (with the possibility of repackaging the model with `nequip-package` again).
 Packaged models are more reliable in allowing for old models to be used across version changes of the NequIP codebase.
-While packaged models guard against breaking changes in model code, they may no be compatible if there are fundamental changes to the code that performs packaging and loads packaged models.
+While packaged models guard against breaking changes in model code, they may not be compatible if there are fundamental changes to the code that performs packaging and loads packaged models.
 Changes like this should be rare, and we will refrain from making such changes unless absolutely necessary.
 
 More information can be found in the docs on [packaging](workflow.md/#packaging) and on the different [file types](files.md).

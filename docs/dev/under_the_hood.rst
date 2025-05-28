@@ -15,7 +15,7 @@ Examples that currently exist in ``nequip`` include the ``EMALightningModule`` (
 We aim for modularity of new training techniques, at the cost of proliferating various combinations of techniques.
 This design choice is motivated by the fact that not all implemented training techniques are seamlessly composable with one another, and thought has to be put into composing them anyway.
 
-Because of the potential need to compose ``NequIPLightningModule`` subclasses, several rules should be obeyed to limit the possibility of silent errors. Note that composing ``NequIPLightningModule`` subclasses takes the form of the "dealy diamond of death", a notorious multiple inheritance pattern that developers must be aware and cautious of when writting compositions.
+Because of the potential need to compose ``NequIPLightningModule`` subclasses, several rules should be obeyed to limit the possibility of silent errors. Note that composing ``NequIPLightningModule`` subclasses takes the form of the "deadly diamond of death", a notorious multiple inheritance pattern that developers must be aware and cautious of when writing compositions.
 
  - class attributes specific to a subclass should have a unique, distinguishable name to avoid the possibility of overwriting variables when attempting multiple inheritance (a clean way might be to use a dataclass)
  - be very careful of the order of inheritance when creating "diamond" subclasses (a subclass that derives from other subclasses of ``NequIPLightningModule``), and use assertions to make sure that the new training module behaves as intended

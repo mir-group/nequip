@@ -8,7 +8,7 @@ nequip.data.datamodule
   
 An ``ASEDataModule`` is also provided as a general wrapper of the ``NequIPDataModule`` if the datasets are all in the same `ASE <https://wiki.fysik.dtu.dk/ase/ase/io/io.html>`_-readable file formats.
 
-The ``sGDML_CCSD_DataModule`` and ``NequIP3BPADataModule`` are examples of data modules for specific datasets. Such datasets may support auto-downloading capabilities, pre-defined train-test splits and involve more a more minimal set of arguments.
+The ``sGDML_CCSD_DataModule`` and ``NequIP3BPADataModule`` are examples of data modules for specific datasets. Such datasets may support auto-downloading capabilities, pre-defined train-test splits and involve a more minimal set of arguments.
 
 All data modules should (and would) share the following features
 

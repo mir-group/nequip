@@ -21,7 +21,7 @@ data:
   # datamodule arguments ...
 
   stats_manager:
-    _target_: _target_: nequip.data.CommonDataStatisticsManager
+    _target_: nequip.data.CommonDataStatisticsManager
     type_names: ${model_type_names}
     dataloader_kwargs:
       batch_size: 10
@@ -95,7 +95,7 @@ Users may also consider toggling the `per_type_energy_shifts_trainable` and `per
 
 For practical molecular dynamics simulations, it may be favorable to train models with a strong prior for repulsion at close atomic distances. One can add the Ziegler-Biersack-Littmark (ZBL) screened nuclear repulsion term as a `pair_potential` in NequIP and Allegro models. This section of the config file could look something like
 
-```
+```yaml
 training_module:
   _target_: nequip.train.EMALightningModule
   

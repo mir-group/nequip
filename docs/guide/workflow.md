@@ -139,7 +139,7 @@ The `--target` flag wraps the `--input-fields` and `--output-fields` options. De
 ```
 
 ```{tip}
-If performing training and inference on separate machines, with possibly different Python, CUDA, or hardware environments, consider [packaging](#packaging) the trained model and transfering the packaged model to the inference machine and running `nequip-compile` on it there.
+If performing training and inference on separate machines, with possibly different Python, CUDA, or hardware environments, consider [packaging](#packaging) the trained model and transferring the packaged model to the inference machine and running `nequip-compile` on it there.
 ```
 
 ## Production Simulations

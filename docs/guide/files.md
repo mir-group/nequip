@@ -10,7 +10,7 @@ Config files have the `.yaml` extension and describe [training](./workflow.md/#t
 
 Checkpoint files have the `.ckpt` extension and are produced from [training](./workflow.md/#training) runs (`nequip-train` with the `train` run type). 
 
-Checkpointing is controlled through PyTorch Lightning's [ModelCheckpoint](https://lightning.ai/docs/pytorch/stable/api/lightning.pytorch.callbacks.ModelCheckpoint.html#lightning.pytorch.callbacks.ModelCheckpoint) callback, which can be provided to the []`lightning.Trainer`](https://lightning.ai/docs/pytorch/stable/common/trainer.html). See relevant [section](./config.md/#trainer) of the "Config File" page for how to configure checkpointing behavior in the config file.
+Checkpointing is controlled through PyTorch Lightning's [ModelCheckpoint](https://lightning.ai/docs/pytorch/stable/api/lightning.pytorch.callbacks.ModelCheckpoint.html#lightning.pytorch.callbacks.ModelCheckpoint) callback, which can be provided to the [`lightning.Trainer`](https://lightning.ai/docs/pytorch/stable/common/trainer.html). See relevant [section](./config.md/#trainer) of the "Config File" page for how to configure checkpointing behavior in the config file.
 
 Checkpoint files can be used to [continue/restart](./workflow.md/#restarts) interrupted training runs.
 
