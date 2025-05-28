@@ -29,7 +29,7 @@ def ModelFromCheckpoint(checkpoint_path: str, compile_mode: str = _EAGER_MODEL_K
     ::
 
       model:
-        _target_: nequip.model.saved_models.ModelFromCheckpoint
+        _target_: nequip.model.ModelFromCheckpoint
         checkpoint_path: path/to/ckpt
         compile_mode: eager/compile
 

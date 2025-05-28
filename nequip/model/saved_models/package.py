@@ -67,7 +67,7 @@ def ModelFromPackage(package_path: str, compile_mode: str = _EAGER_MODEL_KEY):
     ::
 
       model:
-        _target_: nequip.model.saved_models.ModelFromPackage
+        _target_: nequip.model.ModelFromPackage
         checkpoint_path: path/to/pkg
         compile_mode: eager/compile
 
