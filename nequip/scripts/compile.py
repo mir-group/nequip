@@ -8,8 +8,6 @@ from nequip.model.saved_models.load_utils import load_saved_model
 from nequip.model.modify_utils import modify
 from nequip.train.lightning import _SOLE_MODEL_KEY
 from nequip.data import AtomicDataDict
-from nequip.model.saved_models.checkpoint import data_dict_from_checkpoint
-from nequip.model.saved_models.package import data_dict_from_package
 from nequip.utils.logger import RankedLogger
 from nequip.utils.global_state import set_global_state, get_latest_global_state
 from omegaconf import OmegaConf
@@ -48,14 +46,14 @@ def _parse_bounds_to_Dim(name: str, bounds_str: str):
 def main(args=None):
     # === parse inputs ===
     parser = argparse.ArgumentParser(
-        description="Compiles NequIP/Allegro models from checkpoint or package files.",
+        description="Compiles NequIP framework models from checkpoint or package files."
     )
 
     # positional arguments:
     parser.add_argument(
         "input_path",
-        help="path to a checkpoint model or packaged model file",
-        type=pathlib.Path,
+        help="path to a packaged model file (local `.nequip.zip` file), a nequip.net model (`nequip.net:group-name/model-name:version`), or a checkpoint file (any other local path)",
+        type=str,
     )
 
     parser.add_argument(
@@ -182,9 +180,17 @@ def main(args=None):
         )
 
     # === load model ===
-    # only eager models are loaded
-    logger.info(f"Loading model for compilation from {args.input_path} ...")
-    model = load_saved_model(args.input_path, _EAGER_MODEL_KEY, args.model)
+    # For aotinductor mode, we also need the data dict (unless data_path is provided)
+    need_data_from_model = args.mode == "aotinductor" and args.data_path is None
+
+    model = load_saved_model(
+        args.input_path,
+        _EAGER_MODEL_KEY,
+        args.model,
+        return_data_dict=need_data_from_model,
+    )
+    if need_data_from_model:
+        model, data_from_loaded_model = model
 
     # === modify model ===
     # for now, we restrict modifiers to those without arguments, i.e. accelerations
@@ -231,11 +237,7 @@ def main(args=None):
             for k, v in torch.jit.load(args.data_path).state_dict().items():
                 data[k] = v
         else:
-            # call different functions depending on whether checkpoint or package file
-            if not str(args.input_path).endswith(".nequip.zip"):
-                data = data_dict_from_checkpoint(args.input_path)
-            else:
-                data = data_dict_from_package(args.input_path)
+            data = data_from_loaded_model
         data = AtomicDataDict.to_(data, device)
 
         # === parse batch dims range ===

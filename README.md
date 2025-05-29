@@ -14,6 +14,7 @@ NequIP is an open-source code for building E(3)-equivariant interatomic potentia
  
  - [Installation and usage](#installation-and-usage)
  - [Tutorial](#tutorial)
+ - [Pre-trained models](#pre-trained-models)
  - [Highlighted Features](#highlighted-features)
  - [Extension Packages](#extension-packages)
  - [References & citing](#references--citing)
@@ -30,6 +31,10 @@ Installation instructions and user guides can be found in our [docs](https://neq
 ## Tutorial 
 
 The best way to learn how to use NequIP is through the [tutorial notebook](https://colab.research.google.com/github/mir-group/nequip-tutorial/blob/main/NequIP_Tutorial.ipynb). This will run entirely on Google Colab's cloud virtual machine; you do not need to install or run anything locally.
+
+## Pre-trained models
+
+Pre-trained models can be found at [nequip.net](https://www.nequip.net/).
 
 ## Highlighted Features
 
