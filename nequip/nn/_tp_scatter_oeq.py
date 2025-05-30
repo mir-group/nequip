@@ -1,5 +1,6 @@
 import torch
 from ._tp_scatter_base import TensorProductScatter
+from .compile_utils import uses_custom_op
 from openequivariance import (
     TensorProductConv,
     TPProblem,
@@ -7,6 +8,7 @@ from openequivariance import (
 )
 
 
+@uses_custom_op("openequivariance")
 class OpenEquivarianceTensorProductScatter(TensorProductScatter):
 
     def __init__(
