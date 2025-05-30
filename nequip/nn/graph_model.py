@@ -3,6 +3,7 @@ import torch
 
 from nequip.data import AtomicDataDict
 from ._graph_mixin import GraphModuleMixin
+from .compile_utils import get_custom_op_libraries
 
 from typing import List, Dict, Any, Optional, Final
 
@@ -12,9 +13,10 @@ PER_EDGE_TYPE_CUTOFF_KEY: Final[str] = "per_edge_type_cutoff"
 TYPE_NAMES_KEY: Final[str] = "type_names"
 NUM_TYPES_KEY: Final[str] = "num_types"
 MODEL_DTYPE_KEY: Final[str] = "model_dtype"
+CUSTOM_OP_LIBRARIES_KEY: Final[str] = "custom_op_libraries"
 
 
-def _model_metadata_from_config(model_config: Dict[str, str]) -> Dict[str, Any]:
+def _model_metadata_from_config(model_config: Dict[str, str]) -> Dict[str, str]:
     model_metadata_dict = {}
     # manually process everything
     model_metadata_dict[MODEL_DTYPE_KEY] = model_config[MODEL_DTYPE_KEY]
@@ -50,6 +52,8 @@ class GraphModel(GraphModuleMixin, torch.nn.Module):
     is_graph_model: Final[bool] = True
     # ^ to identify `GraphModel` types from `nequip-package`d models (see https://pytorch.org/docs/stable/package.html#torch-package-sharp-edges)
 
+    _metadata: Dict[str, str]
+
     def __init__(
         self,
         model: GraphModuleMixin,
@@ -80,15 +84,26 @@ class GraphModel(GraphModuleMixin, torch.nn.Module):
 
         # the following logic is for backward compatibility and to simplify unittests
         self.model_dtype = torch.get_default_dtype()
-        self.metadata = {}
+        self._metadata = {}
         self.type_names = []
         if model_config is not None:
-            self.metadata = _model_metadata_from_config(model_config)
-            self.type_names = self.metadata[TYPE_NAMES_KEY].split(" ")
+            self._metadata = _model_metadata_from_config(model_config)
+            self.type_names = self._metadata[TYPE_NAMES_KEY].split(" ")
             model_dtype = {"float32": torch.float32, "float64": torch.float64}[
-                self.metadata[MODEL_DTYPE_KEY]
+                self._metadata[MODEL_DTYPE_KEY]
             ]
             assert self.model_dtype == model_dtype
+
+    @property
+    def metadata(self) -> Dict[str, str]:
+        # Note that this is a property so that the metadata can depend on the _current_ state
+        # of the model, and not just what happened at initialization. This is essential for
+        # get_custom_op_libraries, the results of which will often be changed by model modifiers
+        # that are applied after initialization. (See _tp_scatter_oeq.py for an example.)
+        # TODO: make other metadata keys dynamic rather than pre-set in _metadata?
+        out = self._metadata.copy()
+        out[CUSTOM_OP_LIBRARIES_KEY] = ",".join(get_custom_op_libraries(self))
+        return out
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
         # restrict the input data to allowed keys to prevent the model from directly using the dict from the outside,
