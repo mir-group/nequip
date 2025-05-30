@@ -22,6 +22,7 @@ from nequip.model.utils import (
     _EAGER_MODEL_KEY,
 )
 from nequip.nn.model_modifier_utils import is_persistent_model_modifier
+from nequip.nn.compile_utils import get_custom_op_libraries
 from nequip.model.modify_utils import get_all_modifiers, only_apply_persistent_modifiers
 from nequip.utils.logger import RankedLogger
 from nequip.utils.versions import get_current_code_versions, _TORCH_GE_2_6
@@ -42,7 +43,16 @@ logger = RankedLogger(__name__, rank_zero_only=True)
 # `nequip-package` generates the archival format for NequIP framework models. This file contains the information necessary to track the archival format itself.
 # whenever the archival format changes, `_CURRENT_NEQUIP_PACKAGE_VERSION` (counter to track the packaged model format) should be bumped up to the next number. We can then condition `ModelFromPackage` on the packaging format version to decide code paths to load the model appropriately.
 # `nequip-package` format version index to condition other features upon when loading `nequip-package` from a specific version
-_CURRENT_NEQUIP_PACKAGE_VERSION = 1
+#
+# Package version high-level CHANGELOG:
+# (use git blame on this line to identify specific commits and details of changes)
+# 0:
+#   - Initial version
+# 1:
+#   - package_metadata.txt instead of package_metadata.pkl
+# 2:
+#   - added `uses_custom_op_libraries` to package metadata
+_CURRENT_NEQUIP_PACKAGE_VERSION = 2
 
 
 def main(args=None):
@@ -242,6 +252,20 @@ def main(args=None):
                 model = ModelFromCheckpoint(args.ckpt_path, compile_mode=compile_mode)
             models_to_package.update({compile_mode: model})
 
+        # Find the complete set of custom op libraries used by _all_ models.
+        # Note that we take the union rather than doing this per-model because
+        # externing these dependencies happens at the package level in the exporter,
+        # rather than in the per-model pickling.
+        # Technically, this could import unnecessary libraries if only some models
+        # use them, but that seems like an unimportant edge case (especially since
+        # the introduction of new library dependencies is expected to be done by
+        # model modifiers rather than selecting a different model key).
+        uses_custom_op_libraries = set.union(
+            get_custom_op_libraries(model) for model in models_to_package.values()
+        )
+        _EXTERNAL_MODULES.extend(uses_custom_op_libraries)
+        logger.debug(f"Also externing custom op libraries: {uses_custom_op_libraries}")
+
         # == package ==
         with warnings.catch_warnings():
             # suppress torch.package TypedStorage warning
@@ -274,6 +298,7 @@ def main(args=None):
                     "versions": code_versions,
                     "package_version_id": _CURRENT_NEQUIP_PACKAGE_VERSION,
                     "available_models": list(models_to_package.keys()),
+                    "uses_custom_op_libraries": list(uses_custom_op_libraries),
                     "atom_types": {idx: name for idx, name in enumerate(type_names)},
                 }
                 pkg_metadata = yaml.dump(
