@@ -204,10 +204,19 @@ def main(args=None):
     # ^ `ModuleDict` of `GraphModel` is loaded, we then select the desired `GraphModel` (`args.model` defaults to work for single model case)
 
     # === combine model and global options metadata ===
+    # note that model.metadata can be dynamic and so can account for things that change as a result of modifiers
+    # reference the implementation of model.metadata to check whether this is true for any particular metadata key
     metadata = model.metadata.copy()
-    metadata.update(get_latest_global_state(only_metadata_related=True))
-    # ensure bool -> int for metadata
-    metadata = {k: int(v) if isinstance(v, bool) else v for k, v in metadata.items()}
+    global_metadata_state = get_latest_global_state(only_metadata_related=True)
+    assert set(metadata.keys()).isdisjoint(global_metadata_state.keys())
+    metadata.update(global_metadata_state)
+    del global_metadata_state
+    assert all(isinstance(k, str) for k in metadata.keys())
+    assert all(isinstance(v, (str, bool)) for v in metadata.values())
+    # ensure bool -> str(int) for metadata
+    metadata = {
+        k: str(int(v)) if isinstance(v, bool) else v for k, v in metadata.items()
+    }
 
     logger.debug(model)
 
