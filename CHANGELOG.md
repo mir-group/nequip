@@ -8,6 +8,8 @@ Most recent change on the top.
 
 ## Unreleased
 
+## [0.9.0]
+
 ### Changed
 - [Breaking] `nequip-compile` CLI: `--input-path` and `--output-path` are now positional arguments instead of flags
 - [Breaking] `nequip-package build` CLI: `--ckpt-path` and `--output-path` are now positional arguments instead of flags
