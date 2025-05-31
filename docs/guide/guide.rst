@@ -1,15 +1,15 @@
 User Guide
 ==========
 
- .. toctree::
+.. toctree::
 
-    install
-    workflow
-    files
-    config
-    model
-    stats_metrics
-    conventions
-    advanced
-    faq
-    troubleshoot
+   install
+   workflow
+   files
+   config
+   model
+   stats_metrics
+   conventions
+   advanced
+   faq
+   troubleshoot

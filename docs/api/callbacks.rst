@@ -1,16 +1,16 @@
 nequip.train.callbacks
 ######################
 
- .. autoclass:: nequip.train.callbacks.SoftAdapt
+.. autoclass:: nequip.train.callbacks.SoftAdapt
     :members:
 
- .. autoclass:: nequip.train.callbacks.LossCoefficientScheduler
+.. autoclass:: nequip.train.callbacks.LossCoefficientScheduler
     :members:
 
- .. autoclass:: nequip.train.callbacks.LossCoefficientMonitor
+.. autoclass:: nequip.train.callbacks.LossCoefficientMonitor
     :members:
 
- .. autoclass:: nequip.train.callbacks.TestTimeXYZFileWriter
+.. autoclass:: nequip.train.callbacks.TestTimeXYZFileWriter
     :members:
 
 .. autoclass:: nequip.train.callbacks.WandbWatch

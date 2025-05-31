@@ -1,14 +1,14 @@
 NequIPLightningModule
 #####################
 
- .. autoclass:: nequip.train.NequIPLightningModule
+.. autoclass:: nequip.train.NequIPLightningModule
     :members:
 
- .. autoclass:: nequip.train.EMALightningModule
+.. autoclass:: nequip.train.EMALightningModule
     :members:
 
- .. autoclass:: nequip.train.ConFIGLightningModule
+.. autoclass:: nequip.train.ConFIGLightningModule
     :members:
 
- .. autoclass:: nequip.train.EMAConFIGLightningModule
+.. autoclass:: nequip.train.EMAConFIGLightningModule
     :members:

@@ -17,23 +17,23 @@ All data modules should (and would) share the following features
   * ``xxx_dataloader``, which refers to a PyTorch :class:`~torch.utils.data.DataLoader`. Crucially, this is where one would specify the ``batch_size`` (number of frames per batch), ``num_workers``, and ``shuffle`` as common parameters that should be configured.
 
 
- .. autoclass:: nequip.data.datamodule.NequIPDataModule
+.. autoclass:: nequip.data.datamodule.NequIPDataModule
      :members:
 
- .. autoclass:: nequip.data.datamodule.ASEDataModule
+.. autoclass:: nequip.data.datamodule.ASEDataModule
      :members:
 
- .. autoclass:: nequip.data.datamodule.sGDML_CCSD_DataModule
+.. autoclass:: nequip.data.datamodule.sGDML_CCSD_DataModule
      :members:
 
- .. autoclass:: nequip.data.datamodule.rMD17DataModule
+.. autoclass:: nequip.data.datamodule.rMD17DataModule
      :members:
 
- .. autoclass:: nequip.data.datamodule.MD22DataModule
+.. autoclass:: nequip.data.datamodule.MD22DataModule
      :members:
 
- .. autoclass:: nequip.data.datamodule.NequIP3BPADataModule
+.. autoclass:: nequip.data.datamodule.NequIP3BPADataModule
      :members:
 
- .. autoclass:: nequip.data.datamodule.TM23DataModule
+.. autoclass:: nequip.data.datamodule.TM23DataModule
      :members:
