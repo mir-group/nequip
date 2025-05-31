@@ -3,7 +3,7 @@
 To build the docs locally, install the necessary requirements.
 
 ```bash
-pip install sphinx sphinx_rtd_theme myst_parser
+pip install sphinx furo myst_parser
 ```
 
 Then, build it.
