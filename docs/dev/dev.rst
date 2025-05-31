@@ -1,7 +1,7 @@
 Developer Guide
 ===============
 
- .. toctree::
+.. toctree::
 
    contributing
    under_the_hood

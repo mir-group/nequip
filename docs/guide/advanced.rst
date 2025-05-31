@@ -1,7 +1,7 @@
 Advanced Usage
 ==============
 
- .. toctree::
+.. toctree::
 
     advanced_training
     tf32

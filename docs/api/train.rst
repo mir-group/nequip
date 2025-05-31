@@ -1,7 +1,7 @@
 nequip.train
 ============
 
- .. toctree::
+.. toctree::
   :maxdepth: 2
 
   lightning_module

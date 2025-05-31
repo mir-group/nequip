@@ -1,7 +1,7 @@
 Python API
 ==========
 
- .. toctree::
+.. toctree::
 
   data
   train

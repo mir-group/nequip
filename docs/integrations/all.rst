@@ -1,7 +1,7 @@
 Integrations
 ============
 
- .. toctree::
+.. toctree::
 
     lammps
     ase
