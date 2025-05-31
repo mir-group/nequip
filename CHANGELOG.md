@@ -8,6 +8,10 @@ Most recent change on the top.
 
 ## Unreleased
 
+### Added
+- `SortedNeighborListTransform` for sorted neighborlists with permutation indices to get a sorted transpose
+
+
 ## [0.9.0]
 
 ### Changed
