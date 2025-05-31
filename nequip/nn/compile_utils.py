@@ -4,6 +4,7 @@ from typing import Final, Callable, Type, Set, Union, List
 
 
 _CUSTOM_OP_ATTR_NAME: Final[str] = "_nequip_module_uses_custom_op_libraries"
+_GLOBAL_CUSTOM_OP_LIBRARIES: Set[str] = set()
 
 
 def uses_custom_op(
@@ -48,6 +49,9 @@ def uses_custom_op(
         libraries = (
             [library_name] if isinstance(library_name, str) else list(library_name)
         )
+
+        # Add to global registry
+        _GLOBAL_CUSTOM_OP_LIBRARIES.update(libraries)
 
         # Check if the class already has custom op libraries (from parent class)
         existing_libraries = getattr(cls, _CUSTOM_OP_ATTR_NAME, None)
@@ -99,3 +103,15 @@ def get_custom_op_libraries(model: torch.nn.Module) -> Set[str]:
         all_libraries.update(module_libraries)
 
     return all_libraries
+
+
+def get_all_registered_custom_op_libraries() -> Set[str]:
+    """Get all custom op libraries that have been registered.
+
+    This function returns the set of all libraries that have ever been
+    registered using the @uses_custom_op decorator up until now.
+
+    Returns:
+        A set of all library names that have been registered via @uses_custom_op.
+    """
+    return _GLOBAL_CUSTOM_OP_LIBRARIES.copy()
