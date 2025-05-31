@@ -1,3 +1,3 @@
 myst-parser
-sphinx_rtd_theme>=3
+furo
 torch
