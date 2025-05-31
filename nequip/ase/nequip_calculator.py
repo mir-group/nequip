@@ -81,19 +81,9 @@ class NequIPCalculator(Calculator):
         """
         compile_fname = str(compile_path).split("/")[-1]
         if compile_fname.endswith(".nequip.pth"):
-            # == model ==
-            metadata = {
-                graph_model.R_MAX_KEY: None,
-                graph_model.TYPE_NAMES_KEY: None,
-                TF32_KEY: None,
-            }
-            model = torch.jit.load(
-                compile_path, _extra_files=metadata, map_location=device
-            )
-            model = torch.jit.freeze(model)
-            # == metadata ==
-            r_max = float(metadata[graph_model.R_MAX_KEY])
-            type_names = metadata[graph_model.TYPE_NAMES_KEY].decode("utf-8").split(" ")
+            from nequip.model.inference_models import load_torchscript_model
+
+            model, metadata = load_torchscript_model(compile_path, device)
         elif compile_fname.endswith(".nequip.pt2"):
             # == imports and sanity checks ==
             from nequip.utils.versions import check_pt2_compile_compatibility
@@ -114,23 +104,29 @@ class NequIPCalculator(Calculator):
                 raise RuntimeError(
                     f"`{compile_path}` was compiled for `{compile_device}` and won't work with `NequIPCalculator.from_compiled_model(device={device})`, use `NequIPCalculator.from_compiled_model(device={compile_device})` instead."
                 )
-            r_max = float(metadata[graph_model.R_MAX_KEY])
-            type_names = metadata[graph_model.TYPE_NAMES_KEY].split(" ")
+            metadata[graph_model.R_MAX_KEY] = float(metadata[graph_model.R_MAX_KEY])
+            metadata[graph_model.TYPE_NAMES_KEY] = metadata[
+                graph_model.TYPE_NAMES_KEY
+            ].split(" ")
+
+            # set global state
+            set_global_state(
+                **{
+                    TF32_KEY: bool(int(metadata[TF32_KEY])),
+                }
+            )
         else:
             raise ValueError(
                 f"Unknown file type: {compile_fname} (expected `*.nequip.pth` or `*.nequip.pt2`)"
             )
 
-        # == global state initialization ==
-        set_global_state(
-            **{
-                TF32_KEY: bool(int(metadata[TF32_KEY])),
-            }
-        )
-
         # prepare model for inference
         model = model.to(device)
         model.eval()
+
+        # extract r_max and type_names for transforms
+        r_max = metadata[graph_model.R_MAX_KEY]
+        type_names = metadata[graph_model.TYPE_NAMES_KEY]
 
         # use `type_names` metadata as substitute for `chemical_symbols` if latter not provided
         if chemical_symbols is None:
