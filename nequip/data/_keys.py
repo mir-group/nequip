@@ -12,6 +12,8 @@ from typing import List, Final
 POSITIONS_KEY: Final[str] = "pos"
 # The [2, n_edge] index tensor giving center -> neighbor relations
 EDGE_INDEX_KEY: Final[str] = "edge_index"
+# Permutation indices for transposing edges from row to column major order
+EDGE_TRANSPOSE_PERM_KEY: Final[str] = "edge_transpose_perm"
 # A [n_edge, 3] tensor of how many periodic cells each edge crosses in each cell vector
 EDGE_CELL_SHIFT_KEY: Final[str] = "edge_cell_shift"
 # [n_batch, 3, 3] or [3, 3] tensor where rows are the cell vectors

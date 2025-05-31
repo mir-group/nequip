@@ -22,6 +22,7 @@ from nequip.model.utils import (
     _EAGER_MODEL_KEY,
 )
 from nequip.nn.model_modifier_utils import is_persistent_model_modifier
+from nequip.nn.compile_utils import get_all_registered_custom_op_libraries
 from nequip.model.modify_utils import get_all_modifiers, only_apply_persistent_modifiers
 from nequip.utils.logger import RankedLogger
 from nequip.utils.versions import get_current_code_versions, _TORCH_GE_2_6
@@ -41,6 +42,13 @@ logger = RankedLogger(__name__, rank_zero_only=True)
 # `nequip-package` generates the archival format for NequIP framework models. This file contains the information necessary to track the archival format itself.
 # whenever the archival format changes, `_CURRENT_NEQUIP_PACKAGE_VERSION` (counter to track the packaged model format) should be bumped up to the next number. We can then condition `ModelFromPackage` on the packaging format version to decide code paths to load the model appropriately.
 # `nequip-package` format version index to condition other features upon when loading `nequip-package` from a specific version
+#
+# Package version high-level CHANGELOG:
+# (use git blame on this line to identify specific commits and details of changes)
+# 0:
+#   - Initial version
+# 1:
+#   - package_metadata.txt instead of package_metadata.pkl
 _CURRENT_NEQUIP_PACKAGE_VERSION = 1
 
 
@@ -257,6 +265,18 @@ def main(args=None):
             with only_apply_persistent_modifiers(persistent_only=True):
                 model = ModelFromCheckpoint(args.ckpt_path, compile_mode=compile_mode)
             models_to_package.update({compile_mode: model})
+
+        # Find the complete set of custom op libraries used by _all_ models.
+        # Note that because non-persistent modifiers are not applied now at
+        # packaging time, we cannot look only for custom ops that are used
+        # in the actual model objects, since others may also be caught by
+        # the packaging process. Instead, we extern all custom op libraries
+        # that have been registered in the current process, which should
+        # ideally be a superset of the custom op libraries that
+        # torch.package will try to include here.
+        custom_op_libraries = get_all_registered_custom_op_libraries()
+        _EXTERNAL_MODULES.extend(custom_op_libraries)
+        logger.debug(f"Also externing custom op libraries: {custom_op_libraries}")
 
         # == package ==
         with _suppress_package_importer_warnings():

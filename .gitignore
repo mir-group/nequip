@@ -1,4 +1,5 @@
 lightning_logs/
+outputs/
 .idea/
 .vscode/
 *wandb/
@@ -9,9 +10,12 @@ cov*.xml
 *.icloud
 benchmark_data/
 *.ipynb_checkpoints/
-outputs/
 .DS_store/
 .python-version
+
+# test data
+aspirin_data/
+fcu.xyz
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

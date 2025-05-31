@@ -1,6 +1,14 @@
+import torch
 import pytest
 from nequip.utils.unittests.model_tests import BaseEnergyModelTests
+from nequip.utils.test import override_irreps_debug
 
+try:
+    import openequivariance  # noqa: F401
+
+    OEQ_AVAILABLE = True
+except ImportError:
+    OEQ_AVAILABLE = False
 
 BASIC_INFO = {
     "seed": 123,
@@ -81,3 +89,32 @@ class TestNequIPModel(BaseEnergyModelTests):
         config = request.param
         config = config.copy()
         return config
+
+    @pytest.mark.skipif(not OEQ_AVAILABLE, reason="OpenEquivariance not available")
+    @override_irreps_debug(False)
+    def test_oeq(self, model, model_test_data, device):
+        if device == "cpu":
+            pytest.skip("OEQ tests skipped for CPU")
+
+        instance, config, _ = model
+        # get tolerance based on model_dtype
+        tol = {
+            torch.float32: 5e-5,
+            torch.float64: 1e-12,
+        }[instance.model_dtype]
+
+        # Make OEQ model
+        config = {
+            "_target_": "nequip.model.modify",
+            "modifiers": [{"modifier": "enable_OpenEquivariance"}],
+            "model": config.copy(),
+        }
+        oeq_model = self.make_model(config, device=device)
+
+        self.compare_output_and_gradients(
+            modelA=instance,
+            modelB=oeq_model,
+            model_test_data=model_test_data,
+            tol=tol,
+            compare_outputs=True,
+        )
