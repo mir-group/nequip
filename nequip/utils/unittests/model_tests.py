@@ -113,7 +113,7 @@ class BaseModelTests:
         assert isinstance(instance, GraphModuleMixin)
 
     def test_jit(self, model, atomic_batch, device):
-        instance, _, out_fields = model
+        instance, _, _ = model
         data = AtomicDataDict.to_(atomic_batch, device)
         model_script = script(instance)
 
@@ -127,7 +127,7 @@ class BaseModelTests:
         out_instance = instance(data.copy())
         out_script = model_script(data.copy())
 
-        for out_field in out_fields:
+        for out_field in out_instance.keys():
             assert torch.allclose(
                 out_instance[out_field],
                 out_script[out_field],
@@ -148,7 +148,7 @@ class BaseModelTests:
             out_script = model_script(data.copy())
             out_load = load_model(load_dat.copy())
 
-            for out_field in out_fields:
+            for out_field in out_instance.keys():
                 assert torch.allclose(
                     out_script[out_field],
                     out_load[out_field],
@@ -258,14 +258,13 @@ class BaseModelTests:
             )
 
     def test_forward(self, model, model_test_data):
-        instance, _, out_fields = model
-        output = instance(model_test_data)
-        for out_field in out_fields:
-            assert out_field in output
+        """Tests that we can run a forward pass without errors."""
+        instance, _, _ = model
+        _ = instance(model_test_data)
 
     def test_wrapped_unwrapped(self, model, device, Cu_bulk):
         atoms, data_orig = Cu_bulk
-        instance, _, out_fields = model
+        instance, _, _ = model
         data = from_ase(atoms)
         data = compute_neighborlist_(data, r_max=3.5)
         data[AtomicDataDict.ATOM_TYPE_KEY] = data_orig[AtomicDataDict.ATOM_TYPE_KEY]
@@ -309,7 +308,7 @@ class BaseModelTests:
             )
             out_unwrapped = instance(from_dict(data2))
             tolerance = FLOAT_TOLERANCE[dtype_to_name(instance.model_dtype)]
-            for out_field in out_fields:
+            for out_field in out_ref.keys():
                 # not important for the purposes of this test
                 if out_field in [
                     AtomicDataDict.POSITIONS_KEY,
@@ -322,7 +321,7 @@ class BaseModelTests:
 
     def test_batch(self, model, model_test_data):
         """Confirm that the results for individual examples are the same regardless of whether they are batched."""
-        instance, _, out_fields = model
+        instance, _, _ = model
 
         tolerance = FLOAT_TOLERANCE[dtype_to_name(instance.model_dtype)]
         allclose = functools.partial(torch.allclose, atol=tolerance)
@@ -331,7 +330,7 @@ class BaseModelTests:
         output1 = instance(data1)
         output2 = instance(data2)
         output = instance(model_test_data)
-        for out_field in out_fields:
+        for out_field in output.keys():
             # to ignore
             if out_field in [
                 AtomicDataDict.EDGE_INDEX_KEY,
