@@ -61,6 +61,7 @@ class GraphModel(GraphModuleMixin, torch.nn.Module):
             # Things that always make sense as inputs:
             AtomicDataDict.POSITIONS_KEY: "1o",
             AtomicDataDict.EDGE_INDEX_KEY: None,
+            AtomicDataDict.EDGE_TRANSPOSE_PERM_KEY: None,
             AtomicDataDict.EDGE_CELL_SHIFT_KEY: None,
             AtomicDataDict.CELL_KEY: "1o",  # 3 of them, but still
             AtomicDataDict.BATCH_KEY: None,
