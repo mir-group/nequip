@@ -33,6 +33,7 @@ extensions = [
     "sphinx.ext.intersphinx",
     "sphinx.ext.viewcode",
     "myst_parser",
+    "sphinx_copybutton",
 ]
 myst_enable_extensions = [
     "html_admonition",
