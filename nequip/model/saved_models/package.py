@@ -64,7 +64,8 @@ def ModelFromPackage(package_path: str, compile_mode: str = _EAGER_MODEL_KEY):
     """Builds model from a NequIP framework packaged zip file constructed with ``nequip-package``.
 
     This function can be used in the config file as follows.
-    ::
+
+    .. code-block:: yaml
 
       model:
         _target_: nequip.model.ModelFromPackage

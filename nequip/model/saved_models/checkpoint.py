@@ -26,7 +26,8 @@ def ModelFromCheckpoint(checkpoint_path: str, compile_mode: str = _EAGER_MODEL_K
     """Builds model from a NequIP framework checkpoint file.
 
     This function can be used in the config file as follows.
-    ::
+
+    .. code-block:: yaml
 
       model:
         _target_: nequip.model.ModelFromCheckpoint

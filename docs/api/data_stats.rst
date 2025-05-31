@@ -8,7 +8,9 @@ The following :class:`~nequip.data.CommonDataStatisticsManager` can generally be
 For users who seek to configure their own custom dataset statistics, the following API is offered.
 
 As an example, we show how one can configure the full :class:`~nequip.data.DataStatisticsManager` to have behavior equivalent to using
-:class:`~nequip.data.CommonDataStatisticsManager` as follows::
+:class:`~nequip.data.CommonDataStatisticsManager` as follows:
+
+.. code-block:: yaml
 
    stats_manager:
      _target_: nequip.data.DataStatisticsManager

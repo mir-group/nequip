@@ -344,7 +344,8 @@ def EnergyForceLoss(
     The loss component names are ``per_atom_energy_mse`` OR `total_energy_mse` (depending on whether ``per_atom_energy`` is ``True`` or ``False``), and `forces_mse`, which are the names to refer to when neeeded, e.g. when scheduling loss component coefficients.
 
     Example usage in config:
-    ::
+
+    .. code-block:: yaml
 
         training_module:
           _target_: nequip.train.NequIPLightningModule
@@ -411,7 +412,8 @@ def EnergyForceMetrics(
     """Simplified :class:`MetricsManager` wrapper for a **metric** term containing energy and force mean absolute errors (MAEs) and root mean squared errors (RMSEs).
 
     Example usage in config:
-    ::
+
+    .. code-block:: yaml
 
         training_module:
           _target_: nequip.train.NequIPLightningModule
@@ -487,7 +489,8 @@ def EnergyForceStressLoss(
     The loss component names are ``per_atom_energy_mse`` OR ``total_energy_mse`` (depending on whether ``per_atom_energy`` is ``True`` or ``False``), ``forces_mse``, and ``stress_mse``, which are the names to refer to when neeeded, e.g. when scheduling loss component coefficients.
 
     Example usage in config:
-    ::
+
+    .. code-block:: yaml
 
         training_module:
           _target_: nequip.train.NequIPLightningModule
@@ -548,7 +551,8 @@ def EnergyForceStressMetrics(
     """Simplified :class:`MetricsManager` wrapper for a **metric** term containing energy, force and stress mean absolute errors (MAEs) and root mean squared errors (RMSEs).
 
     Example usage in config:
-    ::
+
+    .. code-block:: yaml
 
         training_module:
           _target_: nequip.train.NequIPLightningModule

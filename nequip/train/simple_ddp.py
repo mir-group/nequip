@@ -9,7 +9,9 @@ class SimpleDDPStrategy(DDPStrategy):
     .. note::
         To use train-time compilation with multi-rank training, this strategy must be used in place of PyTorch Lightning's :class:`~lightning.pytorch.strategies.DDPStrategy`.
 
-    Example use in the config file::
+    Example use in the config file:
+
+    .. code-block:: yaml
 
       trainer:
         _target_: lightning.Trainer

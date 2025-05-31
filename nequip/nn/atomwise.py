@@ -293,7 +293,8 @@ class PerTypeScaleShift(GraphModuleMixin, torch.nn.Module):
         The new ``scales`` and ``shifts`` should be provided as dicts.
         The keys must correspond to the ``type_names`` registered in the model being modified, and may not include all the possible ``type_names`` of the original model.
         For example, if one uses a pretrained model with 50 atom types, and seeks to only modify 3 per-atom shifts to be consistent with a fine-tuning dataset's DFT settings, one could use
-        ::
+
+        .. code-block:: yaml
 
             shifts:
               C: 1.23

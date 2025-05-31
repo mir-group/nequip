@@ -17,7 +17,8 @@ class SoftAdapt(Callback):
         It is dangerous to restart training (with SoftAdapt) and use a differently configured loss function for the restart because SoftAdapt's loaded checkpoint state will become ill-suited for the new loss function.
 
     Example usage in config where the loss coefficients are updated every 5 epochs:
-    ::
+
+    .. code-block:: yaml
 
         callbacks:
           - _target_: nequip.train.callbacks.SoftAdapt

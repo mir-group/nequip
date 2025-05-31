@@ -15,7 +15,8 @@ class LossCoefficientScheduler(Callback):
     The coefficients will be normalized to sum up to 1 in line with the convention of :class:`~nequip.train.MetricsManager`.
 
     Example usage in config where there are two loss contributions:
-    ::
+
+    .. code-block:: yaml
 
         callbacks:
           - _target_: nequip.train.callbacks.LossCoefficientScheduler

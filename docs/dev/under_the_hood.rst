@@ -27,7 +27,9 @@ Model Building
 
 Model Builder Decorator
 -----------------------
-The following decorator should be used for new model builders, e.g. ::
+The following decorator should be used for new model builders, e.g.:
+
+.. code-block:: python
 
   @nequip.model.model_builder
   def my_new_model_builder(arg1, arg2):

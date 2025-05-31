@@ -229,7 +229,9 @@ def CommonDataStatisticsManager(
 
     The dataset statistics computed by using this wrapper include ``num_neighbors_mean``, ``per_atom_energy_mean``, ``forces_rms``, and ``per_type_forces_rms``, which are variables that can be interpolated for in the ``model`` section of the config file.
 
-    For example::
+    For example:
+
+    .. code-block:: yaml
 
         training_module:
         _target_: nequip.train.EMALightningModule

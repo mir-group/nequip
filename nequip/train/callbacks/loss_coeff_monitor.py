@@ -10,7 +10,8 @@ class LossCoefficientMonitor(Callback):
     """Monitor and log loss coefficients during training.
 
     Example usage in config to log loss coefficients every 5 epochs:
-    ::
+
+    .. code-block:: yaml
 
         callbacks:
           - _target_: nequip.train.callbacks.LossCoefficientMonitor

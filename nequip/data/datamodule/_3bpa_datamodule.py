@@ -36,7 +36,7 @@ class NequIP3BPADataModule(ASEDataModule):
     The following information can be found in ``iso_atoms.xyz`` in the 3BPA data zip, but is reproduced here
     in the format of the config arguments:
 
-    ::
+    .. code-block:: yaml
 
       model:
         type_names: [C, H, N, O]

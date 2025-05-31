@@ -32,7 +32,8 @@ class TestTimeXYZFileWriter(Callback):
     the model's ``type_names``.
 
     Example usage in config to write predictions and original dataset ``total_energy`` and ``forces`` to an ``xyz`` file:
-    ::
+
+    .. code-block:: yaml
 
         callbacks:
           - _target_: nequip.train.callbacks.TestTimeXYZFileWriter
