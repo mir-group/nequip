@@ -3,17 +3,17 @@ Loss Function and Error Metrics
 
 The following :class:`~nequip.train.MetricsManager` wrappers can be used for common force field training scenarios, where one seeks to include energyies and forces or energy, forces, and stresses in the loss function or as metrics for monitoring.
 
- .. autoclass:: nequip.train.EnergyForceLoss
-    :members:
+.. autoclass:: nequip.train.EnergyForceLoss
+   :members:
 
- .. autoclass:: nequip.train.EnergyForceStressLoss
-    :members:
+.. autoclass:: nequip.train.EnergyForceStressLoss
+   :members:
 
- .. autoclass:: nequip.train.EnergyForceMetrics
-    :members:
+.. autoclass:: nequip.train.EnergyForceMetrics
+   :members:
 
- .. autoclass:: nequip.train.EnergyForceStressMetrics
-    :members:
+.. autoclass:: nequip.train.EnergyForceStressMetrics
+   :members:
 
 
 For users who seek to configure their own custom loss function or metrics, the following API is offered.
@@ -46,17 +46,17 @@ As an example, we show how one can configure the full :class:`~nequip.train.Metr
 Error Metrics
 =============
 
- .. autoclass:: nequip.train.MeanSquaredError
-    :members:
+.. autoclass:: nequip.train.MeanSquaredError
+   :members:
 
- .. autoclass:: nequip.train.RootMeanSquaredError
-    :members:
+.. autoclass:: nequip.train.RootMeanSquaredError
+   :members:
 
- .. autoclass:: nequip.train.MeanAbsoluteError
-    :members:
+.. autoclass:: nequip.train.MeanAbsoluteError
+   :members:
 
- .. autoclass:: nequip.train.HuberLoss
-    :members:
+.. autoclass:: nequip.train.HuberLoss
+   :members:
 
 .. autoclass:: nequip.train.StratifiedHuberForceLoss
     :members:
