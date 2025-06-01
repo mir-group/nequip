@@ -6,17 +6,21 @@ from .. import AtomicDataDict
 
 
 class AtomicDataset(torch.utils.data.Dataset):
-    """The base class for all NequIP datasets.
+    """Base class for all NequIP datasets.
+
+    This class provides a standard interface for loading atomic structure data and applying
+    transforms.
 
     Subclasses must implement:
+        - ``__len__()`` - Return the total number of data samples
+        - ``get_data_list(indices)`` - Return raw data for the given indices
 
-     - ``__len__()``
-     - ``get_data_list()``
-
-    Or may optionally directly override ``__getitem__`` and ``__getitems__`` at their own risk.
+    Alternatively, subclasses may directly override ``__getitem__`` and ``__getitems__``
+    for custom indexing behavior.
 
     Args:
-        transforms (List[Callable]): list of data transforms
+        transforms (List[Callable], optional): List of data transforms to apply to each
+            data sample. Transforms are applied in order. Defaults to empty list.
     """
 
     dtype: torch.dtype

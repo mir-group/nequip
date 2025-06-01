@@ -32,7 +32,7 @@ class NequIP3BPADataModule(ASEDataModule):
     testing dataset in that order by default, but one can override this by providing the
     ``test_set`` argument as a ``List`` test sets. One can provide an empty list to have no test sets.
 
-    It is recommended to set the isolated atom energies in the ``model``'s ``per_species_rescale_shifts``.
+    It is recommended to set the isolated atom energies in the ``model``'s ``per_type_energy_shifts``.
     The following information can be found in ``iso_atoms.xyz`` in the 3BPA data zip, but is reproduced here
     in the format of the config arguments:
 
@@ -40,7 +40,11 @@ class NequIP3BPADataModule(ASEDataModule):
 
       model:
         type_names: [C, H, N, O]
-        per_species_rescale_shifts: [-1029.4889999855063, -13.587222780835477, -1484.9814568572233, -2041.9816003861047]
+        per_type_energy_shifts:
+          C: -1029.4889999855063
+          H: -13.587222780835477
+          N: -1484.9814568572233
+          O: -2041.9816003861047
 
     Args:
         seed (int): data seed for reproducibility
