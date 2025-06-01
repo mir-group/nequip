@@ -96,6 +96,7 @@ class GraphModel(GraphModuleMixin, torch.nn.Module):
             assert self.model_dtype == model_dtype
 
     @property
+    @torch.jit.unused
     def metadata(self) -> Dict[str, str]:
         # Note that this is a property so that the metadata can depend on the _current_ state
         # of the model, and not just what happened at initialization. This is essential for
