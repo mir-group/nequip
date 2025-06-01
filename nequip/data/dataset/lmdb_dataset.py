@@ -2,7 +2,7 @@
 import torch
 
 from .. import AtomicDataDict
-from ._base_datasets import AtomicDataset
+from .base_datasets import AtomicDataset
 import lmdb
 import pickle
 from typing import Iterable, List, Callable, Union

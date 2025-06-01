@@ -5,7 +5,7 @@ import ase.io
 
 from .. import AtomicDataDict
 from ..ase import from_ase
-from ._base_datasets import AtomicDataset
+from .base_datasets import AtomicDataset
 
 from typing import Union, Dict, List, Optional, Callable, Any
 

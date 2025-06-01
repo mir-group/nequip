@@ -5,7 +5,7 @@ import torch
 
 from .. import AtomicDataDict
 from ..dict import from_dict
-from ._base_datasets import AtomicDataset
+from .base_datasets import AtomicDataset
 
 
 class HDF5Dataset(AtomicDataset):

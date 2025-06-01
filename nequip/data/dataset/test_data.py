@@ -11,7 +11,7 @@ from ase.calculators.emt import EMT
 
 from .. import AtomicDataDict
 from ..dict import from_dict
-from ._base_datasets import AtomicDataset
+from .base_datasets import AtomicDataset
 
 
 class EMTTestDataset(AtomicDataset):

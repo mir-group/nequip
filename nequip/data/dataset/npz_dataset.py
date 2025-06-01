@@ -4,7 +4,7 @@ import torch
 
 from .. import AtomicDataDict
 from ..dict import from_dict
-from ._base_datasets import AtomicDataset
+from .base_datasets import AtomicDataset
 
 from typing import Union, Dict, List, Callable
 
