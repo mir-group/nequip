@@ -1,6 +1,11 @@
 Saved Models
 ============
 
+``nequip-train`` can be used to train, validate, and test models loaded from saved model files.
+
+Loading Saved Models
+####################
+
 There are two main forms of saved models that can be loaded for use in training, validation, and/or testing with ``nequip-train`` or custom Python scripts.
 There are **checkpoint files** (saved during ``nequip-train`` training runs) and **package files** (constructed with ``nequip-package`` and has the ``.nequip.zip`` extension).
 These files can be loaded using the following :class:`~nequip.model.ModelFromCheckpoint` and :class:`~nequip.model.ModelFromPackage` model loaders.
@@ -19,3 +24,8 @@ These files can be loaded using the following :class:`~nequip.model.ModelFromChe
 .. autofunction:: nequip.model.ModelFromCheckpoint
 
 .. autofunction:: nequip.model.ModelFromPackage
+
+Modifying Saved Models
+######################
+
+.. autofunction:: nequip.model.modify

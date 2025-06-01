@@ -1,3 +1,4 @@
+# This file is a part of the `nequip` package. Please see LICENSE and README at the root for information on using it.
 import torch
 
 from nequip.nn.model_modifier_utils import (
@@ -34,6 +35,15 @@ def only_apply_persistent_modifiers(persistent_only: bool):
 def get_all_modifiers(
     module: torch.nn.Module, _all_modifiers: Optional[Dict[str, callable]] = None
 ) -> Dict[str, callable]:
+    """
+    Find all model modifiers available in a model.
+
+    Args:
+        module (torch.nn.Module): The model to collect modifiers from.
+
+    Returns:
+        Dict[str, callable]: A dictionary mapping modifier names to their functions.
+    """
     if _all_modifiers is None:
         _all_modifiers = {}
 
@@ -54,10 +64,21 @@ def get_all_modifiers(
 
 
 def modify(
-    model: Union[Dict, torch.nn.Module],
-    modifiers: Union[List[Dict], Dict[str, List[Dict]]],
-) -> Any:
-    """Applies a sequence of model modifier functions to a model."""
+    model: Union[Dict[str, torch.nn.Module], torch.nn.Module],
+    modifiers: Union[List[Dict[str, Any]], Dict[str, List[Dict[str, Any]]]],
+) -> Union[Dict[str, torch.nn.Module], torch.nn.Module]:
+    """Applies a sequence of model modifier functions to a model.
+
+    The modifiers will be applied in the specified order. Whether the order of modifiers matters depends on the specific modifiers used.
+
+    Args:
+        model (Union[Dict[str, torch.nn.Module], torch.nn.Module]): The model(s) to modify.
+        modifiers (Union[List[Dict[str, Any]], Dict[str, List[Dict[str, Any]]]]): A list of modifier configurations (if `model` is a single model) or a dictionary mapping model names to lists of modifier configurations (if `model` is a dictionary).
+            Each modifier configuration is a dictionary. The dictionary must contain a key "modifier" that specifies the name of the modifier function to apply as a string. All other keys in the dictionary are passed as keyword arguments to the modifier function.
+
+    Returns:
+        Union[Dict[str, torch.nn.Module], torch.nn.Module]: The modified model(s).
+    """
     # check persistence
     global _ONLY_APPLY_PERSISTENT
     persistent_only: bool = _ONLY_APPLY_PERSISTENT.get()
