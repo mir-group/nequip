@@ -6,12 +6,12 @@ from .nequip_models import NequIPGNNModel, FullNequIPGNNModel
 from .pair_potential import ZBLPairPotential
 
 __all__ = [
-    model_builder,
-    override_model_compile_mode,
-    modify,
-    ModelFromCheckpoint,
-    ModelFromPackage,
-    NequIPGNNModel,
-    FullNequIPGNNModel,
-    ZBLPairPotential,
+    "model_builder",
+    "override_model_compile_mode",
+    "modify",
+    "ModelFromCheckpoint",
+    "ModelFromPackage",
+    "NequIPGNNModel",
+    "FullNequIPGNNModel",
+    "ZBLPairPotential",
 ]
