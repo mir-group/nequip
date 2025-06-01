@@ -14,7 +14,7 @@ Checkpointing is controlled through PyTorch Lightning's {class}`~lightning.pytor
 
 Checkpoint files can be used to [continue/restart](./workflow.md/#saving-and-restarting) interrupted training runs.
 
-Checkpoint files may also be used to fine-tune a pre-trained model through the {func}`~nequip.model.ModelFromCheckpoint` [model loader](../api/save_model.rst).
+Checkpoint files may also be used to [fine-tune](./workflow.md#fine-tuning-packaged-models) a pre-trained model through the {func}`~nequip.model.ModelFromCheckpoint` [model loader](../api/save_model.rst).
 
 Checkpoint files can also be [compiled](./workflow.md/#compilation) to be used for inference.
 
@@ -32,7 +32,7 @@ Package files have the `.nequip.zip` extension and are produced by [packaging mo
 
 The package file is an archival format for storing and distributing models. It does not only contain the weights of the model, but also the very code required for the model to work, hence making it (mostly) version independent.
 
-Package files can also be used to fine-tune the packaged pre-trained model through the {func}`~nequip.model.ModelFromPackage` [model loader](../api/save_model.rst).
+Package files can also be used to [fine-tune](./workflow.md#fine-tuning-packaged-models) the packaged pre-trained model through the {func}`~nequip.model.ModelFromPackage` [model loader](../api/save_model.rst).
 
 ```{important}
 It is safest to provide absolute paths when using {func}`~nequip.model.ModelFromPackage`.

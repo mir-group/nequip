@@ -33,7 +33,7 @@ Under the hood, the [Hydra](https://hydra.cc/) config utilities and the [PyTorch
 - {mod}`lightning`, such as Lightning's {class}`~lightning.pytorch.trainer.trainer.Trainer` or Lightning's native [callbacks](https://lightning.ai/docs/pytorch/stable/api_references.html#callbacks);
 - `nequip`, such as the various [DataModules](../api/datamodule.rst), custom [callbacks](../api/callbacks.rst), and so on.
 
-Users are advised to look at `configs/tutorial.yaml` to understand how the config file is structured, and then to look up what each of the classes do and what parameters they can take (be they on `torch`, `Lightning` or `nequip`'s docs). The documentation for `nequip`'s own classes can be found in the [Python API](../api/nequip.rst) section of this documentation.
+Users are advised to look at the [tutorial configuration](https://github.com/mir-group/nequip/blob/main/configs/tutorial.yaml) to understand how the config file is structured, and then to look up what each of the classes do and what parameters they can take (be they on [PyTorch](https://pytorch.org/docs/stable/), [PyTorch Lightning](https://lightning.ai/docs/pytorch/stable/) or [NequIP's API docs](../api/nequip.rst)). The documentation for `nequip`'s own classes can be found in the [Python API](../api/nequip.rst) section of this documentation. For detailed guidance on config structure, see the [Config File guide](./config.md).
 
 ```{tip}
 Hydra's output directory can be accessed in the config file using variable interpolation, which is very useful, for example, to instruct `Lightning` to save checkpoints in Hydra's output directory:
