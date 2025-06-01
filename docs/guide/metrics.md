@@ -1,27 +1,15 @@
-# Data Statistics, Loss, and Metrics
+# Loss and Metrics
 
-Data statistics, loss functions, and metrics are all configured by specifying a field (e.g. `total_energy`, `forces`, [etc.](../api/data_fields.rst)) and a quantity to calculate for it. Data statistics are bare quantities (e.g. `Mean`, `RootMeanSquare`, `Max`, etc), while loss and metrics use error quantities (e.g. `MeanSquaredError`, `MeanAbsoluteError`, etc).
-
-## Data Statistics
-
-There are two key reasons why one would use the automatic data statistics utilities during `nequip-train`: for inspection to get a feel for the data distribution, and to use specific data statistics as [model parameters](model.md/#training-data-statistics-as-hyperparameters) during model initialization.
-
-Data statistics is configured by setting the `stats_manager` argument of the {class}`~nequip.data.datamodule.NequIPDataModule` used (under the `data` [block of the config](config.md/#data)). 
-The `stats_manager` refers to a {class}`~nequip.data.DataStatisticsManager` object (see docs [here](../api/data_stats.rst)).
-Follow the link to the {class}`~nequip.data.DataStatisticsManager` API to learn more about how to use it.
-There is an example of the full config block for a base {class}`~nequip.data.DataStatisticsManager` object.
-A simplified and less verbose wrapper is provided through the {class}`~nequip.data.CommonDataStatisticsManager` for typical use cases where one's data contains `total_energy` and `forces` (and `edge_index`, i.e. the neighborlist that will be computed on-the-fly).
-
-## Loss and Metrics
+Loss functions and metrics are configured by specifying a field (e.g. `total_energy`, `forces`, [etc.](../api/data_fields.rst)) and an error quantity to calculate for it (e.g. `MeanSquaredError`, `MeanAbsoluteError`, etc).
 
 Loss functions and metrics are configured through {class}`~nequip.train.MetricsManager` objects in the `training_module` [block of the config](config.md/#training_module).
 The loss function determines what the model optimizes during training, while metrics are used for monitoring training progress and conditioning training behavior (early stopping, learning rate scheduling, etc.).
 
-### Units
+## Units
 All loss components and metrics are in the physical units associated with the dataset.
 For example, if the dataset uses force units of eV/Å, a force mean-squared error (MSE) would have units of (eV/Å)².
 
-### Simplified Wrappers
+## Simplified Wrappers
 
 Most users should use the simplified wrapper classes for common force field training scenarios. These wrappers automatically configure the appropriate metrics for you:
 
@@ -35,7 +23,7 @@ Most users should use the simplified wrapper classes for common force field trai
 
 When using simplified wrappers, the actual metric names logged during training may not be immediately obvious. Each wrapper creates specific metrics with predetermined names. To see exactly what metric names each wrapper produces, refer to their individual API documentation in the [metrics API reference](../api/metrics.rst).
 
-### Coefficients and Weighted Sum
+## Coefficients and Weighted Sum
 
 Users can set coefficients (`coeff`) for each loss or metric term, which leads to the computation of a `weighted_sum` metric.
 
@@ -115,7 +103,7 @@ trainer:
     monitor: ${monitored_metric}
 ```
 
-### Advanced Usage: Custom MetricsManager
+## Advanced Usage: Custom MetricsManager
 
 For scenarios not covered by the simplified wrappers, you can use the full {class}`~nequip.train.MetricsManager` directly. Technical details and advanced examples are provided in the {class}`~nequip.train.MetricsManager` [API page](../api/metrics.rst).
 

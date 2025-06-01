@@ -38,7 +38,9 @@ run: [val, test, train, val, test]
 
 ## `data`
 
-`data` defines the {class}`~nequip.data.datamodule.NequIPDataModule` object, which manages the train, validation, and test datasets. Users are directed to the [API page](../api/datamodule.rst) of {mod}`nequip.data.datamodule` for the API of the `DataModule` classes that `nequip` provides. Custom datamodules that subclass from {class}`~nequip.data.datamodule.NequIPDataModule` can also be used.
+`data` defines the {class}`~nequip.data.datamodule.NequIPDataModule` object, which manages the train, validation, and test datasets.
+For guidance on data configuration, see the [Data Configuration guide](data.md).
+For technical API details, users are directed to the {mod}`nequip.data.datamodule` [API page](../api/datamodule.rst).
 
 
 ## `trainer`
@@ -77,7 +79,7 @@ The following important objects are configured as part of the `training_module`:
   This section configures the model itself, including hyperparameters and the choice of architecture (for example, the NequIP message-passing E(3)-equivariant GNN, or the Allegro architecture). Refer to the [model documentation page](../api/model) to learn how to configure this section.
 
  ### `loss` and `metrics`
-  Loss functions and metrics to monitor training progress are configured here in the `training_module`. See the [Loss and Metrics guide](stats_metrics.md/#loss-and-metrics) for configuration details, including simplified wrappers, coefficient mechanics, and monitoring setup.
+  Loss functions and metrics to monitor training progress are configured here in the `training_module`. See the [Loss and Metrics guide](metrics.md) for configuration details, including simplified wrappers, coefficient mechanics, and monitoring setup.
 
  ### `optimizer` and `lr_scheduler`
 

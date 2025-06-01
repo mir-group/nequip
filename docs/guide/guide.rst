@@ -7,8 +7,9 @@ User Guide
    workflow
    files
    config
+   data
+   metrics
    model
-   stats_metrics
    conventions
    advanced
    faq

@@ -1,0 +1,130 @@
+# Data Configuration
+
+## Data Processing Flow
+
+The data processing in NequIP follows the following pipeline from raw files to model-ready data:
+
+```
+Raw Data File (`.xyz`, `.npz`, etc.)
+        ↓
+  Dataset Object (loads and parses raw data)
+        ↓
+  Transforms (applied to each data point, e.g. neighbor lists, type mapping)
+        ↓
+  DataLoader (batches transformed data for training)
+        ↓
+  Model Training
+
+DataModule ("manager" class)
+    ├── Manages train/val/test dataset splits  
+    ├── Applies transform chains
+    ├── Configures DataLoaders
+    └── Computes dataset statistics
+```
+
+**Key Components:**
+
+- **DataModule**: Orchestrates everything - manages datasets, applies transforms, configures loaders, and computes statistics
+- **Dataset**: Reads raw data files and applies transforms to individual structures
+- **Transforms**: Process data sequentially (e.g., compute neighbor lists, map atom types)
+- **DataLoader**: Batches transformed data for efficient training with parallel loading
+- **Statistics**: Computed from processed data to initialize model parameters (energy shifts, force scales, etc.)
+
+## DataModules and Datasets
+
+The [data section](config.md/#data) of the NequIP config file specifies a {class}`~nequip.data.datamodule.NequIPDataModule`, which manages how training data is loaded and processed.
+`DataModule`s coordinate all aspects of data handling from loading to preprocessing.
+For comprehensive configuration options, see the {mod}`nequip.data.datamodule` [API reference](../api/datamodule.rst).
+
+### Common DataModules
+
+{class}`~nequip.data.datamodule.ASEDataModule` is the most commonly used datamodule because it can read many file formats through [ASE](https://wiki.fysik.dtu.dk/ase/) (Atomic Simulation Environment), including popular formats such as the `.xyz` format:
+
+```yaml
+data:
+  _target_: nequip.data.datamodule.ASEDataModule
+  split_dataset:
+    file_path: training_data.xyz
+    train: 0.8
+    val: 0.1
+    test: 0.1
+```
+
+### Specialized DataModules
+
+For specific benchmark datasets, specialized datamodules provide auto-download capabilities and predefined configurations:
+
+- {class}`~nequip.data.datamodule.MD22DataModule` - MD22 datasets
+- {class}`~nequip.data.datamodule.rMD17DataModule` - Revised MD17 datasets
+- {class}`~nequip.data.datamodule.sGDML_CCSD_DataModule` - sGDML datasets
+- {class}`~nequip.data.datamodule.TM23DataModule` - TM23 dataset
+- {class}`~nequip.data.datamodule.NequIP3BPADataModule` - 3BPA dataset
+
+These specialized datamodules have unique APIs tailored to their specific datasets and often handle downloading and preprocessing automatically.
+
+### Custom Data Configurations
+
+For more complex or custom data setups, you can use the base {class}`~nequip.data.datamodule.NequIPDataModule` directly with specific dataset objects. See the dataset [API documentation](../api/dataset.rst) for available dataset classes.
+
+The existing specialized datamodules are essentially convenience wrappers that simplify configuring the base `NequIPDataModule` with specific datasets and common settings.
+
+## Data Transforms
+
+Transforms process raw data into a format suitable for model training. They are applied sequentially to each data point. Two transforms are essential for most use cases:
+
+- **{class}`~nequip.data.transforms.NeighborListTransform`** (always required) computes which atoms are neighbors of each atom within a cutoff distance. This is fundamental for graph-based neural networks:
+  ```yaml
+  - _target_: nequip.data.transforms.NeighborListTransform
+    r_max: 5.0  # should be the same as model `r_max`
+  ```
+
+- **{class}`~nequip.data.transforms.ChemicalSpeciesToAtomTypeMapper`** (usually required) maps atomic numbers to model type indices. This handles the distinction between chemical elements (C, H, O) and the integer type indices (0, 1, 2) that the model uses:
+  ```yaml
+  - _target_: nequip.data.transforms.ChemicalSpeciesToAtomTypeMapper
+    chemical_symbols: [C, H, O, Cu]  # Order determines type indices
+  ```
+
+The `chemical_symbols` list defines the mapping from atomic numbers to type indices, and `type_names` should be consistent across data, model, and statistics configurations.
+
+Here's an example with both transforms:
+
+```yaml
+transforms:
+  - _target_: nequip.data.transforms.NeighborListTransform
+    r_max: 5.0
+  - _target_: nequip.data.transforms.ChemicalSpeciesToAtomTypeMapper
+    chemical_symbols: [C, H, O, Cu]
+```
+
+Additional transforms are available for specific use cases. For stress-related data, you may need {class}`~nequip.data.transforms.VirialToStressTransform` (converts virial to stress tensors) or {class}`~nequip.data.transforms.StressSignFlipTransform` (handles different stress sign conventions). For a complete list of available transforms, see the [transforms API documentation](../api/data_transforms.rst).
+
+## DataLoaders
+
+DataLoaders handle batching and parallel data loading using PyTorch's {class}`torch.utils.data.DataLoader`:
+
+```yaml
+train_dataloader:
+  _target_: torch.utils.data.DataLoader
+  batch_size: 5        # an important training hyperparameter to tune
+  num_workers: 5       # parallel workers for data loading
+  shuffle: true        # often useful to shuffle training data
+```
+
+## Dataset Statistics
+
+Dataset statistics provide both rough knowledge of your dataset (e.g., average energy per atom, force magnitudes) and are crucial for initializing data-derived model hyperparameters. The {class}`~nequip.data.CommonDataStatisticsManager` automatically computes essential statistics:
+
+```yaml
+stats_manager:
+  _target_: nequip.data.CommonDataStatisticsManager
+  type_names: [C, H, O, Cu]
+  dataloader_kwargs:
+    batch_size: 10  # Can be larger than training batch size to speed up computation
+```
+
+You can use larger `batch_size` in `dataloader_kwargs` than your training batch size to compute statistics faster without memory issues.
+Statistics are computed once during data setup, not during training.
+For advanced use cases, you should use the base {class}`~nequip.data.DataStatisticsManager` directly for more flexible configuration.
+See the [dataset statistics API documentation](../api/data_stats.rst) for configuration options.
+
+For guidance on using computed statistics to initialize model parameters, see [Training data statistics as hyperparameters](model.md/#training-data-statistics-as-hyperparameters).

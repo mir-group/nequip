@@ -12,43 +12,32 @@ To see the documentation for individual hyperparameters, look at the Python API 
 
 ## Training data statistics as hyperparameters
 
-Sometimes we may want to derive certain hyperparameters from the statistics of the data used for training. For example, it is reasonable to use the average number of neighbors around a central atom to normalize a sum over edge features. Users are able to configure specific types of dataset statistics to compute with the `stats_manager` argument of the {class}`~nequip.data.datamodule.NequIPDataModule` used under the `data` section of the config file. Consider the following example:
+Model hyperparameters can be derived from statistics computed from your training data. For dataset statistics configuration, see the [Dataset Statistics](data.md/#dataset-statistics) section in the data guide.
+
+Once statistics are configured, use the resolver syntax `${training_data_stats:statistic_name}` to reference them in model configuration:
 
 ```yaml
-data:
-  _target_:  [the datamodule class]
+model:
+  _target_: nequip.model.NequIPGNNModel
   
-  # datamodule arguments ...
-
-  stats_manager:
-    _target_: nequip.data.CommonDataStatisticsManager
-    type_names: ${model_type_names}
-    dataloader_kwargs:
-      batch_size: 10
+  # Use computed statistics for model initialization
+  avg_num_neighbors: ${training_data_stats:num_neighbors_mean}
+  per_type_energy_shifts: ${training_data_stats:per_atom_energy_mean}
+  per_type_energy_scales: ${training_data_stats:per_type_forces_rms}
 ```
-In the above example, we call {class}`~nequip.data.CommonDataStatisticsManager`, which will automatically compute the following dataset statistics: `num_neighbors_mean`, `per_atom_energy_mean`, `forces_rms`, and `per_type_forces_rms`. (One could also configure custom dataset statistics with the [{class}`~nequip.data.DataStatisticsManager`](../api/data_stats).) We are then able to refer to these dataset statistics variables when configuring the model hyperparameters in the `model` section of the config file:
-```yaml
-training_module:
-  _target_: nequip.train.EMALightningModule
-  
-  # other `EMALightningModule` arguments...
 
-  model:
-    _target_: nequip.model.NequIPGNNModel
+The {class}`~nequip.data.CommonDataStatisticsManager` computes these essential statistics:
 
-    # other model hyperparameters...
+- `num_neighbors_mean` - for edge normalization (`avg_num_neighbors`)
+- `per_atom_energy_mean` - for energy shifts (`per_type_energy_shifts`)  
+- `forces_rms` - for energy scales (`per_type_energy_scales`)
+- `per_type_forces_rms` - for per-type energy scales (`per_type_energy_scales`)
 
-    avg_num_neighbors: ${training_data_stats:num_neighbors_mean}
-    per_type_energy_shifts: ${training_data_stats:per_atom_energy_mean}
-    per_type_energy_scales: ${training_data_stats:per_type_forces_rms}
-```
-Note the special syntax `${training_data_stats:name_of_dataset_statistic}` that resembles variable interpolation (it's actually an {mod}`omegaconf` [resolver](https://omegaconf.readthedocs.io/en/latest/custom_resolvers.html)). Under the hood, it tells the NequIP infrastructure to look for the dataset statistics computed by the `stats_manager` and copy their values into the `model` configuration dictionary.
+However, it is often advisable to use isolated atom energies as `per_type_energy_shifts` instead of the computed `per_atom_energy_mean` for better physical behavior.
 
 ```{tip}
-The `name` of the dataset statistic is customizable, but the same `name` must be used when referring to it from the `model` section of the config file. For example, if you call the dataset statistic `name: my_custom_stat`, the model part of the config should use `${training_data_stats:my_custom_stat}`.
+The statistic name must match exactly between the `stats_manager` configuration and the model reference. For custom statistics, use `${training_data_stats:my_custom_stat}` where `my_custom_stat` is the name you defined.
 ```
-
-The three dataset statistics `num_neighbors_mean`, `per_atom_energy_mean`, and `forces_rms` are sufficient for most cases. (Note that it is often advisable to use isolated atom energies as `per_type_energy_shifts` instead of `per_atom_energy_mean`.) The NequIP infrastructure supports other dataset statistics: see [Dataset Statistics](../api/data_stats).
 
 ## Energy Shifts & Scales
 
