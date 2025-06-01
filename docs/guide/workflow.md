@@ -108,20 +108,20 @@ Packaged models can be used for both inference and fine-tuning.  Fine-tuning use
 To compile a model with TorchScript:
 ```bash
 nequip-compile \
-path/to/ckpt_file/or/package_file \
-path/to/compiled_model.nequip.pth \
---device (cpu/cuda) \
---mode torchscript
+  path/to/ckpt_file/or/package_file \
+  path/to/compiled_model.nequip.pth \
+  --device [cpu|cuda] \
+  --mode torchscript
 ```
 
 To compile a model with AOTInductor:
 ```bash
 nequip-compile \
-path/to/ckpt_file/or/package_file \
-path/to/compiled_model.nequip.pt2 \
---device [cpu|cuda] \
---mode aotinductor \
---target [ase|pair_nequip|pair_allegro|...]
+  path/to/ckpt_file/or/package_file \
+  path/to/compiled_model.nequip.pt2 \
+  --device [cpu|cuda] \
+  --mode aotinductor \
+  --target [ase|pair_nequip|pair_allegro|...]
 ```
 
 ```{important}
