@@ -77,7 +77,7 @@ The following important objects are configured as part of the `training_module`:
   This section configures the model itself, including hyperparameters and the choice of architecture (for example, the NequIP message-passing E(3)-equivariant GNN, or the Allegro architecture). Refer to the [model documentation page](../api/model) to learn how to configure this section.
 
  ### `loss` and `metrics`
-  Loss functions and metrics to monitor training progress are configured here in the `training_module`. Refer to the [Loss and Metrics](stats_metrics.md/#loss-and-metrics) docs for more information.
+  Loss functions and metrics to monitor training progress are configured here in the `training_module`. See the [Loss and Metrics guide](stats_metrics.md/#loss-and-metrics) for configuration details, including simplified wrappers, coefficient mechanics, and monitoring setup.
 
  ### `optimizer` and `lr_scheduler`
 

@@ -1,7 +1,13 @@
 Loss Function and Error Metrics
 ###############################
 
-The following :class:`~nequip.train.MetricsManager` wrappers can be used for common force field training scenarios, where one seeks to include energyies and forces or energy, forces, and stresses in the loss function or as metrics for monitoring.
+For practical usage and configuration guidance, see the :doc:`/guide/stats_metrics` guide.
+This page provides technical API details.
+
+Simplified Wrappers
+===================
+
+The following :class:`~nequip.train.MetricsManager` wrappers can be used for common force field training scenarios:
 
 .. autoclass:: nequip.train.EnergyForceLoss
    :members:
@@ -15,10 +21,12 @@ The following :class:`~nequip.train.MetricsManager` wrappers can be used for com
 .. autoclass:: nequip.train.EnergyForceStressMetrics
    :members:
 
+Advanced Configuration: MetricsManager
+=======================================
 
-For users who seek to configure their own custom loss function or metrics, the following API is offered.
+For users who need custom configurations beyond the simplified wrappers, the full :class:`~nequip.train.MetricsManager` API is available.
 
-As an example, we show how one can configure the full :class:`~nequip.train.MetricsManager` to have behavior equivalent to using :class:`~nequip.train.EnergyForceLoss` as follows:
+Example: Custom MetricsManager equivalent to EnergyForceLoss:
 
 .. code-block:: yaml
 
@@ -36,7 +44,6 @@ As an example, we show how one can configure the full :class:`~nequip.train.Metr
         coeff: 1
         metric:
           _target_: nequip.train.MeanSquaredError
-
 
 .. autoclass:: nequip.train.MetricsManager
    :members:
