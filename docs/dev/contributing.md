@@ -24,6 +24,14 @@ All additions should support CUDA/GPU. If possible, please test your changes on 
 
 - For new classes or functions that will be exposed to users, comprehensive user-facing docstrings are a must. We follow **Google-style Python docstrings**.
 
+- Please carefully follow correct reStructuredText markup in user-facing docstrings or reStructuredText docs and ensure that they render correctly.  Pay particular attention to whitespace, which can easily end up rendering things in blockquotes by accident in reStructuredText.
+
+- Use correct Sphinx (and InterSphinx) references to other classes, functions, etc. that are mentioned.
+
+- Use `.. code-block: language` directives in reStructuredText or `` ```language `` in Markdown to make sure code blocks are rendered with syntax highlighting.
+
+- See docs/README.md for instructions on building the docs locally.
+
 - For new classes or functions that are not user-facing, docstrings and explanatory comments are strongly encouraged and will likely be asked for during code reviews.
 
 - Added options should be documented in the docs and changes in the `CHANGELOG.md` file

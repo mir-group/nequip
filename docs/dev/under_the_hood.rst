@@ -17,8 +17,8 @@ This design choice is motivated by the fact that not all implemented training te
 
 Because of the potential need to compose ``NequIPLightningModule`` subclasses, several rules should be obeyed to limit the possibility of silent errors. Note that composing ``NequIPLightningModule`` subclasses takes the form of the "deadly diamond of death", a notorious multiple inheritance pattern that developers must be aware and cautious of when writing compositions.
 
- - class attributes specific to a subclass should have a unique, distinguishable name to avoid the possibility of overwriting variables when attempting multiple inheritance (a clean way might be to use a dataclass)
- - be very careful of the order of inheritance when creating "diamond" subclasses (a subclass that derives from other subclasses of ``NequIPLightningModule``), and use assertions to make sure that the new training module behaves as intended
+- class attributes specific to a subclass should have a unique, distinguishable name to avoid the possibility of overwriting variables when attempting multiple inheritance (a clean way might be to use a dataclass)
+- be very careful of the order of inheritance when creating "diamond" subclasses (a subclass that derives from other subclasses of ``NequIPLightningModule``), and use assertions to make sure that the new training module behaves as intended
 
 
 
