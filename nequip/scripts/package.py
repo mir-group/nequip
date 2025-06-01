@@ -169,11 +169,13 @@ def main(args=None):
             ep.value for ep in _DISCOVERED_NEQUIP_EXTENSION
         ]
         # TODO: ideally we don't have any numpy or matplotlib dependencies, but for now it's here because of e3nn TPs
+        # TODO: better mechanism for registering? specifically, openequivariance is tricky because it is enabled through the base TPScatter class
         _EXTERNAL_MODULES = [
             "triton",
             "io",
             "opt_einsum_fx",
             "numpy",
+            "openequivariance",
         ] + args.extra_externs
 
         _MOCK_MODULES = ["matplotlib"]
