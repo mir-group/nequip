@@ -26,4 +26,4 @@ Callbacks are configured in the [`trainer` section](config.md/#trainer) of your 
 
 - **{class}`~nequip.train.callbacks.LossCoefficientMonitor`** - A callback for tracking and logging loss coefficients over time, useful for monitoring how coefficient scheduling affects training dynamics.
 
-- **{class}`~nequip.train.callbacks.SoftAdapt`** - An adaptive callback that automatically adjusts loss coefficients based on the relative rate of learning of different tasks. See [SoftAdapt paper](https://arxiv.org/abs/2403.18122).
+- **{class}`~nequip.train.callbacks.SoftAdapt`** - An adaptive callback that automatically adjusts loss coefficients based on the relative rate of learning of different tasks. See [SoftAdapt paper](https://www.sciencedirect.com/science/article/pii/S0927025624003768).

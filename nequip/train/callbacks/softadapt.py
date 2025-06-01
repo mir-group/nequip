@@ -8,7 +8,7 @@ from typing import List, Dict
 
 
 class SoftAdapt(Callback):
-    """Adaptively modify loss coefficients over a training run using the `SoftAdapt <https://arxiv.org/abs/2403.18122>`_ scheme.
+    """Adaptively modify loss coefficients over a training run using the `SoftAdapt <https://www.sciencedirect.com/science/article/pii/S0927025624003768>`_ scheme.
 
     .. warning::
         The SoftAdapt requires that all components of the loss function contribute to the loss function, i.e. that their ``coeff`` in the :class:`~nequip.train.MetricsManager` is not ``None``.
