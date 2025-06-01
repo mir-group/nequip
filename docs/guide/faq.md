@@ -31,7 +31,7 @@
 
   **Q**: How do I train with multiple GPUs?
 
-  **A**: Read our [Distributed Data Parallel training docs](advanced_training.md/#distributed-data-parallel-training).
+  **A**: Read our [Distributed Data Parallel training docs](ddp_training.md).
 
 ## Upgrading from pre-`0.7.0` `nequip`
 
