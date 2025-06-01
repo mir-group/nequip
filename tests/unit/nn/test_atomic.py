@@ -17,9 +17,9 @@ from nequip.utils import dtype_from_name, torch_default_dtype
     scope="class",
     params=[
         (1.3, 5.7),
-        (1.3, [5.7, 77.7, 34.1]),
-        ([1.3, 9.3, 4.1], 5.7),
-        ([1.3, 9.3, 4.1], [5.7, 77.7, 34.1]),
+        (1.3, {"A": 5.7, "B": 77.7, "C": 34.1}),
+        ({"A": 1.3, "B": 9.3, "C": 4.1}, 5.7),
+        ({"A": 1.3, "B": 9.3, "C": 4.1}, {"A": 5.7, "B": 77.7, "C": 34.1}),
     ],
 )
 def model(model_dtype, request):
@@ -62,8 +62,7 @@ def model(model_dtype, request):
 
 @pytest.fixture(scope="class")
 def batches(nequip_dataset):
-    print(nequip_dataset[0])
-    print(nequip_dataset[1])
+    """Create test batches for single frames and combined batches."""
     b = []
     for idx in [[0], [1], [0, 1]]:
         b += [AtomicDataDict.batched_from_list(nequip_dataset[idx])]
