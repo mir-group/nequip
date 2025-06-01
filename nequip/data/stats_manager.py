@@ -13,30 +13,31 @@ logger = RankedLogger(__name__, rank_zero_only=True)
 
 
 class DataStatisticsManager(torch.nn.ModuleList):
-    """Manages ``nequip`` metrics that can be applied to ``AtomicDataDict`` s to compute dataset statistics.
+    """Manages ``nequip`` metrics that can be applied to ``AtomicDataDict`` to compute dataset statistics.
 
-    The main input argument ``metrics`` is a list of dictionaries, where each dictionary contains the following keys.
+    The main input argument ``metrics`` is a list of dictionaries, where each dictionary contains the following keys:
 
-    There are two mandatory keys.
+    **Mandatory keys:**
 
-      - ``field`` refers to the quantity of interest for metric computation. It has two formats.
+    - ``field`` refers to the quantity of interest for metric computation. It has two formats:
 
-         - a ``str`` for a ``nequip`` defined field (e.g. ``total_energy``, ``forces``, ``stress``), or
-         - a ``Callable`` that performs some additional operations before returning a ``torch.Tensor``
-           for metric computation (e.g. :class:`~nequip.data.PerAtomModifier`).
-      - ``metric`` is a ``nequip`` data metric object (a subclass of :class:`torchmetrics.Metric`).
+      - a ``str`` for a ``nequip`` defined field (e.g. ``total_energy``, ``forces``, ``stress``), or
+      - a ``Callable`` that performs some additional operations before returning a ``torch.Tensor``
+        for metric computation (e.g. :class:`~nequip.data.PerAtomModifier`).
 
-    The remaining keys are optional.
+    - ``metric`` is a ``nequip`` data metric object (a subclass of :class:`torchmetrics.Metric`).
 
-      - ``per_type`` is a ``bool`` (defaults to ``False`` if not provided). If ``True``, node fields (such as ``forces``) will have their metrics computed separately for each node type based on the ``type_names`` argument.
+    **Optional keys:**
 
-      - ``ignore_nan`` is a ``bool`` (defaults to ``False`` if not provided). This should be set to true if one expects the underlying ``target`` data to contain ``NaN`` entries.
+    - ``per_type`` is a ``bool`` (defaults to ``False`` if not provided). If ``True``, node fields (such as ``forces``) will have their metrics computed separately for each node type based on the ``type_names`` argument.
 
-      - ``name`` is the name that the metric is logged as. Default names are used if not provided, but it is recommended for users to set custom names for clarity and control.
+    - ``ignore_nan`` is a ``bool`` (defaults to ``False`` if not provided). This should be set to true if one expects the underlying ``target`` data to contain ``NaN`` entries.
+
+    - ``name`` is the name that the metric is logged as. Default names are used if not provided, but it is recommended for users to set custom names for clarity and control.
 
     Args:
         metrics (list): list of dictionaries with keys ``field``, ``metric``, ``per_type``, ``ignore_nan``, and ``name``
-        dataloader_kwargs (dict): arguments of :class:`torch.utils.data.DataLoader` for dataset statitstics computation (ideally, the ``batch_size`` should be as large as possible without triggering OOM)
+        dataloader_kwargs (dict): arguments of :class:`torch.utils.data.DataLoader` for dataset statistics computation (ideally, the ``batch_size`` should be as large as possible without triggering OOM)
         type_names (list): required for ``per_type`` metrics (this must match the ``type_names`` argument of the model, it is advisable to use variable interpolation in the config file to make sure they are consistent)
     """
 
