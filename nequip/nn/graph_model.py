@@ -21,7 +21,7 @@ def _model_metadata_from_config(model_config: Dict[str, str]) -> Dict[str, str]:
     # manually process everything
     model_metadata_dict[MODEL_DTYPE_KEY] = model_config[MODEL_DTYPE_KEY]
     model_metadata_dict[TYPE_NAMES_KEY] = " ".join(model_config[TYPE_NAMES_KEY])
-    model_metadata_dict[NUM_TYPES_KEY] = len(model_config[TYPE_NAMES_KEY])
+    model_metadata_dict[NUM_TYPES_KEY] = str(len(model_config[TYPE_NAMES_KEY]))
     model_metadata_dict[R_MAX_KEY] = str(model_config[R_MAX_KEY])
 
     if PER_EDGE_TYPE_CUTOFF_KEY in model_config:
