@@ -1,0 +1,67 @@
+<svg width="400" height="600" xmlns="http://www.w3.org/2000/svg" style="background-color: transparent;">
+  <!-- Define arrow marker -->
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" 
+            refX="10" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#333" />
+    </marker>
+  </defs>
+  
+  <!-- Raw Data File -->
+  <rect x="50" y="20" width="300" height="60" rx="10" 
+        fill="#e8f4f8" stroke="#2196F3" stroke-width="2"/>
+  <text x="200" y="45" text-anchor="middle" font-family="Arial, sans-serif" 
+        font-size="16" font-weight="bold">Raw Data File</text>
+  <text x="200" y="65" text-anchor="middle" font-family="Arial, sans-serif" 
+        font-size="14" fill="#666">.xyz, .npz, etc.</text>
+  
+  <!-- Arrow 1 -->
+  <line x1="200" y1="80" x2="200" y2="120" stroke="#333" stroke-width="2" 
+        marker-end="url(#arrowhead)"/>
+  
+  <!-- Dataset Object -->
+  <rect x="50" y="130" width="300" height="60" rx="10" 
+        fill="#e8f4f8" stroke="#2196F3" stroke-width="2"/>
+  <text x="200" y="155" text-anchor="middle" font-family="Arial, sans-serif" 
+        font-size="16" font-weight="bold">Dataset Object(s)</text>
+  <text x="200" y="175" text-anchor="middle" font-family="Arial, sans-serif" 
+        font-size="14" fill="#666">load raw data and parses into AtomicDataDicts</text>
+  
+  <!-- Arrow 2 -->
+  <line x1="200" y1="190" x2="200" y2="230" stroke="#333" stroke-width="2" 
+        marker-end="url(#arrowhead)"/>
+  
+  <!-- Transforms -->
+  <rect x="50" y="240" width="300" height="80" rx="10" 
+        fill="#e8f4f8" stroke="#2196F3" stroke-width="2"/>
+  <text x="200" y="265" text-anchor="middle" font-family="Arial, sans-serif" 
+        font-size="16" font-weight="bold">Data Transforms</text>
+  <text x="200" y="285" text-anchor="middle" font-family="Arial, sans-serif" 
+        font-size="14" fill="#666">applied to each data point</text>
+  <text x="200" y="305" text-anchor="middle" font-family="Arial, sans-serif" 
+        font-size="13" fill="#888">neighbor lists, type mapping, etc.</text>
+  
+  <!-- Arrow 3 -->
+  <line x1="200" y1="320" x2="200" y2="360" stroke="#333" stroke-width="2" 
+        marker-end="url(#arrowhead)"/>
+  
+  <!-- DataLoader -->
+  <rect x="50" y="370" width="300" height="60" rx="10" 
+        fill="#e8f4f8" stroke="#2196F3" stroke-width="2"/>
+  <text x="200" y="395" text-anchor="middle" font-family="Arial, sans-serif" 
+        font-size="16" font-weight="bold">DataLoader</text>
+  <text x="200" y="415" text-anchor="middle" font-family="Arial, sans-serif" 
+        font-size="14" fill="#666">combine transformed data into batches</text>
+  
+  <!-- Arrow 4 -->
+  <line x1="200" y1="430" x2="200" y2="470" stroke="#333" stroke-width="2" 
+        marker-end="url(#arrowhead)"/>
+  
+  <!-- Model Training -->
+  <rect x="50" y="480" width="300" height="60" rx="10" 
+        fill="#e8f4f8" stroke="#2196F3" stroke-width="2"/>
+  <text x="200" y="505" text-anchor="middle" font-family="Arial, sans-serif" 
+        font-size="16" font-weight="bold">Model Training</text>
+  <text x="200" y="525" text-anchor="middle" font-family="Arial, sans-serif" 
+        font-size="14" fill="#666">nequip-train</text>
+</svg>

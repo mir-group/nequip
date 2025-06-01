@@ -4,31 +4,22 @@
 
 The data processing in NequIP follows the following pipeline from raw files to model-ready data:
 
+```{figure} ./ml-data-flow-chart.svg
+:width: 400px
+:align: center
 ```
-Raw Data File (`.xyz`, `.npz`, etc.)
-        ↓
-  Dataset Object (loads and parses raw data)
-        ↓
-  Transforms (applied to each data point, e.g. neighbor lists, type mapping)
-        ↓
-  DataLoader (batches transformed data for training)
-        ↓
-  Model Training
 
-DataModule ("manager" class)
-    ├── Manages train/val/test dataset splits  
-    ├── Applies transform chains
-    ├── Configures DataLoaders
-    └── Computes dataset statistics
-```
+This entire pipeline is coordinated and managed by a DataModule object, which also
+- Manages train/val/test dataset splits  
+- Computes dataset statistics
 
 **Key Components:**
 
-- **DataModule**: Orchestrates everything - manages datasets, applies transforms, configures loaders, and computes statistics
+- **DataModule**: Orchestrates everything
 - **Dataset**: Reads raw data files and applies transforms to individual structures
 - **Transforms**: Process data sequentially (e.g., compute neighbor lists, map atom types)
 - **DataLoader**: Batches transformed data for efficient training with parallel loading
-- **Statistics**: Computed from processed data to initialize model parameters (energy shifts, force scales, etc.)
+- **Statistics Manager**: Computed from processed data to initialize model parameters (energy shifts, force scales, etc.)
 
 ## DataModules and Datasets
 
