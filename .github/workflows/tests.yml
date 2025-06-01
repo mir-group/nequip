@@ -48,11 +48,22 @@ jobs:
             pip install torch==${TORCH} --index-url https://download.pytorch.org/whl/cpu --upgrade
         fi
     - name: Install test dependencies
+      env:
+        TORCH: "${{ matrix.torch-version }}"
       run: |
         # install packages that aren't required dependencies but that the tests do need
         pip install h5py vesin
-        # install OpenEquivariance
-        pip install git+https://github.com/PASSIONLab/OpenEquivariance
+        # install OpenEquivariance only if torch >= 2.4 and CUDA is available
+        if python3 -c "import torch; import packaging.version; exit(0 if packaging.version.parse(torch.__version__).base_version >= '2.4' else 1)"; then
+          if python3 -c "import torch; exit(0 if torch.cuda.is_available() else 1)"; then
+            echo "Installing OpenEquivariance (torch >= 2.4 and CUDA available)"
+            pip install git+https://github.com/PASSIONLab/OpenEquivariance
+          else
+            echo "Skipping OpenEquivariance installation (CUDA not available)"
+          fi
+        else
+          echo "Skipping OpenEquivariance installation (torch < 2.4)"
+        fi
         pip install --upgrade-strategy only-if-needed .
         pip install pytest pytest-xdist[psutil]
     - name: Test with pytest
