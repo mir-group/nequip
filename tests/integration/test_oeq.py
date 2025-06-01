@@ -9,19 +9,17 @@ import uuid
 from nequip.data import to_ase
 from nequip.ase import NequIPCalculator
 from hydra.utils import instantiate
-
-try:
-    import openequivariance  # noqa: F401
-
-    OEQ_AVAILABLE = True
-except ImportError:
-    OEQ_AVAILABLE = False
+from nequip.utils.versions import _TORCH_GE_2_4
 
 
-@pytest.mark.skipif(not OEQ_AVAILABLE, reason="OpenEquivariance not available")
+@pytest.mark.skipif(not _TORCH_GE_2_4, reason="OpenEquivariance requires torch >= 2.4")
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="OEQ requires CUDA")
 class TestOEQTrainingInvariance(TrainingInvarianceBaseTest):
     def modify_model_config(self, original_config):
+        try:
+            import openequivariance  # noqa: F401
+        except ImportError:
+            pytest.skip("OpenEquivariance not installed")
         new_config = original_config.copy()
         training_module = new_config["training_module"]
         original_model = training_module["model"]
@@ -36,7 +34,7 @@ class TestOEQTrainingInvariance(TrainingInvarianceBaseTest):
         return "cuda"
 
 
-@pytest.mark.skipif(not OEQ_AVAILABLE, reason="OpenEquivariance not available")
+@pytest.mark.skipif(not _TORCH_GE_2_4, reason="OpenEquivariance requires torch >= 2.4")
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="OEQ requires CUDA")
 def test_oeq_package_compile_workflow(fake_model_training_session):
     """
@@ -48,6 +46,11 @@ def test_oeq_package_compile_workflow(fake_model_training_session):
     3. Compiles both checkpoint and package to torchscript with OEQ
     4. Creates three NequIPCalculator instances and verifies they give identical results
     """
+    try:
+        import openequivariance  # noqa: F401
+    except ImportError:
+        pytest.skip("OpenEquivariance not installed")
+
     config, tmpdir, env, model_dtype = fake_model_training_session
     device = "cuda"  # OEQ only works on CUDA
 

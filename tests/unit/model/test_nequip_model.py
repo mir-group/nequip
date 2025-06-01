@@ -2,13 +2,7 @@ import torch
 import pytest
 from nequip.utils.unittests.model_tests import BaseEnergyModelTests
 from nequip.utils.test import override_irreps_debug
-
-try:
-    import openequivariance  # noqa: F401
-
-    OEQ_AVAILABLE = True
-except ImportError:
-    OEQ_AVAILABLE = False
+from nequip.utils.versions import _TORCH_GE_2_4
 
 BASIC_INFO = {
     "seed": 123,
@@ -90,9 +84,16 @@ class TestNequIPModel(BaseEnergyModelTests):
         config = config.copy()
         return config
 
-    @pytest.mark.skipif(not OEQ_AVAILABLE, reason="OpenEquivariance not available")
+    @pytest.mark.skipif(
+        not _TORCH_GE_2_4, reason="OpenEquivariance requires torch >= 2.4"
+    )
     @override_irreps_debug(False)
     def test_oeq(self, model, model_test_data, device):
+        try:
+            import openequivariance  # noqa: F401
+        except ImportError:
+            pytest.skip("OpenEquivariance not installed")
+
         if device == "cpu":
             pytest.skip("OEQ tests skipped for CPU")
 
