@@ -8,6 +8,13 @@ Most recent change on the top.
 
 ## Unreleased
 
+
+## [0.9.1]
+
+### Changed
+- Revamped docs
+
+
 ## [0.9.0]
 
 ### Changed
