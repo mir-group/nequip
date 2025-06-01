@@ -117,7 +117,7 @@ class MD22DataModule(NequIPDataModule):
         self.data_file_path = data_file_path
 
     def prepare_data(self):
-        """Downloads and unzips data"""
+        """"""
         if not os.path.isfile(self.data_file_path):
             # download and unzip
             download_path = download_url(
