@@ -2,14 +2,14 @@
 
 ## Data Processing Flow
 
-The data processing in NequIP follows the following pipeline from raw files to model-ready data:
+The data processing in NequIP follows this pipeline from raw files to model-ready data:
 
 ```{figure} ./ml-data-flow-chart.svg
 :width: 400px
 :align: center
 ```
 
-This entire pipeline is coordinated and managed by a DataModule object, which also
+This entire pipeline is coordinated and managed by a `DataModule` object, which also:
 - Manages train/val/test dataset splits  
 - Computes dataset statistics
 
@@ -17,19 +17,20 @@ This entire pipeline is coordinated and managed by a DataModule object, which al
 
 - **DataModule**: Orchestrates everything
 - **Dataset**: Reads raw data files and applies transforms to individual structures
-- **Transforms**: Process data sequentially (e.g., compute neighbor lists, map atom types)
+- **Transforms**: Process data sequentially (e.g. compute neighbor lists, map atom types)
 - **DataLoader**: Batches transformed data for efficient training with parallel loading
-- **Statistics Manager**: Computed from processed data to initialize model parameters (energy shifts, force scales, etc.)
+- **Statistics Manager**: Computes statistics of processed data to initialize model parameters
 
-## DataModules and Datasets
+## DataModules
 
 The [data section](config.md/#data) of the NequIP config file specifies a {class}`~nequip.data.datamodule.NequIPDataModule`, which manages how training data is loaded and processed.
 `DataModule`s coordinate all aspects of data handling from loading to preprocessing.
-For comprehensive configuration options, see the {mod}`nequip.data.datamodule` [API reference](../api/datamodule.rst).
+For comprehensive configuration options, see {mod}`nequip.data.datamodule`.
 
 ### Common DataModules
 
-{class}`~nequip.data.datamodule.ASEDataModule` is the most commonly used datamodule because it can read many file formats through [ASE](https://wiki.fysik.dtu.dk/ase/) (Atomic Simulation Environment), including popular formats such as the `.xyz` format:
+{class}`~nequip.data.datamodule.ASEDataModule` is the most commonly used datamodule because it can read many file formats through [ASE](https://wiki.fysik.dtu.dk/ase/) (Atomic Simulation Environment), including popular formats such as the `.xyz` format.
+The following is an example of splitting a single data file into separate training, validation, and testing sets.
 
 ```yaml
 data:
@@ -39,6 +40,7 @@ data:
     train: 0.8
     val: 0.1
     test: 0.1
+  # ... other arguments
 ```
 
 ### Specialized DataModules
@@ -55,13 +57,18 @@ These specialized datamodules have unique APIs tailored to their specific datase
 
 ### Custom Data Configurations
 
-For more complex or custom data setups, you can use the base {class}`~nequip.data.datamodule.NequIPDataModule` directly with specific dataset objects. See the dataset [API documentation](../api/dataset.rst) for available dataset classes.
+For more complex or custom data setups, you can use the base {class}`~nequip.data.datamodule.NequIPDataModule` directly. This allows you to specify custom dataset configurations - datasets are the components that actually read data files and apply transforms to individual structures. See {mod}`nequip.data.dataset` for available dataset classes.
 
 The existing specialized datamodules are essentially convenience wrappers that simplify configuring the base `NequIPDataModule` with specific datasets and common settings.
 
+### DataModule Arguments
+
+Key arguments that datamodules take include transforms (see [Data Transforms](#data-transforms)), dataloaders (see [DataLoaders](#dataloaders)), and dataset statistics managers (see [Dataset Statistics](#dataset-statistics)).
+
 ## Data Transforms
 
-Transforms process raw data into a format suitable for model training. They are applied sequentially to each data point. Two transforms are essential for most use cases:
+Transforms process raw data into a format suitable for model training. They are specified in datamodule configurations (see [DataModules](#datamodules) and {mod}`nequip.data.datamodule`) which pass them as arguments to datasets (see {mod}`nequip.data.dataset`) where they are applied sequentially to each data point.
+Two transforms are essential for most use cases:
 
 - **{class}`~nequip.data.transforms.NeighborListTransform`** (always required) computes which atoms are neighbors of each atom within a cutoff distance. This is fundamental for graph-based neural networks:
   ```yaml
@@ -91,7 +98,8 @@ Additional transforms are available for specific use cases. For stress-related d
 
 ## DataLoaders
 
-DataLoaders handle batching and parallel data loading using PyTorch's {class}`torch.utils.data.DataLoader`:
+DataLoaders handle batching and parallel data loading using PyTorch's {class}`torch.utils.data.DataLoader`.
+They are specified in datamodule configurations (see [DataModules](#datamodules) and {mod}`nequip.data.datamodule`) which use them to wrap datasets for efficient training:
 
 ```yaml
 train_dataloader:
@@ -101,9 +109,15 @@ train_dataloader:
   shuffle: true        # often useful to shuffle training data
 ```
 
+```{tip}
+Training batch size affects learning dynamics and is an important hyperparameter to tune. However, validation and test batch sizes have no effect on training and should generally be set as large as possible without causing out-of-memory errors to speed up evaluation.
+```
+
 ## Dataset Statistics
 
-Dataset statistics provide both rough knowledge of your dataset (e.g., average energy per atom, force magnitudes) and are crucial for initializing data-derived model hyperparameters. The {class}`~nequip.data.CommonDataStatisticsManager` automatically computes essential statistics:
+Dataset statistics provide both rough knowledge of your dataset (e.g., average energy per atom, force magnitudes) and are crucial for initializing data-derived model hyperparameters.
+They are computed by specifying a dataset statistics manager as an argument to datamodules (see [DataModules](#datamodules) and {mod}`nequip.data.datamodule`).
+The {class}`~nequip.data.CommonDataStatisticsManager` automatically computes essential statistics:
 
 ```yaml
 stats_manager:
@@ -113,8 +127,9 @@ stats_manager:
     batch_size: 10  # Can be larger than training batch size to speed up computation
 ```
 
-You can use larger `batch_size` in `dataloader_kwargs` than your training batch size to compute statistics faster without memory issues.
+You can use a larger `batch_size` in `dataloader_kwargs` than your training batch size to compute statistics faster without memory issues.
 Statistics are computed once during data setup, not during training.
+
 For advanced use cases, you should use the base {class}`~nequip.data.DataStatisticsManager` directly for more flexible configuration.
 See the [dataset statistics API documentation](../api/data_stats.rst) for configuration options.
 
