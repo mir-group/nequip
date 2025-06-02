@@ -11,6 +11,13 @@ from omegaconf import OmegaConf
 from hydra.utils import instantiate
 import tempfile
 
+try:
+    import h5py
+
+    _H5PY_AVAILABLE = True
+except ModuleNotFoundError:
+    _H5PY_AVAILABLE = False
+
 NATOMS = 10
 MAX_ATOMIC_NUMBER: int = 5
 
@@ -52,11 +59,8 @@ def npz_dataset(npz_for_NPZDataset, temp_data):
 
 @pytest.fixture(scope="module")
 def hdf5_dataset(npz, temp_data):
-    try:
-        import h5py
-    except ModuleNotFoundError:
+    if not _H5PY_AVAILABLE:
         pytest.skip("h5py is not installed")
-
     with tempfile.NamedTemporaryFile(suffix=".hdf5") as path:
         f = h5py.File(path.name, "w")
         group = f.create_group("samples")
@@ -90,7 +94,9 @@ def emt_dataset():
 
 
 @pytest.fixture(
-    scope="module", params=["ase_dataset", "emt_dataset", "hdf5_dataset", "npz_dataset"]
+    scope="module",
+    params=["ase_dataset", "emt_dataset", "npz_dataset"]
+    + (["hdf5_dataset"] if _H5PY_AVAILABLE else []),
 )
 def dataset(request):
     yield request.getfixturevalue(request.param)
