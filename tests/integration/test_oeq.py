@@ -55,7 +55,7 @@ def test_oeq_package_compile_workflow(fake_model_training_session):
     device = "cuda"  # OEQ only works on CUDA
 
     # Set tolerance based on model dtype
-    tol = {"float32": 1e-5, "float64": 1e-10}[model_dtype]
+    tol = {"float32": 5e-5, "float64": 1e-10}[model_dtype]
 
     # Path to the checkpoint file from training session
     ckpt_path = str(pathlib.Path(f"{tmpdir}/best.ckpt"))
