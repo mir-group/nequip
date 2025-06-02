@@ -3,6 +3,9 @@ import argparse
 
 import pathlib
 import yaml
+import importlib.metadata
+
+from typing import Optional
 
 # TODO: check if we still need this?
 # This is a weird hack to avoid Intel MKL issues on the cluster when this is called as a subprocess of a process that has itself initialized PyTorch.
@@ -17,6 +20,11 @@ from nequip.model.saved_models.package import (
     _suppress_package_importer_warnings,
 )
 from nequip.model.saved_models import ModelFromCheckpoint
+from nequip.model.saved_models.package import (
+    _EXTERNAL_MODULES,
+    _MOCK_MODULES,
+    _INTERNAL_MODULES,
+)
 from nequip.model.utils import (
     _COMPILE_MODE_OPTIONS,
     _EAGER_MODEL_KEY,
@@ -27,7 +35,6 @@ from nequip.utils.logger import RankedLogger
 from nequip.utils.versions import get_current_code_versions, _TORCH_GE_2_6
 from nequip.utils.global_state import set_global_state
 
-from ..__init__ import _DISCOVERED_NEQUIP_EXTENSION
 from ._workflow_utils import set_workflow_state
 
 from omegaconf import OmegaConf
@@ -48,7 +55,16 @@ logger = RankedLogger(__name__, rank_zero_only=True)
 #   - Initial version
 # 1:
 #   - package_metadata.txt instead of package_metadata.pkl
-_CURRENT_NEQUIP_PACKAGE_VERSION = 1
+# 2:
+#   - added `external_modules`
+_CURRENT_NEQUIP_PACKAGE_VERSION = 2
+
+
+def _get_version_safe(package_name: str) -> Optional[str]:
+    try:
+        return importlib.metadata.version(package_name)
+    except importlib.metadata.PackageNotFoundError:
+        return None
 
 
 def main(args=None):
@@ -67,13 +83,6 @@ def main(args=None):
         "output_path",
         help="output path to save the packaged model. NOTE: a `.nequip.zip` extension is mandatory",
         type=pathlib.Path,
-    )
-    build_parser.add_argument(
-        "--extra-externs",
-        help="additional external modules to support during packaging",
-        nargs="+",
-        type=str,
-        default=[],
     )
 
     info_parser = subparsers.add_parser(
@@ -163,22 +172,6 @@ def main(args=None):
         ), "output path must end with the `.nequip.zip` extension"
 
         # === handle internal and external modules ===
-        # internal and external modules that we know of
-        _INTERNAL_MODULES = ["e3nn", "nequip"] + [
-            ep.value for ep in _DISCOVERED_NEQUIP_EXTENSION
-        ]
-        # TODO: ideally we don't have any numpy or matplotlib dependencies, but for now it's here because of e3nn TPs
-        # TODO: better mechanism for registering? specifically, openequivariance is tricky because it is enabled through the base TPScatter class
-        _EXTERNAL_MODULES = [
-            "triton",
-            "io",
-            "opt_einsum_fx",
-            "numpy",
-            "openequivariance",
-        ] + args.extra_externs
-
-        _MOCK_MODULES = ["matplotlib"]
-
         overlap = set(_INTERNAL_MODULES) & set(_EXTERNAL_MODULES)
         assert (
             not overlap
@@ -186,6 +179,7 @@ def main(args=None):
 
         logger.debug("Internal Modules: " + str(_INTERNAL_MODULES))
         logger.debug("External Modules: " + str(_EXTERNAL_MODULES))
+        logger.debug("Mock Modules: " + str(_MOCK_MODULES))
 
         # === load checkpoint and extract info ===
         checkpoint = torch.load(
@@ -290,6 +284,9 @@ def main(args=None):
                 # save metadata used for loading packages
                 pkg_metadata = {
                     "versions": code_versions,
+                    "external_modules": {
+                        k: _get_version_safe(k) for k in _EXTERNAL_MODULES
+                    },
                     "package_version_id": _CURRENT_NEQUIP_PACKAGE_VERSION,
                     "available_models": list(models_to_package.keys()),
                     "atom_types": {idx: name for idx, name in enumerate(type_names)},
