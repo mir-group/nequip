@@ -9,6 +9,16 @@ At a glance, the NequIP workflow is as follows.
 2. [**Package**](#packaging) the model from the checkpoint file with `nequip-package`, which produces a [package file](./files.md/#package-files). Package files are the recommended format for distributing NequIP framework models as they are designed to be usable on different machines and code environments (e.g. with different {mod}`e3nn`, {mod}`nequip`, {mod}`allegro` versions than what the model was initially trained with).
 3. [**Compile**](#compilation) the packaged model (or model from a checkpoint file) with `nequip-compile`, which produces a [compiled model file](./files.md/#compiled-model-files) that can be loaded for [**production simulations**](#production-simulations) in supported [integrations](../integrations/all.rst) such as [LAMMPS](../integrations/lammps.md) and [ASE](../integrations/ase.md).
 
+<br/>
+
+```{figure} ./workflow.svg
+:width: 95%
+:align: center
+:alt: Flowchart of the NequIP framework workflow.
+
+  The NequIP framework workflow.
+```
+
 ## Training
 
 The core command in NequIP is `nequip-train`, which takes in a YAML config file defining the dataset(s), model, and training hyperparameters, and then runs (or restarts) a training session. [Hydra](https://hydra.cc/) is used to manage the config files, and so many of the features and tricks from Hydra can be used if desired. `nequip-train` can be called as follows.

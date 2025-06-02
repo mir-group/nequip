@@ -1,0 +1,533 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   width="1194.7917"
+   height="261.9119"
+   version="1.1"
+   id="svg11"
+   sodipodi:docname="workflow.svg"
+   inkscape:version="1.4 (e7c3feb1, 2024-10-09)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <!-- White background -->
+  <rect
+     width="100%"
+     height="100%"
+     fill="#ffffff"
+     id="background" />
+  <sodipodi:namedview
+     id="namedview11"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:zoom="1.135284"
+     inkscape:cx="487.54322"
+     inkscape:cy="82.358249"
+     inkscape:window-width="2344"
+     inkscape:window-height="1354"
+     inkscape:window-x="1606"
+     inkscape:window-y="58"
+     inkscape:window-maximized="0"
+     inkscape:current-layer="g19" />
+  <!-- Define arrow marker -->
+  <defs
+     id="defs1">
+    <marker
+       style="overflow:visible"
+       id="ArrowWideRounded"
+       refX="0"
+       refY="0"
+       orient="auto-start-reverse"
+       inkscape:stockid="Wide, rounded arrow"
+       markerWidth="1"
+       markerHeight="1"
+       viewBox="0 0 1 1"
+       inkscape:isstock="true"
+       inkscape:collect="always"
+       preserveAspectRatio="xMidYMid">
+      <path
+         style="fill:none;stroke:context-stroke;stroke-width:1;stroke-linecap:round"
+         d="M 3,-3 0,0 3,3"
+         transform="rotate(180,0.125,0)"
+         sodipodi:nodetypes="ccc"
+         id="path2" />
+    </marker>
+    <marker
+       id="arrowhead"
+       markerWidth="10"
+       markerHeight="7"
+       refX="10"
+       refY="3.5"
+       orient="auto">
+      <polygon
+         points="10,3.5 0,7 0,0 "
+         fill="#333333"
+         id="polygon1" />
+    </marker>
+    <marker
+       style="overflow:visible"
+       id="ArrowWideRounded-1"
+       refX="0"
+       refY="0"
+       orient="auto-start-reverse"
+       inkscape:stockid="Wide, rounded arrow"
+       markerWidth="1"
+       markerHeight="1"
+       viewBox="0 0 1 1"
+       inkscape:isstock="true"
+       inkscape:collect="always"
+       preserveAspectRatio="xMidYMid">
+      <path
+         style="fill:none;stroke:context-stroke;stroke-width:1;stroke-linecap:round"
+         d="M 3,-3 0,0 3,3"
+         transform="rotate(180,0.125,0)"
+         sodipodi:nodetypes="ccc"
+         id="path2-8" />
+    </marker>
+    <marker
+       style="overflow:visible"
+       id="ArrowWideRounded-1-7"
+       refX="0"
+       refY="0"
+       orient="auto-start-reverse"
+       inkscape:stockid="Wide, rounded arrow"
+       markerWidth="1"
+       markerHeight="1"
+       viewBox="0 0 1 1"
+       inkscape:isstock="true"
+       inkscape:collect="always"
+       preserveAspectRatio="xMidYMid">
+      <path
+         style="fill:none;stroke:context-stroke;stroke-width:1;stroke-linecap:round"
+         d="M 3,-3 0,0 3,3"
+         transform="rotate(180,0.125,0)"
+         sodipodi:nodetypes="ccc"
+         id="path2-8-3" />
+    </marker>
+    <marker
+       style="overflow:visible"
+       id="ArrowWideRounded-1-2"
+       refX="0"
+       refY="0"
+       orient="auto-start-reverse"
+       inkscape:stockid="Wide, rounded arrow"
+       markerWidth="1"
+       markerHeight="1"
+       viewBox="0 0 1 1"
+       inkscape:isstock="true"
+       inkscape:collect="always"
+       preserveAspectRatio="xMidYMid">
+      <path
+         style="fill:none;stroke:context-stroke;stroke-width:1;stroke-linecap:round"
+         d="M 3,-3 0,0 3,3"
+         transform="rotate(180,0.125,0)"
+         sodipodi:nodetypes="ccc"
+         id="path2-8-37" />
+    </marker>
+    <marker
+       style="overflow:visible"
+       id="ArrowWideRounded-1-3"
+       refX="0"
+       refY="0"
+       orient="auto-start-reverse"
+       inkscape:stockid="Wide, rounded arrow"
+       markerWidth="1"
+       markerHeight="1"
+       viewBox="0 0 1 1"
+       inkscape:isstock="true"
+       inkscape:collect="always"
+       preserveAspectRatio="xMidYMid">
+      <path
+         style="fill:none;stroke:context-stroke;stroke-width:1;stroke-linecap:round"
+         d="M 3,-3 0,0 3,3"
+         transform="rotate(180,0.125,0)"
+         sodipodi:nodetypes="ccc"
+         id="path2-8-7" />
+    </marker>
+    <marker
+       style="overflow:visible"
+       id="ArrowWideRounded-1-0"
+       refX="0"
+       refY="0"
+       orient="auto-start-reverse"
+       inkscape:stockid="Wide, rounded arrow"
+       markerWidth="1"
+       markerHeight="1"
+       viewBox="0 0 1 1"
+       inkscape:isstock="true"
+       inkscape:collect="always"
+       preserveAspectRatio="xMidYMid">
+      <path
+         style="fill:none;stroke:context-stroke;stroke-width:1;stroke-linecap:round"
+         d="M 3,-3 0,0 3,3"
+         transform="rotate(180,0.125,0)"
+         sodipodi:nodetypes="ccc"
+         id="path2-8-4" />
+    </marker>
+    <marker
+       style="overflow:visible"
+       id="ArrowWideRounded-1-06"
+       refX="0"
+       refY="0"
+       orient="auto-start-reverse"
+       inkscape:stockid="Wide, rounded arrow"
+       markerWidth="1"
+       markerHeight="1"
+       viewBox="0 0 1 1"
+       inkscape:isstock="true"
+       inkscape:collect="always"
+       preserveAspectRatio="xMidYMid">
+      <path
+         style="fill:none;stroke:context-stroke;stroke-width:1;stroke-linecap:round"
+         d="M 3,-3 0,0 3,3"
+         transform="rotate(180,0.125,0)"
+         sodipodi:nodetypes="ccc"
+         id="path2-8-5" />
+    </marker>
+    <marker
+       style="overflow:visible"
+       id="ArrowWideRounded-1-06-9"
+       refX="0"
+       refY="0"
+       orient="auto-start-reverse"
+       inkscape:stockid="Wide, rounded arrow"
+       markerWidth="1"
+       markerHeight="1"
+       viewBox="0 0 1 1"
+       inkscape:isstock="true"
+       inkscape:collect="always"
+       preserveAspectRatio="xMidYMid">
+      <path
+         style="fill:none;stroke:context-stroke;stroke-width:1;stroke-linecap:round"
+         d="M 3,-3 0,0 3,3"
+         transform="rotate(180,0.125,0)"
+         sodipodi:nodetypes="ccc"
+         id="path2-8-5-6" />
+    </marker>
+  </defs>
+  <!-- Raw Data File -->
+  <g
+     id="g18"
+     transform="translate(-3.3046684,-145.15723)">
+    <rect
+       x="119.9367"
+       y="245.19543"
+       width="134.28372"
+       height="60.65464"
+       rx="4.4761243"
+       fill="#e8f4f8"
+       stroke="#2196f3"
+       stroke-width="1.34536"
+       id="rect1" />
+    <text
+       x="187.44576"
+       y="270.52277"
+       text-anchor="middle"
+       font-family="Arial, sans-serif"
+       font-size="16px"
+       font-weight="bold"
+       id="text1">Train</text>
+    <text
+       x="187.0649"
+       y="290.52277"
+       text-anchor="middle"
+       font-family="Arial, sans-serif"
+       font-size="14px"
+       fill="#666666"
+       id="text2"><tspan
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:Monospace;-inkscape-font-specification:Monospace"
+         id="tspan11">nequip-train</tspan></text>
+  </g>
+  <g
+     id="g15"
+     transform="translate(69.418009,-229.23986)">
+    <rect
+       x="203.62785"
+       y="229.91254"
+       width="134.28372"
+       height="60.65464"
+       rx="4.4761243"
+       fill="#e8f4f8"
+       stroke="#2196f3"
+       stroke-width="1.34536"
+       id="rect1-0" />
+    <text
+       x="271.1369"
+       y="255.23985"
+       text-anchor="middle"
+       font-family="Arial, sans-serif"
+       font-size="16px"
+       font-weight="bold"
+       id="text1-9">Test</text>
+    <text
+       x="270.75604"
+       y="275.23987"
+       text-anchor="middle"
+       font-family="Arial, sans-serif"
+       font-size="14px"
+       fill="#666666"
+       id="text2-3"><tspan
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:Monospace;-inkscape-font-specification:Monospace"
+         id="tspan11-4">nequip-train</tspan></text>
+  </g>
+  <g
+     id="g19"
+     transform="translate(65.194646,-226.19422)">
+    <rect
+       x="958.76093"
+       y="426.77881"
+       width="134.28372"
+       height="60.65464"
+       rx="4.4761243"
+       fill="#e8f4f8"
+       stroke="#2196f3"
+       stroke-width="1.34536"
+       id="rect1-0-7"
+       style="fill:#f2f2f2;stroke:#b3b3b3" />
+    <text
+       x="1026.27"
+       y="452.10611"
+       text-anchor="middle"
+       font-family="Arial, sans-serif"
+       font-size="16px"
+       font-weight="bold"
+       id="text1-9-9">Inference</text>
+    <text
+       x="1025.8892"
+       y="472.10614"
+       text-anchor="middle"
+       font-family="Arial, sans-serif"
+       font-size="14px"
+       fill="#666666"
+       id="text2-3-5"><tspan
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:Arial, sans-serif;-inkscape-font-specification:'Arial, sans-serif'"
+         id="tspan11-4-5">LAMMPS, ASE, etc.</tspan></text>
+  </g>
+  <g
+     id="g16"
+     transform="translate(-10.145053,-40.252589)">
+    <rect
+       x="439.26822"
+       y="140.2908"
+       width="134.28372"
+       height="60.65464"
+       rx="4.4761243"
+       fill="#e8f4f8"
+       stroke="#2196f3"
+       stroke-width="1.34536"
+       id="rect1-6" />
+    <text
+       x="506.77728"
+       y="165.61812"
+       text-anchor="middle"
+       font-family="Arial, sans-serif"
+       font-size="16px"
+       font-weight="bold"
+       id="text1-4">Package</text>
+    <text
+       x="506.39642"
+       y="185.61813"
+       text-anchor="middle"
+       font-family="Arial, sans-serif"
+       font-size="14px"
+       fill="#666666"
+       id="text2-78"><tspan
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:Monospace;-inkscape-font-specification:Monospace"
+         id="tspan11-40">nequip-package</tspan></text>
+  </g>
+  <g
+     id="g17"
+     transform="translate(305.46911,-406.2526)">
+    <g
+       id="g14-7"
+       transform="translate(316.64038,276.37827)">
+      <rect
+         x="203.62785"
+         y="229.91254"
+         width="134.28372"
+         height="60.65464"
+         rx="4.4761243"
+         fill="#e8f4f8"
+         stroke="#2196f3"
+         stroke-width="1.34536"
+         id="rect1-7" />
+      <text
+         x="271.1369"
+         y="255.23985"
+         text-anchor="middle"
+         font-family="Arial, sans-serif"
+         font-size="16px"
+         font-weight="bold"
+         id="text1-3">Compile</text>
+      <text
+         x="270.75604"
+         y="275.23987"
+         text-anchor="middle"
+         font-family="Arial, sans-serif"
+         font-size="14px"
+         fill="#666666"
+         id="text2-2"><tspan
+           style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:Monospace;-inkscape-font-specification:Monospace"
+           id="tspan11-56">nequip-compile</tspan></text>
+    </g>
+  </g>
+  <text
+     x="45.004395"
+     y="133.86554"
+     text-anchor="middle"
+     font-family="Arial, sans-serif"
+     font-size="14px"
+     fill="#666666"
+     id="text2-7"><tspan
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:Monospace;-inkscape-font-specification:Monospace;fill:#000000"
+       id="tspan11-5">config.yaml</tspan></text>
+  <text
+     x="340.10492"
+     y="133.86554"
+     text-anchor="middle"
+     font-family="Arial, sans-serif"
+     font-size="14px"
+     fill="#666666"
+     id="text2-7-7"><tspan
+       sodipodi:role="line"
+       id="tspan13"
+       x="340.10492"
+       y="133.86554"
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:Monospace;-inkscape-font-specification:Monospace;fill:#000000">checkpoint.ckpt</tspan></text>
+  <text
+     x="694.33624"
+     y="133.74933"
+     text-anchor="middle"
+     font-family="Arial, sans-serif"
+     font-size="14px"
+     fill="#666666"
+     id="text2-7-7-2"><tspan
+       sodipodi:role="line"
+       id="tspan13-2"
+       x="694.33624"
+       y="133.74933"
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:Monospace;-inkscape-font-specification:Monospace;fill:#000000">packaged_model.nequip.zip</tspan></text>
+  <text
+     x="1091.217"
+     y="124.9902"
+     text-anchor="middle"
+     font-family="Arial, sans-serif"
+     font-size="14px"
+     fill="#666666"
+     id="text2-7-7-2-7"><tspan
+       sodipodi:role="line"
+       id="tspan13-2-5"
+       x="1091.217"
+       y="124.9902"
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:Monospace;-inkscape-font-specification:Monospace;fill:#000000">compiled_model.nequip.pth</tspan><tspan
+       sodipodi:role="line"
+       x="1091.217"
+       y="142.50842"
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:Monospace;-inkscape-font-specification:Monospace;fill:#000000"
+       id="tspan14">compiled_model.nequip.pt2</tspan></text>
+  <!-- Arrow 1 -->
+  <!-- Dataset Object -->
+  <!-- Arrow 2 -->
+  <!-- Transforms -->
+  <!-- Arrow 3 -->
+  <!-- DataLoader -->
+  <!-- Arrow 4 -->
+  <!-- Model Training -->
+  <path
+     style="fill:#4d4d4d;fill-opacity:0.996078;stroke:#4d4d4d;stroke-width:2.235;stroke-linecap:round;stroke-dasharray:none;stroke-opacity:0.996078;marker-end:url(#ArrowWideRounded)"
+     d="M 93.671807,130.36553 H 109.39841"
+     id="path17" />
+  <path
+     style="fill:#4d4d4d;fill-opacity:0.996078;stroke:#4d4d4d;stroke-width:2.235;stroke-linecap:round;stroke-dasharray:none;stroke-opacity:0.996078;marker-end:url(#ArrowWideRounded-1)"
+     d="m 256.01024,130.36553 h 15.7266"
+     id="path17-4" />
+  <path
+     style="fill:#4d4d4d;fill-opacity:0.996078;stroke:#4d4d4d;stroke-width:2.235;stroke-linecap:round;stroke-dasharray:none;stroke-opacity:0.996078;marker-end:url(#ArrowWideRounded-1-06)"
+     d="M 336.21313,109.62731 V 69.443461"
+     id="path17-4-7"
+     sodipodi:nodetypes="cc" />
+  <path
+     style="fill:#4d4d4d;fill-opacity:0.996078;stroke:#4d4d4d;stroke-width:2.235;stroke-linecap:round;stroke-dasharray:none;stroke-opacity:0.996078;marker-end:url(#ArrowWideRounded-1-06-9)"
+     d="m 1091.0974,156.1794 v 34.18385"
+     id="path17-4-7-7"
+     sodipodi:nodetypes="cc" />
+  <path
+     style="fill:#4d4d4d;fill-opacity:0.996078;stroke:#4d4d4d;stroke-width:2.235;stroke-linecap:round;stroke-dasharray:none;stroke-opacity:0.996078"
+     d="M 350.80083,212.99396 V 148.1794"
+     id="path17-4-7-1"
+     sodipodi:nodetypes="cc" />
+  <path
+     style="fill:#4d4d4d;fill-opacity:0.996078;stroke:#4d4d4d;stroke-width:2.235;stroke-linecap:round;stroke-dasharray:none;stroke-opacity:0.996078;marker-end:url(#ArrowWideRounded-1-7)"
+     d="m 406.16294,130.36553 h 15.7266"
+     id="path17-4-1" />
+  <path
+     style="fill:#4d4d4d;fill-opacity:0.996078;stroke:#4d4d4d;stroke-width:2.235;stroke-linecap:round;stroke-dasharray:none;stroke-opacity:0.996078;marker-end:url(#ArrowWideRounded-1-2)"
+     d="m 568.50137,130.36553 h 15.7266"
+     id="path17-4-18" />
+  <path
+     style="fill:#4d4d4d;fill-opacity:0.996078;stroke:#4d4d4d;stroke-width:2.235;stroke-linecap:round;stroke-dasharray:none;stroke-opacity:0.996078;marker-end:url(#ArrowWideRounded-1-3)"
+     d="m 802.77713,130.36553 h 15.7266"
+     id="path17-4-4" />
+  <path
+     style="fill:#4d4d4d;fill-opacity:0.996078;stroke:#4d4d4d;stroke-width:2.235;stroke-linecap:round;stroke-dasharray:none;stroke-opacity:0.996078;marker-end:url(#ArrowWideRounded-1-0)"
+     d="m 965.11555,130.36553 h 15.7266"
+     id="path17-4-0" />
+  <path
+     style="fill:none;fill-opacity:0.996078;stroke:#4d4d4d;stroke-width:2.235;stroke-linecap:round;stroke-dasharray:none;stroke-opacity:0.996078;marker-end:url(#ArrowWideRounded)"
+     d="m 336.21313,148.1794 v 40.18489 H 182.08431 v -16.64827"
+     id="path18"
+     sodipodi:nodetypes="cccc" />
+  <path
+     style="fill:none;fill-opacity:0.996078;stroke:#4d4d4d;stroke-width:2.235;stroke-linecap:round;stroke-dasharray:none;stroke-opacity:0.996078"
+     d="m 703.01304,148.1794 v 65.11768 H 182.08431 v -26.64827"
+     id="path18-4"
+     sodipodi:nodetypes="cccc" />
+  <path
+     style="fill:none;fill-opacity:0.996078;stroke:#4d4d4d;stroke-width:2.235;stroke-linecap:round;stroke-dasharray:none;stroke-opacity:0.996078;marker-end:url(#ArrowWideRounded)"
+     d="M 350.80083,109.62731 V 77.443461 h 542.1451 v 16.18385"
+     id="path18-4-0"
+     sodipodi:nodetypes="cccc" />
+  <rect
+     style="fill:#ffffff;fill-opacity:0.996078;stroke:none;stroke-width:1.99315;stroke-linecap:round;stroke-dasharray:none;stroke-opacity:0.996078"
+     id="rect18"
+     width="44.104462"
+     height="12.415739"
+     x="237.17325"
+     y="181.51227"
+     rx="3.5598238" />
+  <text
+     x="258.82217"
+     y="191.64786"
+     text-anchor="middle"
+     font-family="Arial, sans-serif"
+     font-size="16px"
+     font-weight="bold"
+     id="text1-40"
+     style="font-size:14px"><tspan
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:14px;font-family:Arial, sans-serif;-inkscape-font-specification:'Arial, sans-serif'"
+       id="tspan18">restart</tspan></text>
+  <rect
+     style="fill:#ffffff;fill-opacity:0.996078;stroke:none;stroke-width:2.53196;stroke-linecap:round;stroke-dasharray:none;stroke-opacity:0.996078"
+     id="rect18-4"
+     width="71.172989"
+     height="12.415739"
+     x="223.63899"
+     y="205.88846"
+     rx="5.7446184" />
+  <text
+     x="259.62881"
+     y="216.02405"
+     text-anchor="middle"
+     font-family="Arial, sans-serif"
+     font-size="16px"
+     font-weight="bold"
+     id="text1-40-5"
+     style="font-size:14px"><tspan
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:14px;font-family:Arial, sans-serif;-inkscape-font-specification:'Arial, sans-serif'"
+       id="tspan18-7">fine-tuning</tspan></text>
+</svg>
