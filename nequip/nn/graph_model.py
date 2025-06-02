@@ -3,7 +3,6 @@ import torch
 
 from nequip.data import AtomicDataDict
 from ._graph_mixin import GraphModuleMixin
-from .compile_utils import get_custom_op_libraries
 
 from typing import List, Dict, Any, Optional, Final
 
@@ -13,7 +12,6 @@ PER_EDGE_TYPE_CUTOFF_KEY: Final[str] = "per_edge_type_cutoff"
 TYPE_NAMES_KEY: Final[str] = "type_names"
 NUM_TYPES_KEY: Final[str] = "num_types"
 MODEL_DTYPE_KEY: Final[str] = "model_dtype"
-CUSTOM_OP_LIBRARIES_KEY: Final[str] = "custom_op_libraries"
 
 
 def _model_metadata_from_config(model_config: Dict[str, str]) -> Dict[str, str]:
@@ -99,12 +97,9 @@ class GraphModel(GraphModuleMixin, torch.nn.Module):
     @torch.jit.unused
     def metadata(self) -> Dict[str, str]:
         # Note that this is a property so that the metadata can depend on the _current_ state
-        # of the model, and not just what happened at initialization. This is essential for
-        # get_custom_op_libraries, the results of which will often be changed by model modifiers
-        # that are applied after initialization. (See _tp_scatter_oeq.py for an example.)
+        # of the model, and not just what happened at initialization.
         # TODO: make other metadata keys dynamic rather than pre-set in _metadata?
         out = self._metadata.copy()
-        out[CUSTOM_OP_LIBRARIES_KEY] = ",".join(get_custom_op_libraries(self))
         return out
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:

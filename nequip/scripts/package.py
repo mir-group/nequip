@@ -22,7 +22,6 @@ from nequip.model.utils import (
     _EAGER_MODEL_KEY,
 )
 from nequip.nn.model_modifier_utils import is_persistent_model_modifier
-from nequip.nn.compile_utils import get_all_registered_custom_op_libraries
 from nequip.model.modify_utils import get_all_modifiers, only_apply_persistent_modifiers
 from nequip.utils.logger import RankedLogger
 from nequip.utils.versions import get_current_code_versions, _TORCH_GE_2_6
@@ -267,18 +266,6 @@ def main(args=None):
             with only_apply_persistent_modifiers(persistent_only=True):
                 model = ModelFromCheckpoint(args.ckpt_path, compile_mode=compile_mode)
             models_to_package.update({compile_mode: model})
-
-        # Find the complete set of custom op libraries used by _all_ models.
-        # Note that because non-persistent modifiers are not applied now at
-        # packaging time, we cannot look only for custom ops that are used
-        # in the actual model objects, since others may also be caught by
-        # the packaging process. Instead, we extern all custom op libraries
-        # that have been registered in the current process, which should
-        # ideally be a superset of the custom op libraries that
-        # torch.package will try to include here.
-        custom_op_libraries = get_all_registered_custom_op_libraries()
-        _EXTERNAL_MODULES.extend(custom_op_libraries)
-        logger.debug(f"Also externing custom op libraries: {custom_op_libraries}")
 
         # == package ==
         with _suppress_package_importer_warnings():
