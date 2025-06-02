@@ -49,7 +49,7 @@ def npz_for_NPZDataset():
 
 
 @pytest.fixture(scope="module")
-def npz_dataset(npz_for_NPZDataset, temp_data):
+def npz_dataset(npz_for_NPZDataset):
     with tempfile.NamedTemporaryFile(suffix=".npz") as path:
         np.savez(path.name, **npz_for_NPZDataset)
         yield NPZDataset(
@@ -58,7 +58,7 @@ def npz_dataset(npz_for_NPZDataset, temp_data):
 
 
 @pytest.fixture(scope="module")
-def hdf5_dataset(npz, temp_data):
+def hdf5_dataset(npz):
     if not _H5PY_AVAILABLE:
         pytest.skip("h5py is not installed")
     with tempfile.NamedTemporaryFile(suffix=".hdf5") as path:
