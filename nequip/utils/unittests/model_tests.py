@@ -787,11 +787,19 @@ class BaseEnergyModelTests(BaseModelTests):
         # Check each edge type
         for node_idx, node_type in enumerate(type_names):
             for nbor_idx, nbor_type in enumerate(type_names):
-                # Extract the cutoff radius for the edge type
+                # extract the cutoff radius for the edge type
                 if per_edge_type:
-                    r_max = per_edge_type_cutoff[node_type]
-                    if not isinstance(r_max, float):
-                        r_max = r_max[nbor_type]
+                    if node_type in per_edge_type_cutoff:
+                        r_max = per_edge_type_cutoff[node_type]
+                        if not isinstance(r_max, float):
+                            if nbor_type in r_max:
+                                r_max = r_max[nbor_type]
+                            else:
+                                # default missing target types to global r_max
+                                r_max = config["r_max"]
+                    else:
+                        # default missing source types to global r_max
+                        r_max = config["r_max"]
 
                 # Control group: force is non-zero within the cutoff radius
                 partial_forces = pair_force(

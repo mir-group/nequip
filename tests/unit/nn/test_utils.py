@@ -15,21 +15,21 @@ import ase
 
 
 def test_process_per_edge_cutoff():
-    # Unit case
+    # single atom type with float cutoff
     assert torch.all(
         _process_per_edge_type_cutoff(["O"], {"O": 2.0}, r_max=4.0)
         == torch.as_tensor([[2.0]], dtype=_GLOBAL_DTYPE)
     )
-    # Unit case more complex
+
+    # single atom type with dict cutoff
     assert torch.all(
         _process_per_edge_type_cutoff(["O"], {"O": {"O": 2.0}}, r_max=4.0)
         == torch.as_tensor([[2.0]], dtype=_GLOBAL_DTYPE)
     )
 
-    # Normal behavior
+    # complete specification with mixed float/dict cutoffs
     type_names = ["H", "C", "O"]
     per_edge_type_cutoff = {"H": 2.0, "C": {"H": 4.0, "C": 3.5, "O": 3.7}, "O": 3.9}
-
     assert torch.all(
         _process_per_edge_type_cutoff(type_names, per_edge_type_cutoff, r_max=4.0)
         == torch.as_tensor(
@@ -37,14 +37,34 @@ def test_process_per_edge_cutoff():
         )
     )
 
-    # Ignores unspecified atoms
-    type_names = ["H", "C", "O"]
+    # missing source types default to r_max
+    per_edge_type_cutoff = {"H": 2.0}  # C and O missing
+    assert torch.all(
+        _process_per_edge_type_cutoff(type_names, per_edge_type_cutoff, r_max=4.0)
+        == torch.as_tensor(
+            [[2.0, 2.0, 2.0], [4.0, 4.0, 4.0], [4.0, 4.0, 4.0]], dtype=_GLOBAL_DTYPE
+        )
+    )
+
+    # missing target types default to r_max
     per_edge_type_cutoff = {
-        "H": 2.0,
-        "C": {"H": 4.0, "C": 3.5, "O": 3.7, "N": 3.7},
+        "H": {"C": 2.0},  # missing H->H and H->O
+        "C": {"H": 3.0, "C": 3.5, "O": 3.7},
         "O": 3.9,
     }
+    assert torch.all(
+        _process_per_edge_type_cutoff(type_names, per_edge_type_cutoff, r_max=4.0)
+        == torch.as_tensor(
+            [[4.0, 2.0, 4.0], [3.0, 3.5, 3.7], [3.9, 3.9, 3.9]], dtype=_GLOBAL_DTYPE
+        )
+    )
 
+    # extra atoms in cutoff spec are ignored
+    per_edge_type_cutoff = {
+        "H": 2.0,
+        "C": {"H": 4.0, "C": 3.5, "O": 3.7, "N": 3.7},  # N not in type_names
+        "O": 3.9,
+    }
     assert torch.all(
         _process_per_edge_type_cutoff(type_names, per_edge_type_cutoff, r_max=4.0)
         == torch.as_tensor(

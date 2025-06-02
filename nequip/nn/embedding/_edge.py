@@ -14,14 +14,32 @@ from ..utils import with_edge_vectors_
 from typing import Optional, List, Dict, Union
 
 
-def _process_per_edge_type_cutoff(type_names, per_edge_type_cutoff, r_max):
-    num_types = len(type_names)
+def _process_per_edge_type_cutoff(
+    type_names: List[str], per_edge_type_cutoff, r_max: float
+) -> torch.Tensor:
+    num_types: int = len(type_names)
+
     # map dicts from type name to thing into lists
-    per_edge_type_cutoff = {
-        k: ([e[t] for t in type_names] if not isinstance(e, float) else [e] * num_types)
-        for k, e in per_edge_type_cutoff.items()
-    }
-    per_edge_type_cutoff = [per_edge_type_cutoff[k] for k in type_names]
+    processed_cutoffs = {}
+    for source_type in type_names:
+        if source_type in per_edge_type_cutoff:
+            e = per_edge_type_cutoff[source_type]
+            if not isinstance(e, float):
+                cutoffs_for_source = []
+                for target_type in type_names:
+                    if target_type in e:
+                        cutoffs_for_source.append(e[target_type])
+                    else:
+                        # default missing target types to `r_max`
+                        cutoffs_for_source.append(r_max)
+                processed_cutoffs[source_type] = cutoffs_for_source
+            else:
+                processed_cutoffs[source_type] = [e] * num_types
+        else:
+            # default missing source types to `r_max`
+            processed_cutoffs[source_type] = [r_max] * num_types
+
+    per_edge_type_cutoff = [processed_cutoffs[k] for k in type_names]
     per_edge_type_cutoff = torch.as_tensor(
         per_edge_type_cutoff, dtype=_GLOBAL_DTYPE
     ).contiguous()
