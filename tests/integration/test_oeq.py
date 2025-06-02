@@ -15,6 +15,9 @@ from nequip.utils.versions import _TORCH_GE_2_4
 @pytest.mark.skipif(not _TORCH_GE_2_4, reason="OpenEquivariance requires torch >= 2.4")
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="OEQ requires CUDA")
 class TestOEQTrainingInvariance(TrainingInvarianceBaseTest):
+    # Only test with EMALightningModule for OEQ
+    _TRAINING_MODULES_TO_TEST = ["nequip.train.EMALightningModule"]
+
     def modify_model_config(self, original_config):
         try:
             import openequivariance  # noqa: F401

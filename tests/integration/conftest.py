@@ -10,6 +10,16 @@ import torch
 from omegaconf import OmegaConf, open_dict
 
 
+# available training modules for integration tests
+# to save time, we only check the EMA ones for now
+_ALL_TRAINING_MODULES = [
+    # "nequip.train.NequIPLightningModule",
+    "nequip.train.EMALightningModule",
+    # "nequip.train.ConFIGLightningModule",
+    "nequip.train.EMAConFIGLightningModule",
+]
+
+
 def _check_and_print(retcode):
     __tracebackhide__ = True
     if retcode.returncode:
@@ -115,13 +125,7 @@ def conffile(request):
 
 @pytest.fixture(
     scope="session",
-    # to save time, we only check the EMA ones for now
-    params=[
-        # "nequip.train.NequIPLightningModule",
-        "nequip.train.EMALightningModule",
-        # "nequip.train.ConFIGLightningModule",
-        "nequip.train.EMAConFIGLightningModule",
-    ],
+    params=_ALL_TRAINING_MODULES,
 )
 def training_module(request):
     return request.param
@@ -148,6 +152,9 @@ def fake_model_training_session(
 
 
 class TrainingInvarianceBaseTest:
+    # Override this in subclasses to specify which training modules to test
+    _TRAINING_MODULES_TO_TEST = _ALL_TRAINING_MODULES
+
     def modify_model_config(self, original_config):
         raise NotImplementedError
 
@@ -173,6 +180,11 @@ class TrainingInvarianceBaseTest:
 
         # NOTE: at the time the tests were written, both minimal configs have val dataloader batch sizes of 5, so we only train again with batch_size=1 here
         config, tmpdir, env, model_dtype = fake_model_training_session
+
+        # Only test with allowed training modules
+        current_training_module = config.training_module._target_
+        if current_training_module not in self._TRAINING_MODULES_TO_TEST:
+            return
         tol = {"float32": 1e-5, "float64": 1e-8}[model_dtype]
 
         # == get necessary info from checkpoint ==
@@ -233,6 +245,11 @@ class TrainingInvarianceBaseTest:
     # TODO: will fail if train dataloader has shuffle=True
     def test_restarts(self, fake_model_training_session):
         config, tmpdir, env, model_dtype = fake_model_training_session
+
+        # Only test with allowed training modules
+        current_training_module = config.training_module._target_
+        if current_training_module not in self._TRAINING_MODULES_TO_TEST:
+            return
         tol = {"float32": 1e-5, "float64": 1e-8}[model_dtype]
         orig_max_epochs = config.trainer.max_epochs
         new_max_epochs = orig_max_epochs + 5
