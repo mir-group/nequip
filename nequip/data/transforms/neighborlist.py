@@ -47,6 +47,12 @@ class NeighborListTransform:
 
         # prune based on per-edge-type cutoffs if specified
         if self._per_edge_type:
+            if AtomicDataDict.ATOM_TYPE_KEY not in data:
+                raise KeyError(
+                    f"Per-edge-type cutoffs require '{AtomicDataDict.ATOM_TYPE_KEY}' to be present in the data. "
+                    "This is likely because nequip.data.transforms.ChemicalSpeciesToAtomTypeMapper needs to be applied before "
+                    "nequip.data.transforms.NeighborListTransform. Please check your data transform order in the configuration."
+                )
             data = self._apply_per_edge_type_cutoffs(data)
 
         return data
