@@ -8,11 +8,16 @@ Most recent change on the top.
 
 ## Unreleased
 
+
 ## [0.10.0]
+
+### Changed
+- Restructured user guide docs
 
 ### Added
 - OpenEquivariance acceleration for NequIP GNN models
-- `SortedNeighborListTransform` for sorted neighborlists with permutation indices to get a sorted transposeI
+- `SortedNeighborListTransform` for sorted neighborlists with permutation indices to get a sorted transpose
+- Per-edge-type cutoff-aware neighborlist transform
 
 ## [0.9.1]
 
