@@ -91,65 +91,24 @@ def from_dict(data: Dict) -> AtomicDataDict.Type:
     else:
         N_edges = None
 
-    # == Cartesian tensor field reshapes (ensure batch dimension present) ==
-
-    # IMPORTANT: the following reshape logic only applies to rank-2 Cartesian tensor fields
+    # == cartesian tensor shape validation ==
+    # cartesian tensor fields should already be properly shaped by input parsers (e.g. ase.py)
     for k, v in data.items():
         if k in _key_registry._CARTESIAN_TENSOR_FIELDS:
-            # enforce (N_frames, 3, 3) shape for graph fields, e.g. stress, virial
-            # remembering to handle ASE-style 6 element Voigt order stress
             if k in _key_registry._GRAPH_FIELDS:
-                err_msg = f"bad shape {v.shape} for {k} registered as a Cartesian tensor graph field---please note that only rank-2 Cartesian tensors are currently supported"
-                if v.dim() == 1:  # two possibilities
-                    if v.shape == (6,):
-                        assert k in (
-                            AtomicDataDict.STRESS_KEY,
-                            AtomicDataDict.VIRIAL_KEY,
-                        )
-                        data[k] = _voigt_6_to_full_3x3_stress(v).reshape(1, 3, 3)
-                    elif v.shape == (9,):
-                        data[k] = v.reshape(1, 3, 3)
-                    else:
-                        raise RuntimeError(err_msg)
-                elif v.dim() == 2:  # three cases
-                    if v.shape == (N_frames, 6):
-                        raise NotImplementedError(
-                            f"File a GitHub issue if the parsing of shape signature (N_frames, 6) is required for {k}"
-                        )
-                    elif v.shape == (N_frames, 9):
-                        data[k] = v.reshape((N_frames, 3, 3))
-                    elif v.shape == (3, 3):
-                        data[k] = v.reshape((1, 3, 3))
-                    else:
-                        raise RuntimeError(err_msg)
-                elif v.dim() == 3:  # one possibility - it's already correctly shaped
-                    assert v.shape == (N_frames, 3, 3), err_msg
-            # enforce (N_nodes, 3, 3) shape for node fields, e.g. Born effective charges
+                # expect (N_frames, 3, 3) for graph cartesian tensors
+                assert v.dim() == 3 and v.shape == (
+                    N_frames,
+                    3,
+                    3,
+                ), f"graph cartesian tensor {k} should have shape ({N_frames}, 3, 3), got {v.shape}"
             elif k in _key_registry._NODE_FIELDS:
-                err_msg = f"bad shape {v.shape} for {k} registered as a Cartesian tensor node field---please note that only rank-2 Cartesian tensors are currently supported"
-                if v.dim() == 1:  # one possibility
-                    assert v.shape[0] == 9, err_msg
-                    data[k] = v.reshape((1, 3, 3))
-                elif v.dim() == 2:  # three possibilities
-                    if v.shape == (3, 3):
-                        data[k] = v.reshape(-1, 3, 3)
-                    elif v.shape == (N_nodes, 9):
-                        data[k] = v.reshape(N_nodes, 3, 3)
-                    elif v.shape == (N_nodes, 6):  # i.e. Voigt format
-                        # TODO (maybe): this is inefficient, but who is going to train on per-atom stresses except for toy training runs?
-                        data[k] = torch.stack(
-                            [_voigt_6_to_full_3x3_stress(vec6) for vec6 in v]
-                        )
-                    else:
-                        raise RuntimeError(err_msg)
-                elif v.dim() == 3:  # one possibility
-                    assert v.shape == (N_nodes, 3, 3), err_msg
-                else:
-                    raise RuntimeError(err_msg)
-            else:
-                raise RuntimeError(
-                    f"{k} registered as a Cartesian tensor field was not registered as either a graph or node field"
-                )
+                # expect (N_nodes, 3, 3) for node cartesian tensors
+                assert v.dim() == 3 and v.shape == (
+                    N_nodes,
+                    3,
+                    3,
+                ), f"node cartesian tensor {k} should have shape ({N_nodes}, 3, 3), got {v.shape}"
 
     # == general shape checks ==
     for k, v in data.items():
@@ -201,16 +160,3 @@ def from_dict(data: Dict) -> AtomicDataDict.Type:
         assert pbc.dim() == 2 and pbc.shape == (N_frames, 3)
 
     return data
-
-
-def _voigt_6_to_full_3x3_stress(voigt_stress):
-    """
-    Form a 3x3 stress matrix from a 6 component vector in Voigt notation
-    """
-    return torch.Tensor(
-        [
-            [voigt_stress[0], voigt_stress[5], voigt_stress[4]],
-            [voigt_stress[5], voigt_stress[1], voigt_stress[3]],
-            [voigt_stress[4], voigt_stress[3], voigt_stress[2]],
-        ]
-    )

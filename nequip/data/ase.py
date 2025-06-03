@@ -7,7 +7,7 @@ import torch
 import ase
 from ase.calculators.singlepoint import SinglePointCalculator, SinglePointDFTCalculator
 from ase.calculators.calculator import all_properties as ase_all_properties
-from ase.stress import full_3x3_to_voigt_6_stress
+from ase.stress import full_3x3_to_voigt_6_stress, voigt_6_to_full_3x3_stress
 
 from . import AtomicDataDict, _key_registry
 from .dict import from_dict
@@ -88,6 +88,52 @@ def from_ase(
             raise NotImplementedError(
                 f"`from_ase` does not support calculator {atoms.calc}"
             )
+
+    # handle ase-specific formats for single frame (no batching yet)
+    for key, value in add_fields.items():
+        if isinstance(value, np.ndarray):
+            # handle ase cartesian tensor formats
+            if key in _key_registry._CARTESIAN_TENSOR_FIELDS:
+                if key in _key_registry._GRAPH_FIELDS:
+                    # graph tensors: stress, virial, polarizability
+                    if value.shape == (6,):  # voigt -> 3x3
+                        add_fields[key] = voigt_6_to_full_3x3_stress(value)
+                    elif value.shape == (9,):  # flat -> 3x3
+                        add_fields[key] = value.reshape(3, 3)
+                    # (3,3) stays as is
+                    # validate graph tensor is now (3, 3)
+                    assert add_fields[key].shape == (
+                        3,
+                        3,
+                    ), f"graph cartesian tensor {key} should be (3, 3) after reshaping, got {add_fields[key].shape}"
+                elif key in _key_registry._NODE_FIELDS:
+                    # node tensors: born charges per atom
+                    if (
+                        value.ndim == 2 and value.shape[1] == 9
+                    ):  # (N_atoms, 9) -> (N_atoms, 3, 3)
+                        add_fields[key] = value.reshape(value.shape[0], 3, 3)
+                    elif (
+                        value.ndim == 2 and value.shape[1] == 6
+                    ):  # (N_atoms, 6) voigt -> (N_atoms, 3, 3)
+                        add_fields[key] = np.stack(
+                            [voigt_6_to_full_3x3_stress(row) for row in value]
+                        )
+                    # validate node tensor is now (N_atoms, 3, 3)
+                    assert add_fields[key].ndim == 3 and add_fields[key].shape[1:] == (
+                        3,
+                        3,
+                    ), f"node cartesian tensor {key} should be (N_atoms, 3, 3) after reshaping, got {add_fields[key].shape}"
+
+            # add batch dimension for graph-level fields
+            if key in _key_registry._GRAPH_FIELDS:
+                add_fields[key] = np.expand_dims(add_fields[key], 0)
+                # validate graph field now has batch dimension
+                if key in _key_registry._CARTESIAN_TENSOR_FIELDS:
+                    assert add_fields[key].shape == (
+                        1,
+                        3,
+                        3,
+                    ), f"graph cartesian tensor {key} should be (1, 3, 3) after adding batch dim, got {add_fields[key].shape}"
 
     data = {
         AtomicDataDict.POSITIONS_KEY: atoms.positions,

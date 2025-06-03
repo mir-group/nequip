@@ -69,7 +69,7 @@ class EMTTestDataset(AtomicDataset):
                         "atomic_numbers": base_atoms.get_atomic_numbers(),
                         "forces": base_atoms.get_forces(),
                         "total_energy": base_atoms.get_potential_energy(),
-                        "stress": base_atoms.get_stress(voigt=True),
+                        "stress": np.expand_dims(base_atoms.get_stress(voigt=False), 0),
                     }
                 )
             )
