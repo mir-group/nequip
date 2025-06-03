@@ -1,8 +1,8 @@
 # Loss and Metrics
 
-Loss functions and metrics are configured by specifying a field (e.g. `total_energy`, `forces`, [etc.](../api/data_fields.rst)) and an error quantity to calculate for it (e.g. `MeanSquaredError`, `MeanAbsoluteError`, etc).
+Loss functions and metrics are configured by specifying a field (e.g. `total_energy`, `forces`, [etc.](../api/data_fields.rst)) and an error quantity to calculate for it (e.g. {class}`~nequip.train.MeanSquaredError`, {class}`~nequip.train.MeanAbsoluteError`, etc).
 
-Loss functions and metrics are configured through {class}`~nequip.train.MetricsManager` objects in the `training_module` [block of the config](config.md/#training_module).
+Loss functions and metrics are configured through {class}`~nequip.train.MetricsManager` objects in the [`training_module`](config.md/#training_module) section of the config.
 The loss function determines what the model optimizes during training, while metrics are used for monitoring training progress and conditioning training behavior (early stopping, learning rate scheduling, etc.).
 
 ## Units
@@ -21,14 +21,14 @@ Most users should use the simplified wrapper classes for common force field trai
 - {class}`~nequip.train.EnergyForceMetrics`
 - {class}`~nequip.train.EnergyForceStressMetrics`
 
-When using simplified wrappers, the actual metric names logged during training may not be immediately obvious. Each wrapper creates specific metrics with predetermined names. To see exactly what metric names each wrapper produces, refer to their individual API documentation in the [metrics API reference](../api/metrics.rst).
+When using simplified wrappers, the actual metric names logged during training may not be immediately obvious. Each wrapper creates specific metrics with predetermined names. To see exactly what metric names each wrapper produces, refer to their individual API documentation in the [`nequip.train` metrics API reference](../api/metrics.rst).
 
 ## Coefficients and Weighted Sum
 
 Users can set coefficients (`coeff`) for each loss or metric term, which leads to the computation of a `weighted_sum` metric.
 
 1. For **loss functions**, `weighted_sum` is the actual loss value used for backpropagation.
-2. For **validation/test metrics**, `weighted_sum` provides a single monitoring metric that balances multiple quantities to be used for conditioning checkpointing, erly stopping, learning rate scheduling, etc.
+2. For **validation/test metrics**, `weighted_sum` provides a single monitoring metric that balances multiple quantities to be used for conditioning checkpointing, early stopping, learning rate scheduling, etc.
 
 Coefficients are automatically normalized to sum to 1. For example:
 ```yaml
@@ -105,10 +105,10 @@ trainer:
 
 ## Advanced Usage: Custom MetricsManager
 
-For scenarios not covered by the simplified wrappers, you can use the full {class}`~nequip.train.MetricsManager` directly. Technical details and advanced examples are provided in the {class}`~nequip.train.MetricsManager` [API page](../api/metrics.rst).
+For scenarios not covered by the simplified wrappers, you can use the full {class}`~nequip.train.MetricsManager` directly. Technical details and advanced examples are provided in the [`nequip.train.MetricsManager` API documentation](../api/metrics.rst).
 
 Common advanced use cases include:
-- Custom field modifiers beyond `PerAtomModifier`
+- Custom field modifiers beyond {class}`~nequip.data.PerAtomModifier`
 - Per-type metrics (separate metrics for each atom type)
-- Custom metric types (e.g., `HuberLoss`, `StratifiedHuberForceLoss`)
+- Custom metric types (e.g., {class}`~nequip.train.HuberLoss`, {class}`~nequip.train.StratifiedHuberForceLoss`)
 - Handling datasets with missing labels (using `ignore_nan: true`)
