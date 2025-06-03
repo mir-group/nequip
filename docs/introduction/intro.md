@@ -5,10 +5,12 @@ NequIP is an open-source code for machine learning on atomic systems, in particu
 ## How to use this documentation
 
 The documentation consists of four main sections:
- - The **User Guide**.
- - The **Python API** documentation.  Most config files and options in the NequIP framework correspond directly to specific functions or classes in the underlying Python API and the comprehensive set of options and arguments that are available are documented in this section.
- - **Integrations** discusses how to use models from the NequIP framework with other software packages.
- - The **Developer Guide** discusses how to extend and contribute to NequIP.
+ - The **[User Guide](../guide/guide.rst)** covers getting started, configuration, training techniques, accelerations, and reference materials.
+ - The **[Python API](../api/nequip.rst)** documentation.  Most config files and options in the NequIP framework correspond directly to specific functions or classes in the underlying Python API and the comprehensive set of options and arguments that are available are documented in this section.
+ - **[Integrations](../integrations/all.rst)** discusses how to use models from the NequIP framework with other software packages.
+ - The **[Developer Guide](../dev/dev.rst)** discusses how to extend and contribute to NequIP.
+
+If you're new to NequIP, we recommend starting with the [Installation Guide](../guide/getting-started/install.md), [Workflow Overview](../guide/getting-started/workflow.md), and [Config File documentation](../guide/configuration/config.md).
 
 There is also a [tutorial notebook](https://colab.research.google.com/github/mir-group/nequip-tutorial/blob/main/NequIP_Tutorial.ipynb) that introduces the NequIP framework. This notebook will run entirely on Google Colab's cloud virtual machine and you will not need to install or run anything locally.
 

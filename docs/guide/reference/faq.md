@@ -4,7 +4,7 @@
 
   **Q**: How does logging work? How do I use Tensorboard or Weights and Biases?
 
-  **A**: Logging is configured under the `trainer` section of the config file by specifying the `logger` argument of the {class}`~lightning.pytorch.trainer.trainer.Trainer` (see [API](https://lightning.ai/docs/pytorch/stable/common/trainer.html#trainer-class-api)). Compatible loggers are found [here](https://lightning.ai/docs/pytorch/stable/api_references.html#loggers). Read the [Config](config.md) docs for a more complete description.
+  **A**: Logging is configured under the [`trainer`](../configuration/config.md#trainer) section of the config file by specifying the `logger` argument of the {class}`~lightning.pytorch.trainer.trainer.Trainer`. Compatible loggers are found [here](https://lightning.ai/docs/pytorch/stable/api_references.html#loggers). Read the [Config](../configuration/config.md) docs for a more complete description.
 
 ## Units
   **Q**: What units do `nequip` framework models use?
@@ -31,7 +31,7 @@
 
   **Q**: How do I train with multiple GPUs?
 
-  **A**: Read our [Distributed Data Parallel training docs](ddp_training.md).
+  **A**: Read our [Distributed Data Parallel training docs](../accelerations/ddp_training.md).
 
 ## Upgrading from pre-`0.7.0` `nequip`
 
@@ -41,13 +41,12 @@ Importing, restarting, or migrating models or training runs from pre-0.7.0 versi
 
   **Q**: What replaces `nequip-evaluate`, which was removed?
 
-  **A**: `nequip-evaluate` is replaced by using the `test` [run type](config.md#run) with `nequip-train` with the {class}`~nequip.train.callbacks.TestTimeXYZFileWriter` [callback](../api/callbacks.rst)
+  **A**: `nequip-evaluate` is replaced by using the `test` [run type](../configuration/config.md#run) with [`nequip-train`](../getting-started/workflow.md#testing) with the {class}`~nequip.train.callbacks.TestTimeXYZFileWriter` [callback](../../api/callbacks.rst)
 
   **Q**: What replaces `nequip-deploy`, which was removed?
 
-  **A**: `nequip-deploy` (which previously generates a TorchScript `.pth` file) is replaced by `nequip-compile` (see [compilation docs](workflow.md#compilation)) that can produce either a TorchScript `.nequip.pth` file or an AOTInductor `.nequip.pt2` file to be used for inference tasks in our [integrations](../integrations/all.rst) such as ASE and [LAMMPS](../integrations/lammps.md).
- 
-  **Q**: What replaces `nequip-benchmark`, which been removed?
+  **A**: `nequip-deploy` (which previously generates a TorchScript `.pth` file) is replaced by [`nequip-compile`](../getting-started/workflow.md#compilation) that can produce either a TorchScript `.nequip.pth` file or an AOTInductor `.nequip.pt2` file to be used for inference tasks in our [integrations](../../integrations/all.rst) such as ASE and [LAMMPS](../../integrations/lammps.md).
+  **Q**: What replaces `nequip-benchmark`, which has been removed?
 
   **A**: No direct substitute exists, but the NequIP ASE calculator can be used to similarly run a model from Python on a single static frame.
 

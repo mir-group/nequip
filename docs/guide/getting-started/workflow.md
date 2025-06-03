@@ -7,7 +7,7 @@ At a glance, the NequIP workflow is as follows.
 1. [**Train**](#training) models with `nequip-train`, which produces a [checkpoint file](./files.md/#checkpoint-files).
 2. [**Test**](#testing) those models using `nequip-train`, sometimes as part of the same call to the command.
 2. [**Package**](#packaging) the model from the checkpoint file with `nequip-package`, which produces a [package file](./files.md/#package-files). Package files are the recommended format for distributing NequIP framework models as they are designed to be usable on different machines and code environments (e.g. with different {mod}`e3nn`, {mod}`nequip`, {mod}`allegro` versions than what the model was initially trained with).
-3. [**Compile**](#compilation) the packaged model (or model from a checkpoint file) with `nequip-compile`, which produces a [compiled model file](./files.md/#compiled-model-files) that can be loaded for [**production simulations**](#production-simulations) in supported [integrations](../integrations/all.rst) such as [LAMMPS](../integrations/lammps.md) and [ASE](../integrations/ase.md).
+3. [**Compile**](#compilation) the packaged model (or model from a checkpoint file) with `nequip-compile`, which produces a [compiled model file](./files.md/#compiled-model-files) that can be loaded for [**production simulations**](#production-simulations) in supported [integrations](../../integrations/all.rst) such as [LAMMPS](../../integrations/lammps.md) and [ASE](../../integrations/ase.md).
 
 <br/>
 
@@ -41,9 +41,9 @@ Under the hood, the [Hydra](https://hydra.cc/) config utilities and the [PyTorch
 
 - {mod}`torch` itself, in the case of [optimizers](https://docs.pytorch.org/docs/stable/optim.html) and [learning rate schedulers](https://docs.pytorch.org/docs/stable/optim.html#how-to-adjust-learning-rate);
 - {mod}`lightning`, such as Lightning's {class}`~lightning.pytorch.trainer.trainer.Trainer` or Lightning's native [callbacks](https://lightning.ai/docs/pytorch/stable/api_references.html#callbacks);
-- `nequip`, such as the various [DataModules](../api/datamodule.rst), custom [callbacks](../api/callbacks.rst), and so on.
+- `nequip`, such as the various [DataModules](../../api/datamodule.rst), custom [callbacks](../../api/callbacks.rst), and so on.
 
-Users are advised to look at the [tutorial configuration](https://github.com/mir-group/nequip/blob/main/configs/tutorial.yaml) to understand how the config file is structured, and then to look up what each of the classes do and what parameters they can take (be they on [PyTorch](https://pytorch.org/docs/stable/), [PyTorch Lightning](https://lightning.ai/docs/pytorch/stable/) or [NequIP's API docs](../api/nequip.rst)). The documentation for `nequip`'s own classes can be found in the [Python API](../api/nequip.rst) section of this documentation. For detailed guidance on config structure, see the [Config File guide](./config.md).
+Users are advised to look at the [tutorial configuration](https://github.com/mir-group/nequip/blob/main/configs/tutorial.yaml) to understand how the config file is structured, and then to look up what each of the classes do and what parameters they can take (be they on [PyTorch](https://pytorch.org/docs/stable/), [PyTorch Lightning](https://lightning.ai/docs/pytorch/stable/) or [NequIP's API docs](../../api/nequip.rst)). The documentation for `nequip`'s own classes can be found in the [Python API](../../api/nequip.rst) section of this documentation. For detailed guidance on config structure, see the [Config File guide](../configuration/config.md).
 
 ```{tip}
 Hydra's output directory can be accessed in the config file using variable interpolation, which is very useful, for example, to instruct `Lightning` to save checkpoints in Hydra's output directory:
@@ -67,7 +67,7 @@ nequip-train -cp full/path/to/config/directory -cn config_name.yaml ++ckpt_path=
 where we have used Hydra's [override syntax](https://hydra.cc/docs/advanced/override_grammar/basic/) (`++`). Note how one must still specify the config file used. Training from a checkpoint will always use the model from the checkpoint file, but other training hyperparameters (dataset, loss, metrics, callbacks, etc) are determined by the config file passed in the restart `nequip-train` (and can therefore be different from that of the original config used to generate the checkpoint). The restart will also resume from the last `run` stage (i.e. `train`, `val`, `test`, etc) that was running before the interruption.
 
 ```{warning}
-DO NOT MODIFY THE CONFIG BETWEEN RESTARTS. There are no safety checks to guard against nonsensical changes to the config used for restarts, which can cause various problems during state restoration. It is safest to restart without changes to the original config. If one seeks to train a model from a checkpoint file with different training hyperparameters or datasets (e.g. for fine-tuning), one can use the {func}`~nequip.model.ModelFromCheckpoint` [model loader](../api/save_model). The only endorsed exception is raising the `max_epochs` argument of the {class}`~lightning.pytorch.trainer.trainer.Trainer` to extend the training run if it was interrupted because `max_epochs` was previously too small.
+DO NOT MODIFY THE CONFIG BETWEEN RESTARTS. There are no safety checks to guard against nonsensical changes to the config used for restarts, which can cause various problems during state restoration. It is safest to restart without changes to the original config. If one seeks to train a model from a checkpoint file with different training hyperparameters or datasets (e.g. for fine-tuning), one can use the {func}`~nequip.model.ModelFromCheckpoint` [model loader](../../api/save_model.rst). The only endorsed exception is raising the `max_epochs` argument of the {class}`~lightning.pytorch.trainer.trainer.Trainer` to extend the training run if it was interrupted because `max_epochs` was previously too small.
 ```
 
 ## Testing
@@ -77,9 +77,9 @@ Testing is also performed with `nequip-train` by adding `test` to the list of `r
 There are two main ways users can use `test`.
 
 - One can have testing be done automatically after training in the same `nequip-train` session by specifying `run: [train, test]` in the config. The `test` phase will use the `best` model checkpoint from the `train` phase.
-- One can run tests from a checkpoint file by having `run: [test]` in the config and using the {func}`~nequip.model.ModelFromCheckpoint` [model loader](../api/save_model) to load a model from a checkpoint file.
+- One can run tests from a checkpoint file by having `run: [test]` in the config and using the {func}`~nequip.model.ModelFromCheckpoint` [model loader](../../api/save_model.rst) to load a model from a checkpoint file.
 
-One can use the {class}`~nequip.train.callbacks.TestTimeXYZFileWriter` callback ([see API](../api/callbacks.rst)) to write out `.xyz` files containing the predictions of the model on the test dataset(s).
+One can use the {class}`~nequip.train.callbacks.TestTimeXYZFileWriter` callback ([see API](../../api/callbacks.rst)) to write out `.xyz` files containing the predictions of the model on the test dataset(s).
 
 ## Packaging
 
@@ -109,11 +109,11 @@ The packaged model can thus be loaded and used independently even if new and dif
 
 ### Fine-tuning packaged models
 
-Packaged models can be used for both inference and fine-tuning.  Fine-tuning uses the {func}`~nequip.model.ModelFromPackage` [model loader](../api/save_model) in the config for a new `nequip-train` run to use the model from the package as the starting point. The checkpoint files produced by this kind of fine-tuning `nequip-train` run can be used as usual and support restarting training with `++ckpt_path path/to/ckpt`, further fine-tuning using {func}`~nequip.model.ModelFromCheckpoint`, `nequip-compile`, `nequip-package`, etc.
+Packaged models can be used for both inference and fine-tuning.  Fine-tuning uses the {func}`~nequip.model.ModelFromPackage` [model loader](../../api/save_model.rst) in the config for a new `nequip-train` run to use the model from the package as the starting point. The checkpoint files produced by this kind of fine-tuning `nequip-train` run can be used as usual and support restarting training with `++ckpt_path path/to/ckpt`, further fine-tuning using {func}`~nequip.model.ModelFromCheckpoint`, `nequip-compile`, `nequip-package`, etc.
 
 ## Compilation
 
-`nequip-compile` is the command used to compile a model (either from a checkpoint file or a package file) for [production simulations](#production-simulations) with our various [integrations](../integrations/all.rst). There are two compiler modes: `torchscript` and `aotinductor`, which produce compiled model files with extensions `.nequip.pth` and `.nequip.pt2` respectively. We generally recommend the newer and faster `aotinductor`, but it requires PyTorch 2.6 or later. 
+`nequip-compile` is the command used to compile a model (either from a checkpoint file or a package file) for [production simulations](#production-simulations) with our various [integrations](../../integrations/all.rst). There are two compiler modes: `torchscript` and `aotinductor`, which produce compiled model files with extensions `.nequip.pth` and `.nequip.pt2` respectively. We generally recommend the newer and faster `aotinductor`, but it requires PyTorch 2.6 or later. 
 
 To compile a model with TorchScript:
 ```bash
@@ -154,4 +154,4 @@ If performing training and inference on separate machines, with possibly differe
 
 ## Production Simulations
 
-Once a model has been [trained](#training) and [compiled](#compilation) it can be used to run production simulations in our supported [integrations](../integrations/all.rst) with other codes and simulation engines, including [LAMMPS](../integrations/lammps.md) and [ASE](../integrations/ase.md).
+Once a model has been [trained](#training) and [compiled](#compilation) it can be used to run production simulations in our supported [integrations](../../integrations/all.rst) with other codes and simulation engines, including [LAMMPS](../../integrations/lammps.md) and [ASE](../../integrations/ase.md).

@@ -14,7 +14,7 @@ In general, you can refer to PyTorch Lightning's docs and other Lightning-based 
 
 ### SLURM Example
 
-A useful resource for SLURM-managed clusters is PyTorch Lightning's [docs for SLURM-managed clusters](https://lightning.ai/docs/pytorch/stable/clouds/cluster_advanced.html), which details, for instance the need to use `srun nequip-train ...`, and which SLURM variables correspond to arguments in the `trainer` section of the config file.
+A useful resource for SLURM-managed clusters is PyTorch Lightning's [docs for SLURM-managed clusters](https://lightning.ai/docs/pytorch/stable/clouds/cluster_advanced.html), which details, for instance the need to use `srun nequip-train ...`, and which SLURM variables correspond to arguments in the [`trainer`](../configuration/config.md#trainer) section of the config file.
 
 A minimal SLURM example for doing DDP training with 2 nodes with 4 GPUs per node (8 GPUs in total) is shown as follows.
 
@@ -58,7 +58,7 @@ The main difference is that NequIP's custom {class}`~nequip.train.SimpleDDPStrat
 
 ### Batch Size and Learning Rate Scaling
 
-The `batch_size` configured under the dataloaders in the `data` [section of the config](config.md/#data) refers to the **per-rank batch size**. When using multiple ranks, this leads to an **effective batch size that is the per-rank batch size times the number of ranks**.
+The `batch_size` configured under the dataloaders in the `data` [section of the config](../configuration/config.md#data) refers to the **per-rank batch size**. When using multiple ranks, this leads to an **effective batch size that is the per-rank batch size times the number of ranks**.
 
 As increasing the number of ranks (while holding the per-rank batch size constant) increases the effective batch size, you should consider adjusting other hyperparameters that you would typically adjust when raising the batch size, such as the learning rate (see [Lightning's docs](https://lightning.ai/docs/pytorch/stable/accelerators/gpu_faq.html#how-should-i-adjust-the-learning-rate-when-using-multiple-devices) for similar advice).
 

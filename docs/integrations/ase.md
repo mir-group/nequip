@@ -3,7 +3,7 @@
 ## Introduction
 The [Atomic Simulation Environment (ASE)](https://wiki.fysik.dtu.dk/ase/) is a popular Python package providing a framework for working with atomic data, reading and writing common formats, and running various simulations and calculations.
 
-The `nequip` package provides seamless integration of NequIP models with the standard ASE interface through an [ASE Calculator](https://wiki.fysik.dtu.dk/ase/ase/calculators/calculators.html). The {class}`~nequip.ase.NequIPCalculator` can be constructed from a model [compiled](../guide/workflow.md#compilation) with `nequip-compile` as detailed in the [ASE calculator API](../api/ase.rst). Other options include using a model from a checkpoint file or one that has been [packaged](../guide/workflow.md#packaging), but it is strongly recommended to use compiled models as they are optimized for inference.
+The `nequip` package provides seamless integration of NequIP models with the standard ASE interface through an [ASE Calculator](https://wiki.fysik.dtu.dk/ase/ase/calculators/calculators.html). The {class}`~nequip.ase.NequIPCalculator` can be constructed from a model [compiled](../guide/getting-started/workflow.md#compilation) with `nequip-compile` as detailed in the [ASE calculator API](../api/ase.rst). Other options include using a model from a checkpoint file or one that has been [packaged](../guide/getting-started/workflow.md#packaging), but it is strongly recommended to use compiled models as they are optimized for inference.
 
 ## Creating an ASE Calculator
 
@@ -41,7 +41,7 @@ calculator = NequIPCalculator.from_checkpoint_model(
 ```
 
 ### Units from NequIP to ASE
-The ASE convention uses eV energy units and Å length units while the NequIP framework follows the ([internally consistent](../guide/faq.md/#units)) units of the underlying dataset. If it is necessary to account for units conversions, users should specify conversion factors with the arguments `energy_units_to_eV` and `length_units_to_A` (see [ASE calculator API](../api/ase.rst)).
+The ASE convention uses eV energy units and Å length units while the NequIP framework follows the ([internally consistent](../guide/reference/faq.md#units)) units of the underlying dataset. If it is necessary to account for units conversions, users should specify conversion factors with the arguments `energy_units_to_eV` and `length_units_to_A` (see [ASE calculator API](../api/ase.rst)).
 
 ## Example Usage
 The NequIP ASE calculator can then be used for standard ASE operations. Below are a few (nonexhaustive) common examples.

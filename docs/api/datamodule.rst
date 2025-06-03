@@ -1,7 +1,7 @@
 nequip.data.datamodule
 ######################
 
-For usage examples and configuration guidance, see the :doc:`../guide/data` guide.
+For usage examples and configuration guidance, see the :doc:`../guide/configuration/data` guide.
 
 
 .. autoclass:: nequip.data.datamodule.NequIPDataModule

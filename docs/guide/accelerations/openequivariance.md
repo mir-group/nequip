@@ -44,12 +44,12 @@ The {func}`~nequip.model.modify` function wraps your base model and applies the 
 
 ## Inference with OpenEquivariance
 
-For inference, you need to [compile](workflow.md#compilation) your trained model with OpenEquivariance support using `nequip-compile`.
-Currently, OpenEquivariance only works with TorchScript compilation for use in [ASE](../integrations/ase.md) (Atomic Simulation Environment).
+For inference, you need to [`nequip-compile`](../getting-started/workflow.md#compilation) your trained model with OpenEquivariance enabled.
+Currently, OpenEquivariance only works with TorchScript compilation for use in [ASE](../../integrations/ase.md) (Atomic Simulation Environment).
 
 ### Supported Integrations
 
-| [Compilation Mode](workflow.md#compilation) | [ASE](../integrations/ase.md) | [LAMMPS](../integrations/lammps.md) |
+| [Compilation Mode](../getting-started/workflow.md#compilation) | [ASE](../../integrations/ase.md) | [LAMMPS](../../integrations/lammps.md) |
 |:-------------------------------------------:|:------------------------------:|:-----------------------------------:|
 | TorchScript (`.nequip.pth`) | ✅ Stable | 🔨 Work in Progress |
 | AOT Inductor (`.nequip.pt2`) | 🔨 Work in Progress | 🔨 Work in Progress |

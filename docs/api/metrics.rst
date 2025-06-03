@@ -1,7 +1,7 @@
 Loss Function and Error Metrics
 ###############################
 
-For practical usage and configuration guidance, see the :doc:`/guide/metrics` guide.
+For practical usage and configuration guidance, see the :doc:`../guide/configuration/metrics` guide.
 This page provides technical API details.
 
 Simplified Wrappers
