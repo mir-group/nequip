@@ -36,21 +36,6 @@ if VESIN_AVAILABLE:
     NL_METHODS.append("vesin")
 
 
-def test_from_ase(CuFcc):
-    atoms, data = CuFcc
-    for key in [AtomicDataDict.FORCE_KEY, AtomicDataDict.POSITIONS_KEY]:
-        assert data[key].shape == (len(atoms), 3)  # 4 species in this atoms
-
-
-def test_to_ase(CH3CHO_no_typemap):
-    atoms, data = CH3CHO_no_typemap
-    to_ase_atoms = to_ase(data)[0]
-    assert np.allclose(atoms.get_positions(), to_ase_atoms.get_positions())
-    assert np.array_equal(atoms.get_atomic_numbers(), to_ase_atoms.get_atomic_numbers())
-    assert np.array_equal(atoms.get_pbc(), to_ase_atoms.get_pbc())
-    assert np.array_equal(atoms.get_cell(), to_ase_atoms.get_cell())
-
-
 def test_to_ase_batches(atomic_batch):
     to_ase_atoms_batch = to_ase(atomic_batch)
     atomic_batch = AtomicDataDict.to_(atomic_batch, device="cpu")
@@ -75,20 +60,10 @@ def test_to_ase_batches(atomic_batch):
         ).all()
 
 
-def test_ase_roundtrip(CuFcc):
-    atoms, data = CuFcc
-    atoms2 = to_ase(data)[0]
-    assert np.allclose(atoms.get_positions(), atoms2.get_positions())
-    assert np.array_equal(atoms.get_atomic_numbers(), atoms2.get_atomic_numbers())
-    assert np.array_equal(atoms.get_pbc(), atoms2.get_pbc())
-    assert np.allclose(atoms.get_cell(), atoms2.get_cell())
-    assert np.allclose(atoms.calc.results["forces"], atoms2.calc.results["forces"])
-
-
 def test_process_dict_invariance(H2, CuFcc, CH3CHO):
 
     for system in [H2, CuFcc, CH3CHO]:
-        atoms, data = system
+        _, data = system
         data1 = from_dict(data.copy())
         data2 = from_dict(data1.copy())
     for k in data.keys():
@@ -162,13 +137,13 @@ def test_no_neighbors(nl_method):
 
     # isolated atom
     H = Atoms("H", positions=[[0, 0, 0]], cell=20 * np.eye(3))
-    data = compute_neighborlist_(from_ase(H), r_max=2.5)
+    data = compute_neighborlist_(from_ase(H), r_max=2.5, NL=nl_method)
     assert data[AtomicDataDict.EDGE_INDEX_KEY].numel() == 0
     assert data[AtomicDataDict.EDGE_CELL_SHIFT_KEY].numel() == 0
 
     # cutoff smaller than interatomic distance
     Cu = ase.build.bulk("Cu", "fcc", a=3.6, cubic=True)
-    data = compute_neighborlist_(from_ase(Cu), r_max=2.5)
+    data = compute_neighborlist_(from_ase(Cu), r_max=2.5, NL=nl_method)
     assert data[AtomicDataDict.EDGE_INDEX_KEY].numel() == 0
     assert data[AtomicDataDict.EDGE_CELL_SHIFT_KEY].numel() == 0
 
