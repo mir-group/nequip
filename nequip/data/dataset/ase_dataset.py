@@ -9,8 +9,6 @@ from .base_datasets import AtomicDataset
 
 from typing import Union, Dict, List, Optional, Callable, Any
 
-# TODO: link "standard keys" under `include_keys` to docs
-
 
 class ASEDataset(AtomicDataset):
     """:class:`~nequip.data.dataset.AtomicDataset` for `ASE <https://wiki.fysik.dtu.dk/ase/ase/io/io.html>`_-readable file formats.
@@ -19,7 +17,7 @@ class ASEDataset(AtomicDataset):
         file_path (str): path to ASE-readable file
         transforms (List[Callable]): list of data transforms
         ase_args (Dict[str, Any]): arguments for :func:`ase.io.iread`
-        include_keys (List[str]): the keys that needs to be parsed into dataset in addition to standard keys. The data stored in :attr:`ase.atoms.Atoms.array` has the lowest priority, and it will be overrided by data in :attr:`ase.atoms.Atoms.info` and :attr:`ase.atoms.Atoms.calc.results`
+        include_keys (List[str]): the keys that needs to be parsed into dataset in addition to standard keys (see :doc:`../../../api/data_fields`). The data stored in :attr:`ase.atoms.Atoms.array` has the lowest priority, and it will be overrided by data in :attr:`ase.atoms.Atoms.info` and :attr:`ase.atoms.Atoms.calc.results`
         exclude_keys (List[str]): list of keys that may be present in the ASE-readable file but the user wishes to exclude
         key_mapping (Dict[str, str]): mapping of ``ase`` keys to ``AtomicDataDict`` keys
     """
