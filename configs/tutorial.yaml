@@ -216,7 +216,7 @@ training_module:
     _target_: nequip.model.NequIPGNNModel
 
     # If you have PyTorch >= 2.6.0 installed, and are training on GPUs, the following line uses torch.compile to speed up training
-    # for more details, see https://nequip.readthedocs.io/en/latest/guide/pt2_compilation.html
+    # for more details, see https://nequip.readthedocs.io/en/latest/guide/accelerations/pt2_compilation.html
     compile_mode: compile
     # ^ if you're using PyTorch <= 2.6.0, an error will be thrown -- comment out the line to avoid it
 
@@ -244,7 +244,7 @@ training_module:
     # radial_mlp_width: ${int_mul:${num_features},2}
     # the NequIP framework implements `int_mul` and `int_div`
 
-    # see https://nequip.readthedocs.io/en/latest/guide/model.html to understand the following hyperparameters
+    # see https://nequip.readthedocs.io/en/latest/guide/configuration/model.html to understand the following hyperparameters
 
     # dataset statistics used to inform the model's initial parameters for normalization, shifting and rescaling
     # we use omegaconf's resolvers (https://omegaconf.readthedocs.io/en/2.3_branch/usage.html#resolvers)
