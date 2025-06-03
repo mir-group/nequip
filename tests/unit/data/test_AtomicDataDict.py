@@ -5,7 +5,6 @@ import numpy as np
 import torch
 from ase import Atoms
 import ase.build
-import ase.geometry
 
 from ase.calculators.singlepoint import SinglePointCalculator
 
@@ -18,6 +17,23 @@ from nequip.data import (
 )
 from nequip.data._nl import neighbor_list_and_relative_vec
 from nequip.utils.test import compare_neighborlists
+
+# check for optional neighborlist libraries
+try:
+    import vesin  # noqa: F401
+
+    VESIN_AVAILABLE = True
+except ImportError:
+    VESIN_AVAILABLE = False
+
+# build parametrize lists based on available libraries
+ALT_NL_METHODS = ["matscipy"]
+if VESIN_AVAILABLE:
+    ALT_NL_METHODS.append("vesin")
+
+NL_METHODS = ["ase", "matscipy"]
+if VESIN_AVAILABLE:
+    NL_METHODS.append("vesin")
 
 
 def test_from_ase(CuFcc):
@@ -127,15 +143,8 @@ def test_silicon_neighbors(Si):
     assert edge_index_set_equiv(data["edge_index"], edge_index_true)
 
 
-@pytest.mark.parametrize("alt_nl_method", ["matscipy", "vesin"])
+@pytest.mark.parametrize("alt_nl_method", ALT_NL_METHODS)
 def test_neighborlist_consistency(alt_nl_method, CH3CHO, CuFcc, Si):
-
-    # check if modules are installed
-    try:
-        if alt_nl_method == "vesin":
-            import vesin  # noqa: F401
-    except ImportError:
-        pytest.skip(f"package for {alt_nl_method} neighborlist not available")
 
     CH3CHO_atoms, _ = CH3CHO
     CuFcc_atoms, _ = CuFcc
@@ -147,15 +156,9 @@ def test_neighborlist_consistency(alt_nl_method, CH3CHO, CuFcc, Si):
         compare_neighborlists(atoms_or_data, nl1="ase", nl2=alt_nl_method, r_max=r_max)
 
 
-@pytest.mark.parametrize("nl_method", ["ase", "matscipy", "vesin"])
+@pytest.mark.parametrize("nl_method", NL_METHODS)
 def test_no_neighbors(nl_method):
     """Tests that the neighborlist is empty if there are no neighbors."""
-    # check if modules are installed
-    try:
-        if nl_method == "vesin":
-            import vesin  # noqa: F401
-    except ImportError:
-        pytest.skip(f"package for {nl_method} neighborlist not available")
 
     # isolated atom
     H = Atoms("H", positions=[[0, 0, 0]], cell=20 * np.eye(3))
