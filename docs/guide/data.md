@@ -9,13 +9,13 @@ The data processing in NequIP follows this pipeline from raw files to model-read
 :align: center
 ```
 
-This entire pipeline is coordinated and managed by a `DataModule` object, which also:
+This entire pipeline is coordinated and managed by a {class}`~nequip.data.datamodule.NequIPDataModule` object, which also:
 - Manages train/val/test dataset splits  
 - Computes dataset statistics
 
 **Key Components:**
 
-- **DataModule**: Orchestrates everything
+- **{class}`~nequip.data.datamodule.NequIPDataModule`**: Orchestrates everything
 - **Dataset**: Reads raw data files and applies transforms to individual structures
 - **Transforms**: Process data sequentially (e.g. compute neighbor lists, map atom types)
 - **DataLoader**: Batches transformed data for efficient training with parallel loading
@@ -24,8 +24,8 @@ This entire pipeline is coordinated and managed by a `DataModule` object, which 
 ## DataModules
 
 The [data section](config.md/#data) of the NequIP config file specifies a {class}`~nequip.data.datamodule.NequIPDataModule`, which manages how training data is loaded and processed.
-`DataModule`s coordinate all aspects of data handling from loading to preprocessing.
-For comprehensive configuration options, see {mod}`nequip.data.datamodule`.
+{class}`~nequip.data.datamodule.NequIPDataModule`s coordinate all aspects of data handling from loading to preprocessing.
+For comprehensive configuration options, see [`nequip.data.datamodule`](../api/datamodule.rst).
 
 ### Common DataModules
 
@@ -57,9 +57,9 @@ These specialized datamodules have unique APIs tailored to their specific datase
 
 ### Custom Data Configurations
 
-For more complex or custom data setups, you can use the base {class}`~nequip.data.datamodule.NequIPDataModule` directly. This allows you to specify custom dataset configurations - datasets are the components that actually read data files and apply transforms to individual structures. See {mod}`nequip.data.dataset` for available dataset classes.
+For more complex or custom data setups, you can use the base {class}`~nequip.data.datamodule.NequIPDataModule` directly. This allows you to specify custom dataset configurations - datasets are the components that actually read data files and apply transforms to individual structures. See [`nequip.data.dataset`](../api/dataset.rst) for available dataset classes.
 
-The existing specialized datamodules are essentially convenience wrappers that simplify configuring the base `NequIPDataModule` with specific datasets and common settings.
+The existing [specialized datamodules](#specialized-datamodules) are essentially convenience wrappers that simplify configuring the base {class}`~nequip.data.datamodule.NequIPDataModule` with specific datasets and common settings.
 
 ### DataModule Arguments
 
@@ -67,19 +67,19 @@ Key arguments that datamodules take include transforms (see [Data Transforms](#d
 
 ## Data Transforms
 
-Transforms process raw data into a format suitable for model training. They are specified in datamodule configurations (see [DataModules](#datamodules) and {mod}`nequip.data.datamodule`) which pass them as arguments to datasets (see {mod}`nequip.data.dataset`) where they are applied sequentially to each data point.
+Transforms process raw data into a format suitable for model training. They are specified in datamodule configurations (see [DataModules](#datamodules) and [`nequip.data.datamodule`](../api/datamodule.rst)) which pass them as arguments to datasets (see [`nequip.data.dataset`](../api/dataset.rst)) where they are applied sequentially to each data point.
 Two transforms are essential for most use cases:
-
-- **{class}`~nequip.data.transforms.NeighborListTransform`** (always required) computes which atoms are neighbors of each atom within a cutoff distance. This is fundamental for graph-based neural networks:
-  ```yaml
-  - _target_: nequip.data.transforms.NeighborListTransform
-    r_max: 5.0  # should be the same as model `r_max`
-  ```
 
 - **{class}`~nequip.data.transforms.ChemicalSpeciesToAtomTypeMapper`** (usually required) maps atomic numbers to model type indices. This handles the distinction between chemical elements (C, H, O) and the integer type indices (0, 1, 2) that the model uses:
   ```yaml
   - _target_: nequip.data.transforms.ChemicalSpeciesToAtomTypeMapper
     chemical_symbols: [C, H, O, Cu]  # Order determines type indices
+  ```
+
+- **{class}`~nequip.data.transforms.NeighborListTransform`** (always required) computes which atoms are neighbors of each atom within a cutoff distance. This is fundamental for graph-based neural networks:
+  ```yaml
+  - _target_: nequip.data.transforms.NeighborListTransform
+    r_max: 5.0  # should be the same as model `r_max`
   ```
 
 The `chemical_symbols` list defines the mapping from atomic numbers to type indices, and `type_names` should be consistent across data, model, and statistics configurations.
@@ -88,10 +88,14 @@ Here's an example with both transforms:
 
 ```yaml
 transforms:
-  - _target_: nequip.data.transforms.NeighborListTransform
-    r_max: 5.0
   - _target_: nequip.data.transforms.ChemicalSpeciesToAtomTypeMapper
     chemical_symbols: [C, H, O, Cu]
+  - _target_: nequip.data.transforms.NeighborListTransform
+    r_max: 5.0
+```
+
+```{warning}
+**Transform Order May Matter**: The order of transforms can be important for some configurations. For example, when using per-edge-type cutoffs in {class}`~nequip.data.transforms.NeighborListTransform`, the {class}`~nequip.data.transforms.ChemicalSpeciesToAtomTypeMapper` must come before {class}`~nequip.data.transforms.NeighborListTransform` because the neighborlist transform needs atom type information to apply different cutoffs for different element pairs.
 ```
 
 Additional transforms are available for specific use cases. For stress-related data, you may need {class}`~nequip.data.transforms.VirialToStressTransform` (converts virial to stress tensors) or {class}`~nequip.data.transforms.StressSignFlipTransform` (handles different stress sign conventions). For a complete list of available transforms, see the [transforms API documentation](../api/data_transforms.rst).
@@ -99,7 +103,7 @@ Additional transforms are available for specific use cases. For stress-related d
 ## DataLoaders
 
 DataLoaders handle batching and parallel data loading using PyTorch's {class}`torch.utils.data.DataLoader`.
-They are specified in datamodule configurations (see [DataModules](#datamodules) and {mod}`nequip.data.datamodule`) which use them to wrap datasets for efficient training:
+They are specified in datamodule configurations (see [DataModules](#datamodules) and [`nequip.data.datamodule`](../api/datamodule.rst)) which use them to wrap datasets for efficient training:
 
 ```yaml
 train_dataloader:
@@ -116,7 +120,7 @@ Training batch size affects learning dynamics and is an important hyperparameter
 ## Dataset Statistics
 
 Dataset statistics provide both rough knowledge of your dataset (e.g., average energy per atom, force magnitudes) and are crucial for initializing data-derived model hyperparameters.
-They are computed by specifying a dataset statistics manager as an argument to datamodules (see [DataModules](#datamodules) and {mod}`nequip.data.datamodule`).
+They are computed by specifying a dataset statistics manager as an argument to datamodules (see [DataModules](#datamodules) and [`nequip.data.datamodule`](../api/datamodule.rst)).
 The {class}`~nequip.data.CommonDataStatisticsManager` automatically computes essential statistics:
 
 ```yaml

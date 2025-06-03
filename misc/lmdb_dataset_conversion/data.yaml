@@ -17,10 +17,10 @@ data:
       _target_: nequip.data.dataset.EMTTestDataset
       # transforms are optional, depending on whether you want the transformations to be pre-applied
       #transforms:
-      #  - _target_: nequip.data.transforms.NeighborListTransform
-      #    r_max: ${cutoff_radius}
       #  - _target_: nequip.data.transforms.ChemicalSpeciesToAtomTypeMapper
       #    chemical_symbols: ${chemical_symbols}
+      #  - _target_: nequip.data.transforms.NeighborListTransform
+      #    r_max: ${cutoff_radius}
       supercell: [4, 4, 4]
       seed: ${data_seed}
       num_frames: 50

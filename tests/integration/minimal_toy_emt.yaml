@@ -16,10 +16,10 @@ data:
     dataset:
       _target_: nequip.data.dataset.EMTTestDataset
       transforms:
-        - _target_: nequip.data.transforms.NeighborListTransform
-          r_max: ${cutoff_radius}
         - _target_: nequip.data.transforms.ChemicalSpeciesToAtomTypeMapper
           chemical_symbols: ${chemical_symbols}
+        - _target_: nequip.data.transforms.NeighborListTransform
+          r_max: ${cutoff_radius}
       supercell: [4, 4, 4]
       seed: ${seed}
       num_frames: 50

@@ -72,9 +72,6 @@ data:
   # data is kept in its untransformed form
   
   transforms:
-    # data doesn't usually come with a neighborlist -- this tranforms prepares the neighborlist
-    - _target_: nequip.data.transforms.NeighborListTransform
-      r_max: ${cutoff_radius}
     # the models only know atom types, which can be different from the chemical species (e.g. C, H)
     # for instance we can have data with different charge states of carbon, which means they are
     # all labeled by chemical species `C`, but may have different atom type labels based on the charge states
@@ -82,6 +79,9 @@ data:
     # transformation to ensure that the data has 0-indexed atom type lists used in the various model operations 
     - _target_: nequip.data.transforms.ChemicalSpeciesToAtomTypeMapper
       chemical_symbols: ${chemical_symbols}
+    # data doesn't usually come with a neighborlist -- this tranforms prepares the neighborlist
+    - _target_: nequip.data.transforms.NeighborListTransform
+      r_max: ${cutoff_radius}
 
   # the following are torch.utils.data.DataLoader configs excluding the arguments `dataset` and `collate_fn`
   # https://pytorch.org/docs/stable/data.html#torch.utils.data.DataLoader

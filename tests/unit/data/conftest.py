@@ -114,10 +114,10 @@ def TolueneDataModule(num_trainval_test, batch_size):
           dataset: toluene
           data_source_dir: {}
           transforms:
-            - _target_: nequip.data.transforms.NeighborListTransform
-              r_max: 4.0
             - _target_: nequip.data.transforms.ChemicalSpeciesToAtomTypeMapper
               chemical_symbols: [C, H]
+            - _target_: nequip.data.transforms.NeighborListTransform
+              r_max: 4.0
           train_val_split: [0.8, 0.2]
           trainval_test_subset: [{}, {}]
           seed: 1234
