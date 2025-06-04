@@ -146,7 +146,7 @@ class NequIPCalculator(Calculator):
         )
 
     @classmethod
-    def from_checkpoint_model(
+    def _from_checkpoint_model(
         cls,
         ckpt_path: str,
         device: Union[str, torch.device] = "cpu",
@@ -156,6 +156,10 @@ class NequIPCalculator(Calculator):
         **kwargs,
     ):
         """Creates a :class:`~nequip.ase.NequIPCalculator` from a checkpoint file.
+
+        .. note::
+            This method is private and intended for internal testing only.
+            Users should use `from_compiled_model` instead.
 
         Args:
             ckpt_path (str): path to checkpoint file
@@ -174,7 +178,7 @@ class NequIPCalculator(Calculator):
         )
 
     @classmethod
-    def from_packaged_model(
+    def _from_packaged_model(
         cls,
         package_path: str,
         device: Union[str, torch.device] = "cpu",
@@ -184,6 +188,10 @@ class NequIPCalculator(Calculator):
         **kwargs,
     ):
         """Creates a :class:`~nequip.ase.NequIPCalculator` from a package file.
+
+        .. note::
+            This method is private and intended for internal testing only.
+            Users should use `from_compiled_model` instead.
 
         Args:
             package_path (str): path to packaged model

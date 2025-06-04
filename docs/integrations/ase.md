@@ -3,25 +3,18 @@
 ## Introduction
 The [Atomic Simulation Environment (ASE)](https://wiki.fysik.dtu.dk/ase/) is a popular Python package providing a framework for working with atomic data, reading and writing common formats, and running various simulations and calculations.
 
-The `nequip` package provides seamless integration of NequIP models with the standard ASE interface through an [ASE Calculator](https://wiki.fysik.dtu.dk/ase/ase/calculators/calculators.html). The {class}`~nequip.ase.NequIPCalculator` can be constructed from a model [compiled](../guide/getting-started/workflow.md#compilation) with `nequip-compile` as detailed in the [ASE calculator API](../api/ase.rst). Other options include using a model from a checkpoint file or one that has been [packaged](../guide/getting-started/workflow.md#packaging), but it is strongly recommended to use compiled models as they are optimized for inference.
+The `nequip` package provides seamless integration of NequIP models with the standard ASE interface through an [ASE Calculator](https://wiki.fysik.dtu.dk/ase/ase/calculators/calculators.html). The {class}`~nequip.ase.NequIPCalculator` can be constructed from a model [compiled](../guide/getting-started/workflow.md#compilation) with `nequip-compile` as detailed in the [ASE calculator API](../api/ase.rst).
 
 ## Creating an ASE Calculator
 
-The following code block shows how one can build an ASE {class}`~nequip.ase.NequIPCalculator` from a compiled model file or checkpoint file.
+The following code block shows how to build an ASE {class}`~nequip.ase.NequIPCalculator` from a compiled model file.
 
 ```python
 from nequip.ase import NequIPCalculator
 
-# from compiled model (optimized for inference)
 calculator = NequIPCalculator.from_compiled_model(
     compile_path="path/to/compiled_model.nequip.pt2",
     device="cpu",  # "cuda" for GPUs, etc
-)
-
-# from checkpoint (not optimized for inference)
-calculator = NequIPCalculator.from_checkpoint_model(
-    ckpt_path="path/to/checkpoint_model.ckpt",
-    device="cpu",  # "cuda" for GPUs, etc.
 )
 ```
 
@@ -33,8 +26,8 @@ If this is not the case, or if you want to silence the warning from not providin
 ```python
 from nequip.ase import NequIPCalculator
 
-calculator = NequIPCalculator.from_checkpoint_model(
-    ckpt_path="path/to/checkpoint_model.ckpt",
+calculator = NequIPCalculator.from_compiled_model(
+    compile_path="path/to/compiled_model.nequip.pt2",
     device="cpu",  # "cuda", etc.
     chemical_symbols={"H": "myHydrogen", "C": "someCarbonType"}
 )
@@ -57,8 +50,8 @@ from nequip.ase import NequIPCalculator
 import torch
 
 # Initialize the nequip calculator
-calculator = NequIPCalculator.from_checkpoint_model(
-    ckpt_path="/content/results/best.ckpt", 
+calculator = NequIPCalculator.from_compiled_model(
+    compile_path="path/to/compiled_model.nequip.pt2", 
     chemical_symbols=["Si"], 
     device="cuda" if torch.cuda.is_available() else "cpu",  
 )  # use GPUs if available
@@ -113,7 +106,7 @@ from tqdm import tqdm
 from nequip.ase import NequIPCalculator
 
 
-compile_path = "./best.nequip.pt2"  # path to compiled model
+compile_path = "path/to/compiled_model.nequip.pt2"  # path to compiled model
 # choose ASE force optimizer and 'filter' (volume relaxation) methods:
 ase_optimizer = "GOQN" # faster than "FIRE" from tests; see SI of https://arxiv.org/abs/2412.19330
 # note that GOQN is particularly fast with the optimizer updates here: https://gitlab.com/ase/ase/-/merge_requests/3570
