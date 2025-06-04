@@ -88,13 +88,16 @@ def test_compile(fake_model_training_session, device, mode):
 
         # test both devices if possible, where we are testing swapping of devices between compile and
         # loading (CUDA -> cpu and vice versa)
+        chemical_symbols = config.chemical_symbols
         ckpt_calc = NequIPCalculator.from_checkpoint_model(
             ckpt_path,
             device=load_device,
+            chemical_symbols=chemical_symbols,
         )
         compile_calc = NequIPCalculator.from_compiled_model(
             output_path,
             device=load_device,
+            chemical_symbols=chemical_symbols,
         )
 
         # == get validation data by instantiating datamodules ==
