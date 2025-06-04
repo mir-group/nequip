@@ -28,6 +28,34 @@ import warnings
 from typing import Sequence, Optional, Dict, Union, Callable
 
 
+def _nequip_gnn_docstring(header: str) -> str:
+    """Generate common docstring for NequIP GNN models with customizable header."""
+    return f"""{header}
+
+    Args:
+        seed (int): seed for reproducibility
+        model_dtype (str): ``float32`` or ``float64``
+        r_max (float): cutoff radius
+        per_edge_type_cutoff (Dict): one can optionally specify cutoffs for each edge type [must be smaller than ``r_max``] (default ``None``)
+        type_names (Sequence[str]): list of atom type names
+        num_layers (int): number of interaction blocks, we find 3-5 to work best (default ``4``)
+        l_max (int): the maximum rotation order for the network's features, ``1`` is a good default, ``2`` is more accurate but slower (default ``1``)
+        parity (bool): whether to include features with odd mirror parity -- often turning parity off gives equally good results but faster networks, so it's worth testing (default ``True``)
+        num_features (int): multiplicity of the features, smaller is faster (default ``32``)
+        radial_mlp_depth (int): number of radial layers, usually 1-3 works best, smaller is faster (default ``2``)
+        radial_mlp_width (int): number of hidden neurons in radial function, smaller is faster (default ``64``)
+        num_bessels (int): number of Bessel basis functions (default ``8``)
+        bessel_trainable (bool): whether the Bessel roots are trainable (default ``False``)
+        polynomial_cutoff_p (int): p-exponent used in polynomial cutoff function, smaller p corresponds to stronger decay with distance (default ``6``)
+        avg_num_neighbors (float): used to normalize edge sums for better numerics (default ``None``)
+        per_type_energy_scales (float/List[float]): per-atom energy scales, which could be derived from the force RMS of the data (default ``None``)
+        per_type_energy_shifts (float/List[float]): per-atom energy shifts, which should generally be isolated atom reference energies or estimated from average per-atom energies of the data (default ``None``)
+        per_type_energy_scales_trainable (bool): whether the per-atom energy scales are trainable (default ``False``)
+        per_type_energy_shifts_trainable (bool): whether the per-atom energy shifts are trainable (default ``False``)
+        pair_potential (torch.nn.Module): additional pair potential term, e.g. :class:`~nequip.nn.pair_potential.ZBL` (default ``None``)
+    """
+
+
 @model_builder
 def NequIPGNNEnergyModel(
     num_layers: int = 4,
@@ -38,7 +66,6 @@ def NequIPGNNEnergyModel(
     radial_mlp_width: int = 64,
     **kwargs,
 ) -> GraphModel:
-    """NequIP GNN model that predicts energies."""
     # === sanity checks and warnings ===
     assert (
         num_layers > 0
@@ -79,33 +106,21 @@ def NequIPGNNEnergyModel(
     return model
 
 
+# assign docstrings using the shared function
+NequIPGNNEnergyModel.__doc__ = _nequip_gnn_docstring(
+    "NequIP GNN model that predicts energies only."
+)
+
+
 @model_builder
 def NequIPGNNModel(**kwargs) -> GraphModel:
-    """NequIP GNN model that predicts energies and forces (and stresses if cell is provided).
-
-    Args:
-        seed (int): seed for reproducibility
-        model_dtype (str): ``float32`` or ``float64``
-        r_max (float): cutoff radius
-        per_edge_type_cutoff (Dict): one can optionally specify cutoffs for each edge type [must be smaller than ``r_max``] (default ``None``)
-        type_names (Sequence[str]): list of atom type names
-        num_layers (int): number of interaction blocks, we find 3-5 to work best (default ``4``)
-        l_max (int): the maximum rotation order for the network's features, ``1`` is a good default, ``2`` is more accurate but slower (default ``1``)
-        parity (bool): whether to include features with odd mirror parity -- often turning parity off gives equally good results but faster networks, so it's worth testing (default ``True``)
-        num_features (int): multiplicity of the features, smaller is faster (default ``32``)
-        radial_mlp_depth (int): number of radial layers, usually 1-3 works best, smaller is faster (default ``2``)
-        radial_mlp_width (int): number of hidden neurons in radial function, smaller is faster (default ``64``)
-        num_bessels (int): number of Bessel basis functions (default ``8``)
-        bessel_trainable (bool): whether the Bessel roots are trainable (default ``False``)
-        polynomial_cutoff_p (int): p-exponent used in polynomial cutoff function, smaller p corresponds to stronger decay with distance (default ``6``)
-        avg_num_neighbors (float): used to normalize edge sums for better numerics (default ``None``)
-        per_type_energy_scales (float/List[float]): per-atom energy scales, which could be derived from the force RMS of the data (default ``None``)
-        per_type_energy_shifts (float/List[float]): per-atom energy shifts, which should generally be isolated atom reference energies or estimated from average per-atom energies of the data (default ``None``)
-        per_type_energy_scales_trainable (bool): whether the per-atom energy scales are trainable (default ``False``)
-        per_type_energy_shifts_trainable (bool): whether the per-atom energy shifts are trainable (default ``False``)
-        pair_potential (torch.nn.Module): additional pair potential term, e.g. :class:`~nequip.nn.pair_potential.ZBL` (default ``None``)
-    """
     return ForceStressOutput(func=NequIPGNNEnergyModel(**kwargs))
+
+
+# assign docstring for the force+energy model
+NequIPGNNModel.__doc__ = _nequip_gnn_docstring(
+    "NequIP GNN model that predicts energies and forces (and stresses if cell is provided)."
+)
 
 
 @model_builder
