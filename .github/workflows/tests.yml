@@ -69,4 +69,4 @@ jobs:
     - name: Test with pytest
       run: |
         # See https://github.com/pytest-dev/pytest/issues/1075
-        PYTHONHASHSEED=0 pytest -n auto tests/
+        PYTHONHASHSEED=0 pytest -x -n auto tests/
