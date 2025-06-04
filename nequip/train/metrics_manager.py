@@ -345,7 +345,7 @@ def EnergyForceLoss(
 ):
     """Simplified :class:`MetricsManager` wrapper for a **loss** term containing energy and forces mean squared errors (MSEs).
 
-    The loss component names are ``per_atom_energy_mse`` OR `total_energy_mse` (depending on whether ``per_atom_energy`` is ``True`` or ``False``), and `forces_mse`, which are the names to refer to when neeeded, e.g. when scheduling loss component coefficients.
+    The loss component names are ``per_atom_energy_mse`` OR ``total_energy_mse`` (depending on whether ``per_atom_energy`` is ``True`` or ``False``), and ``forces_mse``, which are the names to refer to when neeeded, e.g. when scheduling loss component coefficients.
 
     Example usage in config:
 
