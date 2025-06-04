@@ -9,6 +9,7 @@ BASIC_INFO = {
     "type_names": ["H", "C", "O"],
     "r_max": 4.0,
     "avg_num_neighbors": 3.0,
+    "per_type_energy_shifts": {"H": 3.45, "C": 5.67, "O": 7.89},
 }
 
 COMMON_CONFIG = {
@@ -41,7 +42,6 @@ minimal_config1 = dict(
 minimal_config2 = dict(
     num_features=8,
     num_layers=3,
-    per_type_energy_shifts={"H": 3.45, "C": 5.67, "O": 7.89},
     **COMMON_CONFIG,
 )
 minimal_config3 = dict(
