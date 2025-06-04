@@ -117,10 +117,9 @@ def neighbor_list_and_relative_vec(
         first_idex, second_idex, shifts = vesin_nl(
             cutoff=float(r_max), full_list=True
         ).compute(points=temp_pos, box=temp_cell, periodic=periodic, quantities="ijS")
-        if first_idex.dtype != np.int64:
-            first_idex = first_idex.astype(np.int64)
-        if second_idex.dtype != np.int64:
-            second_idex = second_idex.astype(np.int64)
+        # vesin returns uint64
+        first_idex = first_idex.astype(np.int64)
+        second_idex = second_idex.astype(np.int64)
 
     elif NL == "matscipy":
         first_idex, second_idex, shifts = matscipy_nl(
