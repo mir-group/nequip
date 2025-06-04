@@ -10,6 +10,14 @@ model:
 ```
 To see the documentation for individual hyperparameters, look at the Python API documentation for the model builder function ({func}`~nequip.model.NequIPGNNModel` in this example).  Model builders are usually in the `.model` subpackage of `nequip` or a `nequip` extension package.
 
+For energy-only datasets (without forces), use {func}`~nequip.model.NequIPGNNEnergyModel` instead:
+
+```yaml
+model:
+    _target_: nequip.model.NequIPGNNEnergyModel
+    # ... other hyperparameters
+```
+
 ## Training data statistics as hyperparameters
 
 Model hyperparameters can be derived from statistics computed from your training data. For dataset statistics configuration, see the [Dataset Statistics](data.md/#dataset-statistics) section in the data guide.
@@ -32,6 +40,13 @@ The {class}`~nequip.data.CommonDataStatisticsManager` computes these essential s
 - `per_atom_energy_mean` - for energy shifts (`per_type_energy_shifts`)  
 - `forces_rms` - for energy scales (`per_type_energy_scales`)
 - `per_type_forces_rms` - for per-type energy scales (`per_type_energy_scales`)
+
+For energy-only datasets, {class}`~nequip.data.EnergyOnlyDataStatisticsManager` computes:
+
+- `num_neighbors_mean` - for edge normalization (`avg_num_neighbors`)
+- `per_atom_energy_mean` - for energy shifts (`per_type_energy_shifts`)
+- `total_energy_std` - for energy scales (`per_type_energy_scales`)
+- `per_atom_energy_std` - alternative for energy scales (`per_type_energy_scales`)
 
 However, it is often advisable to use isolated atom energies as `per_type_energy_shifts` instead of the computed `per_atom_energy_mean` for better physical behavior.
 

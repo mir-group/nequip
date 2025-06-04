@@ -131,6 +131,16 @@ stats_manager:
     batch_size: 10  # Can be larger than training batch size to speed up computation
 ```
 
+For energy-only datasets (without forces), use {class}`~nequip.data.EnergyOnlyDataStatisticsManager` instead:
+
+```yaml
+stats_manager:
+  _target_: nequip.data.EnergyOnlyDataStatisticsManager
+  type_names: [C, H, O, Cu]
+  dataloader_kwargs:
+    batch_size: 10
+```
+
 You can use a larger `batch_size` in `dataloader_kwargs` than your training batch size to compute statistics faster without memory issues.
 Statistics are computed once during data setup, not during training.
 
