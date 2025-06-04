@@ -5,6 +5,10 @@ The following :class:`~nequip.data.CommonDataStatisticsManager` can generally be
 
 .. autofunction:: nequip.data.CommonDataStatisticsManager
 
+The following can be used for energy-only datasets (without forces):
+
+.. autofunction:: nequip.data.EnergyOnlyDataStatisticsManager
+
 For users who seek to configure their own custom dataset statistics, the following API is offered.
 
 As an example, we show how one can configure the full :class:`~nequip.data.DataStatisticsManager` to have behavior equivalent to using

@@ -4,7 +4,7 @@ from torchmetrics import Metric
 from . import AtomicDataDict
 
 from .modifier import BaseModifier, PerAtomModifier, NumNeighbors
-from .stats import Mean, RootMeanSquare
+from .stats import Mean, RootMeanSquare, StandardDeviation
 from typing import List, Dict, Union, Callable, Iterable
 
 from nequip.utils.logger import RankedLogger
@@ -277,6 +277,64 @@ def CommonDataStatisticsManager(
             "field": AtomicDataDict.FORCE_KEY,
             "metric": RootMeanSquare(),
             "per_type": True,
+        },
+    ]
+    return DataStatisticsManager(metrics, dataloader_kwargs, type_names)
+
+
+def EnergyOnlyDataStatisticsManager(
+    dataloader_kwargs: Dict = {},
+    type_names: List[str] = None,
+):
+    """:class:`~nequip.data.DataStatisticsManager` wrapper for energy-only datasets.
+
+    This manager computes statistics for datasets that only contain energies and no forces.
+    The dataset statistics computed include ``num_neighbors_mean``, ``per_atom_energy_mean``, ``per_atom_energy_std``, and ``total_energy_std``, which are variables that can be interpolated for in the ``model`` section of the config file.
+
+    For example:
+
+    .. code-block:: yaml
+
+        training_module:
+        _target_: nequip.train.EMALightningModule
+
+        # other `EMALightningModule` arguments
+
+        model:
+          _target_: nequip.model.NequIPGNNEnergyModel
+
+          # other model hyperparameters
+          avg_num_neighbors: ${training_data_stats:num_neighbors_mean}
+          per_type_energy_shifts: ${training_data_stats:per_atom_energy_mean}
+          per_type_energy_scales: ${training_data_stats:total_energy_std}
+
+    """
+    metrics = [
+        {
+            "name": "num_neighbors_mean",
+            "field": NumNeighbors(),
+            "metric": Mean(),
+        },
+        {
+            "name": "per_type_num_neighbors_mean",
+            "field": NumNeighbors(),
+            "metric": Mean(),
+            "per_type": True,
+        },
+        {
+            "name": "per_atom_energy_mean",
+            "field": PerAtomModifier(AtomicDataDict.TOTAL_ENERGY_KEY),
+            "metric": Mean(),
+        },
+        {
+            "name": "per_atom_energy_std",
+            "field": PerAtomModifier(AtomicDataDict.TOTAL_ENERGY_KEY),
+            "metric": StandardDeviation(),
+        },
+        {
+            "name": "total_energy_std",
+            "field": AtomicDataDict.TOTAL_ENERGY_KEY,
+            "metric": StandardDeviation(),
         },
     ]
     return DataStatisticsManager(metrics, dataloader_kwargs, type_names)

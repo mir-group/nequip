@@ -24,7 +24,11 @@ from .stats import (
     Max,
     Min,
 )
-from .stats_manager import DataStatisticsManager, CommonDataStatisticsManager
+from .stats_manager import (
+    DataStatisticsManager,
+    CommonDataStatisticsManager,
+    EnergyOnlyDataStatisticsManager,
+)
 from .modifier import BaseModifier, PerAtomModifier, EdgeLengths, NumNeighbors
 
 
@@ -46,6 +50,7 @@ __all__ = [
     "compute_neighborlist_",
     "DataStatisticsManager",
     "CommonDataStatisticsManager",
+    "EnergyOnlyDataStatisticsManager",
     "Count",
     "Mean",
     "MeanAbsolute",
