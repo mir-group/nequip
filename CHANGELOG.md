@@ -8,6 +8,10 @@ Most recent change on the top.
 
 ## Unreleased
 
+## [0.11.0]
+
+### Added
+- Energy-only training support: `NequIPGNNEnergyModel`, `EnergyOnlyDataStatisticsManager`, `EnergyOnlyLoss`, and `EnergyOnlyMetrics` for datasets without force labels
 
 ### Changed
 - [Breaking] Hide `NequIPCalculator.from_checkpoint_model` and `NequIPCalculator.from_packaged_model` methods by making them private; users should only ever use `NequIPCalculator.from_compiled_model`
