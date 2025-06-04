@@ -3,6 +3,7 @@
 """Custom OmegaConf resolvers for nequip."""
 
 from omegaconf import OmegaConf
+from typing import Dict, Callable, Set
 
 
 def _sanitize_int(x, client: str):
@@ -34,7 +35,43 @@ def int_mul(a, b):
     return a * b
 
 
-def _register_resolvers():
-    """Register all nequip OmegaConf resolvers."""
-    OmegaConf.register_new_resolver("int_div", int_div)
-    OmegaConf.register_new_resolver("int_mul", int_mul)
+# === Resolver Registry ===
+
+_DEFAULT_RESOLVERS: Dict[str, Callable] = {
+    "int_div": int_div,
+    "int_mul": int_mul,
+}
+
+_REGISTERED_RESOLVERS: Set[str] = set()
+_DEFAULT_RESOLVERS_REGISTERED: bool = False
+
+
+def register_resolvers(resolvers: Dict[str, Callable]) -> None:
+    """Register custom OmegaConf resolvers.
+
+    Args:
+        resolvers (Dict[str, Callable]): mapping from resolver name to resolver function
+
+    Raises:
+        ValueError: if any resolver name conflicts with existing registered resolvers
+    """
+    # Check for conflicts with already registered resolvers
+    new_names = set(resolvers.keys())
+    conflicts = new_names.intersection(_REGISTERED_RESOLVERS)
+    if conflicts:
+        raise ValueError(
+            f"Resolver name(s) {conflicts} already registered. Cannot register the same resolver name twice."
+        )
+
+    # Register each resolver with OmegaConf
+    for name, func in resolvers.items():
+        OmegaConf.register_new_resolver(name, func)
+        _REGISTERED_RESOLVERS.add(name)
+
+
+def _register_default_resolvers():
+    """Register all default nequip OmegaConf resolvers."""
+    global _DEFAULT_RESOLVERS_REGISTERED
+    if not _DEFAULT_RESOLVERS_REGISTERED:
+        register_resolvers(_DEFAULT_RESOLVERS)
+        _DEFAULT_RESOLVERS_REGISTERED = True

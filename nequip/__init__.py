@@ -5,6 +5,8 @@ import packaging.version
 import torch
 import torchmetrics
 
+from .utils.resolvers import _register_default_resolvers
+
 # torch version checks
 torch_version = packaging.version.parse(torch.__version__.split("+")[0])
 
@@ -40,3 +42,6 @@ except (ImportError, TypeError):
 for ep in _DISCOVERED_NEQUIP_EXTENSION:
     if ep.name == "init_always":
         ep.load()
+
+# register OmegaConf resolvers
+_register_default_resolvers()
