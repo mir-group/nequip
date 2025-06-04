@@ -21,6 +21,14 @@ The following :class:`~nequip.train.MetricsManager` wrappers can be used for com
 .. autoclass:: nequip.train.EnergyForceStressMetrics
    :members:
 
+The following can be used for energy-only datasets (without forces):
+
+.. autoclass:: nequip.train.EnergyOnlyLoss
+   :members:
+
+.. autoclass:: nequip.train.EnergyOnlyMetrics
+   :members:
+
 Advanced Configuration: MetricsManager
 =======================================
 

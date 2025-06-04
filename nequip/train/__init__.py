@@ -12,6 +12,8 @@ from .metrics_manager import (
     EnergyForceMetrics,
     EnergyForceStressLoss,
     EnergyForceStressMetrics,
+    EnergyOnlyLoss,
+    EnergyOnlyMetrics,
 )
 from .lightning import NequIPLightningModule
 from .ema import EMALightningModule
@@ -28,6 +30,8 @@ __all__ = [
     "EnergyForceMetrics",
     "EnergyForceStressLoss",
     "EnergyForceStressMetrics",
+    "EnergyOnlyLoss",
+    "EnergyOnlyMetrics",
     "MeanAbsoluteError",
     "MeanSquaredError",
     "RootMeanSquaredError",

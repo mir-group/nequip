@@ -10,6 +10,8 @@ from nequip.train import (
     EnergyForceMetrics,
     EnergyForceStressLoss,
     EnergyForceStressMetrics,
+    EnergyOnlyLoss,
+    EnergyOnlyMetrics,
 )
 
 
@@ -649,3 +651,93 @@ class TestMetricsManagerBuilders:
     def test_invalid_EFS_coeff_key_triggers_assert(self):
         with pytest.raises(AssertionError):
             EnergyForceStressMetrics(coeffs={"bad_key": 0.5})
+
+    @pytest.mark.parametrize("per_atom_energy", [True, False])
+    def test_EnergyOnlyLoss(self, data, per_atom_energy):
+        """test EnergyOnlyLoss for energy-only training."""
+        pred1, ref1, pred2, ref2 = data
+        mm = EnergyOnlyLoss(per_atom_energy=per_atom_energy)
+
+        for pred, ref in [(pred1, ref1), (pred2, ref2)]:
+            metrics_dict = mm(pred, ref)
+            assert len(metrics_dict) > 0
+            assert isinstance(metrics_dict, dict)
+            for key, value in metrics_dict.items():
+                assert isinstance(value, torch.Tensor)
+
+            E_MSE = self.compute_MSE(
+                pred, ref, AtomicDataDict.TOTAL_ENERGY_KEY, per_atom_energy
+            )
+            # coefficient is fixed at 1.0, so weighted_sum should equal the energy MSE
+            expected_name = (
+                "per_atom_energy_mse" if per_atom_energy else "total_energy_mse"
+            )
+            assert torch.allclose(metrics_dict[expected_name], E_MSE)
+            assert torch.allclose(metrics_dict["weighted_sum"], E_MSE)
+
+            # should only have energy metric (no forces)
+            assert "forces_mse" not in metrics_dict
+            assert (
+                len([k for k in metrics_dict.keys() if not k.endswith("weighted_sum")])
+                == 1
+            )
+
+    @pytest.mark.parametrize("ratio1", [1])
+    @pytest.mark.parametrize("ratio2", [1, 10])
+    @pytest.mark.parametrize("ratio3", [1, 10, 100])
+    @pytest.mark.parametrize("ratio4", [1, 10, 100, None])
+    def test_EnergyOnlyMetrics(self, data, ratio1, ratio2, ratio3, ratio4):
+        """test EnergyOnlyMetrics for energy-only datasets."""
+        pred1, ref1, pred2, ref2 = data
+        mm = EnergyOnlyMetrics(
+            coeffs={
+                "total_energy_rmse": ratio1,
+                "per_atom_energy_rmse": ratio2,
+                "total_energy_mae": ratio3,
+                "per_atom_energy_mae": ratio4,
+            },
+        )
+
+        for pred, ref in [(pred1, ref1), (pred2, ref2)]:
+            metrics_dict = mm(pred, ref)
+            assert len(metrics_dict) > 0
+            assert isinstance(metrics_dict, dict)
+            for key, value in metrics_dict.items():
+                assert isinstance(value, torch.Tensor)
+
+            E_RMSE = self.compute_RMSE(
+                pred, ref, AtomicDataDict.TOTAL_ENERGY_KEY, per_atom_energy=False
+            )
+            per_atom_E_RMSE = self.compute_RMSE(
+                pred, ref, AtomicDataDict.TOTAL_ENERGY_KEY, per_atom_energy=True
+            )
+            E_MAE = self.compute_MAE(
+                pred, ref, AtomicDataDict.TOTAL_ENERGY_KEY, per_atom_energy=False
+            )
+            per_atom_E_MAE = self.compute_MAE(
+                pred, ref, AtomicDataDict.TOTAL_ENERGY_KEY, per_atom_energy=True
+            )
+
+            if not ratio4:
+                ratio4 = 0
+            weighted_sum = (
+                ratio1 * E_RMSE
+                + ratio2 * per_atom_E_RMSE
+                + ratio3 * E_MAE
+                + ratio4 * per_atom_E_MAE
+            ) / (ratio1 + ratio2 + ratio3 + ratio4)
+
+            assert torch.allclose(metrics_dict["total_energy_rmse"], E_RMSE)
+            assert torch.allclose(metrics_dict["per_atom_energy_rmse"], per_atom_E_RMSE)
+            assert torch.allclose(metrics_dict["total_energy_mae"], E_MAE)
+            assert torch.allclose(metrics_dict["per_atom_energy_mae"], per_atom_E_MAE)
+            assert torch.allclose(metrics_dict["weighted_sum"], weighted_sum)
+
+            # should only have energy metrics (no forces)
+            assert "forces_rmse" not in metrics_dict
+            assert "forces_mae" not in metrics_dict
+
+    def test_invalid_energy_only_coeff_key_triggers_assert(self):
+        """test that invalid coefficient keys trigger assertion errors."""
+        with pytest.raises(AssertionError):
+            EnergyOnlyMetrics(coeffs={"bad_key": 0.5})

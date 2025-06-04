@@ -630,3 +630,110 @@ def EnergyForceStressMetrics(
         },
     ]
     return MetricsManager(metrics, type_names=type_names)
+
+
+def EnergyOnlyLoss(
+    per_atom_energy: bool = True,
+    type_names=None,
+):
+    """Simplified :class:`MetricsManager` wrapper for a **loss** term containing only energy mean squared error (MSE).
+
+    The loss component name is ``per_atom_energy_mse`` OR ``total_energy_mse`` (depending on whether ``per_atom_energy`` is ``True`` or ``False``).
+
+    Example usage in config:
+
+    .. code-block:: yaml
+
+        training_module:
+          _target_: nequip.train.NequIPLightningModule
+
+          loss:
+            _target_: nequip.train.EnergyOnlyLoss
+            per_atom_energy: true
+
+    Args:
+        per_atom_energy (bool, optional): whether to normalize the total energy by the number of atoms (default ``True``)
+    """
+
+    metrics = [
+        {
+            "name": "per_atom_energy_mse" if per_atom_energy else "total_energy_mse",
+            "field": (
+                PerAtomModifier(AtomicDataDict.TOTAL_ENERGY_KEY)
+                if per_atom_energy
+                else AtomicDataDict.TOTAL_ENERGY_KEY
+            ),
+            "coeff": 1.0,  # single term, coefficient is always 1
+            "metric": MeanSquaredError(),
+        },
+    ]
+    return MetricsManager(metrics, type_names=type_names)
+
+
+_ENERGY_ONLY_METRICS_COEFFS_KEYS: Final[List[str]] = [
+    "total_energy_rmse",
+    "per_atom_energy_rmse",
+    "total_energy_mae",
+    "per_atom_energy_mae",
+]
+
+
+def EnergyOnlyMetrics(
+    coeffs: Dict[str, float] = {
+        "total_energy_rmse": 1.0,
+        "per_atom_energy_rmse": None,
+        "total_energy_mae": None,
+        "per_atom_energy_mae": None,
+    },
+    type_names=None,
+):
+    """Simplified :class:`MetricsManager` wrapper for a **metric** term containing only energy mean absolute errors (MAEs) and root mean squared errors (RMSEs).
+
+    Example usage in config:
+
+    .. code-block:: yaml
+
+        training_module:
+          _target_: nequip.train.NequIPLightningModule
+
+          val_metrics:
+            _target_: nequip.train.EnergyOnlyMetrics
+            coeffs:
+              total_energy_rmse: 1.0
+              per_atom_energy_rmse: null
+              total_energy_mae: null
+              per_atom_energy_mae: null
+
+    Args:
+        coeffs (Dict[str, float]): ``dict`` that stores the relative contribution of the different energy metrics to the ``weighted_sum`` version of the metric as in ``nequip.train.MetricsManager`` (default ``{'total_energy_rmse': 1.0, 'per_atom_energy_rmse': None, 'total_energy_mae': None, 'per_atom_energy_mae': None}``)
+    """
+    assert all(
+        [k in _ENERGY_ONLY_METRICS_COEFFS_KEYS for k in coeffs.keys()]
+    ), f"Unrecognized key found in `coeffs`, only the following are recognized: {_ENERGY_ONLY_METRICS_COEFFS_KEYS}"
+    metrics = [
+        {
+            "name": "total_energy_rmse",
+            "field": AtomicDataDict.TOTAL_ENERGY_KEY,
+            "metric": RootMeanSquaredError(),
+            "coeff": coeffs.get("total_energy_rmse", None),
+        },
+        {
+            "name": "total_energy_mae",
+            "field": AtomicDataDict.TOTAL_ENERGY_KEY,
+            "metric": MeanAbsoluteError(),
+            "coeff": coeffs.get("total_energy_mae", None),
+        },
+        {
+            "name": "per_atom_energy_rmse",
+            "field": PerAtomModifier(AtomicDataDict.TOTAL_ENERGY_KEY),
+            "metric": RootMeanSquaredError(),
+            "coeff": coeffs.get("per_atom_energy_rmse", None),
+        },
+        {
+            "name": "per_atom_energy_mae",
+            "field": PerAtomModifier(AtomicDataDict.TOTAL_ENERGY_KEY),
+            "metric": MeanAbsoluteError(),
+            "coeff": coeffs.get("per_atom_energy_mae", None),
+        },
+    ]
+    return MetricsManager(metrics, type_names=type_names)

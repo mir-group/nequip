@@ -16,10 +16,12 @@ Most users should use the simplified wrapper classes for common force field trai
 **For Loss Functions:**
 - {class}`~nequip.train.EnergyForceLoss`
 - {class}`~nequip.train.EnergyForceStressLoss`
+- {class}`~nequip.train.EnergyOnlyLoss` (for energy-only datasets)
 
 **For Validation/Test Metrics:**
 - {class}`~nequip.train.EnergyForceMetrics`
 - {class}`~nequip.train.EnergyForceStressMetrics`
+- {class}`~nequip.train.EnergyOnlyMetrics` (for energy-only datasets)
 
 When using simplified wrappers, the actual metric names logged during training may not be immediately obvious. Each wrapper creates specific metrics with predetermined names. To see exactly what metric names each wrapper produces, refer to their individual API documentation in the [`nequip.train` metrics API reference](../../api/metrics.rst).
 
