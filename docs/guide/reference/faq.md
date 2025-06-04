@@ -33,6 +33,19 @@
 
   **A**: Read our [Distributed Data Parallel training docs](../accelerations/ddp_training.md).
 
+## Energy-Only Training
+
+  **Q**: How do I train on datasets that only contain energies (no forces)?
+
+  **A**: For energy-only datasets, use the following specialized components:
+
+  - **Model**: {class}`~nequip.model.NequIPGNNEnergyModel` instead of {class}`~nequip.model.NequIPGNNModel`
+  - **Data Statistics**: {class}`~nequip.data.EnergyOnlyDataStatisticsManager` instead of {class}`~nequip.data.CommonDataStatisticsManager`
+  - **Loss Function**: {class}`~nequip.train.EnergyOnlyLoss` instead of {class}`~nequip.train.EnergyForceLoss`
+  - **Validation Metrics**: {class}`~nequip.train.EnergyOnlyMetrics` instead of {class}`~nequip.train.EnergyForceMetrics`
+
+  These components are specifically designed for energy-only training and will not attempt to compute force-related statistics or metrics that would cause errors with datasets lacking force labels.
+
 ## Upgrading from pre-`0.7.0` `nequip`
 
 ```{warning}
