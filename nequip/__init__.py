@@ -1,11 +1,24 @@
 from ._version import __version__  # noqa: F401
 
 import packaging.version
+import sys
+import warnings
 
 import torch
 import torchmetrics
 
 from .utils.resolvers import _register_default_resolvers
+
+# Python version check
+python_version = packaging.version.parse(
+    f"{sys.version_info.major}.{sys.version_info.minor}"
+)
+if python_version == packaging.version.parse("3.9"):
+    warnings.warn(
+        "NequIP's Python 3.9 support is deprecated and will be removed in a future release. Please migrate to Python 3.10 or newer. Python 3.10 will be the minimum supported version in the next few releases.",
+        FutureWarning,
+        stacklevel=2,
+    )
 
 # torch version checks
 torch_version = packaging.version.parse(torch.__version__.split("+")[0])
