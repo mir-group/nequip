@@ -24,6 +24,7 @@ def load_torchscript_model(
     metadata = {
         graph_model.R_MAX_KEY: None,
         graph_model.TYPE_NAMES_KEY: None,
+        graph_model.PER_EDGE_TYPE_CUTOFF_KEY: None,
         TF32_KEY: None,
     }
     model = torch.jit.load(compile_path, _extra_files=metadata, map_location=device)
@@ -34,6 +35,17 @@ def load_torchscript_model(
     metadata[graph_model.TYPE_NAMES_KEY] = (
         metadata[graph_model.TYPE_NAMES_KEY].decode("utf-8").split(" ")
     )
+
+    # process per-edge-type cutoffs if present
+    if metadata[graph_model.PER_EDGE_TYPE_CUTOFF_KEY] is not None:
+        from nequip.nn.embedding.utils import parse_per_edge_type_cutoff_metadata
+
+        cutoff_str = metadata[graph_model.PER_EDGE_TYPE_CUTOFF_KEY].decode("utf-8")
+        metadata[graph_model.PER_EDGE_TYPE_CUTOFF_KEY] = (
+            parse_per_edge_type_cutoff_metadata(
+                cutoff_str, metadata[graph_model.TYPE_NAMES_KEY]
+            )
+        )
 
     # set global state
     set_global_state(
