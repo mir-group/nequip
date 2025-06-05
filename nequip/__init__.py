@@ -8,6 +8,7 @@ import torch
 import torchmetrics
 
 from .utils.resolvers import _register_default_resolvers
+from .utils.version_utils import get_version_safe
 
 # Python version check
 python_version = packaging.version.parse(
@@ -21,7 +22,7 @@ if python_version == packaging.version.parse("3.9"):
     )
 
 # torch version checks
-torch_version = packaging.version.parse(torch.__version__.split("+")[0])
+torch_version = packaging.version.parse(get_version_safe(torch.__name__).split("+")[0])
 
 # only allow 2.2.* or higher, required for `lightning` and `torchmetrics` compatibility
 assert torch_version >= packaging.version.parse(
@@ -30,7 +31,7 @@ assert torch_version >= packaging.version.parse(
 
 # torchmetrics >= 1.6.0 for ddp autograd
 # https://github.com/Lightning-AI/torchmetrics/releases/tag/v1.6.0
-torchmetrics_version = packaging.version.parse(torchmetrics.__version__)
+torchmetrics_version = packaging.version.parse(get_version_safe(torchmetrics.__name__))
 assert torchmetrics_version >= packaging.version.parse(
     "1.6.0"
 ), f"NequIP requires torchmetrics>=1.6.0 for ddp training but {torchmetrics_version} found"

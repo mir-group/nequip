@@ -3,9 +3,6 @@ import argparse
 
 import pathlib
 import yaml
-import importlib.metadata
-
-from typing import Optional
 
 # TODO: check if we still need this?
 # This is a weird hack to avoid Intel MKL issues on the cluster when this is called as a subprocess of a process that has itself initialized PyTorch.
@@ -33,6 +30,7 @@ from nequip.nn.model_modifier_utils import is_persistent_model_modifier
 from nequip.model.modify_utils import get_all_modifiers, only_apply_persistent_modifiers
 from nequip.utils.logger import RankedLogger
 from nequip.utils.versions import get_current_code_versions, _TORCH_GE_2_6
+from nequip.utils.version_utils import get_version_safe
 from nequip.utils.global_state import set_global_state
 
 from ._workflow_utils import set_workflow_state
@@ -58,13 +56,6 @@ logger = RankedLogger(__name__, rank_zero_only=True)
 # 2:
 #   - added `external_modules`
 _CURRENT_NEQUIP_PACKAGE_VERSION = 2
-
-
-def _get_version_safe(package_name: str) -> Optional[str]:
-    try:
-        return importlib.metadata.version(package_name)
-    except importlib.metadata.PackageNotFoundError:
-        return None
 
 
 def main(args=None):
@@ -285,7 +276,7 @@ def main(args=None):
                 pkg_metadata = {
                     "versions": code_versions,
                     "external_modules": {
-                        k: _get_version_safe(k) for k in _EXTERNAL_MODULES
+                        k: get_version_safe(k) for k in _EXTERNAL_MODULES
                     },
                     "package_version_id": _CURRENT_NEQUIP_PACKAGE_VERSION,
                     "available_models": list(models_to_package.keys()),
