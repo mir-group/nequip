@@ -12,6 +12,10 @@ Most recent change on the top.
 
 ### Added
 - Energy-only training support: `NequIPGNNEnergyModel`, `EnergyOnlyDataStatisticsManager`, `EnergyOnlyLoss`, and `EnergyOnlyMetrics` for datasets without force labels
+- Per-edge-type cutoff handling in ASE Calculator
+
+### Removed
+- [Future] Python 3.9 support will be removed in the coming releases. For now, users will be warned to upgrade if using NequIP with Python 3.9.
 
 ### Changed
 - [Breaking] Hide `NequIPCalculator.from_checkpoint_model` and `NequIPCalculator.from_packaged_model` methods by making them private; users should only ever use `NequIPCalculator.from_compiled_model`
