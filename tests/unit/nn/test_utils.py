@@ -14,65 +14,6 @@ from nequip.utils.global_dtype import _GLOBAL_DTYPE
 import ase
 
 
-def test_process_per_edge_cutoff():
-    # single atom type with float cutoff
-    assert torch.all(
-        _process_per_edge_type_cutoff(["O"], {"O": 2.0}, r_max=4.0)
-        == torch.as_tensor([[2.0]], dtype=_GLOBAL_DTYPE)
-    )
-
-    # single atom type with dict cutoff
-    assert torch.all(
-        _process_per_edge_type_cutoff(["O"], {"O": {"O": 2.0}}, r_max=4.0)
-        == torch.as_tensor([[2.0]], dtype=_GLOBAL_DTYPE)
-    )
-
-    # complete specification with mixed float/dict cutoffs
-    type_names = ["H", "C", "O"]
-    per_edge_type_cutoff = {"H": 2.0, "C": {"H": 4.0, "C": 3.5, "O": 3.7}, "O": 3.9}
-    assert torch.all(
-        _process_per_edge_type_cutoff(type_names, per_edge_type_cutoff, r_max=4.0)
-        == torch.as_tensor(
-            [[2.0, 2.0, 2.0], [4.0, 3.5, 3.7], [3.9, 3.9, 3.9]], dtype=_GLOBAL_DTYPE
-        )
-    )
-
-    # missing source types default to r_max
-    per_edge_type_cutoff = {"H": 2.0}  # C and O missing
-    assert torch.all(
-        _process_per_edge_type_cutoff(type_names, per_edge_type_cutoff, r_max=4.0)
-        == torch.as_tensor(
-            [[2.0, 2.0, 2.0], [4.0, 4.0, 4.0], [4.0, 4.0, 4.0]], dtype=_GLOBAL_DTYPE
-        )
-    )
-
-    # missing target types default to r_max
-    per_edge_type_cutoff = {
-        "H": {"C": 2.0},  # missing H->H and H->O
-        "C": {"H": 3.0, "C": 3.5, "O": 3.7},
-        "O": 3.9,
-    }
-    assert torch.all(
-        _process_per_edge_type_cutoff(type_names, per_edge_type_cutoff, r_max=4.0)
-        == torch.as_tensor(
-            [[4.0, 2.0, 4.0], [3.0, 3.5, 3.7], [3.9, 3.9, 3.9]], dtype=_GLOBAL_DTYPE
-        )
-    )
-
-    # extra atoms in cutoff spec are ignored
-    per_edge_type_cutoff = {
-        "H": 2.0,
-        "C": {"H": 4.0, "C": 3.5, "O": 3.7, "N": 3.7},  # N not in type_names
-        "O": 3.9,
-    }
-    assert torch.all(
-        _process_per_edge_type_cutoff(type_names, per_edge_type_cutoff, r_max=4.0)
-        == torch.as_tensor(
-            [[2.0, 2.0, 2.0], [4.0, 3.5, 3.7], [3.9, 3.9, 3.9]], dtype=_GLOBAL_DTYPE
-        )
-    )
-
-
 def test_non_periodic_edge(CH3CHO):
     atoms, data = CH3CHO
     # check edges
@@ -178,3 +119,132 @@ def test_basic(model_dtype):
     )
     saved = out["saved"]
     assert saved.shape == (5, 13)
+
+
+def test_process_per_edge_cutoff():
+    # single atom type with float cutoff
+    assert torch.all(
+        _process_per_edge_type_cutoff(["O"], {"O": 2.0}, r_max=4.0)
+        == torch.as_tensor([[2.0]], dtype=_GLOBAL_DTYPE)
+    )
+
+    # single atom type with dict cutoff
+    assert torch.all(
+        _process_per_edge_type_cutoff(["O"], {"O": {"O": 2.0}}, r_max=4.0)
+        == torch.as_tensor([[2.0]], dtype=_GLOBAL_DTYPE)
+    )
+
+    # complete specification with mixed float/dict cutoffs
+    type_names = ["H", "C", "O"]
+    per_edge_type_cutoff = {"H": 2.0, "C": {"H": 4.0, "C": 3.5, "O": 3.7}, "O": 3.9}
+    assert torch.all(
+        _process_per_edge_type_cutoff(type_names, per_edge_type_cutoff, r_max=4.0)
+        == torch.as_tensor(
+            [[2.0, 2.0, 2.0], [4.0, 3.5, 3.7], [3.9, 3.9, 3.9]], dtype=_GLOBAL_DTYPE
+        )
+    )
+
+    # missing source types default to r_max
+    per_edge_type_cutoff = {"H": 2.0}  # C and O missing
+    assert torch.all(
+        _process_per_edge_type_cutoff(type_names, per_edge_type_cutoff, r_max=4.0)
+        == torch.as_tensor(
+            [[2.0, 2.0, 2.0], [4.0, 4.0, 4.0], [4.0, 4.0, 4.0]], dtype=_GLOBAL_DTYPE
+        )
+    )
+
+    # missing target types default to r_max
+    per_edge_type_cutoff = {
+        "H": {"C": 2.0},  # missing H->H and H->O
+        "C": {"H": 3.0, "C": 3.5, "O": 3.7},
+        "O": 3.9,
+    }
+    assert torch.all(
+        _process_per_edge_type_cutoff(type_names, per_edge_type_cutoff, r_max=4.0)
+        == torch.as_tensor(
+            [[4.0, 2.0, 4.0], [3.0, 3.5, 3.7], [3.9, 3.9, 3.9]], dtype=_GLOBAL_DTYPE
+        )
+    )
+
+    # extra atoms in cutoff spec are ignored
+    per_edge_type_cutoff = {
+        "H": 2.0,
+        "C": {"H": 4.0, "C": 3.5, "O": 3.7, "N": 3.7},  # N not in type_names
+        "O": 3.9,
+    }
+    assert torch.all(
+        _process_per_edge_type_cutoff(type_names, per_edge_type_cutoff, r_max=4.0)
+        == torch.as_tensor(
+            [[2.0, 2.0, 2.0], [4.0, 3.5, 3.7], [3.9, 3.9, 3.9]], dtype=_GLOBAL_DTYPE
+        )
+    )
+
+
+def test_per_edge_type_cutoff_conversion():
+    """Test round-trip conversion of per-edge-type cutoffs to/from metadata string."""
+    from nequip.nn.embedding.utils import (
+        per_edge_type_cutoff_to_metadata_str,
+        parse_per_edge_type_cutoff_metadata,
+    )
+
+    type_names = ["H", "C", "O"]
+    r_max = 5.0
+
+    # test case 1: mixed float/dict specification
+    original_dict = {
+        "H": 2.0,
+        "C": {"H": 4.0, "C": 3.5, "O": 3.7},
+        "O": 3.9,
+    }
+
+    # get expected tensor from original processing
+    expected_tensor = _process_per_edge_type_cutoff(type_names, original_dict, r_max)
+
+    # test round-trip conversion
+    metadata_str = per_edge_type_cutoff_to_metadata_str(
+        type_names, original_dict, r_max
+    )
+    parsed_dict = parse_per_edge_type_cutoff_metadata(metadata_str, type_names)
+    result_tensor = _process_per_edge_type_cutoff(type_names, parsed_dict, r_max)
+
+    # tensors should be identical
+    assert torch.allclose(expected_tensor, result_tensor)
+
+    # test case 2: all uniform cutoffs
+    original_dict = {"H": 3.0, "C": 3.0, "O": 3.0}
+
+    expected_tensor = _process_per_edge_type_cutoff(type_names, original_dict, r_max)
+    metadata_str = per_edge_type_cutoff_to_metadata_str(
+        type_names, original_dict, r_max
+    )
+    parsed_dict = parse_per_edge_type_cutoff_metadata(metadata_str, type_names)
+    result_tensor = _process_per_edge_type_cutoff(type_names, parsed_dict, r_max)
+
+    assert torch.allclose(expected_tensor, result_tensor)
+
+    # test case 3: all r_max values (edge case)
+    original_dict = {"H": r_max, "C": r_max, "O": r_max}
+
+    expected_tensor = _process_per_edge_type_cutoff(type_names, original_dict, r_max)
+    metadata_str = per_edge_type_cutoff_to_metadata_str(
+        type_names, original_dict, r_max
+    )
+    parsed_dict = parse_per_edge_type_cutoff_metadata(metadata_str, type_names)
+    result_tensor = _process_per_edge_type_cutoff(type_names, parsed_dict, r_max)
+
+    assert torch.allclose(expected_tensor, result_tensor)
+
+    # test case 4: single type
+    type_names_single = ["H"]
+    original_dict = {"H": 2.5}
+
+    expected_tensor = _process_per_edge_type_cutoff(
+        type_names_single, original_dict, r_max
+    )
+    metadata_str = per_edge_type_cutoff_to_metadata_str(
+        type_names_single, original_dict, r_max
+    )
+    parsed_dict = parse_per_edge_type_cutoff_metadata(metadata_str, type_names_single)
+    result_tensor = _process_per_edge_type_cutoff(type_names_single, parsed_dict, r_max)
+
+    assert torch.allclose(expected_tensor, result_tensor)

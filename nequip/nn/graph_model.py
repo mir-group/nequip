@@ -23,15 +23,14 @@ def _model_metadata_from_config(model_config: Dict[str, str]) -> Dict[str, str]:
     model_metadata_dict[R_MAX_KEY] = str(model_config[R_MAX_KEY])
 
     if PER_EDGE_TYPE_CUTOFF_KEY in model_config:
-        from .embedding._edge import _process_per_edge_type_cutoff
+        from .embedding.utils import per_edge_type_cutoff_to_metadata_str
 
-        per_edge_type_cutoff = _process_per_edge_type_cutoff(
-            model_config[TYPE_NAMES_KEY],
-            model_config[PER_EDGE_TYPE_CUTOFF_KEY],
-            model_config[R_MAX_KEY],
-        )
-        model_metadata_dict[PER_EDGE_TYPE_CUTOFF_KEY] = " ".join(
-            str(e.item()) for e in per_edge_type_cutoff.view(-1)
+        model_metadata_dict[PER_EDGE_TYPE_CUTOFF_KEY] = (
+            per_edge_type_cutoff_to_metadata_str(
+                model_config[TYPE_NAMES_KEY],
+                model_config[PER_EDGE_TYPE_CUTOFF_KEY],
+                model_config[R_MAX_KEY],
+            )
         )
     return model_metadata_dict
 
