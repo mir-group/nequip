@@ -1,8 +1,6 @@
 # This file is a part of the `nequip` package. Please see LICENSE and README at the root for information on using it.
 import torch
 
-from e3nn.util.jit import script
-
 from ._workflow_utils import set_workflow_state
 from ._compile_utils import COMPILE_TARGET_DICT
 from nequip.model.utils import _EAGER_MODEL_KEY
@@ -13,7 +11,6 @@ from nequip.data import AtomicDataDict
 from nequip.model.saved_models.checkpoint import data_dict_from_checkpoint
 from nequip.model.saved_models.package import data_dict_from_package
 from nequip.utils.logger import RankedLogger
-from nequip.utils.compile import prepare_model_for_compile
 from nequip.utils.global_state import set_global_state, get_latest_global_state
 from omegaconf import OmegaConf
 import hydra
@@ -222,10 +219,9 @@ def main(args=None):
 
     # === TorchScript ===
     if args.mode == "torchscript":
-        metadata = {k: str(v).encode("ascii") for k, v in metadata.items()}
-        model = prepare_model_for_compile(model, device)
-        script_model = script(model)
-        torch.jit.save(script_model, args.output_path, _extra_files=metadata)
+        from nequip.model.inference_models.torchscript import save_torchscript_model
+
+        save_torchscript_model(model, metadata, args.output_path, device)
         logger.info(f"TorchScript model saved to {args.output_path}")
         set_workflow_state(None)
         return

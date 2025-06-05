@@ -1,9 +1,11 @@
 # This file is a part of the `nequip` package. Please see LICENSE and README
 # at the root for information on using it.
 import torch
+from e3nn.util.jit import script
 
 from nequip.nn import graph_model
 from nequip.utils.global_state import TF32_KEY, set_global_state
+from nequip.utils.compile import prepare_model_for_compile
 
 from typing import Union, Tuple
 
@@ -41,3 +43,28 @@ def load_torchscript_model(
     )
 
     return model, metadata
+
+
+def save_torchscript_model(
+    model: torch.nn.Module,
+    metadata: dict,
+    output_path: str,
+    device: Union[str, torch.device],
+) -> None:
+    """Save a model as a torchscript .nequip.pth file.
+
+    Args:
+        model: model to save
+        metadata: metadata dictionary to save with the model
+        output_path: path to save the compiled model
+        device: device to prepare model on
+    """
+    # encode metadata for torchscript
+    encoded_metadata = {k: str(v).encode("ascii") for k, v in metadata.items()}
+
+    # prepare and script model
+    model = prepare_model_for_compile(model, device)
+    script_model = script(model)
+
+    # save with metadata
+    torch.jit.save(script_model, output_path, _extra_files=encoded_metadata)
