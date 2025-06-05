@@ -40,14 +40,16 @@ def parse_per_edge_type_cutoff_metadata(
     Returns:
         dict format suitable for NeighborListTransform
     """
+    # short-circuit
+    if cutoff_str in ("", None):
+        return None
+
     cutoff_values = [float(x) for x in cutoff_str.split()]
     num_types = len(type_names)
 
-    if len(cutoff_values) != num_types * num_types:
-        raise ValueError(
-            f"Expected {num_types * num_types} cutoff values, "
-            f"got {len(cutoff_values)}"
-        )
+    assert (
+        len(cutoff_values) == num_types * num_types
+    ), f"Expected {num_types * num_types} cutoff values, but got {len(cutoff_values)}"
 
     result = {}
     for i, source_type in enumerate(type_names):
