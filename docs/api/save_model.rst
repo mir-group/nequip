@@ -25,6 +25,14 @@ These files can be loaded using the following :class:`~nequip.model.ModelFromChe
 
 .. autofunction:: nequip.model.ModelFromPackage
 
+Loading Compiled Models
+#######################
+
+:doc:`Compiled models <../guide/getting-started/workflow>` created with ``nequip-compile`` can be loaded for inference using the following loader.
+This is typically used by the ASE calculator or other inference applications.
+
+.. autofunction:: nequip.model.inference_models.load_compiled_model
+
 Modifying Saved Models
 ######################
 

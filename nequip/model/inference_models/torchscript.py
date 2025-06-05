@@ -4,8 +4,8 @@ import torch
 from e3nn.util.jit import script
 
 from nequip.nn import graph_model
-from nequip.utils.global_state import TF32_KEY, set_global_state
 from nequip.utils.compile import prepare_model_for_compile
+from nequip.utils.global_state import TF32_KEY
 
 from typing import Union, Tuple
 
@@ -46,13 +46,6 @@ def load_torchscript_model(
                 cutoff_str, metadata[graph_model.TYPE_NAMES_KEY]
             )
         )
-
-    # set global state
-    set_global_state(
-        **{
-            TF32_KEY: bool(int(metadata[TF32_KEY])),
-        }
-    )
 
     return model, metadata
 
