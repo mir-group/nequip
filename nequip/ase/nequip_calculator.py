@@ -14,7 +14,7 @@ from nequip.data.transforms import (
     ChemicalSpeciesToAtomTypeMapper,
     NeighborListTransform,
 )
-from nequip.utils.global_state import set_global_state, TF32_KEY
+from nequip.utils.global_state import set_global_state
 
 
 class NequIPCalculator(Calculator):
@@ -37,6 +37,20 @@ class NequIPCalculator(Calculator):
     """
 
     implemented_properties = ["energy", "energies", "forces", "stress", "free_energy"]
+
+    @classmethod
+    def _handle_chemical_symbols(
+        cls,
+        chemical_symbols: Optional[Union[List[str], Dict[str, str]]],
+        type_names: List[str],
+    ) -> Union[List[str], Dict[str, str]]:
+        """Handle chemical symbols fallback to type names with warning."""
+        if chemical_symbols is None:
+            warnings.warn(
+                "Trying to use model type names as chemical symbols; this may not be correct for your model (and may cause an error if model type names are not chemical symbols)! To avoid this warning, please provide `chemical_symbols` explicitly."
+            )
+            chemical_symbols = type_names
+        return chemical_symbols
 
     def __init__(
         self,
@@ -79,68 +93,28 @@ class NequIPCalculator(Calculator):
             device (torch.device): the device to use
             chemical_symbols (List[str] or Dict[str, str]): mapping between chemical symbols and model type names
         """
-        compile_fname = str(compile_path).split("/")[-1]
-        if compile_fname.endswith(".nequip.pth"):
-            from nequip.model.inference_models import load_torchscript_model
+        from nequip.model.inference_models import load_compiled_model
+        from nequip.scripts._compile_utils import PAIR_NEQUIP_INPUTS, ASE_OUTPUTS
 
-            model, metadata = load_torchscript_model(compile_path, device)
-        elif compile_fname.endswith(".nequip.pt2"):
-            # == imports and sanity checks ==
-            from nequip.utils.versions import check_pt2_compile_compatibility
-
-            check_pt2_compile_compatibility()
-            from nequip.scripts._compile_utils import PAIR_NEQUIP_INPUTS, ASE_OUTPUTS
-            from nequip.nn.compile import DictInputOutputWrapper
-
-            # == model ==
-            compiled_model = torch._inductor.aoti_load_package(compile_path)
-            model = DictInputOutputWrapper(
-                compiled_model, PAIR_NEQUIP_INPUTS, ASE_OUTPUTS
-            )
-            # == metadata ==
-            metadata = compiled_model.get_metadata()
-            compile_device = metadata["AOTI_DEVICE_KEY"]
-            if compile_device != device:
-                raise RuntimeError(
-                    f"`{compile_path}` was compiled for `{compile_device}` and won't work with `NequIPCalculator.from_compiled_model(device={device})`, use `NequIPCalculator.from_compiled_model(device={compile_device})` instead."
-                )
-            metadata[graph_model.R_MAX_KEY] = float(metadata[graph_model.R_MAX_KEY])
-            metadata[graph_model.TYPE_NAMES_KEY] = metadata[
-                graph_model.TYPE_NAMES_KEY
-            ].split(" ")
-
-            # set global state
-            set_global_state(
-                **{
-                    TF32_KEY: bool(int(metadata[TF32_KEY])),
-                }
-            )
-        else:
-            raise ValueError(
-                f"Unknown file type: {compile_fname} (expected `*.nequip.pth` or `*.nequip.pt2`)"
-            )
-
-        # prepare model for inference
-        model = model.to(device)
-        model.eval()
+        model, metadata = load_compiled_model(
+            compile_path, device, PAIR_NEQUIP_INPUTS, ASE_OUTPUTS
+        )
 
         # extract r_max and type_names for transforms
         r_max = metadata[graph_model.R_MAX_KEY]
         type_names = metadata[graph_model.TYPE_NAMES_KEY]
+        # create neighbor list transform with per-edge-type cutoffs if available
+        neighbor_transform = _create_neighbor_transform(metadata, r_max, type_names)
 
         # use `type_names` metadata as substitute for `chemical_symbols` if latter not provided
-        if chemical_symbols is None:
-            warnings.warn(
-                "Trying to use model type names as chemical symbols; this may not be correct for your model (and may cause an error if model type names are not chemical symbols)! To avoid this warning, please provide `chemical_symbols` explicitly."
-            )
-            chemical_symbols = type_names
+        chemical_symbols = cls._handle_chemical_symbols(chemical_symbols, type_names)
 
         return cls(
             model=model,
             device=device,
             transforms=[
                 ChemicalSpeciesToAtomTypeMapper(chemical_symbols),
-                NeighborListTransform(r_max=r_max),
+                neighbor_transform,
             ],
             **kwargs,
         )
@@ -230,14 +204,14 @@ class NequIPCalculator(Calculator):
         model.to(device)
 
         r_max = float(model.metadata[graph_model.R_MAX_KEY])
+        type_names = model.metadata[graph_model.TYPE_NAMES_KEY].split(" ")
 
-        if chemical_symbols is None:
-            type_names = model.metadata[graph_model.TYPE_NAMES_KEY].split(" ")
-            # Default to species names
-            warnings.warn(
-                "Trying to use model type names as chemical symbols; this may not be correct for your model (and may cause an error if model type names are not chemical symbols)! To avoid this warning, please provide `chemical_symbols` explicitly."
-            )
-            chemical_symbols = type_names
+        # create neighbor list transform with per-edge-type cutoffs if available
+        neighbor_transform = _create_neighbor_transform(
+            model.metadata, r_max, type_names
+        )
+
+        chemical_symbols = cls._handle_chemical_symbols(chemical_symbols, type_names)
 
         # build nequip calculator
         if "transforms" in kwargs:
@@ -248,7 +222,7 @@ class NequIPCalculator(Calculator):
             device=device,
             transforms=[
                 ChemicalSpeciesToAtomTypeMapper(chemical_symbols),
-                NeighborListTransform(r_max=r_max),
+                neighbor_transform,
             ],
             **kwargs,
         )
@@ -299,3 +273,23 @@ class NequIPCalculator(Calculator):
             # ase wants voigt format
             stress_voigt = full_3x3_to_voigt_6_stress(stress)
             self.results["stress"] = stress_voigt
+
+
+def _create_neighbor_transform(
+    metadata: dict, r_max: float, type_names: List[str]
+) -> NeighborListTransform:
+    """Create NeighborListTransform with per-edge-type cutoffs if available."""
+    if graph_model.PER_EDGE_TYPE_CUTOFF_KEY in metadata:
+        from nequip.nn.embedding.utils import parse_per_edge_type_cutoff_metadata
+
+        per_edge_type_cutoff = parse_per_edge_type_cutoff_metadata(
+            metadata[graph_model.PER_EDGE_TYPE_CUTOFF_KEY], type_names
+        )
+
+        return NeighborListTransform(
+            r_max=r_max,
+            per_edge_type_cutoff=per_edge_type_cutoff,
+            type_names=type_names,
+        )
+    else:
+        return NeighborListTransform(r_max=r_max)
