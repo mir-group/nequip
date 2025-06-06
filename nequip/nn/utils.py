@@ -107,8 +107,10 @@ def with_edge_vectors_(
                 # if batch key absent, we assume that cell has batch dims 1,
                 # so we can avoid creating the large intermediate cell tensor
                 # nj <- nj + ni @ ij
-                edge_vec = torch.addmm(edge_vec, edge_cell_shift, cell.view(3, 3))
+                edge_vec = edge_vec + torch.sum(
+                    edge_cell_shift.view(-1, 3, 1) * cell.view(3, 3), 1
+                )
         data[edge_vec_field] = edge_vec
         if with_lengths:
-            data[edge_len_field] = torch.linalg.norm(edge_vec, dim=-1)
+            data[edge_len_field] = edge_vec.square().sum(1, keepdim=True).sqrt()
         return data
