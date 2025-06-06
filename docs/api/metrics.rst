@@ -62,6 +62,12 @@ Error Metrics
 .. autoclass:: nequip.train.MeanAbsoluteError
    :members:
 
+.. autoclass:: nequip.train.MeanCubicError
+   :members:
+
+.. autoclass:: nequip.train.MeanQuarticError
+   :members:
+
 .. autoclass:: nequip.train.HuberLoss
    :members:
 
