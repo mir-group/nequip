@@ -202,6 +202,7 @@ class PerTypeScaleShift(GraphModuleMixin, torch.nn.Module):
                     * scales
                 )
             assert scales.shape == (self.num_types,) or scales.numel() == 1
+            scales = scales.reshape(-1, 1)
             if self.scales_trainable:
                 self.scales = torch.nn.Parameter(scales)
             else:
@@ -222,6 +223,7 @@ class PerTypeScaleShift(GraphModuleMixin, torch.nn.Module):
                     * shifts
                 )
             assert shifts.shape == (self.num_types,) or shifts.numel() == 1
+            shifts = shifts.reshape(-1, 1)
             if self.shifts_trainable:
                 self.shifts = torch.nn.Parameter(shifts)
             else:
@@ -245,7 +247,7 @@ class PerTypeScaleShift(GraphModuleMixin, torch.nn.Module):
             if self.scales_shortcut:
                 scales = self.scales
             else:
-                scales = torch.index_select(self.scales, 0, types).view(-1, 1)
+                scales = torch.nn.functional.embedding(types, self.scales)
         else:
             scales = self.scales  # dummy for torchscript
 
@@ -253,7 +255,7 @@ class PerTypeScaleShift(GraphModuleMixin, torch.nn.Module):
             if self.shifts_shortcut:
                 shifts = self.shifts
             else:
-                shifts = torch.index_select(self.shifts, 0, types).view(-1, 1)
+                shifts = torch.nn.functional.embedding(types, self.shifts)
         else:
             shifts = self.shifts  # dummy for torchscript
 
@@ -346,7 +348,7 @@ class PerTypeScaleShift(GraphModuleMixin, torch.nn.Module):
         return replace_submodules(model, cls, factory)
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__} \n  scales: {_format_type_vals(self.scales.tolist(), self.type_names)}\n  shifts: {_format_type_vals(self.shifts.tolist(), self.type_names)}"
+        return f"{self.__class__.__name__} \n  scales: {_format_type_vals(self.scales.reshape(-1).tolist(), self.type_names)}\n  shifts: {_format_type_vals(self.shifts.reshape(-1).tolist(), self.type_names)}"
 
 
 def _format_type_vals(
