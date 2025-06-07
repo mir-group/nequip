@@ -106,9 +106,9 @@ class EdgeLengthNormalizer(GraphModuleMixin, torch.nn.Module):
         if self._per_edge_type:
             # get edge types with shape (2, num_edges) form first
             edge_type = torch.index_select(
-                data[AtomicDataDict.ATOM_TYPE_KEY].reshape(-1),
+                data[AtomicDataDict.ATOM_TYPE_KEY].view(-1),
                 0,
-                data[AtomicDataDict.EDGE_INDEX_KEY].reshape(-1),
+                data[AtomicDataDict.EDGE_INDEX_KEY].view(-1),
             ).view(2, -1)
             data[self.edge_type_field] = edge_type
             # then convert into row-major NxN matrix index with shape (num_edges,)
