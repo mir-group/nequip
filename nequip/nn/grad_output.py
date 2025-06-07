@@ -270,9 +270,9 @@ class ForceStressOutput(GraphModuleMixin, torch.nn.Module):
                 pos.unsqueeze(-2), torch.index_select(symmetric_displacement, 0, batch)
             ).squeeze(-2)
         else:
-            # [natom, 3] @ [3, 3] -> [natom, 3]
-            data[AtomicDataDict.POSITIONS_KEY] = torch.addmm(
-                pos, pos, symmetric_displacement
+            # (num_atoms, 3), (3, 3) -> (num_atoms, 3)
+            data[AtomicDataDict.POSITIONS_KEY] = pos + torch.sum(
+                pos.view(-1, 3, 1) * symmetric_displacement, 1
             )
         # assert torch.equal(pos, data[AtomicDataDict.POSITIONS_KEY])
         # we only displace the cell if we have one:
@@ -291,11 +291,10 @@ class ForceStressOutput(GraphModuleMixin, torch.nn.Module):
                 )
             else:
                 # [3, 3] @ [3, 3] --- enforced to these shapes
-                tmpcell = cell.squeeze(0)
-                data[AtomicDataDict.CELL_KEY] = torch.addmm(
-                    tmpcell, tmpcell, symmetric_displacement
-                ).unsqueeze(0)
-            # assert torch.equal(cell, data[AtomicDataDict.CELL_KEY])
+                data[AtomicDataDict.CELL_KEY] = (
+                    cell.view(3, 3)
+                    + torch.sum(cell.view(3, 3, 1) * symmetric_displacement, 1)
+                ).view(1, 3, 3)
 
         # Call model and get gradients
         data = self.func(data)
