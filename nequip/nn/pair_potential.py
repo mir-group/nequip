@@ -316,7 +316,7 @@ class ZBL(GraphModuleMixin, torch.nn.Module):
 
         zbl_edge_eng = self._zbl(
             Z=self.atomic_numbers,
-            r=data[AtomicDataDict.EDGE_LENGTH_KEY],
+            r=data[AtomicDataDict.EDGE_LENGTH_KEY].view(-1),
             atom_types=data[AtomicDataDict.ATOM_TYPE_KEY],
             edge_index=data[AtomicDataDict.EDGE_INDEX_KEY],
             qqr2exesquare=self._qqr2exesquare,
