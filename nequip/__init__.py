@@ -5,7 +5,6 @@ import sys
 import warnings
 
 import torch
-import torchmetrics
 
 from .utils.resolvers import _register_default_resolvers
 from .utils.version_utils import get_version_safe
@@ -28,13 +27,6 @@ torch_version = packaging.version.parse(get_version_safe(torch.__name__).split("
 assert torch_version >= packaging.version.parse(
     "2.2"
 ), f"NequIP supports 2.2.* or later, but {torch_version} found"
-
-# torchmetrics >= 1.6.0 for ddp autograd
-# https://github.com/Lightning-AI/torchmetrics/releases/tag/v1.6.0
-torchmetrics_version = packaging.version.parse(get_version_safe(torchmetrics.__name__))
-assert torchmetrics_version >= packaging.version.parse(
-    "1.6.0"
-), f"NequIP requires torchmetrics>=1.6.0 for ddp training but {torchmetrics_version} found"
 
 # Load all installed nequip extension packages
 # This allows installed extensions to register themselves in
