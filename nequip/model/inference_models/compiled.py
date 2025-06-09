@@ -1,6 +1,8 @@
 # This file is a part of the `nequip` package. Please see LICENSE and README
 # at the root for information on using it.
 import torch
+
+from pathlib import Path
 from typing import Union, Tuple, List, Optional
 
 from .torchscript import load_torchscript_model
@@ -25,7 +27,7 @@ def load_compiled_model(
     Returns:
         tuple of (model, metadata) with model prepared for inference
     """
-    compile_fname = str(compile_path).split("/")[-1]
+    compile_fname = Path(compile_path).name
 
     if compile_fname.endswith(".nequip.pth"):
         model, metadata = load_torchscript_model(compile_path, device)
