@@ -2,4 +2,4 @@
 # See Python packaging guide
 # https://packaging.python.org/guides/single-sourcing-package-version/
 
-__version__ = "0.10.0"
+__version__ = "0.11.0"
