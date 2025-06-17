@@ -279,12 +279,14 @@ def _create_neighbor_transform(
     metadata: dict, r_max: float, type_names: List[str]
 ) -> NeighborListTransform:
     """Create NeighborListTransform with per-edge-type cutoffs if available."""
-    if graph_model.PER_EDGE_TYPE_CUTOFF_KEY in metadata:
-        from nequip.nn.embedding.utils import parse_per_edge_type_cutoff_metadata
+    if metadata.get(graph_model.PER_EDGE_TYPE_CUTOFF_KEY, None) is not None:
+        per_edge_type_cutoff = metadata[graph_model.PER_EDGE_TYPE_CUTOFF_KEY]
+        if isinstance(per_edge_type_cutoff, str):
+            from nequip.nn.embedding.utils import parse_per_edge_type_cutoff_metadata
 
-        per_edge_type_cutoff = parse_per_edge_type_cutoff_metadata(
-            metadata[graph_model.PER_EDGE_TYPE_CUTOFF_KEY], type_names
-        )
+            per_edge_type_cutoff = parse_per_edge_type_cutoff_metadata(
+                per_edge_type_cutoff, type_names
+            )
 
         return NeighborListTransform(
             r_max=r_max,

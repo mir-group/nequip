@@ -22,7 +22,7 @@ def _model_metadata_from_config(model_config: Dict[str, str]) -> Dict[str, str]:
     model_metadata_dict[NUM_TYPES_KEY] = str(len(model_config[TYPE_NAMES_KEY]))
     model_metadata_dict[R_MAX_KEY] = str(model_config[R_MAX_KEY])
 
-    if PER_EDGE_TYPE_CUTOFF_KEY in model_config:
+    if model_config.get(PER_EDGE_TYPE_CUTOFF_KEY, None) is not None:
         from .embedding.utils import per_edge_type_cutoff_to_metadata_str
 
         model_metadata_dict[PER_EDGE_TYPE_CUTOFF_KEY] = (

@@ -8,6 +8,12 @@ Most recent change on the top.
 
 ## Unreleased
 
+
+## [0.11.1]
+
+### Fixed
+- Fixed per-edge-type cutoff metadata parsing when loading compiled models
+
 ## [0.11.0]
 
 ### Added
