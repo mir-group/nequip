@@ -23,6 +23,10 @@ class TestZBLModel(BaseEnergyModelTests):
     def strict_locality(self):
         return True
 
+    @pytest.mark.skip(reason="Skip compile tests for ZBL models.")
+    def test_nequip_compile(self):
+        pass
+
     @pytest.fixture(scope="class")
     def config(self):
 
