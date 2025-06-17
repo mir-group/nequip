@@ -1,5 +1,6 @@
 # This file is a part of the `nequip` package. Please see LICENSE and README at the root for information on using it.
 
+import copy
 import tempfile
 import pathlib
 import subprocess
@@ -67,7 +68,7 @@ def _training_session(
 
             if model_config is not None:
                 # unit test case: replace model entirely
-                config.training_module.model = model_config.copy()
+                config.training_module.model = copy.deepcopy(model_config)
                 config.training_module.model.model_dtype = model_dtype
 
             # set training parameters

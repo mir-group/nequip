@@ -1,6 +1,7 @@
 # This file is a part of the `nequip` package. Please see LICENSE and README at the root for information on using it.
 import pytest
 
+import copy
 import functools
 import torch
 import pathlib
@@ -68,7 +69,7 @@ class BaseModelTests:
 
     @staticmethod
     def make_model(model_config, device):
-        config = model_config.copy()
+        config = copy.deepcopy(model_config)
         model_builder = get_method(config.pop("_target_"))
         model = model_builder(**config)
         model = model.to(device)
@@ -85,7 +86,7 @@ class BaseModelTests:
         assert (
             "compile_mode" not in config
         ), "model test subclasses should not include `compile_mode` in the configs -- the test class will handle it"
-        config = config.copy()
+        config = copy.deepcopy(config)
         config.update({"model_dtype": model_dtype})
         model = self.make_model(config, device=device)
         out_fields = model.irreps_out.keys()
@@ -95,7 +96,7 @@ class BaseModelTests:
     @pytest.fixture(scope="class")
     def partial_model(self, model, device):
         _, config, _ = model
-        aux_model = self.make_model(config.copy(), device=device)
+        aux_model = self.make_model(copy.deepcopy(config), device=device)
         module = find_first_of_type(aux_model, ForceStressOutput)
         # skip test if force/stress module not found
         if module is None:
@@ -151,8 +152,8 @@ class BaseModelTests:
     @pytest.fixture(scope="class")
     def fake_model_training_session(self, conffile, config, model_dtype):
         """Create a fake training session using integration test configs with injected model."""
-        # make a copy and enforce integration config parameters
-        model_config = config.copy()
+        # make a deep copy and enforce integration config parameters
+        model_config = copy.deepcopy(config)
 
         # update parameters to match integration configs and use resolvers
         updates = {
@@ -352,7 +353,7 @@ class BaseModelTests:
         }[instance.model_dtype]
 
         # make compiled model
-        config = config.copy()
+        config = copy.deepcopy(config)
         config["compile_mode"] = "compile"
         compile_model = self.make_model(config, device=device)
 
