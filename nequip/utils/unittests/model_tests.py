@@ -500,7 +500,7 @@ class BaseModelTests:
         elif AtomicDataDict.EDGE_EMBEDDING_KEY in edge_embed:
             key = AtomicDataDict.EDGE_EMBEDDING_KEY
         else:
-            pytest.skip()
+            return
         edge_embed = edge_embed[key]
         data[AtomicDataDict.POSITIONS_KEY][2, 1] = r_max  # put it past the cutoff
         edge_embed2 = instance(from_dict(data))[key]
