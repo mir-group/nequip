@@ -40,6 +40,10 @@ nequip-compile = "nequip.scripts.compile:main"
 [tool.setuptools]
 packages = {find = {include = ["nequip", "nequip.*"]}}
 
+[tool.setuptools.package-data]
+# to ensure config file templates for testing is in the package
+"nequip.utils.unittests" = ["*.yaml"]
+
 [tool.setuptools.dynamic]  # get version from nequip/_version.py
 version = {attr = "nequip._version.__version__"}
 
