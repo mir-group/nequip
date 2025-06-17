@@ -51,6 +51,14 @@ class BaseModelTests:
         """
         raise NotImplementedError
 
+    @pytest.fixture(scope="class")
+    def nequip_compile_tol(self, model_dtype):
+        """Implemented by subclasses.
+
+        Returns tolerance based on ``model_dtype``.
+        """
+        raise NotImplementedError
+
     @pytest.fixture(
         scope="class",
         params=(["cuda", "cpu"] if torch.cuda.is_available() else ["cpu"]),
@@ -188,7 +196,9 @@ class BaseModelTests:
         "mode", ["torchscript"] + (["aotinductor"] if _TORCH_GE_2_6 else [])
     )
     @override_irreps_debug(False)
-    def test_nequip_compile(self, fake_model_training_session, device, mode):
+    def test_nequip_compile(
+        self, fake_model_training_session, device, mode, nequip_compile_tol
+    ):
         """Tests `nequip-compile` workflows.
 
         Covers TorchScript and AOTInductor (ASE target).
@@ -200,12 +210,7 @@ class BaseModelTests:
             )
 
         config, tmpdir, env, model_dtype = fake_model_training_session
-
-        # just in case
         assert torch.get_default_dtype() == torch.float64
-
-        # atol on MODEL dtype, since a mostly float32 model still has float32 variation
-        tol = {"float32": 1e-5, "float64": 1e-10}[model_dtype]
 
         # === test nequip-compile ===
         # !! NOTE: we use the `best.ckpt` because val, test metrics were computed with `best.ckpt` in the `test` run stages !!
@@ -288,12 +293,18 @@ class BaseModelTests:
                     compile_F = compile_atoms.get_forces()
 
                     del atoms, ckpt_atoms, compile_atoms
-                    assert np.allclose(ckpt_E, compile_E, rtol=tol, atol=tol), np.max(
-                        np.abs((ckpt_E - compile_E))
-                    )
-                    assert np.allclose(ckpt_F, compile_F, rtol=tol, atol=tol), np.max(
-                        np.abs((ckpt_F - compile_F))
-                    )
+                    assert np.allclose(
+                        ckpt_E,
+                        compile_E,
+                        rtol=nequip_compile_tol,
+                        atol=nequip_compile_tol,
+                    ), np.max(np.abs((ckpt_E - compile_E)))
+                    assert np.allclose(
+                        ckpt_F,
+                        compile_F,
+                        rtol=nequip_compile_tol,
+                        atol=nequip_compile_tol,
+                    ), np.max(np.abs((ckpt_F - compile_F)))
 
     def compare_output_and_gradients(
         self, modelA, modelB, model_test_data, tol, compare_outputs=True

@@ -70,6 +70,10 @@ class TestNequIPModel(BaseEnergyModelTests):
     def strict_locality(self):
         return False
 
+    @pytest.fixture(scope="class")
+    def nequip_compile_tol(self, model_dtype):
+        return {"float32": 1e-5, "float64": 1e-10}[model_dtype]
+
     @pytest.fixture(
         params=[
             minimal_config1,
