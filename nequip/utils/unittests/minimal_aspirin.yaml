@@ -4,6 +4,13 @@ seed: 1
 cutoff_radius: 5.0
 chemical_symbols: [C, O, H]
 model_type_names: ${chemical_symbols}
+per_edge_type_cutoff:
+  H: 2.0
+  C:
+    H: 4.0
+    C: 3.5
+    O: 3.7
+  O: 3.9
 
 dataloader:
   _target_: torch.utils.data.DataLoader

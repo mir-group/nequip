@@ -8,7 +8,7 @@ BASIC_INFO = {
     "seed": 123,
     "type_names": ["H", "C", "O"],
     "r_max": 4.0,
-    "avg_num_neighbors": 3.0,
+    "avg_num_neighbors": 20,
     "per_type_energy_shifts": {"H": 3.45, "C": 5.67, "O": 7.89},
 }
 

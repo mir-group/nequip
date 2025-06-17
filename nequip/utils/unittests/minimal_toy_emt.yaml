@@ -4,6 +4,7 @@ seed: 1
 cutoff_radius: 5.0
 chemical_symbols: [Cu]
 model_type_names: ${chemical_symbols}
+per_edge_type_cutoff: null
 
 dataloader:
   _target_: torch.utils.data.DataLoader
@@ -101,9 +102,9 @@ training_module:
     # !! test `int_div` resolver !!
     radial_mlp_width: ${int_div:${num_features},${oc.env:TEST_VAL_TWO}}
     # data-dependent model params
+    avg_num_neighbors: ${training_data_stats:num_neighbors_mean}
     per_type_energy_shifts: ${training_data_stats:per_atom_energy_mean}
     per_type_energy_scales: ${training_data_stats:forces_rms}
-    avg_num_neighbors: ${training_data_stats:num_neighbors_mean}
 
 global_options:
   allow_tf32: false

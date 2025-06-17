@@ -1,17 +1,19 @@
 # This file is a part of the `nequip` package. Please see LICENSE and README at the root for information on using it.
 import pytest
 
-import tempfile
 import functools
 import torch
+import pathlib
+import subprocess
+import os
+import uuid
 
 import numpy as np
-
-from e3nn.util.jit import script
 
 from nequip.data import (
     from_dict,
     from_ase,
+    to_ase,
     compute_neighborlist_,
     AtomicDataDict,
     _GRAPH_FIELDS,
@@ -33,7 +35,9 @@ from nequip.utils.test import (
     override_irreps_debug,
 )
 
-from hydra.utils import get_method
+from hydra.utils import get_method, instantiate
+from nequip.ase import NequIPCalculator
+from .utils import _training_session, _check_and_print
 
 
 # see https://github.com/pytest-dev/pytest/issues/421#issuecomment-943386533
@@ -72,7 +76,7 @@ class BaseModelTests:
         ), "model test subclasses should not include `model_dtype` in the configs -- the test class will handle it (looping over `float32` and `float64`)"
         assert (
             "compile_mode" not in config
-        ), "model test subclasses should not include `compile_mode` in the configs -- the test class will handle it (looping over TorchScript and `torch.compile` modes)"
+        ), "model test subclasses should not include `compile_mode` in the configs -- the test class will handle it"
         config = config.copy()
         config.update({"model_dtype": model_dtype})
         model = self.make_model(config, device=device)
@@ -107,53 +111,189 @@ class BaseModelTests:
         # return the data in the device for testing
         return AtomicDataDict.to_(atomic_batch, device)
 
-    # == common tests for all models ==
+    @pytest.fixture(
+        scope="class",
+        params=["minimal_aspirin.yaml", "minimal_toy_emt.yaml"],
+    )
+    def conffile(self, request):
+        """Training config files."""
+        return request.param
+
+    def _update_config_recursively(self, config, updates):
+        """
+        Recursively update config with nested parameter updates.
+
+        Args:
+            config: Configuration dict to update
+            updates: Dict with potentially nested keys using dots (e.g., "pair_potential.chemical_species")
+        """
+        for key, value in updates.items():
+            if "." in key:
+                # handle nested keys like "pair_potential.chemical_species"
+                parts = key.split(".", 1)
+                parent_key, child_key = parts[0], parts[1]
+                if parent_key in config:
+                    # recursively update the nested dict
+                    self._update_config_recursively(
+                        config[parent_key], {child_key: value}
+                    )
+            else:
+                config[key] = value
+
+    @pytest.fixture(scope="class")
+    def fake_model_training_session(self, conffile, config, model_dtype):
+        """Create a fake training session using integration test configs with injected model."""
+        # make a copy and enforce integration config parameters
+        model_config = config.copy()
+
+        # update parameters to match integration configs and use resolvers
+        updates = {
+            # use resolvers for data-dependent parameters
+            "avg_num_neighbors": "${training_data_stats:num_neighbors_mean}",
+            "per_type_energy_shifts": "${training_data_stats:per_atom_energy_mean}",
+            "per_type_energy_scales": "${training_data_stats:forces_rms}",
+            # use top-level config variable references
+            "type_names": "${model_type_names}",
+        }
+
+        # handle nested chemical_species in pair_potential if present
+        if (
+            "pair_potential" in model_config
+            and "chemical_species" in model_config["pair_potential"]
+        ):
+            updates["pair_potential.chemical_species"] = "${chemical_symbols}"
+
+        # handle per_edge_type_cutoff - use the one from integration config if present
+        # this will ensure consistent type names and cutoff values
+        if "per_edge_type_cutoff" in model_config:
+            updates["per_edge_type_cutoff"] = "${per_edge_type_cutoff}"
+
+        self._update_config_recursively(model_config, updates)
+
+        session = _training_session(conffile, model_dtype, model_config=model_config)
+        training_config, tmpdir, env = next(session)
+        yield training_config, tmpdir, env, model_dtype
+        del session
+
     def test_init(self, model):
         instance, _, _ = model
         assert isinstance(instance, GraphModuleMixin)
 
-    def test_jit(self, model, atomic_batch, device):
+    def test_forward(self, model, model_test_data):
+        """Tests that we can run a forward pass without errors."""
         instance, _, _ = model
-        data = AtomicDataDict.to_(atomic_batch, device)
-        model_script = script(instance)
+        _ = instance(model_test_data)
 
-        atol = {
-            # tight, but not that tight, since GPU nondet has to pass
-            # plus model insides are still float32 with global dtype float64 in the tests
-            torch.float32: 5e-5,
-            torch.float64: 5e-7,
-        }[instance.model_dtype]
+    @pytest.mark.parametrize(
+        "mode", ["torchscript"] + (["aotinductor"] if _TORCH_GE_2_6 else [])
+    )
+    @override_irreps_debug(False)
+    def test_nequip_compile(self, fake_model_training_session, device, mode):
+        """Tests `nequip-compile` workflows.
 
-        out_instance = instance(data.copy())
-        out_script = model_script(data.copy())
+        Covers TorchScript and AOTInductor (ASE target).
+        """
+        # TODO: sort out the CPU compilation issues
+        if mode == "aotinductor" and device == "cpu":
+            pytest.skip(
+                "compile tests are skipped for CPU as there are known compilation bugs for both NequIP and Allegro models on CPU"
+            )
 
-        for out_field in out_instance.keys():
-            assert torch.allclose(
-                out_instance[out_field],
-                out_script[out_field],
-                atol=atol,
-            ), f"JIT didn't repro non-JIT on field {out_field} with max error {(out_instance[out_field] - out_script[out_field]).abs().max().item()}"
+        config, tmpdir, env, model_dtype = fake_model_training_session
 
-        # - Try saving, loading in another process, and running -
-        with tempfile.TemporaryDirectory() as tmpdir:
-            # Save stuff
-            model_script.save(tmpdir + "/model.pt")
-            torch.save(data, tmpdir + "/dat.pt")
-            # Ideally, this would be tested in a subprocess where nequip isn't imported.
-            # But CUDA + torch plays very badly with subprocesses here and causes a race condition.
-            # So instead we do a slightly less complete test, loading the saved model here in the original process:
-            load_model = torch.jit.load(tmpdir + "/model.pt")
-            load_dat = torch.load(tmpdir + "/dat.pt", weights_only=False)
+        # just in case
+        assert torch.get_default_dtype() == torch.float64
 
-            out_script = model_script(data.copy())
-            out_load = load_model(load_dat.copy())
+        # atol on MODEL dtype, since a mostly float32 model still has float32 variation
+        tol = {"float32": 1e-5, "float64": 1e-10}[model_dtype]
 
-            for out_field in out_instance.keys():
-                assert torch.allclose(
-                    out_script[out_field],
-                    out_load[out_field],
-                    atol=atol,
-                ), f"JIT didn't repro save-and-loaded JIT on field {out_field} with max error {(out_script[out_field] - out_load[out_field]).abs().max().item()}"
+        # === test nequip-compile ===
+        # !! NOTE: we use the `best.ckpt` because val, test metrics were computed with `best.ckpt` in the `test` run stages !!
+        ckpt_path = str(pathlib.Path(f"{tmpdir}/best.ckpt"))
+
+        uid = uuid.uuid4()
+        compile_fname = (
+            f"compile_model_{uid}.nequip.pt2"
+            if mode == "aotinductor"
+            else f"compile_model_{uid}.nequip.pth"
+        )
+        output_path = str(pathlib.Path(f"{tmpdir}/{compile_fname}"))
+        retcode = subprocess.run(
+            [
+                "nequip-compile",
+                ckpt_path,
+                output_path,
+                "--mode",
+                mode,
+                "--device",
+                device,
+                # target accepted as argument for both modes, but unused for torchscript mode
+                "--target",
+                "ase",
+            ],
+            cwd=tmpdir,
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        _check_and_print(retcode)
+        assert os.path.exists(
+            output_path
+        ), f"Compiled model `{output_path}` does not exist!"
+
+        # == get ase calculator for checkpoint and compiled models ==
+        available_devices = ["cpu"] + (["cuda"] if torch.cuda.is_available() else [])
+        for load_device in available_devices:
+            if mode == "aotinductor" and load_device != device:
+                with pytest.raises(
+                    RuntimeError
+                ):  # aotinductor does not support loading on different devices
+                    NequIPCalculator.from_compiled_model(
+                        output_path,
+                        device=load_device,
+                    )
+                continue
+
+            # test both devices if possible, where we are testing swapping of devices between compile and
+            # loading (CUDA -> cpu and vice versa)
+            chemical_symbols = config.chemical_symbols
+            ckpt_calc = NequIPCalculator._from_checkpoint_model(
+                ckpt_path,
+                device=load_device,
+                chemical_symbols=chemical_symbols,
+            )
+            compile_calc = NequIPCalculator.from_compiled_model(
+                output_path,
+                device=load_device,
+                chemical_symbols=chemical_symbols,
+            )
+
+            # == get validation data by instantiating datamodules ==
+            datamodule = instantiate(config.data, _recursive_=False)
+            datamodule.prepare_data()
+            datamodule.setup("validate")
+            dloader = datamodule.val_dataloader()[0]
+
+            # == loop over data and do checks ==
+            for data in dloader:
+                atoms_list = to_ase(data.copy())
+                for atoms in atoms_list:
+                    ckpt_atoms, compile_atoms = atoms.copy(), atoms.copy()
+                    ckpt_atoms.calc = ckpt_calc
+                    ckpt_E = ckpt_atoms.get_potential_energy()
+                    ckpt_F = ckpt_atoms.get_forces()
+
+                    compile_atoms.calc = compile_calc
+                    compile_E = compile_atoms.get_potential_energy()
+                    compile_F = compile_atoms.get_forces()
+
+                    del atoms, ckpt_atoms, compile_atoms
+                    assert np.allclose(ckpt_E, compile_E, rtol=tol, atol=tol), np.max(
+                        np.abs((ckpt_E - compile_E))
+                    )
+                    assert np.allclose(ckpt_F, compile_F, rtol=tol, atol=tol), np.max(
+                        np.abs((ckpt_F - compile_F))
+                    )
 
     def compare_output_and_gradients(
         self, modelA, modelB, model_test_data, tol, compare_outputs=True
@@ -180,7 +320,7 @@ class BaseModelTests:
                 ), err
 
     @override_irreps_debug(False)
-    def test_compile(self, model, model_test_data, device):
+    def test_train_time_compile(self, model, model_test_data, device):
         """
         Test train-time compilation, i.e. `make_fx` -> `export` -> `AOTAutograd` correctness.
         """
@@ -212,55 +352,6 @@ class BaseModelTests:
             tol=tol,
             compare_outputs=False,  # Internal checks guarantee that outputs are the same
         )
-
-    @pytest.mark.skipif(
-        not _TORCH_GE_2_6, reason="PT2 compile tests skipped for torch < 2.6"
-    )
-    @override_irreps_debug(False)
-    def test_aot_export(self, model, model_test_data, device):
-        """
-        Tests inference-time compilation, i.e. that `make_fx` -> `export` -> `AOTExport` correctness.
-
-        For now, we only test the unbatched case, i.e. a single frame, relevant for ase, pair-nequip, and pair-allegro.
-        """
-        from nequip.model.utils import override_model_compile_mode, _EAGER_MODEL_KEY
-        from nequip.utils.compile import prepare_model_for_compile
-        from nequip.utils.aot import aot_export_model
-        from nequip.scripts._compile_utils import PAIR_NEQUIP_INPUTS, LMP_OUTPUTS
-
-        # get a single frame, and drop batch fields to take optimized path
-        export_data = AtomicDataDict.frame_from_batched(model_test_data.copy(), 0)
-        export_data.pop(AtomicDataDict.BATCH_KEY)
-        export_data.pop(AtomicDataDict.NUM_NODES_KEY)
-
-        _, config, _ = model
-        with override_model_compile_mode(compile_mode=_EAGER_MODEL_KEY):
-            model = self.make_model(config, device=device)
-        model = prepare_model_for_compile(model, device)
-        # export model
-        batch_map = {
-            "graph": torch.export.Dim.STATIC,
-            "node": torch.export.dynamic_shapes.Dim("num_nodes", min=2, max=torch.inf),
-            "edge": torch.export.dynamic_shapes.Dim("num_edges", min=2, max=torch.inf),
-        }
-        # sanity checking done when exporting
-        with tempfile.TemporaryDirectory() as tmpdir:
-            _ = aot_export_model(
-                model=model,
-                device=device,
-                input_fields=PAIR_NEQUIP_INPUTS,
-                output_fields=LMP_OUTPUTS,
-                data=export_data,
-                batch_map=batch_map,
-                output_path=tmpdir + "/export_test.pt2",
-                inductor_configs={},
-                seed=0,
-            )
-
-    def test_forward(self, model, model_test_data):
-        """Tests that we can run a forward pass without errors."""
-        instance, _, _ = model
-        _ = instance(model_test_data)
 
     def test_wrapped_unwrapped(self, model, device, Cu_bulk):
         atoms, data_orig = Cu_bulk
