@@ -1,13 +1,5 @@
 # This file is a part of the `nequip` package. Please see LICENSE and README at the root for information on using it.
-import argparse
 
-import pathlib
-import yaml
-
-# TODO: check if we still need this?
-# This is a weird hack to avoid Intel MKL issues on the cluster when this is called as a subprocess of a process that has itself initialized PyTorch.
-# Since numpy gets imported later anyway for dataset stuff, this shouldn't affect performance.
-import numpy as np  # noqa: F401
 import torch
 
 from nequip.model.saved_models.checkpoint import data_dict_from_checkpoint
@@ -37,6 +29,10 @@ from ._workflow_utils import set_workflow_state
 
 from omegaconf import OmegaConf
 import hydra
+import argparse
+import pathlib
+import yaml
+
 
 # === setup logging ===
 hydra.core.utils.configure_log(None)
