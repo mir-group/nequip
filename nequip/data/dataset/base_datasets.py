@@ -23,13 +23,10 @@ class AtomicDataset(torch.utils.data.Dataset):
             data sample. Transforms are applied in order. Defaults to empty list.
     """
 
-    dtype: torch.dtype
-
     def __init__(
         self,
         transforms: List[Callable] = [],
     ):
-        self.dtype = torch.get_default_dtype()
         self.transforms = transforms
 
     def __getitem__(
@@ -51,7 +48,7 @@ class AtomicDataset(torch.utils.data.Dataset):
         return [self._transform(data) for data in data_list]
 
     def _transform(self, x: AtomicDataDict.Type) -> AtomicDataDict.Type:
-        # TODO: this is very confusing
+        # TODO: understand this behavior
         # when training with a DataLoader, the transforms don't seem to mutate the underlying data
         # but if Datasets are called by index directly, e.g. dataset[[1,3]], the underlying dicts are mutated
         x = x.copy()
@@ -63,7 +60,7 @@ class AtomicDataset(torch.utils.data.Dataset):
         """
         Subclasses may override this.
         """
-        # Note that get_data_list does _not_ call the transforms
+        # NOTE: get_data_list does _not_ call the transforms
         data_list = self.get_data_list(indices)
         return [AtomicDataDict.num_nodes(data) for data in data_list]
 
