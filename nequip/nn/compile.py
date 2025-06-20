@@ -106,13 +106,14 @@ class CompileGraphModel(GraphModel):
         model_input_fields: Dict[str, Any] = {},
     ) -> None:
         super().__init__(model, model_config, model_input_fields)
-        # save model param and buffer names
-        self.weight_names = [n for n, _ in self.model.named_parameters()]
-        self.buffer_names = [n for n, _ in self.model.named_buffers()]
         # these will be updated when the model is compiled
         self._compiled_model = ()
         self.input_fields = None
         self.output_fields = None
+        # weights and buffers should be done lazily because model modification can happen after instantiation
+        # such that parameters and buffers may change between class instantiation and the lazy compilation in the `forward`
+        self.weight_names = None
+        self.buffer_names = None
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
 
@@ -134,6 +135,11 @@ class CompileGraphModel(GraphModel):
         # === compile ===
         # compilation happens on the first data pass when there are at least two atoms (hard to pre-emp pathological data)
         if not self._compiled_model:
+
+            # get weight names and buffers
+            self.weight_names = [n for n, _ in self.model.named_parameters()]
+            self.buffer_names = [n for n, _ in self.model.named_buffers()]
+
             # == get input and output fields ==
             # use intersection of data keys and GraphModel input/outputs, which assumes
             # - correctness of irreps registration system
