@@ -101,9 +101,9 @@ class SoftAdapt(Callback):
             new_coeffs = {k: exp_term / softmax_denom for k, exp_term in exps.items()}
 
             if self.weighted:
-                new_coeffs = {k: v*pl_module.loss.metrics[k]["coeff"] for k,v in new_coeffs.items()}
+                new_coeffs = {k: v*pl_module.loss.metrics[k]["coeff"] for k, v in new_coeffs.items()}
                 total_new_coeffs = sum(new_coeffs.values())
-                new_coeffs = {k : v/total_new_coeffs for k,v in new_coeffs.items()}  # ensure normalised
+                new_coeffs = {k : v/total_new_coeffs for k, v in new_coeffs.items()}  # ensure normalised
 
             # update with new coefficients
             self.cached_coeffs.append(new_coeffs)
