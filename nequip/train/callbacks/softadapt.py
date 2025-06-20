@@ -25,11 +25,13 @@ class SoftAdapt(Callback):
             beta: 1.1
             interval: epoch
             frequency: 5
+            weighted: true
 
     Args:
         beta (float): ``SoftAdapt`` hyperparameter (see paper)
         interval (str): ``batch`` or ``epoch``
         frequency (int): number of intervals between loss coefficient updates
+        weighted (bool): whether to weight the coefficient updates by the original loss coefficients (default: False)
         eps (float): small value to avoid division by zero
     """
 
@@ -38,6 +40,7 @@ class SoftAdapt(Callback):
         beta: float,
         interval: str,
         frequency: int,
+        weighted: bool = False,
         eps: float = 1e-8,
     ):
         assert interval in ["batch", "epoch"]
@@ -46,6 +49,7 @@ class SoftAdapt(Callback):
         self.beta = beta
         self.interval = interval
         self.frequency = frequency
+        self.weighted = weighted
         self.eps = eps
 
         self.prev_losses: Dict[str, float] = None
@@ -86,6 +90,7 @@ class SoftAdapt(Callback):
             loss_changes = {
                 k: new_losses[k] - self.prev_losses[k] for k in new_losses.keys()
             }
+
             # normalize and apply softmax
             sum_of_squares = sum(
                 [loss_changes[k] * loss_changes[k] for k in new_losses.keys()]
@@ -94,6 +99,11 @@ class SoftAdapt(Callback):
             exps = {k: exp(factor * v) for k, v in loss_changes.items()}
             softmax_denom = sum([exps[k] for k in new_losses.keys()]) + self.eps
             new_coeffs = {k: exp_term / softmax_denom for k, exp_term in exps.items()}
+
+            if self.weighted:
+                new_coeffs = {k: v*pl_module.loss.metrics[k]["coeff"] for k,v in new_coeffs.items()}
+                total_new_coeffs = sum(new_coeffs.values())
+                new_coeffs = {k : v/total_new_coeffs for k,v in new_coeffs.items()}  # ensure normalised
 
             # update with new coefficients
             self.cached_coeffs.append(new_coeffs)
