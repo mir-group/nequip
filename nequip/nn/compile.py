@@ -10,7 +10,7 @@ from nequip.utils.dtype import (
 )
 from nequip.utils.fx import nequip_make_fx
 from nequip.utils.dtype import dtype_to_name
-from typing import Dict, Sequence, List, Optional, Any
+from typing import Dict, Sequence, List, Optional, Any, Final
 
 
 def _list_to_dict(
@@ -95,6 +95,9 @@ class ListInputOutputStateDictWrapper(ListInputOutputWrapper):
 
 class CompileGraphModel(GraphModel):
     """Wrapper that uses ``torch.compile`` to optimize the wrapped module while allowing it to be trained."""
+
+    is_compile_graph_model: Final[bool] = True
+    # ^ to identify `GraphModel` types from `nequip-package`d models (see https://pytorch.org/docs/stable/package.html#torch-package-sharp-edges)
 
     def __init__(
         self,
