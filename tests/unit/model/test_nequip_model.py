@@ -1,8 +1,13 @@
-import torch
 import pytest
 from nequip.utils.unittests.model_tests import BaseEnergyModelTests
-from nequip.utils.test import override_irreps_debug
 from nequip.utils.versions import _TORCH_GE_2_4
+
+try:
+    import openequivariance  # noqa: F401
+
+    _OEQ_INSTALLED = True
+except ImportError:
+    _OEQ_INSTALLED = False
 
 BASIC_INFO = {
     "seed": 123,
@@ -88,38 +93,53 @@ class TestNequIPModel(BaseEnergyModelTests):
         config = config.copy()
         return config
 
-    @pytest.mark.skipif(
-        not _TORCH_GE_2_4, reason="OpenEquivariance requires torch >= 2.4"
+    @pytest.fixture(
+        scope="class",
+        params=[None]
+        + (["enable_OpenEquivariance"] if _TORCH_GE_2_4 and _OEQ_INSTALLED else []),
     )
-    @override_irreps_debug(False)
-    def test_oeq(self, model, model_test_data, device):
-        try:
-            import openequivariance  # noqa: F401
-        except ImportError:
-            pytest.skip("OpenEquivariance not installed")
+    def nequip_compile_acceleration_modifiers(self, request):
+        """Test acceleration modifiers in nequip-compile workflows."""
+        if request.param is None:
+            return None
 
-        if device == "cpu":
-            pytest.skip("OEQ tests skipped for CPU")
+        def modifier_handler(mode, device):
+            if request.param == "enable_OpenEquivariance":
+                import openequivariance  # noqa: F401,F811
 
-        instance, config, _ = model
-        # get tolerance based on model_dtype
-        tol = {
-            torch.float32: 5e-5,
-            torch.float64: 1e-12,
-        }[instance.model_dtype]
+                # TODO: test when ready (likely PyTorch 2.8.0)
+                if mode == "aotinductor":
+                    pytest.skip("OEQ AOTI tests skipped for now")
 
-        # Make OEQ model
-        config = {
-            "_target_": "nequip.model.modify",
-            "modifiers": [{"modifier": "enable_OpenEquivariance"}],
-            "model": config.copy(),
-        }
-        oeq_model = self.make_model(config, device=device)
+                if device == "cpu":
+                    pytest.skip("OEQ tests skipped for CPU")
 
-        self.compare_output_and_gradients(
-            modelA=instance,
-            modelB=oeq_model,
-            model_test_data=model_test_data,
-            tol=tol,
-            compare_outputs=True,
-        )
+                return ["enable_OpenEquivariance"]
+            else:
+                raise ValueError(f"Unknown modifier: {request.param}")
+
+        return modifier_handler
+
+    @pytest.fixture(
+        scope="class",
+        params=[None],
+        # TODO: test when ready
+        # + (["enable_OpenEquivariance"] if _TORCH_GE_2_4 and _OEQ_INSTALLED else []),
+    )
+    def train_time_compile_acceleration_modifiers(self, request):
+        """Test acceleration modifiers in train-time compile workflows."""
+        if request.param is None:
+            return None
+
+        def modifier_handler(device):
+            if request.param == "enable_OpenEquivariance":
+                import openequivariance  # noqa: F401,F811
+
+                if device == "cpu":
+                    pytest.skip("OEQ tests skipped for CPU")
+
+                return [{"modifier": "enable_OpenEquivariance"}]
+            else:
+                raise ValueError(f"Unknown modifier: {request.param}")
+
+        return modifier_handler

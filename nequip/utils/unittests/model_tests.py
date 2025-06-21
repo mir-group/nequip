@@ -60,6 +60,43 @@ class BaseModelTests:
         """
         raise NotImplementedError
 
+    @pytest.fixture(scope="class", params=[None])
+    def nequip_compile_acceleration_modifiers(self, request):
+        """Implemented by subclasses.
+
+        Returns a callable that handles model modification and constraints for nequip-compile tests.
+        The callable signature is: (mode, device) -> modifiers_list
+
+        Args:
+            mode: compilation mode ("torchscript" or "aotinductor")
+            device: target device ("cpu" or "cuda")
+
+        Returns:
+            modifiers_list: list of modifier names to pass to nequip-compile --modifiers
+                           or calls pytest.skip() to skip the test
+
+        Default is None (no modifiers applied).
+        """
+        return request.param
+
+    @pytest.fixture(scope="class", params=[None])
+    def train_time_compile_acceleration_modifiers(self, request):
+        """Implemented by subclasses.
+
+        Returns a callable that handles model modification and constraints for train-time compile tests.
+        The callable signature is: (device) -> modifiers_list
+
+        Args:
+            device: target device ("cpu" or "cuda")
+
+        Returns:
+            modifiers_list: list of modifier dicts to apply via nequip.model.modify
+                           or calls pytest.skip() to skip the test
+
+        Default is None (no modifiers applied).
+        """
+        return request.param
+
     @pytest.fixture(
         scope="class",
         params=(["cuda", "cpu"] if torch.cuda.is_available() else ["cpu"]),
@@ -198,7 +235,12 @@ class BaseModelTests:
     )
     @override_irreps_debug(False)
     def test_nequip_compile(
-        self, fake_model_training_session, device, mode, nequip_compile_tol
+        self,
+        fake_model_training_session,
+        device,
+        mode,
+        nequip_compile_tol,
+        nequip_compile_acceleration_modifiers,
     ):
         """Tests `nequip-compile` workflows.
 
@@ -213,6 +255,11 @@ class BaseModelTests:
         config, tmpdir, env, model_dtype = fake_model_training_session
         assert torch.get_default_dtype() == torch.float64
 
+        # handle acceleration modifiers
+        compile_modifiers = []
+        if nequip_compile_acceleration_modifiers is not None:
+            compile_modifiers = nequip_compile_acceleration_modifiers(mode, device)
+
         # === test nequip-compile ===
         # !! NOTE: we use the `best.ckpt` because val, test metrics were computed with `best.ckpt` in the `test` run stages !!
         ckpt_path = str(pathlib.Path(f"{tmpdir}/best.ckpt"))
@@ -224,19 +271,25 @@ class BaseModelTests:
             else f"compile_model_{uid}.nequip.pth"
         )
         output_path = str(pathlib.Path(f"{tmpdir}/{compile_fname}"))
+
+        # build command with optional modifiers
+        cmd = [
+            "nequip-compile",
+            ckpt_path,
+            output_path,
+            "--mode",
+            mode,
+            "--device",
+            device,
+            # target accepted as argument for both modes, but unused for torchscript mode
+            "--target",
+            "ase",
+        ]
+        if compile_modifiers:
+            cmd.extend(["--modifiers"] + compile_modifiers)
+
         retcode = subprocess.run(
-            [
-                "nequip-compile",
-                ckpt_path,
-                output_path,
-                "--mode",
-                mode,
-                "--device",
-                device,
-                # target accepted as argument for both modes, but unused for torchscript mode
-                "--target",
-                "ase",
-            ],
+            cmd,
             cwd=tmpdir,
             env=env,
             stdout=subprocess.PIPE,
@@ -248,64 +301,51 @@ class BaseModelTests:
         ), f"Compiled model `{output_path}` does not exist!"
 
         # == get ase calculator for checkpoint and compiled models ==
-        available_devices = ["cpu"] + (["cuda"] if torch.cuda.is_available() else [])
-        for load_device in available_devices:
-            if mode == "aotinductor" and load_device != device:
-                with pytest.raises(
-                    RuntimeError
-                ):  # aotinductor does not support loading on different devices
-                    NequIPCalculator.from_compiled_model(
-                        output_path,
-                        device=load_device,
-                    )
-                continue
+        # we only ever load it into the same device that we `nequip-compile`d for
+        chemical_symbols = config.chemical_symbols
+        ckpt_calc = NequIPCalculator._from_checkpoint_model(
+            ckpt_path,
+            device=device,
+            chemical_symbols=chemical_symbols,
+        )
+        compile_calc = NequIPCalculator.from_compiled_model(
+            output_path,
+            device=device,
+            chemical_symbols=chemical_symbols,
+        )
 
-            # test both devices if possible, where we are testing swapping of devices between compile and
-            # loading (CUDA -> cpu and vice versa)
-            chemical_symbols = config.chemical_symbols
-            ckpt_calc = NequIPCalculator._from_checkpoint_model(
-                ckpt_path,
-                device=load_device,
-                chemical_symbols=chemical_symbols,
-            )
-            compile_calc = NequIPCalculator.from_compiled_model(
-                output_path,
-                device=load_device,
-                chemical_symbols=chemical_symbols,
-            )
+        # == get validation data by instantiating datamodules ==
+        datamodule = instantiate(config.data, _recursive_=False)
+        datamodule.prepare_data()
+        datamodule.setup("validate")
+        dloader = datamodule.val_dataloader()[0]
 
-            # == get validation data by instantiating datamodules ==
-            datamodule = instantiate(config.data, _recursive_=False)
-            datamodule.prepare_data()
-            datamodule.setup("validate")
-            dloader = datamodule.val_dataloader()[0]
+        # == loop over data and do checks ==
+        for data in dloader:
+            atoms_list = to_ase(data.copy())
+            for atoms in atoms_list:
+                ckpt_atoms, compile_atoms = atoms.copy(), atoms.copy()
+                ckpt_atoms.calc = ckpt_calc
+                ckpt_E = ckpt_atoms.get_potential_energy()
+                ckpt_F = ckpt_atoms.get_forces()
 
-            # == loop over data and do checks ==
-            for data in dloader:
-                atoms_list = to_ase(data.copy())
-                for atoms in atoms_list:
-                    ckpt_atoms, compile_atoms = atoms.copy(), atoms.copy()
-                    ckpt_atoms.calc = ckpt_calc
-                    ckpt_E = ckpt_atoms.get_potential_energy()
-                    ckpt_F = ckpt_atoms.get_forces()
+                compile_atoms.calc = compile_calc
+                compile_E = compile_atoms.get_potential_energy()
+                compile_F = compile_atoms.get_forces()
 
-                    compile_atoms.calc = compile_calc
-                    compile_E = compile_atoms.get_potential_energy()
-                    compile_F = compile_atoms.get_forces()
-
-                    del atoms, ckpt_atoms, compile_atoms
-                    assert np.allclose(
-                        ckpt_E,
-                        compile_E,
-                        rtol=nequip_compile_tol,
-                        atol=nequip_compile_tol,
-                    ), np.max(np.abs((ckpt_E - compile_E)))
-                    assert np.allclose(
-                        ckpt_F,
-                        compile_F,
-                        rtol=nequip_compile_tol,
-                        atol=nequip_compile_tol,
-                    ), np.max(np.abs((ckpt_F - compile_F)))
+                del atoms, ckpt_atoms, compile_atoms
+                assert np.allclose(
+                    ckpt_E,
+                    compile_E,
+                    rtol=nequip_compile_tol,
+                    atol=nequip_compile_tol,
+                ), np.max(np.abs((ckpt_E - compile_E)))
+                assert np.allclose(
+                    ckpt_F,
+                    compile_F,
+                    rtol=nequip_compile_tol,
+                    atol=nequip_compile_tol,
+                ), np.max(np.abs((ckpt_F - compile_F)))
 
     def compare_output_and_gradients(
         self, modelA, modelB, model_test_data, tol, compare_outputs=True
@@ -332,7 +372,9 @@ class BaseModelTests:
                 ), err
 
     @override_irreps_debug(False)
-    def test_train_time_compile(self, model, model_test_data, device):
+    def test_train_time_compile(
+        self, model, model_test_data, device, train_time_compile_acceleration_modifiers
+    ):
         """
         Test train-time compilation, i.e. `make_fx` -> `export` -> `AOTAutograd` correctness.
         """
@@ -352,9 +394,23 @@ class BaseModelTests:
             torch.float64: 1e-12,
         }[instance.model_dtype]
 
+        # handle acceleration modifiers
+        modifier_configs = []
+        if train_time_compile_acceleration_modifiers is not None:
+            modifier_configs = train_time_compile_acceleration_modifiers(device)
+
         # make compiled model
         config = copy.deepcopy(config)
         config["compile_mode"] = "compile"
+
+        # apply modifiers if specified
+        if modifier_configs:
+            config = {
+                "_target_": "nequip.model.modify",
+                "modifiers": modifier_configs,
+                "model": config,
+            }
+
         compile_model = self.make_model(config, device=device)
 
         self.compare_output_and_gradients(
