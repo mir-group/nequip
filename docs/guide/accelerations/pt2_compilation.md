@@ -18,6 +18,8 @@ model:
 Note that `compile_mode` can only be `compile` (use [`torch.compile`](https://pytorch.org/docs/stable/generated/torch.compile.html)), or `eager` (no compilation used). If `compile_mode` is unspecified, it defaults to `eager`.
 It will take a bit of time (around a minute or more) for the model to be compiled with [`torch.compile`](https://pytorch.org/docs/stable/generated/torch.compile.html) before training proceeds, but the speed-ups are worth it.
 
+To use [`torch.compile`](https://pytorch.org/docs/stable/generated/torch.compile.html) with PyTorch>=2.8.0 installed, ensure that you are using NequIP>=0.11.1.
+
 ```{warning}
 Train-time compilation will not work if any of the batch dimensions are all never >=2 over all batches. Batch dimensions include the number of frames, atoms, and edges. It is unlikely for this to happen for the "atom" or "edge" batch dimension, but a practical scenario where it could happen for the "frame" batch dimension is when one trains with both `train` and `val` `batch_size: 1` (perhaps for a dataset where each frame contains many atoms).
 ```

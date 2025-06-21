@@ -14,6 +14,9 @@ Most recent change on the top.
 ### Fixed
 - Fixed per-edge-type cutoff metadata parsing when loading compiled models
 
+### Changed
+- Change to make train-time compile works with PyTorch 2.8.0 -- train-time compile won't work with PyTorch 2.8.0 and NequIP versions before v0.11.1
+
 ## [0.11.0]
 
 ### Added

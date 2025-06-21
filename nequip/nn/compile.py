@@ -2,7 +2,6 @@
 import torch
 
 from nequip.data import AtomicDataDict
-from nequip.data._key_registry import get_dynamic_shapes
 from .graph_model import GraphModel
 from ._graph_mixin import GraphModuleMixin
 from nequip.utils.dtype import (
@@ -156,22 +155,6 @@ class CompileGraphModel(GraphModel):
                 fields=self.input_fields,
                 extra_inputs=weights + buffers,
             )
-
-            # == export with dynamic shape specification ==
-            # TODO: (maybe) include range for dynamic dims
-            batch_map = {
-                "graph": torch.export.dynamic_shapes.Dim("graph"),
-                "node": torch.export.dynamic_shapes.Dim("node"),
-                "edge": torch.export.dynamic_shapes.Dim("edge"),
-            }
-            dynamic_shapes = get_dynamic_shapes(
-                self.input_fields + self.weight_names + self.buffer_names, batch_map
-            )
-            exported = torch.export.export(
-                fx_model,
-                (*([data[k] for k in self.input_fields] + weights + buffers),),
-                dynamic_shapes=dynamic_shapes,
-            )
             del weights, buffers
 
             # == compile exported program ==
@@ -179,7 +162,7 @@ class CompileGraphModel(GraphModel):
             # TODO: compile options
             self._compiled_model = (
                 torch.compile(
-                    exported.module(),
+                    fx_model,
                     dynamic=True,
                     fullgraph=True,
                 ),
