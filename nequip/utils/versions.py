@@ -22,6 +22,9 @@ _TORCH_GE_2_4 = packaging.version.parse(
 _TORCH_GE_2_6 = packaging.version.parse(
     _TORCH_VERSION.base_version
 ) >= packaging.version.parse("2.6")
+_TORCH_GE_2_8 = packaging.version.parse(
+    _TORCH_VERSION.base_version
+) >= packaging.version.parse("2.8")
 
 
 def check_pt2_compile_compatibility():
