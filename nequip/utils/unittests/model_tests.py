@@ -186,8 +186,10 @@ class BaseModelTests:
             else:
                 config[key] = value
 
-    @pytest.fixture(scope="class")
-    def fake_model_training_session(self, conffile, config, model_dtype):
+    # this means we also check if we can `nequip-package` a specific model
+    # this could reveal e.g. missing externs, etc
+    @pytest.fixture(scope="class", params=[None, "package"])
+    def fake_model_training_session(self, conffile, config, model_dtype, request):
         """Create a fake training session using integration test configs with injected model."""
         # make a deep copy and enforce integration config parameters
         model_config = copy.deepcopy(config)
@@ -216,7 +218,12 @@ class BaseModelTests:
 
         self._update_config_recursively(model_config, updates)
 
-        session = _training_session(conffile, model_dtype, model_config=model_config)
+        session = _training_session(
+            conffile,
+            model_dtype,
+            extra_train_from_save=request.param,
+            model_config=model_config,
+        )
         training_config, tmpdir, env = next(session)
         yield training_config, tmpdir, env, model_dtype
         del session
