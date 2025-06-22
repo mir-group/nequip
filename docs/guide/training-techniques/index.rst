@@ -1,10 +1,11 @@
 Training Techniques
 ===================
 
-Advanced training methods to improve model performance and automate hyperparameter search.
+Advanced training methods and techniques.
 
 .. toctree::
    :maxdepth: 1
 
+   fine_tuning
    multitask_training
    wandb_example
