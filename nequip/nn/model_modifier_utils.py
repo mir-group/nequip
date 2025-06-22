@@ -8,10 +8,10 @@ _MODEL_MODIFIER_ATTR_NAME: Final[str] = "_nequip_model_modifier_is_persistent"
 
 def model_modifier(persistent: bool):
     """
-    Mark a @classmethod of an ``nn.Module`` as a "model modifier" that can be applied by the user to modify a packaged or other loaded model on the fly.  Model modifiers must be @classmethods of one of the ``nn.Module``s in the model.
+    Mark a ``@classmethod`` of an ``nn.Module`` as a "model modifier" that can be applied by the user to modify a packaged or other loaded model on-the-fly. Model modifiers must be a ``@classmethod`` of one of the ``nn.Module`` objects in the model.
 
     Args:
-        persistent (bool):  whether the modifier should be applied when building the model for packaging.
+        persistent (bool): Whether the modifier should be applied when building the model for packaging.
     """
 
     def decorator(func):
