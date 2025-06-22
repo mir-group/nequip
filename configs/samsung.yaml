@@ -8,7 +8,7 @@ cutoff_radius: 5.0
 num_layers: 4
 l_max: 1
 num_features: 32
-chemical_symbols: [Hf, O]
+chemical_symbols: [Si, N]
 model_type_names: ${chemical_symbols}
 monitored_metric: val0_epoch/weighted_sum
 
@@ -16,10 +16,11 @@ monitored_metric: val0_epoch/weighted_sum
 #    DATA
 # ===================
 data:
-  _target_: nequip.data.datamodule.SamsungDataModule
+  _target_: nequip.data.datamodule.SAM23DataModule
   seed: 456
   data_source_dir: ./samsung_datasets
-  dataset_type: HfO
+  data_system: SiN
+  include_ood: True
   exclude_keys: [stress]
 
   transforms:
