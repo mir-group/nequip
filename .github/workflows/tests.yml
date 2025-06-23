@@ -57,7 +57,7 @@ jobs:
         if python3 -c "import torch; import packaging.version; exit(0 if packaging.version.parse(torch.__version__).base_version >= '2.4' else 1)"; then
           if python3 -c "import torch; exit(0 if torch.cuda.is_available() else 1)"; then
             echo "Installing OpenEquivariance (torch >= 2.4 and CUDA available)"
-            pip install git+https://github.com/PASSIONLab/OpenEquivariance
+            pip install openequivariance
           else
             echo "Skipping OpenEquivariance installation (CUDA not available)"
           fi
