@@ -117,6 +117,10 @@ train_dataloader:
 Training batch size affects learning dynamics and is an important hyperparameter to tune. However, validation and test batch sizes have no effect on training and should generally be set as large as possible without causing out-of-memory errors to speed up evaluation.
 ```
 
+```{tip}
+When using multiple `num_workers`, consider setting `OMP_NUM_THREADS` depending on the CPU cores available if training on GPUs (if training on CPUs, `OMP_NUM_THREADS` will affect model speed). When setting `num_workers` close to the number of available CPU cores, setting `OMP_NUM_THREADS=1` has been found to be helpful for faster dataloading.
+```
+
 ## Dataset Statistics
 
 Dataset statistics provide both rough knowledge of your dataset (e.g., average energy per atom, force magnitudes) and are crucial for initializing data-derived model hyperparameters.
