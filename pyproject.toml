@@ -7,7 +7,7 @@ name = "nequip"
 dynamic = ["version"]
 description = "NequIP is an open-source code for building E(3)-equivariant interatomic potentials."
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 license = {file = "LICENSE"}
 authors = [
     {name = "The NequIP Developers", email = "allegro-nequip@g.harvard.edu"},
