@@ -8,14 +8,19 @@ Most recent change on the top.
 
 ## Unreleased
 
+## Unreleased
 
 ## [0.11.1]
+
+### Added
+- `SAM23DataModule`: Specialized data module for Samsung's NeurIPS 2023 dataset (HfO and SiN systems), with automatic download, extraction, and optional OOD test set support.
 
 ### Fixed
 - Fixed per-edge-type cutoff metadata parsing when loading compiled models
 
 ### Changed
-- Change to make train-time compile works with PyTorch 2.8.0 -- train-time compile won't work with PyTorch 2.8.0 and NequIP versions before v0.11.1
+- Change to make train-time compile work with PyTorch 2.8.0 -- train-time compile won't work with PyTorch 2.8.0 and NequIP versions before v0.11.1
+
 
 ## [0.11.0]
 
