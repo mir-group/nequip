@@ -40,6 +40,8 @@ _DEFAULT_EXTERNAL_MODULES: Final[Set[str]] = {
     "numpy",
     # for NequIP GNN OpenEquivariance OpenEquivarianceTensorProductScatter
     "openequivariance",
+    # for version parsing in torch_versions.py
+    "packaging",
 }
 _EXTERNAL_MODULES: Set[str] = set(_DEFAULT_EXTERNAL_MODULES)
 _DEFAULT_MOCK_MODULES = {
