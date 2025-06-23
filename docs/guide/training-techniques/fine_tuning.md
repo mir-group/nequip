@@ -12,7 +12,8 @@ You only need to specify the `shifts` and/or `scales` for atom types in the fine
 Model modification only works when the atom types in the new dataset are a subset of the original dataset used to train the model. You cannot add new atom types this way.
 ```
 
-It is recommended to set `shifts` to the isolated atom energies of your fine-tuning dataset's DFT settings, and initialize `scales` from dataset statistics of the fine-tuning dataset.
+It is recommended to set `shifts` to the isolated atom energies of your fine-tuning dataset's DFT settings.
+One can use the original scales (i.e. don't set `scales` when applying the `modify_PerTypeScaleShift` modifier) or initialize `scales` from dataset statistics of the fine-tuning dataset.
 
 ```yaml
 model:
@@ -25,8 +26,10 @@ model:
         C: -153.123
         H: -13.456
         O: -432.789
-      # from dataset statistics
-      scales: ${training_data_stats:per_type_forces_rms}  
+      # scales from dataset statistics
+      scales: ${training_data_stats:per_type_forces_rms}
+      # or use the scales from the original model
+      # scales: null
       shifts_trainable: false
       scales_trainable: false
   model:
