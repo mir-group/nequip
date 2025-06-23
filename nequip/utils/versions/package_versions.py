@@ -3,35 +3,13 @@ import torch
 import e3nn
 import nequip
 
-from ..__init__ import _DISCOVERED_NEQUIP_EXTENSION
-from .logger import RankedLogger
+from ...__init__ import _DISCOVERED_NEQUIP_EXTENSION
+from ...utils.logger import RankedLogger
 import importlib
-import packaging.version
 
 from .version_utils import get_version_safe
 
 logger = RankedLogger(__name__, rank_zero_only=True)
-
-
-_TORCH_VERSION = packaging.version.parse(get_version_safe(torch.__name__))
-_TORCH_GE_2_4 = packaging.version.parse(
-    _TORCH_VERSION.base_version
-) >= packaging.version.parse(
-    "2.4"
-)  # open equivariance's lowest version
-_TORCH_GE_2_6 = packaging.version.parse(
-    _TORCH_VERSION.base_version
-) >= packaging.version.parse("2.6")
-_TORCH_GE_2_8 = packaging.version.parse(
-    _TORCH_VERSION.base_version
-) >= packaging.version.parse("2.8")
-
-
-def check_pt2_compile_compatibility():
-    assert _TORCH_GE_2_6, (
-        f"PyTorch >= 2.6 required for PT2 compilation functionality, "
-        f"but {_TORCH_VERSION} found."
-    )
 
 
 # get versions of torch, e3nn, nequip and all extension packages

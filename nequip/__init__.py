@@ -7,7 +7,7 @@ import warnings
 import torch
 
 from .utils.resolvers import _register_default_resolvers
-from .utils.version_utils import get_version_safe
+from .utils.versions.version_utils import get_version_safe
 
 # Python version check
 python_version = packaging.version.parse(

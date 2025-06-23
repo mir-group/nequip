@@ -22,7 +22,7 @@ from nequip.nn.model_modifier_utils import is_persistent_model_modifier
 from nequip.model.modify_utils import get_all_modifiers, only_apply_persistent_modifiers
 from nequip.utils.logger import RankedLogger
 from nequip.utils.versions import get_current_code_versions, _TORCH_GE_2_6
-from nequip.utils.version_utils import get_version_safe
+from nequip.utils.versions.version_utils import get_version_safe
 from nequip.utils.global_state import set_global_state
 
 from ._workflow_utils import set_workflow_state
