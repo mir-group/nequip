@@ -118,7 +118,7 @@ data:
 # `trainer` is a `Lightning.Trainer` object (https://lightning.ai/docs/pytorch/stable/common/trainer.html#trainer-class-api)
 trainer:
   _target_: lightning.Trainer
-  accelerator: cpu
+  accelerator: gpu
   enable_checkpointing: true
   max_epochs: 1000
   max_time: 03:00:00:00
