@@ -15,6 +15,7 @@ class OpenEquivarianceTensorProductScatter(TensorProductScatter):
         irreps_edge_attr,
         irreps_mid,
         instructions,
+        use_opaque: bool,
     ) -> None:
         super().__init__(
             feature_irreps_in=feature_irreps_in,
@@ -38,7 +39,9 @@ class OpenEquivarianceTensorProductScatter(TensorProductScatter):
             shared_weights=False,
             internal_weights=False,
         )
-        self.tp_conv = TensorProductConv(tpp, torch_op=True, deterministic=False)
+        self.tp_conv = TensorProductConv(
+            tpp, torch_op=True, deterministic=False, use_opaque=use_opaque
+        )
 
     def forward(self, x, edge_attr, edge_weight, edge_dst, edge_src):
         return self.tp_conv(x, edge_attr, edge_weight, edge_dst, edge_src)

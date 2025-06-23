@@ -122,9 +122,8 @@ class TestNequIPModel(BaseEnergyModelTests):
 
     @pytest.fixture(
         scope="class",
-        params=[None],
-        # TODO: test when ready
-        # + (["enable_OpenEquivariance"] if _TORCH_GE_2_4 and _OEQ_INSTALLED else []),
+        params=[None]
+        + (["enable_OpenEquivariance"] if _TORCH_GE_2_4 and _OEQ_INSTALLED else []),
     )
     def train_time_compile_acceleration_modifiers(self, request):
         """Test acceleration modifiers in train-time compile workflows."""
