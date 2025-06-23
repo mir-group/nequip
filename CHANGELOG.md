@@ -9,6 +9,15 @@ Most recent change on the top.
 ## Unreleased
 
 
+## [0.12.0]
+
+### Fixed
+- Train-time compile compatibility of OpenEquivariance accelerated NequIP models
+
+### Removed
+- [Breaking] Python 3.9 support has been removed
+
+
 ## [0.11.1]
 
 ### Fixed
