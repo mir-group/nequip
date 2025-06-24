@@ -1,3 +1,4 @@
+# yamllint disable rule:line-length
 # The config file is divided into 5 sections -- `run`, `data`, `trainer`, `training_module`, and `global_options`
 # The config system relies on omegaconf (https://omegaconf.readthedocs.io/en/2.3_branch/index.html)
 # and hydra (https://hydra.cc/docs/intro/) functionalities, such as
@@ -43,7 +44,7 @@ num_features: 32    # the multiplicity of the features, 32 is a good default for
 # Because of this distinction, these variables show up as arguments across different categories, including, data, model, metrics and even callbacks.
 # In this case, we fix both to be the same, so we define a single set of each here and use variable interpolation to retrieve them below.
 # This ensures a single location where the values are set to reduce the chances of misconfiguring runs.
-chemical_symbols: [C, H, O, Cu] 
+chemical_symbols: [C, H, O, Cu]
 model_type_names: ${chemical_symbols}
 
 # We want a metric to condition training on (e.g. for best `ModelCheckpoint`, `EarlyStopping`, LR scheduling) which will show up in various places later on, so we set up a "single source of truth" to interpolate over
@@ -59,7 +60,7 @@ monitored_metric: val0_epoch/weighted_sum
 data:
   _target_: nequip.data.datamodule.ASEDataModule
   seed: 456             # dataset seed for reproducibility
-  
+
   # here we take an ASE-readable file (in extxyz format) and split it into train:val:test = 80:10:10
   split_dataset:
     file_path: fcu.xyz
@@ -70,13 +71,13 @@ data:
   # `transforms` convert data from the Dataset to a form that can be used by the ML model
   # the transforms are only performed right before data is given to the model
   # data is kept in its untransformed form
-  
+
   transforms:
     # the models only know atom types, which can be different from the chemical species (e.g. C, H)
     # for instance we can have data with different charge states of carbon, which means they are
     # all labeled by chemical species `C`, but may have different atom type labels based on the charge states
     # in this case, the atom types are the same as the chemical species, but we still have to include this
-    # transformation to ensure that the data has 0-indexed atom type lists used in the various model operations 
+    # transformation to ensure that the data has 0-indexed atom type lists used in the various model operations
     - _target_: nequip.data.transforms.ChemicalSpeciesToAtomTypeMapper
       chemical_symbols: ${chemical_symbols}
     # data doesn't usually come with a neighborlist -- this tranforms prepares the neighborlist
@@ -240,7 +241,7 @@ training_module:
     # == radial network ==
     radial_mlp_depth: 2            # number of radial layers, usually 1-3 works best, smaller is faster
     radial_mlp_width: 64           # number of hidden neurons in radial function, smaller is faster
-    #^ we could have programatically set `radial_mlp_width` to be twice `num_features` using NequIP's built in `int_mul` resolver, e.g.
+    # ^ we could have programatically set `radial_mlp_width` to be twice `num_features` using NequIP's built in `int_mul` resolver, e.g.
     # radial_mlp_width: ${int_mul:${num_features},2}
     # the NequIP framework implements `int_mul` and `int_div`
 
@@ -249,16 +250,16 @@ training_module:
     # dataset statistics used to inform the model's initial parameters for normalization, shifting and rescaling
     # we use omegaconf's resolvers (https://omegaconf.readthedocs.io/en/2.3_branch/usage.html#resolvers)
     # to facilitate getting the dataset statistics from the `DataStatisticsManager`
-    
+
     # average number of neighbors for edge sum normalization
     avg_num_neighbors: ${training_data_stats:num_neighbors_mean}
-    
+
     # == per-type per-atom scales and shifts ==
     per_type_energy_scales: ${training_data_stats:per_type_forces_rms}
     per_type_energy_shifts: ${training_data_stats:per_atom_energy_mean}
     # ^ this should typically be the isolated atom energies for your dataset
     #   provided as a dict, e.g.
-    # per_type_energy_shifts: 
+    # per_type_energy_shifts:
     #   C: 1.234
     #   H: 2.345
     #   O: 3.456
@@ -275,7 +276,7 @@ training_module:
 
 
 # ====================
-#    GLOBAL OPTIONS   
+#    GLOBAL OPTIONS
 # ====================
 global_options:
   # whether to use TensorFloat32, which will be faster on GPUs with tensor cores at the cost of precision loss

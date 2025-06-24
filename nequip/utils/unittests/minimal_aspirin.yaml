@@ -68,7 +68,7 @@ training_module:
     coeffs:
       total_energy: 1.0
       forces: 1.0
-  val_metrics: 
+  val_metrics:
     _target_: nequip.train.EnergyForceMetrics
     coeffs:
       total_energy_mae: 1.0

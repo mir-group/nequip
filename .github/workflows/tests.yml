@@ -16,8 +16,8 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# yamllint disable rule:line-length
 jobs:
-
   run-tests:
     runs-on: ${{ github.event.repository.private && 'self-hosted' || 'ubuntu-latest' }}
     strategy:
@@ -27,46 +27,48 @@ jobs:
       image: nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
       options: ${{ github.event.repository.private && '--gpus all' || ' ' }}
     steps:
-    - uses: actions/checkout@v4
-    - name: Install Python
-      run: |
-        apt update && apt install -y python3 python3-pip git
-        python3 -m pip install --upgrade pip
-    - name: Linting
-      run: |
-        pip install flake8==7.1.0 Flake8-pyproject black
-        flake8 . --count --show-source --statistics
-        black . --check
-    - name: Install PyTorch
-      env:
-        TORCH: "${{ matrix.torch-version }}"
-      run: |
-        # use CPU only on GH runner
-        if [ "${{ github.event.repository.private }}" = "true" ]; then
-            pip install torch==${TORCH} --upgrade
-        else
-            pip install torch==${TORCH} --index-url https://download.pytorch.org/whl/cpu --upgrade
-        fi
-    - name: Install test dependencies
-      env:
-        TORCH: "${{ matrix.torch-version }}"
-      run: |
-        # install packages that aren't required dependencies but that the tests do need
-        pip install h5py vesin
-        # install OpenEquivariance only if torch >= 2.4 and CUDA is available
-        if python3 -c "import torch; import packaging.version; exit(0 if packaging.version.parse(torch.__version__).base_version >= '2.4' else 1)"; then
-          if python3 -c "import torch; exit(0 if torch.cuda.is_available() else 1)"; then
-            echo "Installing OpenEquivariance (torch >= 2.4 and CUDA available)"
-            pip install openequivariance
+      - uses: actions/checkout@v4
+      - name: Install Python
+        run: |
+          apt update && apt install -y python3 python3-pip git
+          python3 -m pip install --upgrade pip
+      - name: Linting
+        run: |
+          pip install flake8==7.1.0 Flake8-pyproject black yamllint
+          flake8 . --count --show-source --statistics
+          black . --check
+          yamllint .
+      - name: Install PyTorch
+        env:
+          TORCH: "${{ matrix.torch-version }}"
+        run: |
+          # use CPU only on GH runner
+          if [ "${{ github.event.repository.private }}" = "true" ]; then
+              pip install torch==${TORCH} --upgrade
           else
-            echo "Skipping OpenEquivariance installation (CUDA not available)"
+              pip install torch==${TORCH} --index-url https://download.pytorch.org/whl/cpu --upgrade
           fi
-        else
-          echo "Skipping OpenEquivariance installation (torch < 2.4)"
-        fi
-        pip install --upgrade-strategy only-if-needed .
-        pip install pytest pytest-xdist[psutil]
-    - name: Test with pytest
-      run: |
-        # See https://github.com/pytest-dev/pytest/issues/1075
-        PYTHONHASHSEED=0 pytest -xv -n auto tests/
+      - name: Install test dependencies
+        env:
+          TORCH: "${{ matrix.torch-version }}"
+        run: |
+          # install packages that aren't required dependencies but that the tests do need
+          pip install h5py vesin
+          # install OpenEquivariance only if torch >= 2.4 and CUDA is available
+          if python3 -c "import torch; import packaging.version; exit(0 if packaging.version.parse(torch.__version__).base_version >= '2.4' else 1)"; then
+            if python3 -c "import torch; exit(0 if torch.cuda.is_available() else 1)"; then
+              echo "Installing OpenEquivariance (torch >= 2.4 and CUDA available)"
+              pip install openequivariance
+            else
+              echo "Skipping OpenEquivariance installation (CUDA not available)"
+            fi
+          else
+            echo "Skipping OpenEquivariance installation (torch < 2.4)"
+          fi
+          pip install --upgrade-strategy only-if-needed .
+          pip install pytest pytest-xdist[psutil]
+      - name: Test with pytest
+        run: |
+          # See https://github.com/pytest-dev/pytest/issues/1075
+          PYTHONHASHSEED=0 pytest -xv -n auto tests/
+# yamllint enable

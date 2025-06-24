@@ -16,16 +16,16 @@ command:
 
 parameters:
 
-  cutoff_radius: 
+  cutoff_radius:
     min: 4
     max: 8
     distribution: int_uniform
-  
+
   num_layers:
     values: [2, 3]
 
   l_max:
     values: [2, 3]
 
-  num_features: 
+  num_features:
     values: [32, 64, 128, 256]
