@@ -6,7 +6,7 @@ from ._ase_datamodule import ASEDataModule
 from .tm23_datamodule import TM23DataModule
 from .rmd17_datamodule import rMD17DataModule
 from .md22_datamodule import MD22DataModule
-from .sam23_datamodule import SAM23DataModule
+from .samd23_datamodule import SAMD23DataModule
 
 __all__ = [
     NequIPDataModule,
@@ -16,5 +16,5 @@ __all__ = [
     NequIP3BPADataModule,
     TM23DataModule,
     ASEDataModule,
-    SAM23DataModule,
+    SAMD23DataModule,
 ]
