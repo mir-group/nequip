@@ -3,7 +3,7 @@ from nequip.utils.file_utils import extract_tar
 from nequip.utils.logger import RankedLogger
 
 import os
-from typing import Union, List, Callable
+from typing import List, Callable
 
 logger = RankedLogger(__name__, rank_zero_only=True)
 
