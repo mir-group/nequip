@@ -10,6 +10,7 @@ Most recent change on the top.
 
 ### Added
 - `LinearLossCoefficientScheduler` callback
+- `TF32Scheduler` callback
 
 
 ## [0.12.1]
