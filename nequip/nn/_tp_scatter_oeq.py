@@ -44,4 +44,7 @@ class OpenEquivarianceTensorProductScatter(TensorProductScatter):
         )
 
     def forward(self, x, edge_attr, edge_weight, edge_dst, edge_src):
-        return self.tp_conv(x, edge_attr, edge_weight, edge_dst, edge_src)
+        # NB: Opaque forward call disables C++ export at the moment
+        return self.tp_conv.forward_opaque(
+            x, edge_attr, edge_weight, edge_dst, edge_src
+        )
