@@ -53,6 +53,14 @@ class BaseModelTests:
         raise NotImplementedError
 
     @pytest.fixture(scope="class")
+    def equivariance_tol(self, model_dtype):
+        """May be overriden by subclasses.
+
+        Returns tolerance based on ``model_dtype``.
+        """
+        return {"float32": 1e-3, "float64": 1e-8}[model_dtype]
+
+    @pytest.fixture(scope="class")
     def nequip_compile_tol(self, model_dtype):
         """Implemented by subclasses.
 
@@ -546,16 +554,14 @@ class BaseModelTests:
                     f"Found unregistered `out_field` = {out_field}"
                 )
 
-    def test_equivariance(self, model, model_test_data, device):
+    def test_equivariance(self, model, model_test_data, device, equivariance_tol):
         instance, _, _ = model
         instance = instance.to(device=device)
 
         assert_AtomicData_equivariant(
             func=instance,
             data_in=model_test_data,
-            e3_tolerance={torch.float32: 1e-3, torch.float64: 1e-8}[
-                instance.model_dtype
-            ],
+            e3_tolerance=equivariance_tol,
         )
 
     def test_embedding_cutoff(self, model, device):
