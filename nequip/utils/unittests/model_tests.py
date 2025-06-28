@@ -73,11 +73,12 @@ class BaseModelTests:
         """Implemented by subclasses.
 
         Returns a callable that handles model modification and constraints for nequip-compile tests.
-        The callable signature is: (mode, device) -> modifiers_list
+        The callable signature is: (mode, device, model_dtype) -> modifiers_list
 
         Args:
             mode: compilation mode ("torchscript" or "aotinductor")
             device: target device ("cpu" or "cuda")
+            model_dtype: "float32" or "float64"
 
         Returns:
             modifiers_list: list of modifier names to pass to nequip-compile --modifiers
@@ -273,7 +274,9 @@ class BaseModelTests:
         # handle acceleration modifiers
         compile_modifiers = []
         if nequip_compile_acceleration_modifiers is not None:
-            compile_modifiers = nequip_compile_acceleration_modifiers(mode, device)
+            compile_modifiers = nequip_compile_acceleration_modifiers(
+                mode, device, model_dtype
+            )
 
         # === test nequip-compile ===
         # !! NOTE: we use the `best.ckpt` because val, test metrics were computed with `best.ckpt` in the `test` run stages !!

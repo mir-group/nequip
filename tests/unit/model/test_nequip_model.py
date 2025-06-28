@@ -103,7 +103,7 @@ class TestNequIPModel(BaseEnergyModelTests):
         if request.param is None:
             return None
 
-        def modifier_handler(mode, device):
+        def modifier_handler(mode, device, model_dtype):
             if request.param == "enable_OpenEquivariance":
                 import openequivariance  # noqa: F401,F811
 
