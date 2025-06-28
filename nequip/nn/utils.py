@@ -48,7 +48,7 @@ def scatter(
             ),
             device=src.device,
         )
-        return out.scatter_add_(dim, index, src)
+        return out.scatter_add_(dim, index, src.to(out.dtype))
     else:
         return out.scatter_add_(dim, index, src)
 
