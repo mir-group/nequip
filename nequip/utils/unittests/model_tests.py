@@ -366,13 +366,21 @@ class BaseModelTests:
                 ), np.max(np.abs((ckpt_F - compile_F)))
 
     def compare_output_and_gradients(
-        self, modelA, modelB, model_test_data, tol, compare_outputs=True
+        self, modelA, modelB, model_test_data, tol, compare_outputs=None
     ):
+        # default fields
+        if compare_outputs is None:
+            compare_outputs = [
+                AtomicDataDict.PER_ATOM_ENERGY_KEY,
+                AtomicDataDict.TOTAL_ENERGY_KEY,
+                AtomicDataDict.FORCE_KEY,
+                AtomicDataDict.VIRIAL_KEY,
+            ]
+
         A_out = modelA(model_test_data.copy())
         B_out = modelB(model_test_data.copy())
-
-        if compare_outputs:
-            for key in ["atomic_energy", "total_energy", "forces", "virial"]:
+        for key in compare_outputs:
+            if key in A_out and key in B_out:
                 assert torch.allclose(A_out[key], B_out[key], atol=tol)
 
         # test backwards pass if there are trainable weights
@@ -436,7 +444,6 @@ class BaseModelTests:
             modelB=compile_model,
             model_test_data=model_test_data,
             tol=tol,
-            compare_outputs=False,  # Internal checks guarantee that outputs are the same
         )
 
     def test_wrapped_unwrapped(self, model, device, Cu_bulk):
