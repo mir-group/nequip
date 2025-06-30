@@ -1,4 +1,3 @@
-import torch
 from ._tp_scatter_base import TensorProductScatter
 from openequivariance import (
     TensorProductConv,
@@ -26,16 +25,14 @@ class OpenEquivarianceTensorProductScatter(TensorProductScatter):
         # ^ we ensure that the base class keeps around a `self.tp` that carries its own set of persistent buffers
         # even though `self.tp` is not used, having its (persistent) buffers always around ensures state dict compatibility when adding on or removing this subclass module
 
-        default_dtype = torch.get_default_dtype()
-
         # OEQ
         tpp = TPProblem(
             feature_irreps_in,
             irreps_edge_attr,
             irreps_mid,
             instructions,
-            irrep_dtype=torch_to_oeq_dtype(default_dtype),
-            weight_dtype=torch_to_oeq_dtype(default_dtype),
+            irrep_dtype=torch_to_oeq_dtype(self.model_dtype),
+            weight_dtype=torch_to_oeq_dtype(self.model_dtype),
             shared_weights=False,
             internal_weights=False,
         )
@@ -44,4 +41,11 @@ class OpenEquivarianceTensorProductScatter(TensorProductScatter):
         )
 
     def forward(self, x, edge_attr, edge_weight, edge_dst, edge_src):
-        return self.tp_conv(x, edge_attr, edge_weight, edge_dst, edge_src)
+        # explicit cast to account for AMP
+        return self.tp_conv(
+            x.to(self.model_dtype),
+            edge_attr.to(self.model_dtype),
+            edge_weight.to(self.model_dtype),
+            edge_dst,
+            edge_src,
+        )
