@@ -42,7 +42,7 @@ training_module:
 
 The {func}`~nequip.model.modify` function wraps your base model and applies the specified modifiers. The `enable_OpenEquivariance` modifier serves as a drop-in replacement for standard tensor product operations, utilizing JIT kernel generation for optimal performance.
 
-OpenEquivariance composes with [`torch.compile`](https://pytorch.org/docs/stable/generated/torch.compile.html), and can be used in conjunction with [train-time compilation](pt2_compilation.md), provided the NequIP version is at least v0.11.2 and OpenEquivariance installation is at least v0.3.0.
+OpenEquivariance composes with [`torch.compile`](https://pytorch.org/docs/stable/generated/torch.compile.html), and can be used in conjunction with [train-time compilation](pt2_compilation.md), provided the NequIP version is at least v0.12.0 and OpenEquivariance installation is at least v0.3.0.
 
 ## Inference with OpenEquivariance
 
