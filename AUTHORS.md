@@ -15,6 +15,7 @@ Present and past contributors include, in alphabetical order by last name:
  - Albert Musaelian
  - Gabriel de Miranda Nascimento
  - Aadit Saluja
+ - Viraj Uday Singh
  - [Prof. Tess Smidt](https://blondegeek.github.io/)
  - Lixin Sun
  - [Myles Stapelberg](https://github.com/mstapelberg)
