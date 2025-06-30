@@ -24,3 +24,6 @@ For usage examples and configuration guidance, see the :doc:`../guide/configurat
 
 .. autoclass:: nequip.data.datamodule.TM23DataModule
      :members:
+
+.. autoclass:: nequip.data.datamodule.SAMD23DataModule
+     :members:

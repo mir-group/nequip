@@ -11,6 +11,9 @@ Most recent change on the top.
 
 ## [0.12.0]
 
+### Added
+- `SAM23DataModule`: Specialized datamodule for Samsung's SAMD23 dataset (HfO and SiN systems), with automatic download, extraction, and optional OOD test set support.
+
 ### Fixed
 - Train-time compile compatibility of OpenEquivariance accelerated NequIP models
 
