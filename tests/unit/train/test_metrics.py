@@ -1,5 +1,6 @@
 import torch
 from nequip.train import HuberLoss, StratifiedHuberForceLoss
+from nequip.train.metrics import MaximumAbsoluteError
 
 import pytest
 
@@ -104,3 +105,70 @@ def test_strat_huber(reduction, delta_dict):
         # then reduces to basically just normal Huber behaviour, large force magnitude mask in last
         # stratum isn't being applied:
         assert torch.allclose(nequip_strat_huber.compute(), nequip_max_huber.compute())
+
+
+def test_maximum_absolute_error():
+    """
+    Tests MaximumAbsoluteError metric.
+    """
+    max_ae = MaximumAbsoluteError()
+
+    # test single batch
+    preds = torch.tensor([1.0, 2.0, 3.0])
+    target = torch.tensor([1.5, 1.0, 4.0])
+    max_ae.update(preds, target)
+
+    expected_max = torch.max(torch.abs(preds - target))  # max([0.5, 1.0, 1.0]) = 1.0
+    assert torch.allclose(max_ae.compute(), expected_max)
+
+    # test multiple batches - should track the overall maximum
+    preds2 = torch.tensor([0.0, 5.0])
+    target2 = torch.tensor([2.5, 3.0])  # errors: [2.5, 2.0]
+    max_ae.update(preds2, target2)
+
+    # overall max should now be 2.5
+    expected_max = torch.tensor(2.5)
+    assert torch.allclose(max_ae.compute(), expected_max)
+
+    # test reset
+    max_ae.reset()
+    # after reset, should be -inf (or nan initially, but will update on first use)
+
+    # test with new data after reset
+    preds3 = torch.tensor([1.0, 2.0])
+    target3 = torch.tensor([1.1, 2.8])  # errors: [0.1, 0.8]
+    max_ae.update(preds3, target3)
+    expected_max = torch.tensor(0.8)
+    assert torch.allclose(max_ae.compute(), expected_max)
+
+
+def test_maximum_absolute_error_multidimensional():
+    """
+    Tests MaximumAbsoluteError with multidimensional tensors.
+    """
+    max_ae = MaximumAbsoluteError()
+
+    # test with 2D tensors
+    preds = torch.tensor([[1.0, 2.0], [3.0, 4.0]])
+    target = torch.tensor([[1.5, 1.0], [2.0, 6.0]])
+    max_ae.update(preds, target)
+
+    # flatten and compute expected max absolute error
+    abs_errors = torch.abs(preds - target)  # [[0.5, 1.0], [1.0, 2.0]]
+    expected_max = abs_errors.max()  # 2.0
+    assert torch.allclose(max_ae.compute(), expected_max)
+
+
+def test_maximum_absolute_error_empty_tensor():
+    """
+    Tests MaximumAbsoluteError with empty tensors.
+    """
+    max_ae = MaximumAbsoluteError()
+
+    # test with empty tensors - should not update
+    preds = torch.tensor([])
+    target = torch.tensor([])
+    max_ae.update(preds, target)
+
+    # should still be -inf since no updates occurred
+    assert max_ae.compute() == torch.tensor(-float("inf"))

@@ -1,5 +1,6 @@
 # This file is a part of the `nequip` package. Please see LICENSE and README at the root for information on using it.
 import torch
+from torchmetrics import Metric
 from nequip.data.stats import _MeanX
 
 
@@ -40,6 +41,29 @@ class RootMeanSquaredError(MeanSquaredError):
 
     def __str__(self) -> str:
         return "rmse"
+
+
+class MaximumAbsoluteError(Metric):
+    """Maximum absolute error."""
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.add_state(
+            "max_error", default=torch.tensor(-float("inf")), dist_reduce_fx="max"
+        )
+
+    def update(self, preds: torch.Tensor, target: torch.Tensor) -> None:
+        """"""
+        if preds.numel() > 0:
+            abs_errors = torch.abs(preds - target)
+            self.max_error = torch.maximum(self.max_error, abs_errors.max())
+
+    def compute(self) -> torch.Tensor:
+        """"""
+        return self.max_error
+
+    def __str__(self) -> str:
+        return "max_ae"
 
 
 class HuberLoss(_MeanX):

@@ -13,6 +13,7 @@ from nequip.train import (
     EnergyOnlyLoss,
     EnergyOnlyMetrics,
 )
+from nequip.train.metrics import MaximumAbsoluteError
 
 
 class TestMetricsManager:
@@ -654,7 +655,7 @@ class TestMetricsManagerBuilders:
 
     @pytest.mark.parametrize("per_atom_energy", [True, False])
     def test_EnergyOnlyLoss(self, data, per_atom_energy):
-        """test EnergyOnlyLoss for energy-only training."""
+        """Test EnergyOnlyLoss for energy-only training."""
         pred1, ref1, pred2, ref2 = data
         mm = EnergyOnlyLoss(per_atom_energy=per_atom_energy)
 
@@ -687,7 +688,7 @@ class TestMetricsManagerBuilders:
     @pytest.mark.parametrize("ratio3", [1, 10, 100])
     @pytest.mark.parametrize("ratio4", [1, 10, 100, None])
     def test_EnergyOnlyMetrics(self, data, ratio1, ratio2, ratio3, ratio4):
-        """test EnergyOnlyMetrics for energy-only datasets."""
+        """Test EnergyOnlyMetrics for energy-only datasets."""
         pred1, ref1, pred2, ref2 = data
         mm = EnergyOnlyMetrics(
             coeffs={
@@ -738,6 +739,60 @@ class TestMetricsManagerBuilders:
             assert "forces_mae" not in metrics_dict
 
     def test_invalid_energy_only_coeff_key_triggers_assert(self):
-        """test that invalid coefficient keys trigger assertion errors."""
+        """Test that invalid coefficient keys trigger assertion errors."""
         with pytest.raises(AssertionError):
             EnergyOnlyMetrics(coeffs={"bad_key": 0.5})
+
+    def test_maximum_absolute_error_with_metrics_manager(self, data):
+        """Test MaximumAbsoluteError integration with MetricsManager."""
+        pred1, ref1, pred2, ref2 = data
+        mm = MetricsManager(
+            [
+                {
+                    "field": AtomicDataDict.TOTAL_ENERGY_KEY,
+                    "metric": MaximumAbsoluteError(),
+                    "name": "energy_max_ae",
+                },
+                {
+                    "field": AtomicDataDict.FORCE_KEY,
+                    "metric": MaximumAbsoluteError(),
+                    "name": "force_max_ae",
+                },
+            ]
+        )
+
+        # test step metrics
+        metrics_dict = mm(pred1, ref1)
+        assert "energy_max_ae" in metrics_dict
+        assert "force_max_ae" in metrics_dict
+        assert isinstance(metrics_dict["energy_max_ae"], torch.Tensor)
+        assert isinstance(metrics_dict["force_max_ae"], torch.Tensor)
+
+        # test second batch
+        metrics_dict = mm(pred2, ref2)
+        assert "energy_max_ae" in metrics_dict
+        assert "force_max_ae" in metrics_dict
+
+        # test epoch metrics (compute)
+        epoch_metrics = mm.compute()
+        assert "energy_max_ae" in epoch_metrics
+        assert "force_max_ae" in epoch_metrics
+
+        # max should be >= individual batch maxes
+        energy_max_batch1 = torch.max(
+            torch.abs(
+                pred1[AtomicDataDict.TOTAL_ENERGY_KEY]
+                - ref1[AtomicDataDict.TOTAL_ENERGY_KEY]
+            )
+        )
+        energy_max_batch2 = torch.max(
+            torch.abs(
+                pred2[AtomicDataDict.TOTAL_ENERGY_KEY]
+                - ref2[AtomicDataDict.TOTAL_ENERGY_KEY]
+            )
+        )
+        overall_energy_max = torch.max(
+            torch.stack([energy_max_batch1, energy_max_batch2])
+        )
+
+        assert torch.allclose(epoch_metrics["energy_max_ae"], overall_energy_max)

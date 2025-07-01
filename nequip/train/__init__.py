@@ -3,6 +3,7 @@ from .metrics import (
     MeanAbsoluteError,
     MeanSquaredError,
     RootMeanSquaredError,
+    MaximumAbsoluteError,
     HuberLoss,
     StratifiedHuberForceLoss,
 )
@@ -35,6 +36,7 @@ __all__ = [
     "MeanAbsoluteError",
     "MeanSquaredError",
     "RootMeanSquaredError",
+    "MaximumAbsoluteError",
     "HuberLoss",
     "StratifiedHuberForceLoss",
     "SimpleDDPStrategy",
