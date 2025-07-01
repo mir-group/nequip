@@ -42,6 +42,34 @@ class RootMeanSquaredError(MeanSquaredError):
         return "rmse"
 
 
+class MeanCubicError(_MeanX):
+    """Mean cubic error (L3 norm)."""
+
+    def __init__(self, **kwargs):
+        super().__init__(modifier=lambda x: torch.pow(torch.abs(x), 3), **kwargs)
+
+    def update(self, preds: torch.Tensor, target: torch.Tensor) -> None:
+        """"""
+        super().update(preds - target)
+
+    def __str__(self) -> str:
+        return "mce"
+
+
+class MeanQuarticError(_MeanX):
+    """Mean quartic error (L4 norm)."""
+
+    def __init__(self, **kwargs):
+        super().__init__(modifier=lambda x: torch.pow(x, 4), **kwargs)
+
+    def update(self, preds: torch.Tensor, target: torch.Tensor) -> None:
+        """"""
+        super().update(preds - target)
+
+    def __str__(self) -> str:
+        return "mqe"
+
+
 class HuberLoss(_MeanX):
     """Huber loss (see `torch.nn.HuberLoss <https://pytorch.org/docs/stable/generated/torch.nn.HuberLoss.html>`_)
 
