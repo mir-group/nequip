@@ -66,12 +66,13 @@ def main(args=None):
     )
 
     # required named arguments:
-    required_named = parser.add_argument_group('required arguments')
-    required_named.add_argument(        "--mode",
+    required_named = parser.add_argument_group("required arguments")
+    required_named.add_argument(
+        "--mode",
         help="whether to use `torchscript` or `aotinductor` to compile the model",
         choices=["torchscript", "aotinductor"],
         type=str,
-        required=True
+        required=True,
     )
 
     required_named.add_argument(
