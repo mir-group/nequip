@@ -49,9 +49,10 @@ def main(args=None):
 
     # === parse inputs ===
     parser = argparse.ArgumentParser(
-        description="Compiles NequIP/Allegro models from checkpoint or package files."
+        description="Compiles NequIP/Allegro models from checkpoint or package files.",
     )
 
+    # positional arguments:
     parser.add_argument(
         "input_path",
         help="path to a checkpoint model or packaged model file",
@@ -64,7 +65,9 @@ def main(args=None):
         type=pathlib.Path,
     )
 
-    parser.add_argument(
+    # required named arguments:
+    required_named = parser.add_argument_group("required arguments")
+    required_named.add_argument(
         "--mode",
         help="whether to use `torchscript` or `aotinductor` to compile the model",
         choices=["torchscript", "aotinductor"],
@@ -72,13 +75,14 @@ def main(args=None):
         required=True,
     )
 
-    parser.add_argument(
+    required_named.add_argument(
         "--device",
         help="device to run the model on",
         type=str,
         required=True,
     )
 
+    # optional named arguments:
     parser.add_argument(
         "--model",
         help=f"name of model to compile -- this option is only relevant when using multiple models (default: {_SOLE_MODEL_KEY}, meant to work for the conventional single model case)",
@@ -88,7 +92,7 @@ def main(args=None):
 
     parser.add_argument(
         "--tf32",
-        help="whether to use TF32 or not",
+        help="whether to use TF32 or not (default: False)",
         action=argparse.BooleanOptionalAction,
         default=False,
     )
