@@ -37,6 +37,14 @@ One can always try to lower the learning rate to test if the problem could lie w
 ```bash
 nequip-train config.yaml
 ```
+  with an error that looks like
+
+```bash
+    raise OverrideParseException(
+hydra.errors.OverrideParseException: Error parsing override 'config.yaml'
+missing EQUAL at '<EOF>'
+See https://hydra.cc/docs/1.2/advanced/override_grammar/basic for details
+```
   **Solution**: Read the [workflow docs](../getting-started/workflow.md) and follow hydra's command line options, e.g.
 ```bash
 nequip-train -cn config.yaml
