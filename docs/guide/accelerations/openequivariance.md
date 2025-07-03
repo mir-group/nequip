@@ -85,3 +85,5 @@ atoms.calc = calc
 energy = atoms.get_potential_energy()
 forces = atoms.get_forces()
 ```
+
+If `openequivariance` is not imported before model loading, this error will be thrown: `RuntimeError: Couldn't resolve type '{}', did you forget to add its build dependency?__torch__.torch.classes.libtorch_tp_jit.TorchJITConv`.
