@@ -1,5 +1,6 @@
 import inspect
 import logging
+import importlib
 
 import torch.nn
 from torch_runstats.scatter import scatter, scatter_mean
@@ -26,14 +27,16 @@ class SimpleLoss:
 
     def __init__(self, func_name: str, params: dict = {}):
         self.ignore_nan = params.get("ignore_nan", False)
-        
-        # This is the hotfix for the issue that the loss function is not found 
+
+        # This is the hotfix for the issue that the loss function is not found
         # > NameError: <allegro_pol.pol_loss.FoldedPolLoss object at 0x7fda9286fd90> type is not found in torch.nn module
         func_name = func_name.lstrip("<")
         func_name = func_name.rstrip(">")
         module_trees = func_name.split(".")
         parent_module = ".".join(module_trees[:-1])
         class_name = module_trees[-1]
+
+        importlib.import_module(module_trees[0])
 
         func, _ = instantiate_from_cls_name(
             eval(parent_module) if parent_module else torch.nn,
@@ -168,7 +171,6 @@ class PerSpeciesLoss(SimpleLoss):
             return per_species_loss
 
         else:
-
             if len(reduce_dims) > 0:
                 per_atom_loss = per_atom_loss.mean(dim=reduce_dims)
             assert per_atom_loss.ndim == 1
