@@ -29,6 +29,8 @@ class SimpleLoss:
         
         # This is the hotfix for the issue that the loss function is not found 
         # > NameError: <allegro_pol.pol_loss.FoldedPolLoss object at 0x7fda9286fd90> type is not found in torch.nn module
+        func_name = func_name.lstrip("<")
+        func_name = func_name.rstrip(">")
         module_trees = func_name.split(".")
         parent_module = ".".join(module_trees[:-1])
         class_name = module_trees[-1]
