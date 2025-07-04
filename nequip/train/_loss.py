@@ -36,7 +36,8 @@ class SimpleLoss:
         parent_module = ".".join(module_trees[:-1])
         class_name = module_trees[-1]
 
-        importlib.import_module(module_trees[0])
+        if parent_module:
+            importlib.import_module(module_trees[0])
 
         func, _ = instantiate_from_cls_name(
             eval(parent_module) if parent_module else torch.nn,
