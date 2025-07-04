@@ -26,9 +26,16 @@ class SimpleLoss:
 
     def __init__(self, func_name: str, params: dict = {}):
         self.ignore_nan = params.get("ignore_nan", False)
+        
+        # This is the hotfix for the issue that the loss function is not found 
+        # > NameError: <allegro_pol.pol_loss.FoldedPolLoss object at 0x7fda9286fd90> type is not found in torch.nn module
+        module_trees = func_name.split(".")
+        parent_module = ".".join(module_trees[:-1])
+        class_name = module_trees[-1]
+
         func, _ = instantiate_from_cls_name(
-            torch.nn,
-            class_name=func_name,
+            eval(parent_module) if parent_module else torch.nn,
+            class_name=class_name,
             prefix="",
             positional_args=dict(reduction="none"),
             optional_args=params,
