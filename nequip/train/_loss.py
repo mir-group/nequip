@@ -36,7 +36,7 @@ class SimpleLoss:
         parent_module = ".".join(module_trees[:-1])
         class_name = module_trees[-1]
 
-        if parent_module:
+        if len(module_trees[:-1]) > 0:
             importlib.import_module(module_trees[0])
 
         func, _ = instantiate_from_cls_name(
