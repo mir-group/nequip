@@ -154,17 +154,22 @@ class BaseModelTests:
         # partial_model does not output config. Please use `model` fixture for config
         return aux_model, out_fields
 
-    @pytest.fixture(scope="class")
-    def model_test_data(self, config, atomic_batch, device):
+    @pytest.fixture(scope="class", params=["molecules", "bulk"])
+    def model_test_data(self, config, atomic_batch, diamond_carbon, device, request):
+        if request.param == "molecules":
+            test_data = atomic_batch
+        elif request.param == "bulk":
+            test_data = diamond_carbon
+        else:
+            raise ValueError(f"Unknown test data parameter: {request.param}")
+
         # clone the data to avoid mutating the original batch
         # cpu because we need to reconstruct the neighborlist
-        atomic_batch = {
-            k: v.clone().detach().to("cpu") for k, v in atomic_batch.items()
-        }
+        test_data = {k: v.clone().detach().to("cpu") for k, v in test_data.items()}
         # reset neighborlist
-        atomic_batch = compute_neighborlist_(atomic_batch, r_max=config["r_max"])
+        test_data = compute_neighborlist_(test_data, r_max=config["r_max"])
         # return the data in the device for testing
-        return AtomicDataDict.to_(atomic_batch, device)
+        return AtomicDataDict.to_(test_data, device)
 
     @pytest.fixture(
         scope="class",

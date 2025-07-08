@@ -161,5 +161,18 @@ def atomic_batch(nequip_dataset):
     return AtomicDataDict.batched_from_list([nequip_dataset[0], nequip_dataset[1]])
 
 
+@pytest.fixture(scope="session")
+def diamond_carbon(default_dtype) -> AtomicDataDict.Type:
+    """Diamond structure carbon bulk for testing."""
+    atoms = bulk("C", crystalstructure="diamond", a=3.57) * (2, 2, 2)
+    atoms.rattle(stdev=0.1)
+    data = compute_neighborlist_(from_ase(atoms), r_max=3.5, NL="ase")
+    tm = ChemicalSpeciesToAtomTypeMapper(
+        chemical_symbols=["C"],
+    )
+    data = tm(data)
+    return data
+
+
 # Use debug mode
 set_irreps_debug(True)
