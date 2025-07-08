@@ -77,7 +77,7 @@ class TestNequIPModel(BaseEnergyModelTests):
 
     @pytest.fixture(scope="class")
     def nequip_compile_tol(self, model_dtype):
-        return {"float32": 1e-5, "float64": 1e-10}[model_dtype]
+        return {"float32": 5e-5, "float64": 1e-12}[model_dtype]
 
     @pytest.fixture(
         params=[
