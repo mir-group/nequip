@@ -251,6 +251,8 @@ class _ZBL(torch.nn.Module):
 class ZBL(GraphModuleMixin, torch.nn.Module):
     """`ZBL <https://docs.lammps.org/pair_zbl.html>`_ pair potential energy term.
 
+    Useful as a prior for core repulsion to mitigate molecular dynamics failure modes associated with atoms getting too close.
+
     Args:
         type_names (List[str]): list of type names known by the model, ``[atom1, atom2, atom3]``
         chemical_species (List[str]): list of chemical symbols, e.g. ``[C, H, O]``
