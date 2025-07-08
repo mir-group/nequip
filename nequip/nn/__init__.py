@@ -11,7 +11,6 @@ from .mlp import ScalarMLP, ScalarMLPFunction
 from .interaction_block import InteractionBlock
 from .convnetlayer import ConvNetLayer
 from .grad_output import GradientOutput, PartialForceOutput, ForceStressOutput
-from .rescale import RescaleOutput
 from .misc import Concat, ApplyFactor, SaveForOutput
 from .utils import scatter, tp_path_exists, with_edge_vectors_
 from .model_modifier_utils import model_modifier, replace_submodules
@@ -30,7 +29,6 @@ __all__ = [
     "GradientOutput",
     "PartialForceOutput",
     "ForceStressOutput",
-    "RescaleOutput",
     "ConvNetLayer",
     "Concat",
     "ApplyFactor",
