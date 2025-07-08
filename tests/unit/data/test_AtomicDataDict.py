@@ -40,9 +40,11 @@ def test_to_ase_batches(atomic_batch):
     to_ase_atoms_batch = to_ase(atomic_batch)
     atomic_batch = AtomicDataDict.to_(atomic_batch, device="cpu")
     for batch_idx, atoms in enumerate(to_ase_atoms_batch):
-        mask = atomic_batch["batch"] == batch_idx
+        mask = atomic_batch[AtomicDataDict.BATCH_KEY] == batch_idx
         assert atoms.get_positions().shape == (len(atoms), 3)
-        assert np.allclose(atoms.get_positions(), atomic_batch["pos"][mask])
+        assert np.allclose(
+            atoms.get_positions(), atomic_batch[AtomicDataDict.POSITIONS_KEY][mask]
+        )
         assert atoms.get_atomic_numbers().shape == (len(atoms),)
         assert np.array_equal(
             atoms.get_atomic_numbers(),
@@ -51,12 +53,15 @@ def test_to_ase_batches(atomic_batch):
 
         assert (
             np.max(
-                np.abs(atoms.get_cell()[:] - atomic_batch["cell"][batch_idx].numpy())
+                np.abs(
+                    atoms.get_cell()[:]
+                    - atomic_batch[AtomicDataDict.CELL_KEY][batch_idx].numpy()
+                )
             )
             == 0
         )
         assert not np.logical_xor(
-            atoms.get_pbc(), atomic_batch["pbc"][batch_idx].numpy()
+            atoms.get_pbc(), atomic_batch[AtomicDataDict.PBC_KEY][batch_idx].numpy()
         ).all()
 
 
@@ -106,16 +111,16 @@ def test_without_nodes(CH3CHO):
 def test_silicon_neighbors(Si):
     r_max, points, data = Si
     edge_index, cell_shifts, cell = neighbor_list_and_relative_vec(
-        points["pos"],
+        points[AtomicDataDict.POSITIONS_KEY],
         pbc=True,
-        cell=points["cell"],
+        cell=points[AtomicDataDict.CELL_KEY],
         r_max=r_max,
     )
     edge_index_true = torch.LongTensor(
         [[0, 0, 0, 0, 1, 1, 1, 1], [1, 1, 1, 1, 0, 0, 0, 0]]
     )
     assert edge_index_set_equiv(edge_index, edge_index_true)
-    assert edge_index_set_equiv(data["edge_index"], edge_index_true)
+    assert edge_index_set_equiv(data[AtomicDataDict.EDGE_INDEX_KEY], edge_index_true)
 
 
 @pytest.mark.parametrize("alt_nl_method", ALT_NL_METHODS)
@@ -156,7 +161,9 @@ def test_batching(Si):
     data_list = []
     for _ in range(N):
         new = copy.deepcopy(orig)
-        new["pos"] += torch.randn_like(new["pos"])
+        new[AtomicDataDict.POSITIONS_KEY] += torch.randn_like(
+            new[AtomicDataDict.POSITIONS_KEY]
+        )
         data_list.append(AtomicDataDict.with_batch_(new))
     batch = AtomicDataDict.batched_from_list(data_list)
     for i, orig in enumerate(data_list):
@@ -168,7 +175,9 @@ def test_batching(Si):
     data_list_add = [batch]
     for _ in range(N):
         new = copy.deepcopy(orig)
-        new["pos"] += torch.randn_like(new["pos"])
+        new[AtomicDataDict.POSITIONS_KEY] += torch.randn_like(
+            new[AtomicDataDict.POSITIONS_KEY]
+        )
         data_list_add.append(AtomicDataDict.with_batch_(new))
     new_batch = AtomicDataDict.batched_from_list(data_list_add)
     combined_data_list = data_list + data_list_add[1:]
