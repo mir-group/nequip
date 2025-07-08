@@ -1,17 +1,6 @@
 # yamllint disable rule:line-length
-# The config file is divided into 5 sections -- `run`, `data`, `trainer`, `training_module`, and `global_options`
-# The config system relies on omegaconf (https://omegaconf.readthedocs.io/en/2.3_branch/index.html)
-# and hydra (https://hydra.cc/docs/intro/) functionalities, such as
-# - omegaconf's variable interpolation (https://omegaconf.readthedocs.io/en/2.3_branch/usage.html#variable-interpolation)
-# - omegaconf's resolvers (https://omegaconf.readthedocs.io/en/2.3_branch/usage.html#resolvers)
-# - hydra's instantiate (https://hydra.cc/docs/advanced/instantiate_objects/overview/)
-# With hydra's instantiation (notice the `_target_`s everywhere), the config file (almost) directly corresponds to instantiating objects as one would normally do in Python.
-# Much of the infrastructure is based on PyTorch Lightning (https://lightning.ai/docs/pytorch/stable/), such as the use of Lightning's Trainer, DataModule, LightningModule, Callback objects.
-
-# NequIP also registers a number of custom resolvers to allow users to do basic integer arithmetic directly in the config file:
-# - Integer multiplication: `area: ${int_mul:${width},${height}}`
-# - Integer division: `half_width: ${int_div:${width},2}`
-# These resolvers will throw errors if the inputs are not integers or if division is not exact.
+# This tutorial config file is meant to complement the "User Guide" docs: https://nequip.readthedocs.io/en/latest/guide/guide.html
+# New users are advised to read the config page before continuing: https://nequip.readthedocs.io/en/latest/guide/configuration/config.html
 
 # ===========
 #     RUN
@@ -30,7 +19,7 @@ run: [train, test]
 cutoff_radius: 5.0
 
 # variable interpolation is convenient for wandb sweeps, see documentation for more details
-# the following are NequIP model hyperparameters that can be sweeped over
+# the following are NequIP model hyperparameters that can be swept over
 num_layers: 4       # number of interaction blocks, we find 3-5 to work best
 l_max: 1            # the maximum irrep order (rotation order) for the network's features, l=1 is a good default, l=2 is more accurate but slower
 num_features: 32    # the multiplicity of the features, 32 is a good default for accurate network, if you want to be more accurate, go larger, if you want to be faster, go lower
@@ -48,15 +37,14 @@ chemical_symbols: [C, H, O, Cu]
 model_type_names: ${chemical_symbols}
 
 # We want a metric to condition training on (e.g. for best `ModelCheckpoint`, `EarlyStopping`, LR scheduling) which will show up in various places later on, so we set up a "single source of truth" to interpolate over
+# see https://nequip.readthedocs.io/en/latest/guide/configuration/metrics.html
 monitored_metric: val0_epoch/weighted_sum
 
 
 # ============
 #     DATA
 # ============
-# `data` is managed by `LightningDataModule`s
-# NequIP provides some standard datamodules that can be found in `nequip.data.datamodule`
-# Users are free to define and use their own datamodules that subclass nequip.data.datamodule.NequIPDataModule
+# New users are advised to read the "Data Configuration" docs before continuing: https://nequip.readthedocs.io/en/latest/guide/configuration/data.html
 data:
   _target_: nequip.data.datamodule.ASEDataModule
   seed: 456             # dataset seed for reproducibility
@@ -69,9 +57,6 @@ data:
     test: 0.1
 
   # `transforms` convert data from the Dataset to a form that can be used by the ML model
-  # the transforms are only performed right before data is given to the model
-  # data is kept in its untransformed form
-
   transforms:
     # the models only know atom types, which can be different from the chemical species (e.g. C, H)
     # for instance we can have data with different charge states of carbon, which means they are
@@ -80,11 +65,12 @@ data:
     # transformation to ensure that the data has 0-indexed atom type lists used in the various model operations
     - _target_: nequip.data.transforms.ChemicalSpeciesToAtomTypeMapper
       chemical_symbols: ${chemical_symbols}
-    # data doesn't usually come with a neighborlist -- this tranforms prepares the neighborlist
+    # data doesn't usually come with a neighborlist -- this transform prepares the neighborlist
     - _target_: nequip.data.transforms.NeighborListTransform
       r_max: ${cutoff_radius}
 
-  # the following are torch.utils.data.DataLoader configs excluding the arguments `dataset` and `collate_fn`
+  # the following are torch.utils.data.DataLoader configs,
+  # excluding the arguments `dataset` and `collate_fn`
   # https://pytorch.org/docs/stable/data.html#torch.utils.data.DataLoader
   train_dataloader:
     _target_: torch.utils.data.DataLoader
@@ -105,7 +91,7 @@ data:
     # the dataset statistics include `num_neighbors_mean`, `per_atom_energy_mean`, `forces_rms`, `per_type_forces_rms`
     _target_: nequip.data.CommonDataStatisticsManager
     # dataloader kwargs for data statistics computation
-    # `batch_size` should ideally be as large as possible without trigerring OOM
+    # `batch_size` should ideally be as large as possible without triggering OOM
     dataloader_kwargs:
       batch_size: 10
     # we need to provide the same type names that correspond to the model's `type_names`
@@ -135,23 +121,23 @@ trainer:
     save_dir: ${hydra:runtime.output_dir}  # use resolver to place wandb logs in hydra's output directory
 
   # use any Lightning callbacks https://lightning.ai/docs/pytorch/stable/api_references.html#callbacks
-  # and any custom callbakcs that subclass Lightning's Callback parent class
+  # and any custom callbacks that subclass Lightning's Callback parent class
   callbacks:
 
-    # stop training when some criterion is met
+    # https://lightning.ai/docs/pytorch/stable/api/lightning.pytorch.callbacks.EarlyStopping.html#lightning.pytorch.callbacks.EarlyStopping
     - _target_: lightning.pytorch.callbacks.EarlyStopping
       monitor: ${monitored_metric}            # validation metric to monitor
       min_delta: 1e-3                         # how much to be considered a "change"
       patience: 20                            # how many instances of "no change" before stopping
 
-    # checkpoint based on some criterion
+    # https://lightning.ai/docs/pytorch/stable/api/lightning.pytorch.callbacks.ModelCheckpoint.html#lightning.pytorch.callbacks.ModelCheckpoint
     - _target_: lightning.pytorch.callbacks.ModelCheckpoint
       monitor: ${monitored_metric}            # validation metric to monitor
       dirpath: ${hydra:runtime.output_dir}    # use hydra output directory
-      filename: best                          # best.ckpt is the checkpoint name
-      save_last: true                         # last.ckpt will be saved
+      filename: best                          # `best.ckpt` is the checkpoint name
+      save_last: true                         # `last.ckpt` will be saved
 
-    # log learning rate, e.g. to monitor what the learning rate scheduler is doing
+    # https://lightning.ai/docs/pytorch/stable/api/lightning.pytorch.callbacks.LearningRateMonitor.html#lightning.pytorch.callbacks.LearningRateMonitor
     - _target_: lightning.pytorch.callbacks.LearningRateMonitor
       logging_interval: epoch
 
@@ -170,8 +156,7 @@ training_module:
   # the ema decay parameter of an EMA model
   ema_decay: 0.999
 
-  # here, we use a simplified MetricsManager wrapper (see docs) to construct the energy-force loss function
-  # the more general `nequip.train.MetricsManager` could also be used to configure a custom loss function
+  # New users are advised to read the "Loss and Metrics" docs before continuing: https://nequip.readthedocs.io/en/latest/guide/configuration/metrics.html
   loss:
     _target_: nequip.train.EnergyForceLoss
     per_atom_energy: true
@@ -179,16 +164,12 @@ training_module:
       total_energy: 1.0
       forces: 1.0
 
-  # again, we use a simplified MetricsManager wrapper (see docs) to construct the energy-force metrics
-  # the more general `nequip.train.MetricsManager` could also be used in this case
-  # validation metrics are used for monitoring and influencing training, e.g. with LR schedulers or early stopping, etc
   val_metrics:
     _target_: nequip.train.EnergyForceMetrics
     coeffs:
       total_energy_mae: 1.0
       forces_mae: 1.0
       # keys `total_energy_rmse` and `forces_rmse`, `per_atom_energy_rmse` and `per_atom_energy_mae` are also available
-
   # we could have train_metrics and test_metrics be different from val_metrics, but it makes sense to have them be the same
   train_metrics: ${training_module.val_metrics}  # use variable interpolation
   test_metrics: ${training_module.val_metrics}  # use variable interpolation
@@ -201,7 +182,7 @@ training_module:
   # see options for lr_scheduler_config
   # https://lightning.ai/docs/pytorch/stable/api/lightning.pytorch.core.LightningModule.html#lightning.pytorch.core.LightningModule.configure_optimizers
   lr_scheduler:
-    # any torch compatible lr sceduler
+    # any torch compatible lr scheduler
     scheduler:
       _target_: torch.optim.lr_scheduler.ReduceLROnPlateau
       factor: 0.6
@@ -212,7 +193,7 @@ training_module:
     interval: epoch
     frequency: 1
 
-  # model details
+  # model: https://nequip.readthedocs.io/en/latest/api/nequip_model.html
   model:
     _target_: nequip.model.NequIPGNNModel
 
@@ -269,9 +250,10 @@ training_module:
 
     # == ZBL pair potential ==
     # useful as a prior for core repulsion to mitigate MD failure modes associated with atoms getting too close
+    # docs: https://nequip.readthedocs.io/en/latest/api/nn.html#nequip.nn.pair_potential.ZBL
     pair_potential:
       _target_: nequip.nn.pair_potential.ZBL
-      units: metal     # Ang and kcal/mol, LAMMPS unit names;  allowed values "metal" and "real"
+      units: metal     # Ang and kcal/mol; LAMMPS unit names;  allowed values "metal" and "real"
       chemical_species: ${chemical_symbols}   # must tell ZBL the chemical species of the various model atom types
 
 
@@ -280,5 +262,5 @@ training_module:
 # ====================
 global_options:
   # whether to use TensorFloat32, which will be faster on GPUs with tensor cores at the cost of precision loss
-  # see "Advanced Usage" section of the docs for more details
+  # see "Accelerations" under the "User Guide" section of the docs for more details
   allow_tf32: false
