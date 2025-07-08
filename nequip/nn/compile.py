@@ -145,6 +145,8 @@ class CompileGraphModel(GraphModel):
             # - correctness of irreps registration system
             # - all input `data` batches have the same keys, and contain all necessary inputs and reference labels (outputs)
             self.input_fields = sorted(list(data.keys() & self.model_input_fields))
+            # `output_fields` relies on the fact that `data` contains the necessary output keys
+            # e.g. `total_energy`, `forces`, `stress`
             self.output_fields = sorted(
                 list(data.keys() & self.model.irreps_out.keys())
             )
