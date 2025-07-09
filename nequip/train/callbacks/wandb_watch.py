@@ -13,7 +13,7 @@ class WandbWatch(Callback):
 
     Args:
         log_freq (int): frequency (in batches) to log gradients and parameters
-        log_type (str): specifies whether to log ``"gradients"``, ``"parameters"``, or ``"all"``
+        log (str): specifies whether to log ``"gradients"``, ``"parameters"``, or ``"all"``
         log_graph (bool): whether to log the model's computational graph
     """
 
@@ -25,7 +25,7 @@ class WandbWatch(Callback):
     ):
         self.log_freq = log_freq
         assert log in ["gradients", "parameters", "all", None]
-        self.log_type = log
+        self.log = log
         self.log_graph = log_graph
 
     def on_train_start(
@@ -40,7 +40,7 @@ class WandbWatch(Callback):
         # see https://docs.wandb.ai/ref/python/watch/
         trainer.logger.watch(
             pl_module.model,
-            log=self.log_type,
+            log=self.log,
             log_freq=self.log_freq,
             log_graph=self.log_graph,
         )
