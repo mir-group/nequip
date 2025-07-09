@@ -316,7 +316,8 @@ def main(args=None):
             output_path=str(args.output_path),
             inductor_configs=inductor_configs,
             seed=_COMPILE_SEED,
-            skip_model_check=os.environ.get("NEQUIP_SKIP_COMPILED_MODEL_CHECK", "0") == "1",
+            skip_model_check=os.environ.get("NEQUIP_SKIP_COMPILED_MODEL_CHECK", "0")
+            == "1",
         )
         logger.info(f"Exported model saved to {args.output_path}")
         set_workflow_state(None)
