@@ -1,5 +1,6 @@
 # This file is a part of the `nequip` package. Please see LICENSE and README at the root for information on using it.
 import torch
+import os
 
 from ._workflow_utils import set_workflow_state
 from ._compile_utils import COMPILE_TARGET_DICT
@@ -160,12 +161,6 @@ def main(args=None):
         type=str,
         default=[],
     )
-    parser.add_argument(
-        "--skip-dtype-check",
-        help="whether to skip the output dtype similarity check for the compiled model (default: False)",
-        action=argparse.BooleanOptionalAction,
-        default=False,
-    )
     args = parser.parse_args(args=args)
 
     set_workflow_state("compile")
@@ -321,7 +316,7 @@ def main(args=None):
             output_path=str(args.output_path),
             inductor_configs=inductor_configs,
             seed=_COMPILE_SEED,
-            skip_dtype_check=args.skip_dtype_check,
+            skip_model_check=os.environ.get("NEQUIP_SKIP_COMPILED_MODEL_CHECK", "0") == "1",
         )
         logger.info(f"Exported model saved to {args.output_path}")
         set_workflow_state(None)

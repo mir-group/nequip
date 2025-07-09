@@ -22,7 +22,7 @@ def aot_export_model(
     output_path: str,
     inductor_configs: Dict[str, Any] = {},
     seed: int = 1,
-    skip_dtype_check: bool = False,
+    skip_model_check: bool = False,
 ) -> str:
     # === torch version check ===
     check_pt2_compile_compatibility()
@@ -60,7 +60,7 @@ def aot_export_model(
     assert out_path == output_path
 
     # === sanity check ===
-    if not skip_dtype_check:
+    if not skip_model_check:
         aot_model = DictInputOutputWrapper(
             torch._inductor.aoti_load_package(out_path),
             input_fields,
