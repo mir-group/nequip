@@ -160,6 +160,12 @@ def main(args=None):
         type=str,
         default=[],
     )
+    parser.add_argument(
+        "--skip-dtype-check",
+        help="whether to skip the output dtype similarity check for the compiled model (default: False)",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+    )
     args = parser.parse_args(args=args)
 
     set_workflow_state("compile")
@@ -315,6 +321,7 @@ def main(args=None):
             output_path=str(args.output_path),
             inductor_configs=inductor_configs,
             seed=_COMPILE_SEED,
+            skip_dtype_check=args.skip_dtype_check,
         )
         logger.info(f"Exported model saved to {args.output_path}")
         set_workflow_state(None)

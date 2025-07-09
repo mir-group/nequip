@@ -22,6 +22,7 @@ def aot_export_model(
     output_path: str,
     inductor_configs: Dict[str, Any] = {},
     seed: int = 1,
+    skip_dtype_check: bool = False,
 ) -> str:
     # === torch version check ===
     check_pt2_compile_compatibility()
@@ -59,19 +60,20 @@ def aot_export_model(
     assert out_path == output_path
 
     # === sanity check ===
-    aot_model = DictInputOutputWrapper(
-        torch._inductor.aoti_load_package(out_path),
-        input_fields,
-        output_fields,
-    )
-    test_model_output_similarity_by_dtype(
-        aot_model,
-        model,
-        {k: data[k] for k in input_fields},
-        model.model_dtype,
-        fields=output_fields,
-        error_message=_pt2_compile_error_message,
-    )
-    del aot_model
+    if not skip_dtype_check:
+        aot_model = DictInputOutputWrapper(
+            torch._inductor.aoti_load_package(out_path),
+            input_fields,
+            output_fields,
+        )
+        test_model_output_similarity_by_dtype(
+            aot_model,
+            model,
+            {k: data[k] for k in input_fields},
+            model.model_dtype,
+            fields=output_fields,
+            error_message=_pt2_compile_error_message,
+        )
+        del aot_model
 
     return out_path
