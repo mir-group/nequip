@@ -1,5 +1,6 @@
 # This file is a part of the `nequip` package. Please see LICENSE and README at the root for information on using it.
 import torch
+import os
 
 from nequip.nn.compile import ListInputOutputWrapper, DictInputOutputWrapper
 from nequip.data import AtomicDataDict
@@ -22,7 +23,6 @@ def aot_export_model(
     output_path: str,
     inductor_configs: Dict[str, Any] = {},
     seed: int = 1,
-    skip_model_check: bool = False,
 ) -> str:
     # === torch version check ===
     check_pt2_compile_compatibility()
@@ -60,7 +60,7 @@ def aot_export_model(
     assert out_path == output_path
 
     # === sanity check ===
-    if not skip_model_check:
+    if os.environ.get("NEQUIP_SKIP_AOTI_MODEL_CHECK", "0") == "0":
         aot_model = DictInputOutputWrapper(
             torch._inductor.aoti_load_package(out_path),
             input_fields,

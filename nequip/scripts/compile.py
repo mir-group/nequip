@@ -1,6 +1,5 @@
 # This file is a part of the `nequip` package. Please see LICENSE and README at the root for information on using it.
 import torch
-import os
 
 from ._workflow_utils import set_workflow_state
 from ._compile_utils import COMPILE_TARGET_DICT
@@ -316,8 +315,6 @@ def main(args=None):
             output_path=str(args.output_path),
             inductor_configs=inductor_configs,
             seed=_COMPILE_SEED,
-            skip_model_check=os.environ.get("NEQUIP_SKIP_COMPILED_MODEL_CHECK", "0")
-            == "1",
         )
         logger.info(f"Exported model saved to {args.output_path}")
         set_workflow_state(None)
