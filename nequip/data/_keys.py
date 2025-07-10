@@ -83,6 +83,9 @@ FRAME_SUBSET_KEY: Final[str] = "subset"
 BATCH_KEY: Final[str] = "batch"
 NUM_NODES_KEY: Final[str] = "num_atoms"
 
+# LAMMPS MLIAP integration keys
+LMP_MLIAP_DATA_KEY: Final[str] = "lmp_mliap_data"
+
 # make a list of allowed keys
 ALLOWED_KEYS: List[str] = [v for k, v in globals().items() if k.endswith("_KEY")]
 # check that the fields don't have "." (to avoid clashes with nn parameter names)
