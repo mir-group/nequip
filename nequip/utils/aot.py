@@ -60,7 +60,7 @@ def aot_export_model(
     assert out_path == output_path
 
     # === sanity check ===
-    if os.environ.get("NEQUIP_SKIP_AOTI_MODEL_CHECK", "0") == "0":
+    if os.environ.get("NEQUIP_SKIP_AOTI_MODEL_CHECK", "0") != "1":
         aot_model = DictInputOutputWrapper(
             torch._inductor.aoti_load_package(out_path),
             input_fields,
