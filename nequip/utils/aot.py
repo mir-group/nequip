@@ -1,5 +1,6 @@
 # This file is a part of the `nequip` package. Please see LICENSE and README at the root for information on using it.
 import torch
+import os
 
 from nequip.nn.compile import ListInputOutputWrapper, DictInputOutputWrapper
 from nequip.data import AtomicDataDict
@@ -59,19 +60,20 @@ def aot_export_model(
     assert out_path == output_path
 
     # === sanity check ===
-    aot_model = DictInputOutputWrapper(
-        torch._inductor.aoti_load_package(out_path),
-        input_fields,
-        output_fields,
-    )
-    test_model_output_similarity_by_dtype(
-        aot_model,
-        model,
-        {k: data[k] for k in input_fields},
-        model.model_dtype,
-        fields=output_fields,
-        error_message=_pt2_compile_error_message,
-    )
-    del aot_model
+    if os.environ.get("NEQUIP_SKIP_AOTI_MODEL_CHECK", "0") != "1":
+        aot_model = DictInputOutputWrapper(
+            torch._inductor.aoti_load_package(out_path),
+            input_fields,
+            output_fields,
+        )
+        test_model_output_similarity_by_dtype(
+            aot_model,
+            model,
+            {k: data[k] for k in input_fields},
+            model.model_dtype,
+            fields=output_fields,
+            error_message=_pt2_compile_error_message,
+        )
+        del aot_model
 
     return out_path
