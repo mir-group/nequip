@@ -25,7 +25,7 @@ class WandbWatch(Callback):
     ):
         self.log_freq = log_freq
         assert log in ["gradients", "parameters", "all", None]
-        self.log = log
+        self.wandb_log_setting = log  # use 'wandb_log_setting' as attr name to avoid conflict with LightningModule.log()
         self.log_graph = log_graph
 
     def on_train_start(
@@ -40,7 +40,7 @@ class WandbWatch(Callback):
         # see https://docs.wandb.ai/ref/python/watch/
         trainer.logger.watch(
             pl_module.model,
-            log=self.log,
+            log=self.wandb_log_setting,
             log_freq=self.log_freq,
             log_graph=self.log_graph,
         )
