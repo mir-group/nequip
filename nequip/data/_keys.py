@@ -51,6 +51,8 @@ EDGE_FEATURES_KEY: Final[str] = "edge_features"
 EDGE_CUTOFF_KEY: Final[str] = "edge_cutoff"
 # edge energy as in Allegro
 EDGE_ENERGY_KEY: Final[str] = "edge_energy"
+# edge forces (for LAMMPS MLIAP inference)
+EDGE_FORCE_KEY: Final[str] = "edge_forces"
 
 NODE_FEATURES_KEY: Final[str] = "node_features"
 NODE_ATTRS_KEY: Final[str] = "node_attrs"

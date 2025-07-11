@@ -56,6 +56,7 @@ _DEFAULT_EDGE_FIELDS: Set[str] = {
     _keys.EDGE_FEATURES_KEY,
     _keys.EDGE_CUTOFF_KEY,
     _keys.EDGE_ENERGY_KEY,
+    _keys.EDGE_FORCE_KEY,
 }
 _DEFAULT_CARTESIAN_TENSOR_FIELDS: Dict[str, str] = {
     _keys.STRESS_KEY: "ij=ji",
