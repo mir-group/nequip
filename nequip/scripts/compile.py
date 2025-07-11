@@ -4,8 +4,8 @@ import torch
 from ._workflow_utils import set_workflow_state
 from ._compile_utils import COMPILE_TARGET_DICT
 from nequip.model.utils import _EAGER_MODEL_KEY
-from nequip.model.saved_models import ModelFromPackage, ModelFromCheckpoint
-from nequip.model.modify_utils import modify, only_apply_persistent_modifiers
+from nequip.model.saved_models.load_utils import load_saved_model
+from nequip.model.modify_utils import modify
 from nequip.train.lightning import _SOLE_MODEL_KEY
 from nequip.data import AtomicDataDict
 from nequip.model.saved_models.checkpoint import data_dict_from_checkpoint
@@ -185,24 +185,11 @@ def main(args=None):
     # === load model ===
     # only eager models are loaded
     logger.info(f"Loading model for compilation from {args.input_path} ...")
-    # use package load path if extension matches, otherwise assume checkpoint file
-    use_ckpt = not str(args.input_path).endswith(".nequip.zip")
-    if use_ckpt:
-        # we only apply persistent modifiers when building from checkpoint
-        # i.e. acceleration modifiers won't be applied, and have to be specified during compile time
-        with only_apply_persistent_modifiers(persistent_only=True):
-            model = ModelFromCheckpoint(args.input_path, compile_mode=_EAGER_MODEL_KEY)
-    else:
-        # packaged models will never have non-persistent modifiers built in
-        model = ModelFromPackage(args.input_path, compile_mode=_EAGER_MODEL_KEY)
+    model = load_saved_model(args.input_path, _EAGER_MODEL_KEY, args.model)
 
     # === modify model ===
     # for now, we restrict modifiers to those without arguments, i.e. accelerations
-    # to be consistent with the API of `nequip.model.modify`, the model is a `ModuleDict`
     model = modify(model, [{"modifier": modifier} for modifier in args.modifiers])
-
-    model = model[args.model]
-    # ^ `ModuleDict` of `GraphModel` is loaded, we then select the desired `GraphModel` (`args.model` defaults to work for single model case)
 
     # === combine model and global options metadata ===
     # note that model.metadata can be dynamic and so can account for things that change as a result of modifiers
@@ -246,7 +233,8 @@ def main(args=None):
             for k, v in torch.jit.load(args.data_path).state_dict().items():
                 data[k] = v
         else:
-            if use_ckpt:
+            # call different functions depending on whether checkpoint or package file
+            if not str(args.input_path).endswith(".nequip.zip"):
                 data = data_dict_from_checkpoint(args.input_path)
             else:
                 data = data_dict_from_package(args.input_path)
