@@ -213,12 +213,17 @@ def assert_AtomicData_equivariant(
         if not (k in ("batch", "ptr") and "batch" not in data_in)
     }
     # Assume that all data in `data_in` have the same keys
-    # remove empty outputs from irreps out by running one set of data through
+
+    # run model once to get the true outputs
     data_in_0_copy = data_in[0].copy()
     ref_out = func(data_in_0_copy)
-    for k, v in ref_out.items():
-        if v.numel() == 0 and k in irreps_out.keys():
-            _ = irreps_out.pop(k, None)
+    # remove registered but absent/empty outputs from irreps out
+    new_irreps_out = {}
+    for k, v in irreps_out.items():
+        if k in ref_out.keys():
+            if ref_out[k].numel() != 0:
+                new_irreps_out.update({k: v})
+    irreps_out = new_irreps_out
 
     # for certain things, we don't care what the given irreps are...
     # make sure that we test correctly for equivariance:
@@ -292,9 +297,8 @@ def assert_AtomicData_equivariant(
                 output_list.append(output[k])
             elif k == AtomicDataDict.CELL_KEY:
                 # add a dummy cell
+                # TODO: why is this necessary?
                 output_list.append(torch.zeros(9, dtype=dtype, device=device))
-            else:
-                output_list.append(torch.zeros((1,), dtype=dtype, device=device))
         return output_list
 
     # prepare input data
