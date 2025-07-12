@@ -1,0 +1,86 @@
+run: [train]
+
+dataset_file_name: aspirin.xyz
+cutoff_radius: 5.0
+chemical_symbols: [C, O, H]
+model_type_names: ${chemical_symbols}
+seed: 456
+model_dtype: float32
+
+data:
+  _target_: nequip.data.datamodule.ASEDataModule
+  seed: ${seed}
+  split_dataset:
+    file_path: ${dataset_file_name}
+    train: 5
+    val: 5
+    test: 5
+  transforms:
+    - _target_: nequip.data.transforms.NeighborListTransform
+      r_max: ${cutoff_radius}
+    - _target_: nequip.data.transforms.ChemicalSpeciesToAtomTypeMapper
+      chemical_symbols: ${chemical_symbols}
+  train_dataloader:
+    _target_: torch.utils.data.DataLoader
+    batch_size: 1
+  val_dataloader:
+    _target_: torch.utils.data.DataLoader
+    batch_size: 1
+  test_dataloader:
+    _target_: torch.utils.data.DataLoader
+    batch_size: 1
+  stats_manager:
+    _target_: nequip.data.CommonDataStatisticsManager
+    type_names: ${model_type_names}
+
+trainer:
+  _target_: lightning.Trainer
+  max_epochs: 5
+  check_val_every_n_epoch: 1
+  log_every_n_steps: 1
+  callbacks:
+    - _target_: lightning.pytorch.callbacks.ModelCheckpoint
+      dirpath: ${hydra:runtime.output_dir}
+      save_last: true
+
+training_module:
+  _target_: nequip.train.NequIPLightningModule
+  loss:
+    _target_: nequip.train.MetricsManager
+    metrics:
+      - name: force_MSE
+        field: forces
+        coeff: 1
+        metric:
+          _target_: nequip.train.MeanSquaredError
+  val_metrics:
+    _target_: nequip.train.MetricsManager
+    metrics:
+      - name: force_RMSE
+        field: forces
+        metric:
+          _target_: nequip.train.RootMeanSquaredError
+  optimizer:
+    _target_: torch.optim.Adam
+
+  model:
+    _target_: nequip.model.NequIPGNNModel
+    # basic model params
+    seed: ${seed}
+    model_dtype: ${model_dtype}
+    type_names: ${model_type_names}
+    r_max: ${cutoff_radius}
+    # general model params
+    num_layers: 3
+    num_features: 64
+    radial_mlp_depth: 2
+    radial_mlp_width: 32
+    l_max: 1
+    parity: true
+    # data-dependent model params
+    avg_num_neighbors: ${training_data_stats:num_neighbors_mean}
+    per_type_energy_shifts: ${training_data_stats:per_atom_energy_mean}
+    per_type_energy_scales: ${training_data_stats:forces_rms}
+
+global_options:
+  allow_tf32: false
