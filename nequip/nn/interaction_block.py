@@ -10,10 +10,10 @@ from e3nn.o3._tensor_product._sub import FullyConnectedTensorProduct
 
 from nequip.data import AtomicDataDict
 
-from ._tp_scatter_base import TensorProductScatter
-from .mlp import ScalarMLPFunction
 from ._graph_mixin import GraphModuleMixin
-
+from .mlp import ScalarMLPFunction
+from ._ghost_exchange_base import NoOpGhostExchangeModule
+from ._tp_scatter_base import TensorProductScatter
 
 from typing import Optional
 
@@ -142,6 +142,10 @@ class InteractionBlock(GraphModuleMixin, torch.nn.Module):
                 feature_irreps_out,
             )
 
+        self.ghost_exchange = NoOpGhostExchangeModule(
+            field=AtomicDataDict.NODE_FEATURES_KEY, irreps_in=self.irreps_in
+        )
+
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
         x = data[AtomicDataDict.NODE_FEATURES_KEY]
 
@@ -156,6 +160,12 @@ class InteractionBlock(GraphModuleMixin, torch.nn.Module):
         if alpha is not None:
             x = alpha * x
 
+        # === comms for ghost-exchange ===
+        data[AtomicDataDict.NODE_FEATURES_KEY] = x
+        data = self.ghost_exchange(data, ghost_included=True)
+        x = data[AtomicDataDict.NODE_FEATURES_KEY]
+
+        # === TP and scatter ===
         x = self.tp_scatter(
             x=x,
             edge_attr=data[AtomicDataDict.EDGE_ATTRS_KEY],
