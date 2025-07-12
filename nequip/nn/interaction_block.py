@@ -144,8 +144,6 @@ class InteractionBlock(GraphModuleMixin, torch.nn.Module):
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
         x = data[AtomicDataDict.NODE_FEATURES_KEY]
-        edge_src = data[AtomicDataDict.EDGE_INDEX_KEY][1]
-        edge_dst = data[AtomicDataDict.EDGE_INDEX_KEY][0]
 
         if self.sc is not None:
             sc = self.sc(x, data[AtomicDataDict.NODE_ATTRS_KEY])
@@ -158,10 +156,12 @@ class InteractionBlock(GraphModuleMixin, torch.nn.Module):
         if alpha is not None:
             x = alpha * x
 
-        edge_weight = self.edge_mlp(data[AtomicDataDict.EDGE_EMBEDDING_KEY])
-
         x = self.tp_scatter(
-            x, data[AtomicDataDict.EDGE_ATTRS_KEY], edge_weight, edge_dst, edge_src
+            x=x,
+            edge_attr=data[AtomicDataDict.EDGE_ATTRS_KEY],
+            edge_weight=self.edge_mlp(data[AtomicDataDict.EDGE_EMBEDDING_KEY]),
+            edge_dst=data[AtomicDataDict.EDGE_INDEX_KEY][0],
+            edge_src=data[AtomicDataDict.EDGE_INDEX_KEY][1],
         )
 
         x = self.linear_2(x)
