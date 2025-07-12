@@ -36,6 +36,7 @@ Documentation = "https://nequip.readthedocs.io/"
 nequip-train = "nequip.scripts.train:main"
 nequip-package = "nequip.scripts.package:main"
 nequip-compile = "nequip.scripts.compile:main"
+nequip-prepare-lmp-mliap = "nequip.integrations.lammps_mliap.create_lmp_mliap_file:main"
 
 [tool.setuptools]
 packages = {find = {include = ["nequip", "nequip.*"]}}
