@@ -201,7 +201,9 @@ class PerTypeScaleShift(GraphModuleMixin, torch.nn.Module):
                     torch.ones(self.num_types, dtype=scales.dtype, device=scales.device)
                     * scales
                 )
-            assert scales.shape == (self.num_types,) or scales.numel() == 1
+            assert (
+                scales.shape == (self.num_types,) or scales.numel() == 1
+            ), f"Scales expected to have shape ({self.num_types},), but found {scales.shape}"
             scales = scales.reshape(-1, 1)
             if self.scales_trainable:
                 self.scales = torch.nn.Parameter(scales)
@@ -222,7 +224,9 @@ class PerTypeScaleShift(GraphModuleMixin, torch.nn.Module):
                     torch.ones(self.num_types, dtype=shifts.dtype, device=shifts.device)
                     * shifts
                 )
-            assert shifts.shape == (self.num_types,) or shifts.numel() == 1
+            assert (
+                shifts.shape == (self.num_types,) or shifts.numel() == 1
+            ), f"Shifts expected to have shape ({self.num_types},), but found {shifts.shape}"
             shifts = shifts.reshape(-1, 1)
             if self.shifts_trainable:
                 self.shifts = torch.nn.Parameter(shifts)
@@ -314,7 +318,7 @@ class PerTypeScaleShift(GraphModuleMixin, torch.nn.Module):
 
         def _helper(sc_var, vname, old):
             # get original dict values
-            orig_sc_var = getattr(old, vname).detach().cpu().tolist()
+            orig_sc_var = getattr(old, vname).detach().cpu().reshape(-1).tolist()
             # handle special case of single-valued shortcut
             if len(orig_sc_var) != len(old.type_names):
                 assert len(orig_sc_var) == 1
