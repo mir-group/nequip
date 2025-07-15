@@ -18,7 +18,8 @@ def test_spharm(model_dtype, CH3CHO):
         sph = SphericalHarmonicEdgeAttrs(irreps_edge_sh="0e + 1o + 2e")
         gm = GraphModel(sph)
     assert_auto_jitable(sph)
-    assert_AtomicData_equivariant(gm, data)
+    tol = {"float32": 1e-5, "float64": 1e-9}[model_dtype]
+    assert_AtomicData_equivariant(gm, data, e3_tolerance=tol)
 
 
 def test_radial_basis(model_dtype, CH3CHO):
