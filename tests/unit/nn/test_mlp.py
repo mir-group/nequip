@@ -67,8 +67,5 @@ def test_mlp(
     assert out.shape == (batch, output_dim)
 
     if compare_with_e3nn:
-
         e3nn_out = e3nn_mlp(data)
-        assert torch.allclose(e3nn_out, out, rtol=tol, atol=tol), torch.max(
-            torch.abs(e3nn_out - out)
-        )
+        torch.testing.assert_close(e3nn_out, out, rtol=tol, atol=tol)
