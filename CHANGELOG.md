@@ -9,6 +9,16 @@ Most recent change on the top.
 ## Unreleased
 
 
+## [0.12.1]
+
+### Added
+- `MaximumAbsoluteError` metric
+
+### Fixed
+- `PerTypeScaleShift` model modifier shape bug
+- `WandbWatch` callback typo in docstring
+
+
 ## [0.12.0]
 
 ### Added
@@ -28,6 +38,7 @@ Most recent change on the top.
 
 ### Changed
 - Change to make train-time compile works with PyTorch 2.8.0 -- train-time compile won't work with PyTorch 2.8.0 and NequIP versions before v0.11.1
+
 
 ## [0.11.0]
 
@@ -51,6 +62,7 @@ Most recent change on the top.
 - OpenEquivariance acceleration for NequIP GNN models
 - `SortedNeighborListTransform` for sorted neighborlists with permutation indices to get a sorted transpose
 - Per-edge-type cutoff-aware neighborlist transform
+
 
 ## [0.9.1]
 
@@ -80,6 +92,7 @@ Most recent change on the top.
 ### Removed
 - [Breaking] train-time TorchScript
 
+
 ## [0.7.1]
 
 ### Fixed
@@ -96,6 +109,7 @@ Most recent change on the top.
 
 ## [0.7.0]
 A major backwards-incompatible update with breaking changes throughout the code.
+
 
 ## [0.6.2] - 2025-3-22
 
