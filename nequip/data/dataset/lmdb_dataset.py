@@ -87,6 +87,7 @@ class NequIPLMDBDataset(AtomicDataset):
         self,
         file_path: str,
         transforms: List[Callable] = [],
+        exclude_keys: list[str] = [],
     ):
         super().__init__(transforms=transforms)
         self.file_path = file_path
@@ -100,6 +101,7 @@ class NequIPLMDBDataset(AtomicDataset):
             subdir=False,
         )
         self._length = self.get_metadata(NUM_FRAMES_METADATA_KEY)
+        self.exclude_keys = exclude_keys
 
         # Fallback to stat()['entries'] if no metadata to be backwards compatible
         if self._length is None:
@@ -122,7 +124,7 @@ class NequIPLMDBDataset(AtomicDataset):
                 data = txn.get(f"{idx}".encode("ascii"))
                 if data is None:
                     raise IndexError(f"Index {idx} is out of bounds for LMDB dataset.")
-                data_list.append(pickle.loads(data))
+                data_list.append({k:v for k,v in pickle.loads(data).items() if k not in self.exclude_keys})
         return data_list
 
     @classmethod
