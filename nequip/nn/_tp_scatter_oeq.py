@@ -1,9 +1,4 @@
 from ._tp_scatter_base import TensorProductScatter
-from openequivariance import (
-    TensorProductConv,
-    TPProblem,
-    torch_to_oeq_dtype,
-)
 
 
 class OpenEquivarianceTensorProductScatter(TensorProductScatter):
@@ -25,7 +20,17 @@ class OpenEquivarianceTensorProductScatter(TensorProductScatter):
         # ^ we ensure that the base class keeps around a `self.tp` that carries its own set of persistent buffers
         # even though `self.tp` is not used, having its (persistent) buffers always around ensures state dict compatibility when adding on or removing this subclass module
 
-        # OEQ
+        # === OEQ ===
+
+        # we do lazy imports of oeq to allow `nequip-package` to pick this file up even if oeq is not installed
+        # since `nequip-package` ignores files if it errors on loading the file
+
+        from openequivariance import (
+            TensorProductConv,
+            TPProblem,
+            torch_to_oeq_dtype,
+        )
+
         tpp = TPProblem(
             feature_irreps_in,
             irreps_edge_attr,
