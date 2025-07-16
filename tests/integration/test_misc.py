@@ -80,3 +80,14 @@ def test_lmdb_example():
             cwd=tmpdir,
         )
         _check_and_print(retcode)
+
+        # test ASE example
+        # implicitly tests that the tutorial example link isn't broken
+        retcode = subprocess.run(
+            [
+                "python3",
+                example_dir + "/example_lmdb_conversion.py",
+            ],
+            cwd=tmpdir,
+        )
+        _check_and_print(retcode)
