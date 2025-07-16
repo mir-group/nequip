@@ -81,13 +81,14 @@ class NequIPLMDBDataset(AtomicDataset):
     Args:
         file_path (str): path to LMDB file
         transforms (List[Callable]): list of data transforms
+        exclude_keys (List[str]): list of data keys to ignore
     """
 
     def __init__(
         self,
         file_path: str,
         transforms: List[Callable] = [],
-        exclude_keys: list[str] = [],
+        exclude_keys: List[str] = [],
     ):
         super().__init__(transforms=transforms)
         self.file_path = file_path
@@ -124,7 +125,7 @@ class NequIPLMDBDataset(AtomicDataset):
                 data = txn.get(f"{idx}".encode("ascii"))
                 if data is None:
                     raise IndexError(f"Index {idx} is out of bounds for LMDB dataset.")
-                data_list.append({k:v for k,v in pickle.loads(data).items() if k not in self.exclude_keys})
+                data_list.append(pickle.loads(data) if not self.exclude_keys else {k:v for k,v in pickle.loads(data).items() if k not in self.exclude_keys})
         return data_list
 
     @classmethod
