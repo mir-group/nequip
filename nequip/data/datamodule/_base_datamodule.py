@@ -140,6 +140,9 @@ class NequIPDataModule(lightning.LightningDataModule):
                 dataloader_dict = OmegaConf.to_container(
                     dataloader_dict.copy(), resolve=True
                 )
+            # provide a default just in case
+            if "_target_" not in dataloader_dict:
+                dataloader_dict["_target_"] = "torch.data.utils.DataLoader"
             assert "dataset" not in dataloader_dict
             assert "generator" not in dataloader_dict
             if "collate_fn" not in dataloader_dict:
@@ -258,6 +261,10 @@ class NequIPDataModule(lightning.LightningDataModule):
         )
 
     def _get_dloader(self, datasets, generator, dataloader_dict):
+        if "_target_" not in dataloader_dict:
+            raise RuntimeError(
+                f"`_target_` is missing from the dataloder dict: {dataloader_dict}"
+            )
         return [
             instantiate(
                 dataloader_dict,
