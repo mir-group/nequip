@@ -21,7 +21,7 @@ torch.set_default_dtype(torch.float64)
 
 # === download example xyz file ===
 # skip if one has their own xyz file to run this example
-url = "https://archive.materialscloud.org/record/file?record_id=1302&filename=fcu.xyz"
+url = "https://archive.materialscloud.org/records/ycbvx-knj69/files/fcu.xyz?download=1"
 _ = download_url(url, os.getcwd(), filename=xyz_file_path)
 
 # === ase.Atoms -> AtomicDataDict ===
