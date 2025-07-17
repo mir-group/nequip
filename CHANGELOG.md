@@ -17,6 +17,8 @@ Most recent change on the top.
 ### Fixed
 - `PerTypeScaleShift` model modifier shape bug
 - `WandbWatch` callback typo in docstring
+- Broken links to get `fcu.xyz` example dataset for tutorials/examples
+- `nequip-package` will now always pick up OEQ file even if OEQ is not installed at package time
 
 
 ## [0.12.0]
