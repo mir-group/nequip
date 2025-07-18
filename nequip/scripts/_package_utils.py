@@ -43,6 +43,7 @@ def register_libraries_as_external_for_packaging(
     from that library from being included in the package file.
 
     Two primary types of libraries should be registered as external:
+
     1. Libraries that provide custom C++ or CUDA ops in PyTorch, for example OpenEquivariance.
     2. Large and **stable** third-party, non-PyTorch libraries like NumPy.
 
