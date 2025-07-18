@@ -30,8 +30,6 @@ All additions should support CUDA/GPU. If possible, please test your changes on 
 
 - Use `.. code-block: language` directives in reStructuredText or `` ```language `` in Markdown to make sure code blocks are rendered with syntax highlighting.
 
-- See docs/README.md for instructions on building the docs locally.
-
 - For new classes or functions that are not user-facing, docstrings and explanatory comments are strongly encouraged and will likely be asked for during code reviews.
 
 - Added options should be documented in the docs and changes in the `CHANGELOG.md` file
@@ -44,12 +42,14 @@ We use the [`black`](https://black.readthedocs.io/en/stable/index.html) code for
 --ignore=E226,E501,E741,E743,C901,W503,E203 --max-line-length=127
 ```
 
+For YAML files, we use [`yamllint`](https://yamllint.readthedocs.io/) to ensure consistent formatting and catch syntax errors.
+
 Please run the formatter before you commit and certainly before you make a PR. The formatter can be easily set up to run automatically on file save in various editors.
   
 You can also use ``pre-commit install`` to install a [pre-commit](https://pre-commit.com/) hook.
 
 ```{tip}
-You may need to install `black`, `flake8` and `Flake8-pyproject` (to read the `flake8` settings from `pyproject.toml`) to run the linter and formatter locally. If using a development IDE such as `VSCode` or `PyCharm`, you may need to update the default `flake8` config to match these settings (also listed in `pyproject.toml`).
+You may need to install `black`, `flake8`, `Flake8-pyproject` (to read the `flake8` settings from `pyproject.toml`), and `yamllint` to run the linter and formatter locally. If using a development IDE such as `VSCode` or `PyCharm`, you may need to update the default `flake8` config to match these settings (also listed in `pyproject.toml`).
 ```
 
 ### Git Practices
