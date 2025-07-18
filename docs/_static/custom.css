@@ -1,0 +1,20 @@
+/* Custom CSS for NequIP documentation */
+
+/* Justify paragraph text */
+.content p {
+    text-align: justify;
+}
+
+/* Also justify text in admonitions and other content areas */
+.admonition p,
+.note p,
+.warning p,
+.tip p,
+.important p {
+    text-align: justify;
+}
+
+/* Justify text in list items that contain multiple sentences */
+li p {
+    text-align: justify;
+}
