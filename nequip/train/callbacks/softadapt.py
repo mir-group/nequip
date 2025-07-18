@@ -10,7 +10,7 @@ from typing import List, Dict
 class SoftAdapt(Callback):
     """Adaptively modify loss coefficients over a training run using the `SoftAdapt <https://www.sciencedirect.com/science/article/pii/S0927025624003768>`_ scheme.
 
-    Note that the implementation here differs from the original ``SoftAdapt``scheme (which tends to 1:1:1 loss coefficient ratios), where the coefficient updates are weighted by the input loss coefficients (see PR #515).
+    Note that the implementation here differs from the original ``SoftAdapt`` scheme (which tends to 1:1:1 loss coefficient ratios), where the coefficient updates are weighted by the input loss coefficients (see `PR #515 <https://github.com/mir-group/nequip/pull/515>`_).
 
     .. warning::
         The SoftAdapt requires that all components of the loss function contribute to the loss function, i.e. that their ``coeff`` in the :class:`~nequip.train.MetricsManager` is not ``None``.
