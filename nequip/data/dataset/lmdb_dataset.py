@@ -125,7 +125,16 @@ class NequIPLMDBDataset(AtomicDataset):
                 data = txn.get(f"{idx}".encode("ascii"))
                 if data is None:
                     raise IndexError(f"Index {idx} is out of bounds for LMDB dataset.")
-                data_list.append(pickle.loads(data) if not self.exclude_keys else {k:v for k,v in pickle.loads(data).items() if k not in self.exclude_keys})
+                loaded_data = pickle.loads(data)
+                data_list.append(
+                    loaded_data
+                    if not self.exclude_keys
+                    else {
+                        k: v
+                        for k, v in loaded_data.items()
+                        if k not in self.exclude_keys
+                    }
+                )
         return data_list
 
     @classmethod
