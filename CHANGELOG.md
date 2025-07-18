@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Most recent change on the top.
 
 ## Unreleased
+- Update `SoftAdapt` callback to weight loss coefficient updates by the chosen (initial) loss coefficients.
 
 
 ## [0.12.1]
