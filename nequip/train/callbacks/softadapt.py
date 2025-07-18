@@ -99,11 +99,12 @@ class SoftAdapt(Callback):
             new_coeffs = {k: exp_term / softmax_denom for k, exp_term in exps.items()}
 
             new_coeffs = {
-                k: v * pl_module.loss.metrics[k]["coeff"]
-                for k, v in new_coeffs.items()
+                k: v * pl_module.loss.metrics[k]["coeff"] for k, v in new_coeffs.items()
             }
             # ensure normalised:
-            new_coeffs = {k: v / sum(new_coeffs.values()) for k, v in new_coeffs.items()}
+            new_coeffs = {
+                k: v / sum(new_coeffs.values()) for k, v in new_coeffs.items()
+            }
 
             # update with new coefficients
             self.cached_coeffs.append(new_coeffs)
