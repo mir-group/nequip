@@ -10,6 +10,8 @@ from typing import List, Dict
 class SoftAdapt(Callback):
     """Adaptively modify loss coefficients over a training run using the `SoftAdapt <https://www.sciencedirect.com/science/article/pii/S0927025624003768>`_ scheme.
 
+    Note that the implementation here differs from the original ``SoftAdapt``scheme (which tends to 1:1:1 loss coefficient ratios), where the coefficient updates are weighted by the input loss coefficients (see PR #515).
+
     .. warning::
         The SoftAdapt requires that all components of the loss function contribute to the loss function, i.e. that their ``coeff`` in the :class:`~nequip.train.MetricsManager` is not ``None``.
 
@@ -25,13 +27,11 @@ class SoftAdapt(Callback):
             beta: 1.1
             interval: epoch
             frequency: 5
-            weighted: true
 
     Args:
         beta (float): ``SoftAdapt`` hyperparameter (see paper)
         interval (str): ``batch`` or ``epoch``
         frequency (int): number of intervals between loss coefficient updates
-        weighted (bool): whether to weight the coefficient updates by the original loss coefficients (default: False)
         eps (float): small value to avoid division by zero
     """
 
@@ -40,7 +40,6 @@ class SoftAdapt(Callback):
         beta: float,
         interval: str,
         frequency: int,
-        weighted: bool = False,
         eps: float = 1e-8,
     ):
         assert interval in ["batch", "epoch"]
@@ -49,7 +48,6 @@ class SoftAdapt(Callback):
         self.beta = beta
         self.interval = interval
         self.frequency = frequency
-        self.weighted = weighted
         self.eps = eps
 
         self.prev_losses: Dict[str, float] = None
@@ -100,15 +98,12 @@ class SoftAdapt(Callback):
             softmax_denom = sum([exps[k] for k in new_losses.keys()]) + self.eps
             new_coeffs = {k: exp_term / softmax_denom for k, exp_term in exps.items()}
 
-            if self.weighted:
-                new_coeffs = {
-                    k: v * pl_module.loss.metrics[k]["coeff"]
-                    for k, v in new_coeffs.items()
-                }
-                total_new_coeffs = sum(new_coeffs.values())
-                new_coeffs = {
-                    k: v / total_new_coeffs for k, v in new_coeffs.items()
-                }  # ensure normalised
+            new_coeffs = {
+                k: v * pl_module.loss.metrics[k]["coeff"]
+                for k, v in new_coeffs.items()
+            }
+            # ensure normalised:
+            new_coeffs = {k: v / sum(new_coeffs.values()) for k, v in new_coeffs.items()}
 
             # update with new coefficients
             self.cached_coeffs.append(new_coeffs)
