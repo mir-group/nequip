@@ -26,6 +26,7 @@ class ScalarMLP(GraphModuleMixin, torch.nn.Module):
         nonlinearity: Optional[str] = "silu",
         bias: bool = False,
         forward_weight_init: bool = True,
+        init_mode: str = "uniform",
         field: str = AtomicDataDict.NODE_FEATURES_KEY,
         out_field: Optional[str] = None,
         irreps_in=None,
@@ -48,6 +49,7 @@ class ScalarMLP(GraphModuleMixin, torch.nn.Module):
             nonlinearity=nonlinearity,
             bias=bias,
             forward_weight_init=forward_weight_init,
+            init_mode=init_mode,
         )
         self.irreps_out[self.out_field] = Irreps([(self.mlp_module.dims[-1], (0, 1))])
 
@@ -83,6 +85,7 @@ class ScalarMLPFunction(torch.nn.Module):
         nonlinearity: Optional[str] = "silu",
         bias: bool = False,
         forward_weight_init: bool = True,
+        init_mode: str = "uniform",
     ):
         super().__init__()
         self.bias = bias
@@ -131,6 +134,7 @@ class ScalarMLPFunction(torch.nn.Module):
                 out_features=h_out,
                 alpha=gain / sqrt(norm_dim),
                 bias=bias,
+                init_mode=init_mode,
             )
             mlp.append(linear_layer)
             del gain, norm_dim
@@ -190,14 +194,24 @@ class ScalarLinearLayer(torch.nn.Module):
         out_features: int,
         alpha: float = 1.0,
         bias: bool = False,
+        init_mode: str = "uniform",
     ) -> None:
         super().__init__()
         self.in_features = in_features
         self.out_features = out_features
         self.alpha = alpha
         self.weight = torch.nn.Parameter(torch.empty((in_features, out_features)))
-        # initialize weights to uniform distribution with mean 0 variance 1
-        torch.nn.init.uniform_(self.weight, -sqrt(3), sqrt(3))
+        # initialize weights based on init_mode
+        if init_mode == "uniform":
+            # initialize weights to uniform distribution with mean 0 variance 1
+            torch.nn.init.uniform_(self.weight, -sqrt(3), sqrt(3))
+        elif init_mode == "normal":
+            # initialize weights to normal distribution with mean 0 std 1
+            torch.nn.init.normal_(self.weight, mean=0.0, std=1.0)
+        else:
+            raise ValueError(
+                f"Unknown init_mode: {init_mode}. Must be 'uniform' or 'normal'."
+            )
         # initialize bias (if any) to zeros
         if bias:
             self.bias = torch.nn.Parameter(torch.zeros(out_features))
