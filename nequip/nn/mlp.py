@@ -109,6 +109,7 @@ class ScalarMLPFunction(torch.nn.Module):
             "mish": torch.nn.Mish,
             "gelu": torch.nn.GELU,
             "ssp": ShiftedSoftplus,
+            "tanh": torch.nn.Tanh,
         }[nonlinearity]
         self.is_nonlinear = False  # updated below in loop
 
