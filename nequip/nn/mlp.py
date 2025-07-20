@@ -9,7 +9,20 @@ from nequip.data import AtomicDataDict
 from ._graph_mixin import GraphModuleMixin
 from .nonlinearities import ShiftedSoftplus
 
-from typing import Optional
+from typing import Optional, Final, Dict
+
+
+_NONLINEARITY_MAP: Final[Dict[str, torch.nn.Module]] = {
+    # NOTE: we include str options for `None` so that the parser always works
+    None: torch.nn.Identity,
+    "None": torch.nn.Identity,
+    "null": torch.nn.Identity,
+    "silu": torch.nn.SiLU,
+    "mish": torch.nn.Mish,
+    "gelu": torch.nn.GELU,
+    "ssp": ShiftedSoftplus,
+    "tanh": torch.nn.Tanh,
+}
 
 
 @compile_mode("script")
@@ -68,7 +81,7 @@ class ScalarMLPFunction(torch.nn.Module):
     If ``hidden_layers_depth!=0``,  ``hidden_layers_width`` must be configured (an error will be raised if the default of ``hidden_layers_width=None`` is used).
 
     Args:
-        nonlinearity (str): ``silu`` (default), ``mish``, ``gelu``, or ``None``
+        nonlinearity (str): ``silu`` (default), ``mish``, ``gelu``, ``ssp``, ``tanh``, ``None``, ``null``, or ``"None"``
         bias (bool): whether a bias is included (default ``False``)
         forward_weight_init (bool): whether to initialize weights to preserve forward activation variance (default ``True``) or initialize weights to preserve backward gradient variance
     """
@@ -103,14 +116,12 @@ class ScalarMLPFunction(torch.nn.Module):
 
         # === handle nonlinearity ===
         # TODO: maybe adapt gain to be nonlinearity dependent
-        nonlinearity_module = {
-            None: torch.nn.Identity,
-            "silu": torch.nn.SiLU,
-            "mish": torch.nn.Mish,
-            "gelu": torch.nn.GELU,
-            "ssp": ShiftedSoftplus,
-            "tanh": torch.nn.Tanh,
-        }[nonlinearity]
+        if nonlinearity not in _NONLINEARITY_MAP:
+            available_options = list(_NONLINEARITY_MAP.keys())
+            raise ValueError(
+                f"Unknown nonlinearity '{nonlinearity}'. Available options: {available_options}"
+            )
+        nonlinearity_module = _NONLINEARITY_MAP[nonlinearity]
         self.is_nonlinear = False  # updated below in loop
 
         # === build the MLP + weight init ===
