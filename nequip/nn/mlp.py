@@ -7,6 +7,7 @@ from e3nn.util.jit import compile_mode
 
 from nequip.data import AtomicDataDict
 from ._graph_mixin import GraphModuleMixin
+from .nonlinearities import ShiftedSoftplus
 
 from typing import Optional
 
@@ -101,11 +102,13 @@ class ScalarMLPFunction(torch.nn.Module):
         # a one-layer MLP is a linear layer
 
         # === handle nonlinearity ===
+        # TODO: maybe adapt gain to be nonlinearity dependent
         nonlinearity_module = {
             None: torch.nn.Identity,
             "silu": torch.nn.SiLU,
             "mish": torch.nn.Mish,
             "gelu": torch.nn.GELU,
+            "ssp": ShiftedSoftplus,
         }[nonlinearity]
         self.is_nonlinear = False  # updated below in loop
 

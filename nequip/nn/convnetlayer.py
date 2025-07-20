@@ -8,7 +8,7 @@ from e3nn.nn._normact import NormActivation
 from nequip.data import AtomicDataDict
 from ._graph_mixin import GraphModuleMixin
 from .interaction_block import InteractionBlock
-from .nonlinearities import ShiftedSoftPlus
+from .nonlinearities import shifted_softplus
 from .utils import tp_path_exists
 
 from typing import Dict, Callable
@@ -17,7 +17,7 @@ from typing import Dict, Callable
 acts = {
     "abs": torch.abs,
     "tanh": torch.tanh,
-    "ssp": ShiftedSoftPlus,
+    "ssp": shifted_softplus,
     "silu": torch.nn.functional.silu,
 }
 

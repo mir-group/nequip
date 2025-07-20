@@ -7,6 +7,7 @@ from .atomwise import (
     AtomwiseLinear,
     PerTypeScaleShift,
 )
+from .nonlinearities import ShiftedSoftplus
 from .mlp import ScalarMLP, ScalarMLPFunction
 from .interaction_block import InteractionBlock
 from .convnetlayer import ConvNetLayer
@@ -23,6 +24,7 @@ __all__ = [
     "AtomwiseReduce",
     "AtomwiseLinear",
     "PerTypeScaleShift",
+    "ShiftedSoftplus",
     "ScalarMLP",
     "ScalarMLPFunction",
     "InteractionBlock",

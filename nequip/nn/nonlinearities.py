@@ -8,5 +8,13 @@ import math
 # difficult, so, given the rarety of its use, we have just removed @torch.jit.script
 
 
-def ShiftedSoftPlus(x):
+def shifted_softplus(x):
     return torch.nn.functional.softplus(x) - math.log(2.0)
+
+
+class ShiftedSoftplus(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, x):
+        return shifted_softplus(x)
