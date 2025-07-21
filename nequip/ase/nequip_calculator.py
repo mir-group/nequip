@@ -8,7 +8,6 @@ from ase.stress import full_3x3_to_voigt_6_stress
 
 from nequip.train.lightning import _SOLE_MODEL_KEY
 from nequip.nn import graph_model
-from nequip.model.saved_models import ModelFromCheckpoint, ModelFromPackage
 from nequip.data import AtomicDataDict, from_ase
 from nequip.data.transforms import (
     ChemicalSpeciesToAtomTypeMapper,
@@ -141,6 +140,8 @@ class NequIPCalculator(Calculator):
             chemical_symbols (List[str] or Dict[str, str]): mapping between chemical symbols and model type names
             allow_tf32 (bool): whether to allow TensorFloat32 operations (default ``False``)
         """
+        from nequip.model.saved_models import ModelFromCheckpoint
+
         return cls._from_save(
             save_path=ckpt_path,
             model_getter=ModelFromCheckpoint,
@@ -173,6 +174,8 @@ class NequIPCalculator(Calculator):
             chemical_symbols (List[str] or Dict[str, str]): mapping between chemical symbols and model type names
             allow_tf32 (bool): whether to allow TensorFloat32 operations (default ``False``)
         """
+        from nequip.model.saved_models import ModelFromPackage
+
         return cls._from_save(
             save_path=package_path,
             model_getter=ModelFromPackage,
