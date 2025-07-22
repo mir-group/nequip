@@ -142,7 +142,7 @@ class NequIPDataModule(lightning.LightningDataModule):
                 )
             # provide a default just in case
             if "_target_" not in dataloader_dict:
-                dataloader_dict["_target_"] = "torch.data.utils.DataLoader"
+                dataloader_dict["_target_"] = "torch.utils.data.DataLoader"
             assert "dataset" not in dataloader_dict
             assert "generator" not in dataloader_dict
             if "collate_fn" not in dataloader_dict:
