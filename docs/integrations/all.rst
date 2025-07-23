@@ -3,5 +3,5 @@ Integrations
 
 .. toctree::
 
-    lammps
+    lammps/index
     ase

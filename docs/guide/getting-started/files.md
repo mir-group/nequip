@@ -46,4 +46,4 @@ Package files can be [compiled](./workflow.md/#compilation) to be used for infer
 
 Compiled model files have either the `.nequip.pth` or `.nequip.pt2` extension, depending on whether the compilation mode is `torchscript` or `aotinductor`. They are produced by [`nequip-compile`](./workflow.md/#compilation).
 
-Compiled model files are only used for inference and can be run with [integrations](../../integrations/all.rst) such as ASE and [LAMMPS](../../integrations/lammps.md).
+Compiled model files are only used for inference and can be run with [integrations](../../integrations/all.rst) such as ASE and [LAMMPS](../../integrations/lammps/index.md).

@@ -58,7 +58,7 @@ Importing, restarting, or migrating models or training runs from pre-0.7.0 versi
 
   **Q**: What replaces `nequip-deploy`, which was removed?
 
-  **A**: `nequip-deploy` (which previously generates a TorchScript `.pth` file) is replaced by [`nequip-compile`](../getting-started/workflow.md#compilation) that can produce either a TorchScript `.nequip.pth` file or an AOTInductor `.nequip.pt2` file to be used for inference tasks in our [integrations](../../integrations/all.rst) such as ASE and [LAMMPS](../../integrations/lammps.md).
+  **A**: `nequip-deploy` (which previously generates a TorchScript `.pth` file) is replaced by [`nequip-compile`](../getting-started/workflow.md#compilation) that can produce either a TorchScript `.nequip.pth` file or an AOTInductor `.nequip.pt2` file to be used for inference tasks in our [integrations](../../integrations/all.rst) such as ASE and [LAMMPS](../../integrations/lammps/index.md).
   **Q**: What replaces `nequip-benchmark`, which has been removed?
 
   **A**: No direct substitute exists, but the NequIP ASE calculator can be used to similarly run a model from Python on a single static frame.

@@ -51,7 +51,7 @@ Currently, OpenEquivariance only works with TorchScript compilation for use in [
 
 ### Supported Integrations
 
-| [Compilation Mode](../getting-started/workflow.md#compilation) | [ASE](../../integrations/ase.md) | [LAMMPS](../../integrations/lammps.md) |
+| [Compilation Mode](../getting-started/workflow.md#compilation) | [ASE](../../integrations/ase.md) | [LAMMPS](../../integrations/lammps/index.md) |
 |:-------------------------------------------:|:------------------------------:|:-----------------------------------:|
 | TorchScript (`.nequip.pth`) | ✅ Stable | 🔨 Work in Progress |
 | AOT Inductor (`.nequip.pt2`) | 🔨 Work in Progress | 🔨 Work in Progress |

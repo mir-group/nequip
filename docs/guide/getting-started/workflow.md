@@ -7,7 +7,7 @@ At a glance, the NequIP workflow is as follows.
 1. [**Train**](#training) models with `nequip-train`, which produces a [checkpoint file](./files.md/#checkpoint-files).
 2. [**Test**](#testing) those models using `nequip-train`, sometimes as part of the same call to the command.
 2. [**Package**](#packaging) the model from the checkpoint file with `nequip-package`, which produces a [package file](./files.md/#package-files). Package files are the recommended format for distributing NequIP framework models as they are designed to be usable on different machines and code environments (e.g. with different {mod}`e3nn`, {mod}`nequip`, {mod}`allegro` versions than what the model was initially trained with).
-3. [**Compile**](#compilation) the packaged model (or model from a checkpoint file) with `nequip-compile`, which produces a [compiled model file](./files.md/#compiled-model-files) that can be loaded for [**production simulations**](#production-simulations) in supported [integrations](../../integrations/all.rst) such as [LAMMPS](../../integrations/lammps.md) and [ASE](../../integrations/ase.md).
+3. [**Compile**](#compilation) the packaged model (or model from a checkpoint file) with `nequip-compile`, which produces a [compiled model file](./files.md/#compiled-model-files) that can be loaded for [**production simulations**](#production-simulations) in supported [integrations](../../integrations/all.rst) such as [LAMMPS](../../integrations/lammps/index.md) and [ASE](../../integrations/ase.md).
 
 <br/>
 
@@ -154,4 +154,4 @@ If performing training and inference on separate machines, with possibly differe
 
 ## Production Simulations
 
-Once a model has been [trained](#training) and [compiled](#compilation) it can be used to run production simulations in our supported [integrations](../../integrations/all.rst) with other codes and simulation engines, including [LAMMPS](../../integrations/lammps.md) and [ASE](../../integrations/ase.md).
+Once a model has been [trained](#training) and [compiled](#compilation) it can be used to run production simulations in our supported [integrations](../../integrations/all.rst) with other codes and simulation engines, including [LAMMPS](../../integrations/lammps/index.md) and [ASE](../../integrations/ase.md).
