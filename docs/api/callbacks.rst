@@ -7,6 +7,9 @@ nequip.train.callbacks
 .. autoclass:: nequip.train.callbacks.LossCoefficientScheduler
     :members:
 
+.. autoclass:: nequip.train.callbacks.LinearLossCoefficientScheduler
+    :members:
+
 .. autoclass:: nequip.train.callbacks.LossCoefficientMonitor
     :members:
 
