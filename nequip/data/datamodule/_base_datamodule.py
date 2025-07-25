@@ -256,7 +256,11 @@ class NequIPDataModule(lightning.LightningDataModule):
 
     def predict_dataloader(self):
         """"""
-        self._get_dloader(
+        # we don't expect this method to be used but it's here for consistency
+        logger.warning(
+            "predict_dataloader() is not expected to be used in typical workflows"
+        )
+        return self._get_dloader(
             self.predict_dataset, self.generator, self.predict_dataloader_config
         )
 
