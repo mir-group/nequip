@@ -8,6 +8,9 @@ Most recent change on the top.
 
 ## Unreleased
 
+### Added
+- `LinearLossCoefficientScheduler` callback
+
 
 ## [0.12.1]
 
