@@ -119,8 +119,6 @@ class BaseModelTests:
         model_builder = get_method(config.pop("_target_"))
         model = model_builder(**config)
         model = model.to(device)
-        # test if possible to print model
-        print(model)
         return model
 
     @pytest.fixture(scope="class")
@@ -245,6 +243,12 @@ class BaseModelTests:
     def test_init(self, model):
         instance, _, _ = model
         assert isinstance(instance, GraphModuleMixin)
+
+    def test_model_repr(self, model):
+        """Test that the model can be represented as a string without errors."""
+        instance, _, _ = model
+        repr_str = repr(instance)
+        assert isinstance(repr_str, str)
 
     def test_forward(self, model, model_test_data):
         """Tests that we can run a forward pass without errors."""
