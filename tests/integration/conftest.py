@@ -10,10 +10,12 @@ from nequip.utils.unittests.utils import _training_session, _check_and_print
 
 
 # available training modules for integration tests
-# to save time, we only check the EMA ones for now
+# to save time, we only check the EMA and ScheduleFree ones for now
 _ALL_TRAINING_MODULES = [
     # "nequip.train.NequIPLightningModule",
     "nequip.train.EMALightningModule",
+    # "nequip.train.ScheduleFreeLightningModule"
+    "nequip.train.ScheduleFreeLightningModule",
     # "nequip.train.ConFIGLightningModule",
     "nequip.train.EMAConFIGLightningModule",
 ]

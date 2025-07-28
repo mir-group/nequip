@@ -1,6 +1,9 @@
 from .lightning import NequIPLightningModule
 from typing import Dict, Any
 from lightning.pytorch.utilities.exceptions import MisconfigurationException
+from nequip.utils import RankedLogger
+
+logger = RankedLogger(__name__, rank_zero_only=True)
 
 
 class ScheduleFreeLightningModule(NequIPLightningModule):
@@ -32,18 +35,30 @@ class ScheduleFreeLightningModule(NequIPLightningModule):
         self.schedulefree_optimizer_class = optimizer["_target_"]
         super().__init__(optimizer=optimizer, **kwargs)
 
-    def on_train_epoch_start(self):
-        for opt in self.trainer.optimizers:
-            opt.train()
+    @property
+    def evaluation_model(self) -> Any:
+        logger.info("Loading Schedule-Free optimizer weights for evaluation.")
+        return self.model
 
-    def on_validation_epoch_start(self):
-        for opt in self.trainer.optimizers:
-            opt.eval()
+    def on_fit_start(self) -> None:
+        self.optimizers().train()
 
-    def on_test_epoch_start(self):
-        for opt in self.trainer.optimizers:
-            opt.eval()
+    def on_validation_model_eval(self) -> None:
+        self.model.eval()
+        self.optimizers().eval()
 
-    def on_predict_epoch_start(self):
-        for opt in self.trainer.optimizers:
-            opt.eval()
+    def on_validation_model_train(self) -> None:
+        self.model.train()
+        self.optimizers().train()
+
+    def on_test_model_eval(self) -> None:
+        self.model.eval()
+        self.optimizers().eval()
+
+    def on_test_model_train(self) -> None:
+        self.model.train()
+        self.optimizers().train()
+
+    def on_predict_model_eval(self) -> None:
+        self.model.eval()
+        self.optimizers().eval()
