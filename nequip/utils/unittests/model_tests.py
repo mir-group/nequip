@@ -267,12 +267,6 @@ class BaseModelTests:
 
         Covers TorchScript and AOTInductor (ASE target).
         """
-        # TODO: sort out the CPU compilation issues
-        if mode == "aotinductor" and device == "cpu":
-            pytest.skip(
-                "compile tests are skipped for CPU as there are known compilation bugs for both NequIP and Allegro models on CPU"
-            )
-
         config, tmpdir, env, model_dtype = fake_model_training_session
         assert torch.get_default_dtype() == torch.float64
 
@@ -412,7 +406,9 @@ class BaseModelTests:
         if not _TORCH_GE_2_6:
             pytest.skip("PT2 compile tests skipped for torch < 2.6")
 
-        # TODO: sort out the CPU compilation issues
+        # TODO: have better way to test since problem might be version dependent now
+        # see https://github.com/pytorch/pytorch/issues/146390
+        # i.e. some ops have problems in torch 2.6, but may be ok in torch 2.7
         if device == "cpu":
             pytest.skip(
                 "compile tests are skipped for CPU as there are known compilation bugs for both NequIP and Allegro models on CPU"
