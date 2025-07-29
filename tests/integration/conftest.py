@@ -29,12 +29,15 @@ def conffile(request):
     return request.param
 
 
-@pytest.fixture(scope="session", params=[
-    ("nequip.train.ScheduleFreeLightningModule", "schedulefree.AdamWScheduleFree"),
-    ("nequip.train.ScheduleFreeLightningModule", "schedulefree.RAdamScheduleFree"),
-    ("nequip.train.ScheduleFreeLightningModule", "schedulefree.SGDScheduleFree"),
-    *[m for m in _ALL_TRAINING_MODULES if "ScheduleFreeLightningModule" not in m]
-])
+@pytest.fixture(
+    scope="session",
+    params=[
+        ("nequip.train.ScheduleFreeLightningModule", "schedulefree.AdamWScheduleFree"),
+        ("nequip.train.ScheduleFreeLightningModule", "schedulefree.RAdamScheduleFree"),
+        ("nequip.train.ScheduleFreeLightningModule", "schedulefree.SGDScheduleFree"),
+        *[m for m in _ALL_TRAINING_MODULES if "ScheduleFreeLightningModule" not in m],
+    ],
+)
 def training_module_override_dict(request):
     param = request.param
     if isinstance(param, str):
