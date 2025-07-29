@@ -37,11 +37,6 @@ class ScheduleFreeLightningModule(NequIPLightningModule):
         self._optimizer_config = optimizer
         super().__init__(optimizer=optimizer, **kwargs)
 
-    def configure_optimizers(self):
-        optim = super().configure_optimizers()
-        self._schedulefree_optimizer = optim
-        return optim
-
     def on_save_checkpoint(self, checkpoint: dict):
         opt = getattr(self, "_schedulefree_optimizer", None)
         if opt is not None:
