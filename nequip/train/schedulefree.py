@@ -34,7 +34,7 @@ class ScheduleFreeLightningModule(NequIPLightningModule):
                 f"but found '{optimizer['_target_']}'"
             )
 
-        self.schedulefree_optimizer_class = optimizer["_target_"]
+        self._optimizer_config = optimizer
         super().__init__(optimizer=optimizer, **kwargs)
 
     def configure_optimizers(self):
@@ -42,27 +42,32 @@ class ScheduleFreeLightningModule(NequIPLightningModule):
         self._schedulefree_optimizer = optim
         return optim
 
+    def on_save_checkpoint(self, checkpoint: dict):
+        opt = getattr(self, "_schedulefree_optimizer", None)
+        if opt is not None:
+            checkpoint["schedulefree_optimizer_state_dict"] = opt.state_dict()
+
+    def on_load_checkpoint(self, checkpoint: dict):
+        if "schedulefree_optimizer_state_dict" in checkpoint:
+            logger.info("Restoring Schedule-Free optimizer state from checkpoint.")
+            # Recreate the optimizer if needed
+            if not hasattr(self, "_schedulefree_optimizer"):
+                self._schedulefree_optimizer = self.configure_optimizers()
+            self._schedulefree_optimizer.load_state_dict(
+                checkpoint["schedulefree_optimizer_state_dict"]
+            )
+
     @property
     def evaluation_model(self) -> torch.nn.Module:
         logger.info("Loading Schedule-Free optimizer weights for evaluation.")
-        try:
-            self.optimizers().eval()
-        except Exception as e:
-            logger.warning(f"Cannot call optimizer.eval(): {e}")
-
-            opt = getattr(self, "_schedulefree_optimizer", None)
-            if opt is None:
-                logger.warning("No stored optimizer found — cannot apply smoothing.")
-            else:
-                logger.info("Manually applying Schedule-Free z → param.data smoothing")
-                for group in opt.param_groups:
-                    beta1, _ = group.get("betas", (0.9, 0.999))
-                    for p in group["params"]:
-                        state = opt.state.get(p, {})
-                        z = state.get("z")
-                        if z is not None:
-                            p.data.lerp_(z.to(p.device), 1 - 1 / beta1)
-
+        opt = getattr(self, "_schedulefree_optimizer", None)
+        if opt is not None:
+            try:
+                opt.eval()
+            except Exception as e:
+                logger.warning(f"Schedule-Free optimizer eval() failed: {e}")
+        else:
+            logger.warning("No stored optimizer found — skipping smoothing.")
         return self.model
 
     def on_fit_start(self) -> None:
