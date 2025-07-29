@@ -105,6 +105,9 @@ class NequIPLAMMPSMLIAPWrapper(MLIAPUnified):
         model.model = model.model.func
 
         if self.compile:
+            # NOTE: it seems that we have to set `freezing` this way for constant folding
+            # passing it through `torch.compile(... options={"freezing": True})` doesn't seem to work
+            torch._inductor.config.freezing = 1
             self.model = torch.compile(
                 model, dynamic=True, fullgraph=not _HAS_MLIAP_GHOST_EXCHANGE
             )
