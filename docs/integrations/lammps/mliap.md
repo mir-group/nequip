@@ -45,6 +45,7 @@ cmake --build build-mliap -j 8
 
 Install the Python interface:
 ```bash
+cd build-mliap
 make install-python
 ```
 
