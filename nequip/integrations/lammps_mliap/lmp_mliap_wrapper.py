@@ -138,6 +138,9 @@ class NequIPLAMMPSMLIAPWrapper(MLIAPUnified):
                 lmp_data.elems, dtype=torch.int64
             ).to(self.device),
             AtomicDataDict.LMP_MLIAP_DATA_KEY: lmp_data,
+            AtomicDataDict.NUM_LOCAL_GHOST_NODES_KEY: torch.tensor(
+                [lmp_data.nlocal, lmp_data.ntotal - lmp_data.nlocal], dtype=torch.int64
+            ).to(self.device),
         }
 
         # === run model ===
