@@ -187,7 +187,11 @@ class DeepLinearMLP(torch.nn.Module):
             self.weights.append(new_weight)
             del new_weight
             alphas.append(mlp[mlp_idx].alpha)
-        self.alpha = prod(alphas)
+        alpha = prod(alphas)
+        # the constant has to be a buffer for constant-folding to happen with `torch.compile(...dynamic=True)`
+        # `persistent=False` for backwards compatibility of checkpoint files
+        # (and technically preserves the old behavior when using a float in that it's also not persistent)
+        self.register_buffer("alpha", torch.tensor(alpha), persistent=False)
         del alphas
 
     def forward(self, input: torch.Tensor) -> torch.Tensor:
@@ -214,7 +218,10 @@ class ScalarLinearLayer(torch.nn.Module):
         super().__init__()
         self.in_features = in_features
         self.out_features = out_features
-        self.alpha = alpha
+        # the constant has to be a buffer for constant-folding to happen with `torch.compile(...dynamic=True)`
+        # `persistent=False` for backwards compatibility of checkpoint files
+        # (and technically preserves the old behavior when using a float in that it's also not persistent)
+        self.register_buffer("alpha", torch.tensor(alpha), persistent=False)
         self.weight = torch.nn.Parameter(torch.empty((in_features, out_features)))
         # initialize weights based on init_mode
         if init_mode == "uniform":
@@ -234,6 +241,7 @@ class ScalarLinearLayer(torch.nn.Module):
             self.register_parameter("bias", None)
 
     def forward(self, input: torch.Tensor) -> torch.Tensor:
+        # compute scaled weights separately to be constant folded
         weight = self.weight * self.alpha
         if self.bias is None:
             return torch.mm(input, weight)
