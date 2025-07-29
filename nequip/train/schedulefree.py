@@ -30,6 +30,7 @@ class ScheduleFreeLightningModule(NequIPLightningModule):
         ):
             raise MisconfigurationException(
                 f"Invalid optimizer: expected Schedule-Free optimizer (_target_ ending with one of {valid_targets}), "
+                f"but found '{optimizer['_target_']}'"
             )
 
         self.schedulefree_optimizer_class = optimizer["_target_"]
@@ -38,6 +39,8 @@ class ScheduleFreeLightningModule(NequIPLightningModule):
     @property
     def evaluation_model(self) -> Any:
         logger.info("Loading Schedule-Free optimizer weights for evaluation.")
+        opt = self.optimizers()
+        opt.eval()
         return self.model
 
     def on_fit_start(self) -> None:

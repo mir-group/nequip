@@ -31,10 +31,27 @@ def conffile(request):
 
 @pytest.fixture(
     scope="session",
-    params=_ALL_TRAINING_MODULES,
+    params=[
+        ("nequip.train.ScheduleFreeLightningModule", "schedulefree.AdamWScheduleFree"),
+        ("nequip.train.ScheduleFreeLightningModule", "schedulefree.RAdamScheduleFree"),
+        ("nequip.train.ScheduleFreeLightningModule", "schedulefree.SGDScheduleFree"),
+        *[m for m in _ALL_TRAINING_MODULES if "ScheduleFreeLightningModule" not in m],
+    ],
 )
-def training_module(request):
-    return request.param
+def training_module_override_dict(request):
+    param = request.param
+    if isinstance(param, str):
+        return {"_target_": param}
+    module, optimizer = param
+    return {
+        "_target_": module,
+        "optimizer": {
+            "_target_": optimizer,
+            "lr": 0.0025,
+            "warmup_steps": 10,
+            "weight_decay": 0.0,
+        },
+    }
 
 
 @pytest.fixture(scope="session", params=[None, "checkpoint", "package"])
@@ -47,13 +64,13 @@ def extra_train_from_save(request):
 
 @pytest.fixture(scope="session")
 def fake_model_training_session(
-    conffile, training_module, model_dtype, extra_train_from_save
+    conffile, training_module_override_dict, model_dtype, extra_train_from_save
 ):
     session = _training_session(
         conffile,
         model_dtype,
         extra_train_from_save=extra_train_from_save,
-        training_module=training_module,
+        training_module_override_dict=training_module_override_dict,  # NEW ARG
     )
     config, tmpdir, env = next(session)
     yield config, tmpdir, env, model_dtype

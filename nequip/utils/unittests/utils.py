@@ -26,7 +26,7 @@ def _training_session(
     model_dtype,
     extra_train_from_save=None,
     model_config=None,
-    training_module=None,
+    training_module_override_dict=None,
 ):
     """
     Create a training session using config files with optional model injection.
@@ -38,8 +38,7 @@ def _training_session(
         model_dtype: Model dtype string (e.g., "float32", "float64")
         extra_train_from_save: Optional, None/"checkpoint"/"package" for additional training
         model_config: Optional model config dict to inject (for unit tests)
-        training_module: Optional training module target (for integration tests)
-
+        training_module_override_dict: Optional dict with training_module override, including optimizer (e.g. for ScheduleFreeLightningModule)
     Yields:
         tuple: (config, tmpdir, env) - training config, temp directory, and env vars
     """
@@ -58,9 +57,11 @@ def _training_session(
                 config.data.data_source_dir = data_tmpdir
 
             # configure training module and model
-            if training_module is not None:
+            if training_module_override_dict is not None:
                 # integration test case: use provided training module
-                config.training_module._target_ = training_module
+                if training_module_override_dict:
+                    with open_dict(config):
+                        config.training_module.update(training_module_override_dict)
                 config.training_module.model.model_dtype = model_dtype
             else:
                 # unit test case: default training module
