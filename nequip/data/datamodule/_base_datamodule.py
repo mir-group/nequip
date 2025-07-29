@@ -156,10 +156,37 @@ class NequIPDataModule(lightning.LightningDataModule):
         # == data statistics manager ==
         self.stats_manager_cfg = stats_manager
 
-    def load_state_dict(self, state_dict: Dict[str, any]) -> None:
+    def load_state_dict(self, state_dict: Dict[str, Any]) -> None:
         """"""
         self.train_generator_state = state_dict["train_generator_state"]
         self.generator_state = state_dict["generator_state"]
+
+        for varname in ["train", "val", "test", "predict"]:
+            batch_sampler_sd = state_dict.get(f"{varname}_batch_sampler", {})
+            if not batch_sampler_sd:
+                continue  # skip empty state_dicts
+            dloader_config = getattr(self, f"{varname}_dataloader_config")
+            # If we have a provided a custom batch sampler (i.e. that implements load_state_dict)
+            # we instantiate it and load the state_dict
+            if "batch_sampler" in dloader_config:
+                # instantiate the batch sampler with the config from __init__
+                # TODO: this will instantiate the batch sampler at this point,
+                # instead of when the dataloader is created, regardless of whether the
+                # sampler has a load_state_dict method
+                bsampler = instantiate(dloader_config["batch_sampler"])
+                assert isinstance(
+                    bsampler,
+                    Union[torch.utils.data.BatchSampler, torch.utils.data.Sampler],
+                ), (
+                    "Batch sampler must be a torch.utils.data.BatchSampler or torch.utils.data.Sampler"
+                )
+
+                # check if we have a load_state_dict method
+                if callable(getattr(bsampler, "load_state_dict", None)):
+                    # load the state dict to resume from last checkpoint
+                    bsampler.load_state_dict(batch_sampler_sd)
+                # replace the batch sampler in the dataloader config
+                dloader_config["batch_sampler"] = bsampler
 
     def state_dict(self) -> Dict[str, Any]:
         """"""
@@ -171,10 +198,27 @@ class NequIPDataModule(lightning.LightningDataModule):
             generator_state = self.generator.get_state()
         else:
             generator_state = self.generator_state
-        return {
+
+        sd = {
             "train_generator_state": train_generator_state,
             "generator_state": generator_state,
         }
+
+        for varname in ["train", "val", "test", "predict"]:
+            dloader = getattr(self, f"{varname}_dataloader", None)
+            key = f"{varname}_batch_sampler"
+            # check if dloader exists, has bsampler, and that it has a state_dict method
+            if (
+                not dloader
+                or not hasattr(dloader, "batch_sampler")
+                or not callable(getattr(dloader.batch_sampler, "state_dict", None))
+            ):  # user has not specified restartable batch sampler
+                sd[key] = {}
+                continue
+
+            sd[key] = dloader.batch_sampler.state_dict()
+
+        return sd
 
     def setup(self, stage: str) -> None:
         """"""
@@ -238,21 +282,24 @@ class NequIPDataModule(lightning.LightningDataModule):
         """"""
         # must only return single train dataloader for now
         # see https://lightning.ai/docs/pytorch/stable/data/iterables.html#multiple-dataloaders
-        return self._get_dloader(
+        self._train_dataloader = self._get_dloader(
             self.train_dataset, self.train_generator, self.train_dataloader_config
-        )[0]
+        )
+        return self._train_dataloader[0]
 
     def val_dataloader(self):
         """"""
-        return self._get_dloader(
+        self._val_dataloader = self._get_dloader(
             self.val_dataset, self.generator, self.val_dataloader_config
         )
+        return self._val_dataloader
 
     def test_dataloader(self):
         """"""
-        return self._get_dloader(
+        self._test_dataloader = self._get_dloader(
             self.test_dataset, self.generator, self.test_dataloader_config
         )
+        return self._test_dataloader
 
     def predict_dataloader(self):
         """"""
@@ -260,9 +307,10 @@ class NequIPDataModule(lightning.LightningDataModule):
         logger.warning(
             "predict_dataloader() is not expected to be used in typical workflows"
         )
-        return self._get_dloader(
+        self._predict_dataloader = self._get_dloader(
             self.predict_dataset, self.generator, self.predict_dataloader_config
         )
+        return self._predict_dataloader
 
     def _get_dloader(self, datasets, generator, dataloader_dict):
         if "_target_" not in dataloader_dict:

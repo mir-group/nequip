@@ -12,6 +12,7 @@ from ase.calculators.emt import EMT
 from .. import AtomicDataDict
 from ..dict import from_dict
 from .base_datasets import AtomicDataset
+from .lmdb_dataset import NequIPLMDBDataset
 
 
 class EMTTestDataset(AtomicDataset):
@@ -88,3 +89,34 @@ class EMTTestDataset(AtomicDataset):
             return self.data_list[indices]
         else:
             return [self.data_list[index] for index in indices]
+
+
+class LMDBTestDataset(NequIPLMDBDataset):
+    """LMDB wrapper for the `EMTTestDataset`."""
+
+    def __init__(
+        self,
+        file_path: str,
+        transforms: List[Callable] = [],
+        supercell: Tuple[int, int, int] = (4, 4, 4),
+        sigma: float = 0.1,
+        element: str = "Cu",
+        num_frames: int = 10,
+        seed: int = 123456,
+    ):
+        # Generate random data
+        test_ds = EMTTestDataset(
+            transforms=[],  # transforms are applied in the LMDBDataset
+            supercell=supercell,
+            sigma=sigma,
+            element=element,
+            num_frames=num_frames,
+            seed=seed,
+        )
+        # Save to LMDB
+        NequIPLMDBDataset.save_from_iterator(
+            file_path=file_path,
+            iterator=test_ds,
+        )
+        # Initialize LMDB dataset
+        super().__init__(file_path=file_path, transforms=transforms)

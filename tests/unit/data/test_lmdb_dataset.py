@@ -2,6 +2,7 @@ import lmdb
 import torch
 import pickle
 import pytest
+import numpy as np
 from nequip.data.dataset import NequIPLMDBDataset
 
 
@@ -44,7 +45,7 @@ def test_save_load_and_metadata(tmp_path):
 
     # num_atoms_per_entry should be a list of length n, each entry = 1
     num_atoms_list = ds.get_metadata("num_atoms_per_entry")
-    assert isinstance(num_atoms_list, list)
+    assert isinstance(num_atoms_list, np.ndarray)
     assert len(num_atoms_list) == n
     assert all(x == 1 for x in num_atoms_list)
 
