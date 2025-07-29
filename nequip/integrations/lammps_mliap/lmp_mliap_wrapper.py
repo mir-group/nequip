@@ -121,6 +121,7 @@ class NequIPLAMMPSMLIAPWrapper(MLIAPUnified):
             return
 
         # === create input data ===
+        # TODO: we have yet to exploit per-edge-type cutoffs by pruning the edge vectors and neighborlist
         # make sure edge vectors `requires_grad`
         edge_vectors = torch.as_tensor(lmp_data.rij, dtype=torch.float64).to(
             self.device
