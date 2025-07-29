@@ -9,16 +9,24 @@ from omegaconf import OmegaConf, open_dict
 from nequip.utils.unittests.utils import _training_session, _check_and_print
 
 
+try:
+    import schedulefree  # noqa: F401
+
+    _SCHEDULEFREE_INSTALLED = True
+except ImportError:
+    _SCHEDULEFREE_INSTALLED = False
+
+
 # available training modules for integration tests
 # to save time, we only check the EMA and ScheduleFree ones for now
 _ALL_TRAINING_MODULES = [
     # "nequip.train.NequIPLightningModule",
     "nequip.train.EMALightningModule",
-    # "nequip.train.ScheduleFreeLightningModule"
-    "nequip.train.ScheduleFreeLightningModule",
     # "nequip.train.ConFIGLightningModule",
     "nequip.train.EMAConFIGLightningModule",
 ]
+if _SCHEDULEFREE_INSTALLED:
+    _ALL_TRAINING_MODULES.append("nequip.train.ScheduleFreeLightningModule")
 
 
 @pytest.fixture(
@@ -32,26 +40,27 @@ def conffile(request):
 @pytest.fixture(
     scope="session",
     params=[
-        ("nequip.train.ScheduleFreeLightningModule", "schedulefree.AdamWScheduleFree"),
-        ("nequip.train.ScheduleFreeLightningModule", "schedulefree.RAdamScheduleFree"),
-        ("nequip.train.ScheduleFreeLightningModule", "schedulefree.SGDScheduleFree"),
-        *[m for m in _ALL_TRAINING_MODULES if "ScheduleFreeLightningModule" not in m],
+        *(
+            [
+                {
+                    "_target_": "nequip.train.ScheduleFreeLightningModule",
+                    "optimizer": {
+                        "_target_": "schedulefree.AdamWScheduleFree",
+                        "lr": 0.01,
+                        "weight_decay": 0.0,
+                        "warmup_steps": 10,
+                    },
+                }
+            ]
+            if _SCHEDULEFREE_INSTALLED
+            else []
+        ),
+        {"_target_": "nequip.train.EMALightningModule"},
+        {"_target_": "nequip.train.EMAConFIGLightningModule"},
     ],
 )
 def training_module_override_dict(request):
-    param = request.param
-    if isinstance(param, str):
-        return {"_target_": param}
-    module, optimizer = param
-    return {
-        "_target_": module,
-        "optimizer": {
-            "_target_": optimizer,
-            "lr": 0.0025,
-            "warmup_steps": 10,
-            "weight_decay": 0.0,
-        },
-    }
+    return request.param
 
 
 @pytest.fixture(scope="session", params=[None, "checkpoint", "package"])

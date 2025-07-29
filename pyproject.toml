@@ -25,7 +25,6 @@ dependencies = [
     "hydra-core",
     "lightning",
     "torchmetrics>=1.6.0",
-    "schedulefree",
 ]
 
 [project.urls]
