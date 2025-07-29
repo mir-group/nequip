@@ -2,6 +2,7 @@ from .lightning import NequIPLightningModule
 from typing import Dict, Any
 from lightning.pytorch.utilities.exceptions import MisconfigurationException
 from nequip.utils import RankedLogger
+import torch
 
 logger = RankedLogger(__name__, rank_zero_only=True)
 
@@ -37,10 +38,13 @@ class ScheduleFreeLightningModule(NequIPLightningModule):
         super().__init__(optimizer=optimizer, **kwargs)
 
     @property
-    def evaluation_model(self) -> Any:
+    def evaluation_model(self) -> torch.nn.Module:
         logger.info("Loading Schedule-Free optimizer weights for evaluation.")
-        opt = self.optimizers()
-        opt.eval()
+        if hasattr(self, "trainer") and self.trainer is not None:
+            opt = self.optimizers()
+            opt.eval()
+        else:
+            logger.warning("No Trainer found — skipping optimizer.eval()")
         return self.model
 
     def on_fit_start(self) -> None:
