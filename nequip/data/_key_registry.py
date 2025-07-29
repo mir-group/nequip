@@ -17,6 +17,7 @@ _DEFAULT_LONG_FIELDS: Set[str] = {
     _keys.BATCH_KEY,
     _keys.NUM_NODES_KEY,
     _keys.FRAME_SUBSET_KEY,
+    _keys.NUM_LOCAL_GHOST_NODES_KEY,
 }
 _DEFAULT_GRAPH_FIELDS: Set[str] = {
     _keys.TOTAL_ENERGY_KEY,

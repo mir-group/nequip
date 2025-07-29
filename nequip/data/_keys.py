@@ -85,6 +85,11 @@ NUM_NODES_KEY: Final[str] = "num_atoms"
 
 # LAMMPS MLIAP integration keys
 LMP_MLIAP_DATA_KEY: Final[str] = "lmp_mliap_data"
+# (2,) tensor containing [num_local_atoms, num_ghost_atoms]
+# the sum of the entries is `num_total_atoms`
+# used with LAMMPS ML-IAP for now
+# but possible for reuse with other integrations based on similar local-ghost schemes
+NUM_LOCAL_GHOST_NODES_KEY: Final[str] = "num_local_ghost_atoms"
 
 # make a list of allowed keys
 ALLOWED_KEYS: List[str] = [v for k, v in globals().items() if k.endswith("_KEY")]

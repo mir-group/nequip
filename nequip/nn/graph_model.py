@@ -72,6 +72,7 @@ class GraphModel(GraphModuleMixin, torch.nn.Module):
             AtomicDataDict.ATOM_TYPE_KEY: None,
             # for LAMMPS ML-IAP
             AtomicDataDict.LMP_MLIAP_DATA_KEY: None,
+            AtomicDataDict.NUM_LOCAL_GHOST_NODES_KEY: None,
         }
         model_input_fields = AtomicDataDict._fix_irreps_dict(model_input_fields)
         irreps_in.update(model_input_fields)
