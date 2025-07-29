@@ -6,6 +6,7 @@ from .base_datasets import AtomicDataset
 import lmdb
 import pickle
 import copy
+import numpy as np
 from dataclasses import dataclass
 
 from functools import cached_property
@@ -19,6 +20,7 @@ from typing import (
     Optional,
     Final,
 )
+
 
 NUM_ATOMS_METADATA_KEY: Final[str] = "num_atoms_per_entry"
 NUM_EDGES_METADATA_KEY: Final[str] = "num_edges_per_entry"
@@ -168,7 +170,11 @@ class NequIPLMDBDataset(AtomicDataset):
         )
 
         def _write_metadata(metadata_acc, txn):
-            metadata = pickle.dumps(metadata_acc, protocol=-1)
+            processed_metadata = {
+                k: np.asarray(v) if isinstance(v, list) else v
+                for k, v in metadata_acc.items()
+            }
+            metadata = pickle.dumps(processed_metadata, protocol=-1)
             txn.put(b"__metadata__", metadata)
 
         # Always write base metadata
