@@ -40,11 +40,13 @@ class ScheduleFreeLightningModule(NequIPLightningModule):
     @property
     def evaluation_model(self) -> torch.nn.Module:
         logger.info("Loading Schedule-Free optimizer weights for evaluation.")
-        if hasattr(self, "trainer") and self.trainer is not None:
-            opt = self.optimizers()
-            opt.eval()
+
+        if getattr(self, "_trainer", None) is not None:
+            logger.debug("Calling optimizer.eval() during evaluation_model")
+            self.optimizers().eval()
         else:
             logger.warning("No Trainer found — skipping optimizer.eval()")
+
         return self.model
 
     def on_fit_start(self) -> None:
