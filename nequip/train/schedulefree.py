@@ -40,12 +40,27 @@ class ScheduleFreeLightningModule(NequIPLightningModule):
     @property
     def evaluation_model(self) -> torch.nn.Module:
         logger.info("Loading Schedule-Free optimizer weights for evaluation.")
-
-        if getattr(self, "_trainer", None) is not None:
-            logger.debug("Calling optimizer.eval() during evaluation_model")
-            self.optimizers().eval()
-        else:
-            logger.warning("No Trainer found — skipping optimizer.eval()")
+        try:
+            opt = self.optimizers()
+            opt.eval()
+        except RuntimeError as e:
+            logger.warning(f"Cannot call optimizer.eval(): {e}")
+            # Attempt to manually recover optimizer from self.__dict__ (Lightning stores it here after load_from_checkpoint)
+            for obj in self.__dict__.values():
+                if isinstance(obj, torch.optim.Optimizer):
+                    for group in obj.param_groups:
+                        beta1, _ = group.get("betas", (0.9, 0.999))
+                        for p in group["params"]:
+                            state = obj.state.get(p, {})
+                            z = state.get("z")
+                            if z is not None:
+                                p.data.lerp_(z.to(p.device), 1 - 1 / beta1)
+                    logger.info(
+                        "Manually applied z → param.data from Schedule-Free optimizer"
+                    )
+                    break
+            else:
+                logger.warning("No optimizer found for manual evaluation smoothing.")
 
         return self.model
 
