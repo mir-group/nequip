@@ -37,31 +37,31 @@ class ScheduleFreeLightningModule(NequIPLightningModule):
         self.schedulefree_optimizer_class = optimizer["_target_"]
         super().__init__(optimizer=optimizer, **kwargs)
 
+    def configure_optimizers(self):
+        optim = super().configure_optimizers()
+        self._schedulefree_optimizer = optim
+        return optim
+
     @property
     def evaluation_model(self) -> torch.nn.Module:
         logger.info("Loading Schedule-Free optimizer weights for evaluation.")
-
         try:
-            # Normal case when inside Trainer
             self.optimizers().eval()
         except Exception as e:
             logger.warning(f"Cannot call optimizer.eval(): {e}")
-            # Trainerless fallback: Lightning stores restored optimizers here
-            opt_list = getattr(
-                getattr(self, "_optimizer_connector", None), "_optimizers", []
-            )
-            if not opt_list:
-                logger.warning("No optimizer found for manual evaluation smoothing.")
+
+            opt = getattr(self, "_schedulefree_optimizer", None)
+            if opt is None:
+                logger.warning("No stored optimizer found — cannot apply smoothing.")
             else:
                 logger.info("Manually applying Schedule-Free z → param.data smoothing")
-                for opt in opt_list:
-                    for group in opt.param_groups:
-                        beta1, _ = group.get("betas", (0.9, 0.999))
-                        for p in group["params"]:
-                            state = opt.state.get(p, {})
-                            z = state.get("z")
-                            if z is not None:
-                                p.data.lerp_(z.to(p.device), 1 - 1 / beta1)
+                for group in opt.param_groups:
+                    beta1, _ = group.get("betas", (0.9, 0.999))
+                    for p in group["params"]:
+                        state = opt.state.get(p, {})
+                        z = state.get("z")
+                        if z is not None:
+                            p.data.lerp_(z.to(p.device), 1 - 1 / beta1)
 
         return self.model
 
