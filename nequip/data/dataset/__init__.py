@@ -4,7 +4,7 @@ from .lmdb_dataset import NequIPLMDBDataset
 from .ase_dataset import ASEDataset
 from .npz_dataset import NPZDataset
 from .hdf5_dataset import HDF5Dataset
-from .test_data import EMTTestDataset
+from .test_data import EMTTestDataset, LMDBTestDataset
 from .utils import SubsetByRandomSlice, RandomSplitAndIndexDataset
 
 
@@ -17,4 +17,5 @@ __all__ = [
     "EMTTestDataset",
     "SubsetByRandomSlice",
     "RandomSplitAndIndexDataset",
+    "LMDBTestDataset",
 ]

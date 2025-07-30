@@ -119,4 +119,5 @@ class LMDBTestDataset(NequIPLMDBDataset):
             iterator=test_ds,
         )
         # Initialize LMDB dataset
+        # Note: transforms are not applied here, as they are already applied in the EMTTestDataset
         super().__init__(file_path=file_path, transforms=transforms)
