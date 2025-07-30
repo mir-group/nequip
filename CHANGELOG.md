@@ -12,6 +12,9 @@ Most recent change on the top.
 - `LinearLossCoefficientScheduler` callback
 - `TF32Scheduler` callback
 
+### Changed
+- `EMTTestDataset` now uses orthorhombic cells
+
 
 ## [0.12.1]
 

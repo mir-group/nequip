@@ -17,8 +17,8 @@ from .base_datasets import AtomicDataset
 class EMTTestDataset(AtomicDataset):
     """Test dataset with PBC, based on the toy EMT potential included in ASE.
 
-    Randomly generates (in a reproducable manner) a basic bulk with added
-    Gaussian noise around equilibrium positions.
+    Randomly generates (in a reproducable manner) a basic bulk with added Gaussian noise around equilibrium positions.
+    Uses orthorhombic cell construction for safer testing.
 
     In ASE units (eV, Å, eV/Å).
 
@@ -50,7 +50,10 @@ class EMTTestDataset(AtomicDataset):
         self.seed = seed
 
         # generate data
-        base_atoms = ase.build.bulk(self.element, "fcc").repeat(self.supercell)
+        # NOTE: orthorhombic cell is safer for tests, e.g. LAMMPS
+        base_atoms = ase.build.bulk(self.element, "fcc", orthorhombic=True).repeat(
+            self.supercell
+        )
         base_atoms.calc = EMT()
         orig_pos = copy.deepcopy(base_atoms.positions)
         rng = np.random.default_rng(self.seed)
