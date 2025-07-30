@@ -36,7 +36,15 @@ class ScheduleFreeLightningModule(NequIPLightningModule):
         self._optimizer_config = optimizer
         super().__init__(optimizer=optimizer, **kwargs)
 
+    @classmethod
+    def load_from_checkpoint(cls, checkpoint_path: str, *args, **kwargs):
+        # Load LightningModule, then apply smoothing so that .model holds smoothed weights
+        module = super().load_from_checkpoint(checkpoint_path, *args, **kwargs)
+        _ = module.evaluation_model
+        return module
+
     def on_save_checkpoint(self, checkpoint: dict):
+        # Ensure we capture the Schedule-Free optimizer state
         opt = getattr(self, "_schedulefree_optimizer", None)
         if opt is None:
             opt = self.optimizers()
