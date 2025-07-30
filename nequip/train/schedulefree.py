@@ -37,35 +37,16 @@ class ScheduleFreeLightningModule(NequIPLightningModule):
         self._optimizer_config = optimizer
         super().__init__(optimizer=optimizer, **kwargs)
 
-    def _build_schedulefree_optimizer(self):
-        try:
-            return instantiate(self._optimizer_config)
-        except Exception as e:
-            raise RuntimeError(
-                f"Failed to manually instantiate Schedule-Free optimizer: {e}"
-            )
+    def configure_optimizers(self):
+        self._schedulefree_optimizer = instantiate(self._optimizer_config)
+        return self._schedulefree_optimizer
 
     def on_save_checkpoint(self, checkpoint: dict):
-        opt = getattr(self, "_schedulefree_optimizer", None)
-        if opt is None:
-            try:
-                if hasattr(self, "trainer") and hasattr(self.trainer, "optimizers"):
-                    opt = self.trainer.optimizers
-                else:
-                    opt = self.optimizers()
-                self._schedulefree_optimizer = opt
-            except Exception as e:
-                logger.warning(
-                    f"Could not retrieve optimizer in on_save_checkpoint: {e}"
-                )
-                return
-
-        if hasattr(opt, "state_dict"):
-            checkpoint["schedulefree_optimizer_state_dict"] = opt.state_dict()
-        else:
-            logger.warning(
-                "Schedule-Free optimizer state_dict not available; skipping save."
-            )
+        if not hasattr(self, "_schedulefree_optimizer"):
+            self._schedulefree_optimizer = self.configure_optimizers()
+        checkpoint["schedulefree_optimizer_state_dict"] = (
+            self._schedulefree_optimizer.state_dict()
+        )
 
     def on_load_checkpoint(self, checkpoint: dict):
         if "schedulefree_optimizer_state_dict" in checkpoint:
@@ -76,18 +57,24 @@ class ScheduleFreeLightningModule(NequIPLightningModule):
                 "schedulefree_optimizer_state_dict"
             ]
 
+    @classmethod
+    def load_from_checkpoint(cls, checkpoint_path: str, *args, **kwargs):
+        module = super().load_from_checkpoint(checkpoint_path, *args, **kwargs)
+        _ = module.evaluation_model
+        return module
+
     @property
     def evaluation_model(self) -> torch.nn.Module:
         logger.info("Applying Schedule-Free optimizer weights for evaluation.")
 
         if not hasattr(self, "_schedulefree_optimizer"):
             try:
-                self._schedulefree_optimizer = self.optimizers()
-            except Exception:
+                self._schedulefree_optimizer = self.configure_optimizers()
+            except Exception as e:
                 logger.warning(
-                    "ScheduleFreeLightningModule is not attached to a `Trainer`; manually instantiating optimizer."
+                    f"Failed to initialize Schedule-Free optimizer for evaluation: {e}"
                 )
-                self._schedulefree_optimizer = self._build_schedulefree_optimizer()
+                return self.model
 
         state_dict = getattr(self, "_schedulefree_optimizer_state_dict", None)
         if state_dict is not None:
@@ -103,24 +90,24 @@ class ScheduleFreeLightningModule(NequIPLightningModule):
         return self.model
 
     def on_fit_start(self) -> None:
-        self.optimizers().train()
+        self._schedulefree_optimizer.train()
 
     def on_validation_model_eval(self) -> None:
         self.model.eval()
-        self.optimizers().eval()
+        self._schedulefree_optimizer.eval()
 
     def on_validation_model_train(self) -> None:
         self.model.train()
-        self.optimizers().train()
+        self._schedulefree_optimizer.train()
 
     def on_test_model_eval(self) -> None:
         self.model.eval()
-        self.optimizers().eval()
+        self._schedulefree_optimizer.eval()
 
     def on_test_model_train(self) -> None:
         self.model.train()
-        self.optimizers().train()
+        self._schedulefree_optimizer.train()
 
     def on_predict_model_eval(self) -> None:
         self.model.eval()
-        self.optimizers().eval()
+        self._schedulefree_optimizer.eval()
