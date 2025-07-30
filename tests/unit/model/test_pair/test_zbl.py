@@ -27,6 +27,10 @@ class TestZBLModel(BaseEnergyModelTests):
     def test_nequip_compile(self):
         pass
 
+    @pytest.mark.skip(reason="Skip LAMMPS ML-IAP tests for ZBL models.")
+    def test_mliap_integration(self):
+        pass
+
     @pytest.fixture(scope="class")
     def config(self):
 

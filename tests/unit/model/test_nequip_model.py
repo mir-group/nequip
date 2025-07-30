@@ -75,10 +75,6 @@ class TestNequIPModel(BaseEnergyModelTests):
     def strict_locality(self):
         return False
 
-    @pytest.fixture(scope="class")
-    def nequip_compile_tol(self, model_dtype):
-        return {"float32": 5e-5, "float64": 1e-12}[model_dtype]
-
     @pytest.fixture(
         params=[
             minimal_config1,
@@ -138,6 +134,30 @@ class TestNequIPModel(BaseEnergyModelTests):
                     pytest.skip("OEQ tests skipped for CPU")
 
                 return [{"modifier": "enable_OpenEquivariance"}]
+            else:
+                raise ValueError(f"Unknown modifier: {request.param}")
+
+        return modifier_handler
+
+    @pytest.fixture(
+        scope="class",
+        params=[None]
+        + (["enable_OpenEquivariance"] if _TORCH_GE_2_4 and _OEQ_INSTALLED else []),
+    )
+    def mliap_acceleration_modifiers(self, request):
+        """Test acceleration modifiers in MLIAP workflows."""
+
+        def modifier_handler(compile, model_dtype):
+            # skip float64 for NequIP models as noted in existing integration tests
+            if model_dtype == "float64":
+                pytest.skip("Skipping f64 ML-IAP tests for NequIP.")
+
+            if request.param is None:
+                return []
+            elif request.param == "enable_OpenEquivariance":
+                import openequivariance  # noqa: F401,F811
+
+                return ["enable_OpenEquivariance"]
             else:
                 raise ValueError(f"Unknown modifier: {request.param}")
 
