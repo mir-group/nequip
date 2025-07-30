@@ -10,14 +10,14 @@ import sys
 from omegaconf import OmegaConf, open_dict
 
 
-def _check_and_print(retcode):
+def _check_and_print(retcode, encoding="ascii"):
     """Helper function to check subprocess return code and print output on failure."""
     __tracebackhide__ = True
     if retcode.returncode:
         if retcode.stdout is not None and len(retcode.stdout) > 0:
-            print(retcode.stdout.decode("ascii", errors="replace"))
+            print(retcode.stdout.decode(encoding, errors="replace"))
         if retcode.stderr is not None and len(retcode.stderr) > 0:
-            print(retcode.stderr.decode("ascii", errors="replace"), file=sys.stderr)
+            print(retcode.stderr.decode(encoding, errors="replace"), file=sys.stderr)
         retcode.check_returncode()
 
 
@@ -99,10 +99,10 @@ def _training_session(
             )
             _check_and_print(retcode)
 
-            yield config, tmpdir, env
-
-            # handle extra training from save (for integration tests)
-            if extra_train_from_save is not None:
+            # handle extra training from save
+            if extra_train_from_save is None:
+                yield config, tmpdir, env
+            else:
                 with tempfile.TemporaryDirectory() as new_tmpdir:
                     new_config = config.copy()
                     with open_dict(new_config):
@@ -120,9 +120,7 @@ def _training_session(
                             [
                                 "nequip-package",
                                 "build",
-                                "--ckpt-path",
                                 f"{tmpdir}/last.ckpt",
-                                "--output-path",
                                 package_path,
                             ],
                             cwd=new_tmpdir,
