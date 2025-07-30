@@ -21,13 +21,17 @@ class ScheduleFreeLightningModule(NequIPLightningModule):
     """
 
     def __init__(self, optimizer: Dict[str, Any], **kwargs):
-        valid_targets = {"AdamWScheduleFree", "SGDScheduleFree", "RAdamScheduleFree"}
+        valid_targets = {
+            "AdamWScheduleFree",
+            "SGDScheduleFree",
+            "RAdamScheduleFree",
+        }
         if "_target_" not in optimizer or not any(
             optimizer["_target_"].endswith(name) for name in valid_targets
         ):
             raise MisconfigurationException(
-                f"Invalid optimizer: expected Schedule-Free optimizer (_target_ ending with one of {valid_targets}),"
-                f" but found '{optimizer.get('_target_')}'"
+                f"Invalid optimizer: expected Schedule-Free optimizer (_target_ ending with one of {valid_targets}), "
+                f"but found '{optimizer.get('_target_')}'"
             )
         self._optimizer_config = optimizer
         super().__init__(optimizer=optimizer, **kwargs)
@@ -39,18 +43,27 @@ class ScheduleFreeLightningModule(NequIPLightningModule):
         return module
 
     def on_save_checkpoint(self, checkpoint: dict):
+        # Ensure we capture the Schedule-Free optimizer state and apply smoothing
         opt = getattr(self, "_schedulefree_optimizer", None)
         if opt is None:
-            opt = self.optimizers()
+            try:
+                opt = self.configure_optimizers()
+                if isinstance(opt, dict) and "optimizer" in opt:
+                    opt = opt["optimizer"]
+                elif isinstance(opt, (list, tuple)):
+                    opt = opt[0]
+            except Exception:
+                opt = self.optimizers()
             self._schedulefree_optimizer = opt
-        checkpoint["schedulefree_optimizer_state_dict"] = opt.state_dict()
         try:
+            logger.info(
+                "Setting Schedule-Free optimizer to eval mode for checkpoint smoothing."
+            )
             opt.eval()
-            checkpoint["state_dict"] = {
-                k: v.cpu() for k, v in self.model.state_dict().items()
-            }
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Cannot call optimizer.eval(): {e}")
+
+        checkpoint["schedulefree_optimizer_state_dict"] = opt.state_dict()
 
     def on_load_checkpoint(self, checkpoint: dict):
         if "schedulefree_optimizer_state_dict" in checkpoint:
@@ -71,6 +84,7 @@ class ScheduleFreeLightningModule(NequIPLightningModule):
             try:
                 self._schedulefree_optimizer.load_state_dict(state_dict)
                 self._schedulefree_optimizer.eval()
+                del self._schedulefree_optimizer_state_dict
             except Exception as e:
                 logger.warning(f"Schedule-Free optimizer restore/eval failed: {e}")
         else:
