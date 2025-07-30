@@ -2,7 +2,6 @@ from .lightning import NequIPLightningModule
 from typing import Dict, Any
 from lightning.pytorch.utilities.exceptions import MisconfigurationException
 from nequip.utils import RankedLogger
-from hydra.utils import instantiate
 import torch
 
 logger = RankedLogger(__name__, rank_zero_only=True)
@@ -32,82 +31,82 @@ class ScheduleFreeLightningModule(NequIPLightningModule):
         ):
             raise MisconfigurationException(
                 f"Invalid optimizer: expected Schedule-Free optimizer (_target_ ending with one of {valid_targets}), "
-                f"but found '{optimizer.get('_target_')}'"
+                f"but found '{optimizer['_target_']}'"
             )
+
         self._optimizer_config = optimizer
+        self._schedulefree_optimizer = None
         super().__init__(optimizer=optimizer, **kwargs)
 
     def configure_optimizers(self):
-        self._schedulefree_optimizer = instantiate(self._optimizer_config)
-        return self._schedulefree_optimizer
+        optim = super().configure_optimizers()
+        self._schedulefree_optimizer = optim
+        return optim
 
     def on_save_checkpoint(self, checkpoint: dict):
-        if not hasattr(self, "_schedulefree_optimizer"):
-            self._schedulefree_optimizer = self.configure_optimizers()
-        checkpoint["schedulefree_optimizer_state_dict"] = (
-            self._schedulefree_optimizer.state_dict()
-        )
+        if self._schedulefree_optimizer is not None:
+            checkpoint["schedulefree_optimizer_state_dict"] = (
+                self._schedulefree_optimizer.state_dict()
+            )
 
     def on_load_checkpoint(self, checkpoint: dict):
+        # Don't instantiate anything here — only store the state for later
         if "schedulefree_optimizer_state_dict" in checkpoint:
             logger.info(
-                "Loaded Schedule-Free optimizer state dict for evaluation; will restore in evaluation_model."
+                "Schedule-Free optimizer state found in checkpoint for evaluation."
             )
-            self._schedulefree_optimizer_state_dict = checkpoint[
+            self._schedulefree_optimizer_state_to_restore = checkpoint[
                 "schedulefree_optimizer_state_dict"
             ]
 
-    @classmethod
-    def load_from_checkpoint(cls, checkpoint_path: str, *args, **kwargs):
-        module = super().load_from_checkpoint(checkpoint_path, *args, **kwargs)
-        _ = module.evaluation_model
-        return module
-
     @property
     def evaluation_model(self) -> torch.nn.Module:
-        logger.info("Applying Schedule-Free optimizer weights for evaluation.")
+        logger.info("Preparing Schedule-Free evaluation model.")
 
-        if not hasattr(self, "_schedulefree_optimizer"):
+        if self._schedulefree_optimizer is None:
+            logger.debug("Instantiating Schedule-Free optimizer for evaluation.")
             try:
                 self._schedulefree_optimizer = self.configure_optimizers()
             except Exception as e:
-                logger.warning(
-                    f"Failed to initialize Schedule-Free optimizer for evaluation: {e}"
-                )
+                logger.warning(f"Failed to instantiate Schedule-Free optimizer: {e}")
                 return self.model
 
-        state_dict = getattr(self, "_schedulefree_optimizer_state_dict", None)
-        if state_dict is not None:
+        if hasattr(self, "_schedulefree_optimizer_state_to_restore"):
             try:
-                self._schedulefree_optimizer.load_state_dict(state_dict)
-                self._schedulefree_optimizer.eval()
-                del self._schedulefree_optimizer_state_dict
+                self._schedulefree_optimizer.load_state_dict(
+                    self._schedulefree_optimizer_state_to_restore
+                )
+                logger.debug("Schedule-Free optimizer state successfully restored.")
             except Exception as e:
-                logger.warning(f"Schedule-Free optimizer restore/eval failed: {e}")
-        else:
-            logger.warning("No stored optimizer state found; skipping smoothing.")
+                logger.warning(f"Failed to load Schedule-Free optimizer state: {e}")
+            del self._schedulefree_optimizer_state_to_restore  # Clean up after loading
+
+        try:
+            self._schedulefree_optimizer.eval()
+        except Exception as e:
+            logger.warning(f"Schedule-Free optimizer eval() failed: {e}")
 
         return self.model
 
     def on_fit_start(self) -> None:
-        self._schedulefree_optimizer.train()
+        self.optimizers().train()
 
     def on_validation_model_eval(self) -> None:
         self.model.eval()
-        self._schedulefree_optimizer.eval()
+        self.optimizers().eval()
 
     def on_validation_model_train(self) -> None:
         self.model.train()
-        self._schedulefree_optimizer.train()
+        self.optimizers().train()
 
     def on_test_model_eval(self) -> None:
         self.model.eval()
-        self._schedulefree_optimizer.eval()
+        self.optimizers().eval()
 
     def on_test_model_train(self) -> None:
         self.model.train()
-        self._schedulefree_optimizer.train()
+        self.optimizers().train()
 
     def on_predict_model_eval(self) -> None:
         self.model.eval()
-        self._schedulefree_optimizer.eval()
+        self.optimizers().eval()
