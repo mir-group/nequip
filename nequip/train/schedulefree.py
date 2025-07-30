@@ -37,70 +37,58 @@ class ScheduleFreeLightningModule(NequIPLightningModule):
         self._optimizer_config = optimizer
         super().__init__(optimizer=optimizer, **kwargs)
 
+    def configure_optimizers(self):
+        optim = super().configure_optimizers()
+        self._schedulefree_optimizer = optim
+        return optim
+
     def on_save_checkpoint(self, checkpoint: dict):
-        try:
-            checkpoint["schedulefree_optimizer_state_dict"] = (
-                self.optimizers().state_dict()
-            )
-        except Exception as e:
-            logger.warning(f"Failed to save Schedule-Free optimizer state: {e}")
+        opt = getattr(self, "_schedulefree_optimizer", None)
+        if opt is not None:
+            checkpoint["schedulefree_optimizer_state_dict"] = opt.state_dict()
 
     def on_load_checkpoint(self, checkpoint: dict):
         if "schedulefree_optimizer_state_dict" in checkpoint:
             logger.info("Restoring Schedule-Free optimizer state from checkpoint.")
-            try:
-                self.optimizers().load_state_dict(
-                    checkpoint["schedulefree_optimizer_state_dict"]
-                )
-            except Exception as e:
-                logger.warning(f"Failed to restore Schedule-Free optimizer state: {e}")
+            # Recreate the optimizer if needed
+            if not hasattr(self, "_schedulefree_optimizer"):
+                self._schedulefree_optimizer = self.configure_optimizers()
+            self._schedulefree_optimizer.load_state_dict(
+                checkpoint["schedulefree_optimizer_state_dict"]
+            )
 
     @property
     def evaluation_model(self) -> torch.nn.Module:
         logger.info("Loading Schedule-Free optimizer weights for evaluation.")
-        try:
-            self.optimizers().eval()
-        except Exception as e:
-            logger.warning(f"Schedule-Free optimizer eval() failed: {e}")
+        opt = getattr(self, "_schedulefree_optimizer", None)
+        if opt is not None:
+            try:
+                opt.eval()
+            except Exception as e:
+                logger.warning(f"Schedule-Free optimizer eval() failed: {e}")
+        else:
+            logger.warning("No stored optimizer found — skipping smoothing.")
         return self.model
 
     def on_fit_start(self) -> None:
-        try:
-            self.optimizers().train()
-        except Exception as e:
-            logger.warning(f"Schedule-Free optimizer train() failed on fit start: {e}")
+        self.optimizers().train()
 
     def on_validation_model_eval(self) -> None:
         self.model.eval()
-        try:
-            self.optimizers().eval()
-        except Exception as e:
-            logger.warning(f"Schedule-Free optimizer eval() failed on validation: {e}")
+        self.optimizers().eval()
 
     def on_validation_model_train(self) -> None:
         self.model.train()
-        try:
-            self.optimizers().train()
-        except Exception as e:
-            logger.warning(f"Schedule-Free optimizer train() failed on validation: {e}")
+        self.optimizers().train()
 
     def on_test_model_eval(self) -> None:
         self.model.eval()
-        try:
-            self.optimizers().eval()
-        except Exception as e:
-            logger.warning(f"Schedule-Free optimizer eval() failed on test: {e}")
+        self.optimizers().eval()
 
     def on_test_model_train(self) -> None:
         self.model.train()
-        try:
-            self.optimizers().train()
-        except Exception as e:
-            logger.warning(f"Schedule-Free optimizer train() failed on test: {e}")
+        self.optimizers().train()
 
     def on_predict_model_eval(self) -> None:
         self.model.eval()
-        try:
-            self.optimizers().eval()
-        except Exception as e:
-            logger.warning(f"Schedule-Free optimizer eval() failed on predict: {e}")
+        self.optimizers().eval()
