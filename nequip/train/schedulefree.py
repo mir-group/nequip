@@ -2,6 +2,7 @@ from .lightning import NequIPLightningModule
 from typing import Dict, Any
 from lightning.pytorch.utilities.exceptions import MisconfigurationException
 from nequip.utils import RankedLogger
+from hydra.utils import instantiate
 import torch
 
 logger = RankedLogger(__name__, rank_zero_only=True)
@@ -34,25 +35,39 @@ class ScheduleFreeLightningModule(NequIPLightningModule):
                 f"but found '{optimizer.get('_target_', 'missing')}'"
             )
 
+        self._optimizer_config = optimizer
+        self._schedulefree_optimizer = None
         super().__init__(optimizer=optimizer, **kwargs)
 
     def on_save_checkpoint(self, checkpoint: dict):
-        opt = self.optimizers()
-        checkpoint["schedulefree_optimizer_state_dict"] = opt.state_dict()
+        if self._schedulefree_optimizer is not None:
+            checkpoint["schedulefree_optimizer_state_dict"] = (
+                self._schedulefree_optimizer.state_dict()
+            )
 
     def on_load_checkpoint(self, checkpoint: dict):
         if "schedulefree_optimizer_state_dict" in checkpoint:
             logger.info("Restoring Schedule-Free optimizer state from checkpoint.")
-            opt = self.optimizers()
-            opt.load_state_dict(checkpoint["schedulefree_optimizer_state_dict"])
+            try:
+                self._schedulefree_optimizer = instantiate(
+                    self._optimizer_config, params=self.model.parameters()
+                )
+                self._schedulefree_optimizer.load_state_dict(
+                    checkpoint["schedulefree_optimizer_state_dict"]
+                )
+            except Exception as e:
+                logger.warning(f"Failed to restore Schedule-Free optimizer state: {e}")
 
     @property
     def evaluation_model(self) -> torch.nn.Module:
         logger.info("Loading Schedule-Free optimizer weights for evaluation.")
-        try:
-            self.optimizers().eval()
-        except Exception as e:
-            logger.warning(f"Schedule-Free optimizer eval() failed: {e}")
+        if self._schedulefree_optimizer is not None:
+            try:
+                self._schedulefree_optimizer.eval()
+            except Exception as e:
+                logger.warning(f"Schedule-Free optimizer eval() failed: {e}")
+        else:
+            logger.warning("No stored optimizer found — skipping smoothing.")
         return self.model
 
     def on_fit_start(self) -> None:
