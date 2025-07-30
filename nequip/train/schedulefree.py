@@ -16,8 +16,8 @@ class ScheduleFreeLightningModule(NequIPLightningModule):
 
     Args:
         optimizer (Dict[str, Any]): Dictionary that must include a `_target_`
-            corresponding to one of the Schedule-Free optimizers and other keyword arguments
-            compatible with the Schedule-Free variants.
+            corresponding to one of the Schedule‑Free optimizers and other keyword arguments
+            compatible with the Schedule‑Free variants.
     """
 
     def __init__(self, optimizer: Dict[str, Any], **kwargs):
@@ -30,48 +30,57 @@ class ScheduleFreeLightningModule(NequIPLightningModule):
             optimizer["_target_"].endswith(name) for name in valid_targets
         ):
             raise MisconfigurationException(
-                f"Invalid optimizer: expected Schedule-Free optimizer (_target_ ending with one of {valid_targets}), "
-                f"but found '{optimizer['_target_']}'"
+                f"Invalid optimizer: expected Schedule‑Free optimizer (_target_ ending with one of {valid_targets}), "
+                f"but found '{optimizer.get('_target_')}'"
             )
 
         self._optimizer_config = optimizer
         super().__init__(optimizer=optimizer, **kwargs)
 
-    def configure_optimizers(self):
-        optim = super().configure_optimizers()
+    @classmethod
+    def load_from_checkpoint(
+        cls, checkpoint_path: str, map_location=None, **kwargs: Any
+    ) -> "ScheduleFreeLightningModule":
+        ckpt = torch.load(checkpoint_path, map_location=map_location or "cpu")
+        module: ScheduleFreeLightningModule = super().load_from_checkpoint(
+            checkpoint_path, map_location=map_location, **kwargs
+        )
+        module.on_load_checkpoint(ckpt)
+        return module
+
+    def on_fit_start(self) -> None:
+        optim = self.optimizers()
         self._schedulefree_optimizer = optim
-        return optim
+        optim.train()
 
     def on_save_checkpoint(self, checkpoint: dict):
         opt = getattr(self, "_schedulefree_optimizer", None)
-        if opt is not None:
-            checkpoint["schedulefree_optimizer_state_dict"] = opt.state_dict()
+        if opt is None:
+            opt = super().configure_optimizers()
+            self._schedulefree_optimizer = opt
+        checkpoint["schedulefree_optimizer_state_dict"] = opt.state_dict()
 
     def on_load_checkpoint(self, checkpoint: dict):
-        if "schedulefree_optimizer_state_dict" in checkpoint:
-            logger.info("Restoring Schedule-Free optimizer state from checkpoint.")
-            # Recreate the optimizer if needed
+        state = checkpoint.get("schedulefree_optimizer_state_dict", None)
+        if state is not None:
+            logger.info("Restoring Schedule‑Free optimizer state from checkpoint.")
             if not hasattr(self, "_schedulefree_optimizer"):
-                self._schedulefree_optimizer = self.configure_optimizers()
-            self._schedulefree_optimizer.load_state_dict(
-                checkpoint["schedulefree_optimizer_state_dict"]
-            )
+                # Build a fresh optimizer via the base class
+                self._schedulefree_optimizer = super().configure_optimizers()
+            self._schedulefree_optimizer.load_state_dict(state)
 
     @property
     def evaluation_model(self) -> torch.nn.Module:
-        logger.info("Loading Schedule-Free optimizer weights for evaluation.")
+        logger.info("Applying Schedule‑Free smoothing for evaluation.")
         opt = getattr(self, "_schedulefree_optimizer", None)
         if opt is not None:
             try:
                 opt.eval()
             except Exception as e:
-                logger.warning(f"Schedule-Free optimizer eval() failed: {e}")
+                logger.warning(f"Schedule‑Free optimizer eval() failed: {e}")
         else:
-            logger.warning("No stored optimizer found — skipping smoothing.")
+            logger.warning("No Schedule‑Free optimizer found—skipping smoothing.")
         return self.model
-
-    def on_fit_start(self) -> None:
-        self.optimizers().train()
 
     def on_validation_model_eval(self) -> None:
         self.model.eval()
