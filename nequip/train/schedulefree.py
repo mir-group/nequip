@@ -38,32 +38,31 @@ class ScheduleFreeLightningModule(NequIPLightningModule):
 
     @classmethod
     def load_from_checkpoint(cls, checkpoint_path: str, *args, **kwargs):
+        # Load LightningModule, then apply smoothing so that .model holds smoothed weights
         module = super().load_from_checkpoint(checkpoint_path, *args, **kwargs)
         _ = module.evaluation_model
         return module
 
     def on_save_checkpoint(self, checkpoint: dict):
-        # Ensure we capture the Schedule-Free optimizer state and apply smoothing
         opt = getattr(self, "_schedulefree_optimizer", None)
         if opt is None:
             try:
-                opt = self.configure_optimizers()
-                if isinstance(opt, dict) and "optimizer" in opt:
-                    opt = opt["optimizer"]
-                elif isinstance(opt, (list, tuple)):
-                    opt = opt[0]
-            except Exception:
-                opt = self.optimizers()
-            self._schedulefree_optimizer = opt
-        try:
-            logger.info(
-                "Setting Schedule-Free optimizer to eval mode for checkpoint smoothing."
+                if hasattr(self, "trainer") and hasattr(self.trainer, "optimizers"):
+                    opt = self.trainer.optimizers
+                else:
+                    opt = self.optimizers()
+                self._schedulefree_optimizer = opt
+            except Exception as e:
+                logger.warning(
+                    f"Could not retrieve optimizer in on_save_checkpoint: {e}"
+                )
+                return
+        if hasattr(opt, "state_dict"):
+            checkpoint["schedulefree_optimizer_state_dict"] = opt.state_dict()
+        else:
+            logger.warning(
+                "Schedule-Free optimizer has no state_dict(); skipping save."
             )
-            opt.eval()
-        except Exception as e:
-            logger.warning(f"Cannot call optimizer.eval(): {e}")
-
-        checkpoint["schedulefree_optimizer_state_dict"] = opt.state_dict()
 
     def on_load_checkpoint(self, checkpoint: dict):
         if "schedulefree_optimizer_state_dict" in checkpoint:
@@ -78,7 +77,12 @@ class ScheduleFreeLightningModule(NequIPLightningModule):
     def evaluation_model(self) -> torch.nn.Module:
         logger.info("Applying Schedule-Free optimizer weights for evaluation.")
         if not hasattr(self, "_schedulefree_optimizer"):
-            self._schedulefree_optimizer = super().configure_optimizers()
+            try:
+                self._schedulefree_optimizer = self.optimizers()
+            except Exception as e:
+                logger.warning(f"Failed to initialize optimizer for evaluation: {e}")
+                return self.model
+
         state_dict = getattr(self, "_schedulefree_optimizer_state_dict", None)
         if state_dict is not None:
             try:
@@ -89,6 +93,7 @@ class ScheduleFreeLightningModule(NequIPLightningModule):
                 logger.warning(f"Schedule-Free optimizer restore/eval failed: {e}")
         else:
             logger.warning("No stored optimizer state found; skipping smoothing.")
+
         return self.model
 
     def on_fit_start(self) -> None:
