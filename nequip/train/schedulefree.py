@@ -15,9 +15,8 @@ class ScheduleFreeLightningModule(NequIPLightningModule):
     This module wraps the model's optimizer in one of Facebook's Schedule-Free variants.
     See: https://github.com/facebookresearch/schedule_free
 
-    Note:
-        When evaluating without a Trainer (e.g. in nequip-package or NequIPCalculator),
-        the optimizer state is restored manually for smoothing.
+    Args:
+        optimizer (Dict[str, Any]): A Hydra config dict with `_target_` pointing to a Schedule-Free optimizer.
     """
 
     def __init__(self, optimizer: Dict[str, Any], **kwargs):
@@ -42,6 +41,7 @@ class ScheduleFreeLightningModule(NequIPLightningModule):
         try:
             opt = self.optimizers()
             checkpoint["schedulefree_optimizer_state_dict"] = opt.state_dict()
+            logger.info("Saved Schedule-Free optimizer state for evaluation model.")
         except Exception as e:
             logger.warning(f"Could not save schedule-free optimizer state: {e}")
 
@@ -55,12 +55,13 @@ class ScheduleFreeLightningModule(NequIPLightningModule):
         logger.info("Loading Schedule-Free optimizer weights for evaluation.")
         try:
             opt = instantiate(self._optimizer_config, params=self.model.parameters())
+
             if self._schedulefree_state_dict is not None:
                 opt.load_state_dict(self._schedulefree_state_dict)
                 opt.eval()
                 logger.info("Schedule-Free optimizer eval() applied for smoothing.")
             else:
-                logger.warning("No stored optimizer state found for smoothing.")
+                logger.warning("No optimizer state found — skipping smoothing.")
         except Exception as e:
             logger.warning(f"Schedule-Free optimizer smoothing failed: {e}")
 
@@ -88,3 +89,12 @@ class ScheduleFreeLightningModule(NequIPLightningModule):
     def on_predict_model_eval(self) -> None:
         self.model.eval()
         self.optimizers().eval()
+
+    def on_validation_epoch_end(self) -> None:
+        try:
+            self.optimizers().eval()
+            logger.info(
+                "Schedule-Free optimizer set to eval mode before checkpointing."
+            )
+        except Exception as e:
+            logger.warning(f"Could not set optimizer to eval() before checkpoint: {e}")
