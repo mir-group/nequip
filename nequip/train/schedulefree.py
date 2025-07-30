@@ -2,6 +2,7 @@ from .lightning import NequIPLightningModule
 from typing import Dict, Any
 from lightning.pytorch.utilities.exceptions import MisconfigurationException
 from nequip.utils import RankedLogger
+from hydra.utils import instantiate
 import torch
 
 logger = RankedLogger(__name__, rank_zero_only=True)
@@ -36,12 +37,13 @@ class ScheduleFreeLightningModule(NequIPLightningModule):
         self._optimizer_config = optimizer
         super().__init__(optimizer=optimizer, **kwargs)
 
-    @classmethod
-    def load_from_checkpoint(cls, checkpoint_path: str, *args, **kwargs):
-        # Load LightningModule, then apply smoothing so that .model holds smoothed weights
-        module = super().load_from_checkpoint(checkpoint_path, *args, **kwargs)
-        _ = module.evaluation_model
-        return module
+    def _build_schedulefree_optimizer(self):
+        try:
+            return instantiate(self._optimizer_config)
+        except Exception as e:
+            raise RuntimeError(
+                f"Failed to manually instantiate Schedule-Free optimizer: {e}"
+            )
 
     def on_save_checkpoint(self, checkpoint: dict):
         opt = getattr(self, "_schedulefree_optimizer", None)
@@ -57,11 +59,12 @@ class ScheduleFreeLightningModule(NequIPLightningModule):
                     f"Could not retrieve optimizer in on_save_checkpoint: {e}"
                 )
                 return
+
         if hasattr(opt, "state_dict"):
             checkpoint["schedulefree_optimizer_state_dict"] = opt.state_dict()
         else:
             logger.warning(
-                "Schedule-Free optimizer has no state_dict(); skipping save."
+                "Schedule-Free optimizer state_dict not available; skipping save."
             )
 
     def on_load_checkpoint(self, checkpoint: dict):
@@ -76,12 +79,15 @@ class ScheduleFreeLightningModule(NequIPLightningModule):
     @property
     def evaluation_model(self) -> torch.nn.Module:
         logger.info("Applying Schedule-Free optimizer weights for evaluation.")
+
         if not hasattr(self, "_schedulefree_optimizer"):
             try:
                 self._schedulefree_optimizer = self.optimizers()
-            except Exception as e:
-                logger.warning(f"Failed to initialize optimizer for evaluation: {e}")
-                return self.model
+            except Exception:
+                logger.warning(
+                    "ScheduleFreeLightningModule is not attached to a `Trainer`; manually instantiating optimizer."
+                )
+                self._schedulefree_optimizer = self._build_schedulefree_optimizer()
 
         state_dict = getattr(self, "_schedulefree_optimizer_state_dict", None)
         if state_dict is not None:
