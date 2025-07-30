@@ -31,61 +31,28 @@ class ScheduleFreeLightningModule(NequIPLightningModule):
         ):
             raise MisconfigurationException(
                 f"Invalid optimizer: expected Schedule-Free optimizer (_target_ ending with one of {valid_targets}), "
-                f"but found '{optimizer['_target_']}'"
+                f"but found '{optimizer.get('_target_', 'missing')}'"
             )
 
-        self._optimizer_config = optimizer
-        self._schedulefree_optimizer = None
         super().__init__(optimizer=optimizer, **kwargs)
 
-    def configure_optimizers(self):
-        optim = super().configure_optimizers()
-        self._schedulefree_optimizer = optim
-        return optim
-
     def on_save_checkpoint(self, checkpoint: dict):
-        if self._schedulefree_optimizer is not None:
-            checkpoint["schedulefree_optimizer_state_dict"] = (
-                self._schedulefree_optimizer.state_dict()
-            )
+        opt = self.optimizers()
+        checkpoint["schedulefree_optimizer_state_dict"] = opt.state_dict()
 
     def on_load_checkpoint(self, checkpoint: dict):
-        # Don't instantiate anything here — only store the state for later
         if "schedulefree_optimizer_state_dict" in checkpoint:
-            logger.info(
-                "Schedule-Free optimizer state found in checkpoint for evaluation."
-            )
-            self._schedulefree_optimizer_state_to_restore = checkpoint[
-                "schedulefree_optimizer_state_dict"
-            ]
+            logger.info("Restoring Schedule-Free optimizer state from checkpoint.")
+            opt = self.optimizers()
+            opt.load_state_dict(checkpoint["schedulefree_optimizer_state_dict"])
 
     @property
     def evaluation_model(self) -> torch.nn.Module:
-        logger.info("Preparing Schedule-Free evaluation model.")
-
-        if self._schedulefree_optimizer is None:
-            logger.debug("Instantiating Schedule-Free optimizer for evaluation.")
-            try:
-                self._schedulefree_optimizer = self.configure_optimizers()
-            except Exception as e:
-                logger.warning(f"Failed to instantiate Schedule-Free optimizer: {e}")
-                return self.model
-
-        if hasattr(self, "_schedulefree_optimizer_state_to_restore"):
-            try:
-                self._schedulefree_optimizer.load_state_dict(
-                    self._schedulefree_optimizer_state_to_restore
-                )
-                logger.debug("Schedule-Free optimizer state successfully restored.")
-            except Exception as e:
-                logger.warning(f"Failed to load Schedule-Free optimizer state: {e}")
-            del self._schedulefree_optimizer_state_to_restore  # Clean up after loading
-
+        logger.info("Loading Schedule-Free optimizer weights for evaluation.")
         try:
-            self._schedulefree_optimizer.eval()
+            self.optimizers().eval()
         except Exception as e:
             logger.warning(f"Schedule-Free optimizer eval() failed: {e}")
-
         return self.model
 
     def on_fit_start(self) -> None:
