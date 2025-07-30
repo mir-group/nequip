@@ -8,7 +8,11 @@ Most recent change on the top.
 
 ## Unreleased
 
+
+## [0.13.0]
+
 ### Added
+- LAMMPS ML-IAP integration
 - `LinearLossCoefficientScheduler` callback
 - `TF32Scheduler` callback
 
