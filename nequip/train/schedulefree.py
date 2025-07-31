@@ -1,10 +1,8 @@
+from .lightning import NequIPLightningModule
 from typing import Dict, Any
-
-import torch
 from lightning.pytorch.utilities.exceptions import MisconfigurationException
 from nequip.utils import RankedLogger
-
-from .lightning import NequIPLightningModule
+import torch
 
 logger = RankedLogger(__name__, rank_zero_only=True)
 
@@ -22,71 +20,92 @@ class ScheduleFreeLightningModule(NequIPLightningModule):
             compatible with the Schedule-Free variants.
     """
 
-    _VALID_TARGETS = {"AdamWScheduleFree", "SGDScheduleFree", "RAdamScheduleFree"}
-
     def __init__(self, optimizer: Dict[str, Any], **kwargs):
+        valid_targets = {
+            "AdamWScheduleFree",
+            "SGDScheduleFree",
+            "RAdamScheduleFree",
+        }
         target = optimizer.get("_target_")
-        if not target or not any(target.endswith(t) for t in self._VALID_TARGETS):
+        if not target or not any(target.endswith(name) for name in valid_targets):
             raise MisconfigurationException(
-                f"ScheduleFreeLightningModule got invalid optimiser target "
-                f"'{target}'. Expected one of {sorted(self._VALID_TARGETS)}."
+                f"Invalid optimizer: expected Schedule-Free optimizer (_target_ ending with one of {valid_targets}), "
+                f"but found '{target}'"
             )
-        self._schedulefree_state_dict: Dict[str, Any] = {}
-        self._inference_opt = None
-        self._sf_eval_active = False
 
+        self._schedulefree_state_dict: Dict[str, Any] = {}
         super().__init__(optimizer=optimizer, **kwargs)
 
-    def on_save_checkpoint(self, checkpoint: dict) -> None:
+    def on_save_checkpoint(self, checkpoint: dict):
         opt = self.optimizers()
         if opt is not None:
             checkpoint["schedulefree_optimizer_state_dict"] = opt.state_dict()
 
-    def on_load_checkpoint(self, checkpoint: dict) -> None:
+    def on_load_checkpoint(self, checkpoint: dict):
         state = checkpoint.get("schedulefree_optimizer_state_dict")
-        if not state:
-            return
-
-        self._schedulefree_state_dict = state
-        if getattr(self, "_trainer", None) is None:
-            logger.info("Applying Schedule‑Free evaluation weights on load.")
-            opt = super().configure_optimizers()
-            try:
-                opt.load_state_dict(state)
-                opt.eval()
-            except Exception as err:
-                logger.warning(f"SF weight swap failed: {err!r}")
-            self._inference_opt = opt
+        if state is not None:
+            logger.info(
+                "Storing Schedule-Free optimizer state from checkpoint for lazy loading."
+            )
+            self._schedulefree_state_dict = state
 
     @property
     def evaluation_model(self) -> torch.nn.Module:
-        if getattr(self, "_trainer", None) is not None and not self._sf_eval_active:
-            try:
-                self.optimizers().eval()
-            except Exception as err:
-                logger.warning(f"SF optimiser eval() failed: {err!r}")
-            self._sf_eval_active = True
-        return self.model
+        logger.info("Loading Schedule-Free optimizer weights for evaluation.")
 
-    def _reset_sf_flag(self) -> None:
-        self._sf_eval_active = False
+        # Instantiate optimizer lazily
+        opt = super().configure_optimizers()
+
+        if getattr(self, "_schedulefree_state_dict", None):
+            try:
+                opt.load_state_dict(self._schedulefree_state_dict)
+            except Exception as e:
+                logger.warning(f"Failed to load Schedule-Free optimizer state: {e}")
+
+        try:
+            opt.eval()
+        except Exception as e:
+            logger.warning(f"Schedule-Free optimizer eval() failed: {e}")
+
+        try:
+            if hasattr(opt, "copy_model_weights_to"):
+                opt.copy_model_weights_to(self.model)
+            elif hasattr(opt, "ema_model"):
+                # Fallback: copy state_dict directly
+                self.model.load_state_dict(opt.ema_model.state_dict())
+            elif hasattr(opt, "swap_swa_sgd"):
+                # Swap weights if SWA-style interface
+                opt.swap_swa_sgd()
+            else:
+                logger.warning(
+                    "Schedule-Free optimizer does not expose averaged weights for evaluation."
+                )
+        except Exception as e:
+            logger.warning(
+                f"Failed to load averaged weights from Schedule-Free optimizer: {e}"
+            )
+
+        return self.model
 
     def on_fit_start(self) -> None:
         self.optimizers().train()
 
     def on_validation_model_eval(self) -> None:
+        self.model.eval()
         self.optimizers().eval()
 
     def on_validation_model_train(self) -> None:
+        self.model.train()
         self.optimizers().train()
-        self._reset_sf_flag()
 
     def on_test_model_eval(self) -> None:
+        self.model.eval()
         self.optimizers().eval()
 
     def on_test_model_train(self) -> None:
+        self.model.train()
         self.optimizers().train()
-        self._reset_sf_flag()
 
     def on_predict_model_eval(self) -> None:
+        self.model.eval()
         self.optimizers().eval()
