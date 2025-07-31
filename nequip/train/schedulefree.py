@@ -52,39 +52,58 @@ class ScheduleFreeLightningModule(NequIPLightningModule):
     @property
     def evaluation_model(self) -> torch.nn.Module:
         logger.info("Loading Schedule-Free optimizer weights for evaluation.")
-        # Instantiate optimizer lazily using base class
-        opt = super().configure_optimizers()
-        # Load saved state and switch to eval mode for smoothing
-        if getattr(self, "_schedulefree_state_dict", None):
+        opt = self.optimizers()
+        if opt is None:
+            logger.warning(
+                "No optimizer available; returning unmodified model for evaluation."
+            )
+            return self.model
+
+        if self._schedulefree_state_dict:
             try:
                 opt.load_state_dict(self._schedulefree_state_dict)
             except Exception as e:
-                logger.warning(f"Failed to load Schedule-Free optimizer state: {e}")
+                logger.warning(f"Failed to load optimizer state: {e}")
+
+        # Switch to eval mode so that the Schedule-Free wrapper swaps to the averaged 'x' buffer
         try:
             opt.eval()
         except Exception as e:
             logger.warning(f"Schedule-Free optimizer eval() failed: {e}")
+
         return self.model
 
     def on_fit_start(self) -> None:
-        self.optimizers().train()
+        opt = self.optimizers()
+        if opt is not None:
+            opt.train()
 
     def on_validation_model_eval(self) -> None:
         self.model.eval()
-        self.optimizers().eval()
+        opt = self.optimizers()
+        if opt is not None:
+            opt.eval()
 
     def on_validation_model_train(self) -> None:
         self.model.train()
-        self.optimizers().train()
+        opt = self.optimizers()
+        if opt is not None:
+            opt.train()
 
     def on_test_model_eval(self) -> None:
         self.model.eval()
-        self.optimizers().eval()
+        opt = self.optimizers()
+        if opt is not None:
+            opt.eval()
 
     def on_test_model_train(self) -> None:
         self.model.train()
-        self.optimizers().train()
+        opt = self.optimizers()
+        if opt is not None:
+            opt.train()
 
     def on_predict_model_eval(self) -> None:
         self.model.eval()
-        self.optimizers().eval()
+        opt = self.optimizers()
+        if opt is not None:
+            opt.eval()
