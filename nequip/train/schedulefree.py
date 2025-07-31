@@ -86,6 +86,7 @@ class ScheduleFreeLightningModule(NequIPLightningModule):
         return self.model
 
     @staticmethod
+    @torch.no_grad()
     def _apply_schedulefree_smoothing(optimizer):
         for group in optimizer.param_groups:
             train_mode = group.get("train_mode", False)
