@@ -15,7 +15,7 @@ class ScheduleFreeLightningModule(NequIPLightningModule):
     See: https://github.com/facebookresearch/schedule_free
 
     Args:
-        optimizer (Dict[str, Any]): Dictionary that must include a _target_
+        optimizer (Dict[str, Any]): Dictionary that must include a `_target_`
             corresponding to one of the Schedule-Free optimizers and other keyword arguments
             compatible with the Schedule-Free variants.
     """
@@ -26,14 +26,16 @@ class ScheduleFreeLightningModule(NequIPLightningModule):
             "SGDScheduleFree",
             "RAdamScheduleFree",
         }
-        target = optimizer.get("_target_")
-        if not target or not any(target.endswith(name) for name in valid_targets):
+        if "_target_" not in optimizer or not any(
+            optimizer["_target_"].endswith(name) for name in valid_targets
+        ):
             raise MisconfigurationException(
                 f"Invalid optimizer: expected Schedule-Free optimizer (_target_ ending with one of {valid_targets}), "
-                f"but found '{target}'"
+                f"but found '{optimizer['_target_']}'"
             )
 
-        self._schedulefree_state_dict: Dict[str, Any] = {}
+        self._optimizer_config = optimizer
+        self._sf_opt_state_dict = None
         super().__init__(optimizer=optimizer, **kwargs)
 
     def on_save_checkpoint(self, checkpoint: dict):
@@ -42,68 +44,48 @@ class ScheduleFreeLightningModule(NequIPLightningModule):
             checkpoint["schedulefree_optimizer_state_dict"] = opt.state_dict()
 
     def on_load_checkpoint(self, checkpoint: dict):
-        state = checkpoint.get("schedulefree_optimizer_state_dict")
-        if state is not None:
-            logger.info(
-                "Storing Schedule-Free optimizer state from checkpoint for lazy loading."
-            )
-            self._schedulefree_state_dict = state
+        self._sf_opt_state_dict = checkpoint.get(
+            "schedulefree_optimizer_state_dict", None
+        )
+        if self._sf_opt_state_dict is not None:
+            logger.info("Deferred loading of Schedule-Free optimizer state.")
 
     @property
     def evaluation_model(self) -> torch.nn.Module:
-        logger.info("Loading Schedule-Free optimizer weights for evaluation.")
+        logger.info("Applying Schedule-Free optimizer smoothing for evaluation.")
         opt = self.optimizers()
-        if opt is None:
-            logger.warning(
-                "No optimizer available; returning unmodified model for evaluation."
-            )
-            return self.model
-
-        if self._schedulefree_state_dict:
+        if self._sf_opt_state_dict is not None:
             try:
-                opt.load_state_dict(self._schedulefree_state_dict)
+                opt.load_state_dict(self._sf_opt_state_dict)
+                self._sf_opt_state_dict = None
+                logger.info("Successfully restored Schedule-Free optimizer state.")
             except Exception as e:
-                logger.warning(f"Failed to load optimizer state: {e}")
-
-        # Switch to eval mode so that the Schedule-Free wrapper swaps to the averaged 'x' buffer
+                logger.warning(f"Failed to restore optimizer state: {e}")
         try:
             opt.eval()
         except Exception as e:
             logger.warning(f"Schedule-Free optimizer eval() failed: {e}")
-
         return self.model
 
     def on_fit_start(self) -> None:
-        opt = self.optimizers()
-        if opt is not None:
-            opt.train()
+        self.optimizers().train()
 
     def on_validation_model_eval(self) -> None:
         self.model.eval()
-        opt = self.optimizers()
-        if opt is not None:
-            opt.eval()
+        self.optimizers().eval()
 
     def on_validation_model_train(self) -> None:
         self.model.train()
-        opt = self.optimizers()
-        if opt is not None:
-            opt.train()
+        self.optimizers().train()
 
     def on_test_model_eval(self) -> None:
         self.model.eval()
-        opt = self.optimizers()
-        if opt is not None:
-            opt.eval()
+        self.optimizers().eval()
 
     def on_test_model_train(self) -> None:
         self.model.train()
-        opt = self.optimizers()
-        if opt is not None:
-            opt.train()
+        self.optimizers().train()
 
     def on_predict_model_eval(self) -> None:
         self.model.eval()
-        opt = self.optimizers()
-        if opt is not None:
-            opt.eval()
+        self.optimizers().eval()
