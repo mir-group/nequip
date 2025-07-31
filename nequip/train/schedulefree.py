@@ -77,7 +77,8 @@ class ScheduleFreeLightningModule(NequIPLightningModule):
         return self.model
 
     def on_fit_start(self) -> None:
-        self.optimizers().train()
+        self._schedulefree_optimizer = self.optimizers()
+        self._schedulefree_optimizer.train()
 
     def on_validation_model_eval(self) -> None:
         self.model.eval()
