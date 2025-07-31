@@ -50,7 +50,8 @@ class ScheduleFreeLightningModule(NequIPLightningModule):
         if not state:
             return
         self._schedulefree_state_dict = state
-        if self.trainer is None:
+
+        if getattr(self, "_trainer", None) is None:
             logger.info("Applying Schedule‑Free evaluation weights on load.")
             opt = super().configure_optimizers()
             try:
@@ -62,7 +63,6 @@ class ScheduleFreeLightningModule(NequIPLightningModule):
 
     @property
     def evaluation_model(self) -> torch.nn.Module:
-        # weights are in self.model already
         return self.model
 
     def on_fit_start(self) -> None:
