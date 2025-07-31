@@ -39,7 +39,6 @@ class ScheduleFreeLightningModule(NequIPLightningModule):
         super().__init__(optimizer=optimizer, **kwargs)
 
     def on_fit_start(self) -> None:
-        # Cache optimizer instance explicitly for later saving
         self._schedulefree_optimizer = self.optimizers()
         self._schedulefree_optimizer.train()
 
@@ -53,7 +52,6 @@ class ScheduleFreeLightningModule(NequIPLightningModule):
             )
 
     def on_load_checkpoint(self, checkpoint: dict) -> None:
-        # Do not recreate the optimizer here
         if "schedulefree_optimizer_state_dict" in checkpoint:
             logger.info(
                 "Storing Schedule-Free optimizer state dict for later restoration."
@@ -76,14 +74,28 @@ class ScheduleFreeLightningModule(NequIPLightningModule):
                     self._schedulefree_optimizer_state_dict
                 )
                 logger.info("Loaded optimizer state dict into Schedule-Free optimizer.")
-                self._schedulefree_optimizer.eval()  # Apply smoothing
+                self._apply_schedulefree_smoothing(self._schedulefree_optimizer)
             except Exception as e:
-                logger.warning(f"Failed to load optimizer state or call eval(): {e}")
+                logger.warning(
+                    f"Failed to load optimizer state or apply smoothing: {e}"
+                )
         else:
             logger.warning("No optimizer state found — skipping smoothing.")
 
         self.model.eval()
         return self.model
+
+    @staticmethod
+    def _apply_schedulefree_smoothing(optimizer):
+        for group in optimizer.param_groups:
+            train_mode = group.get("train_mode", False)
+            beta1, _ = group["betas"]
+            if train_mode:
+                for p in group["params"]:
+                    state = optimizer.state.get(p, {})
+                    if "z" in state:
+                        p.lerp_(end=state["z"].to(p.device), weight=1 - 1 / beta1)
+                group["train_mode"] = False
 
     def on_validation_model_eval(self) -> None:
         self.model.eval()
