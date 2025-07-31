@@ -1,8 +1,10 @@
-from .lightning import NequIPLightningModule
 from typing import Dict, Any
+
+import torch
 from lightning.pytorch.utilities.exceptions import MisconfigurationException
 from nequip.utils import RankedLogger
-import torch
+
+from .lightning import NequIPLightningModule
 
 logger = RankedLogger(__name__, rank_zero_only=True)
 
@@ -15,56 +17,52 @@ class ScheduleFreeLightningModule(NequIPLightningModule):
     See: https://github.com/facebookresearch/schedule_free
 
     Args:
-        optimizer (Dict[str, Any]): Dictionary that must include a `_target_`
+        optimizer (Dict[str, Any]): Dictionary that must include a _target_
             corresponding to one of the Schedule-Free optimizers and other keyword arguments
             compatible with the Schedule-Free variants.
     """
 
-    def __init__(self, optimizer: Dict[str, Any], **kwargs):
-        valid_targets = {
-            "AdamWScheduleFree",
-            "SGDScheduleFree",
-            "RAdamScheduleFree",
-        }
-        if "_target_" not in optimizer or not any(
-            optimizer["_target_"].endswith(name) for name in valid_targets
-        ):
-            raise MisconfigurationException(
-                f"Invalid optimizer: expected Schedule-Free optimizer (_target_ ending with one of {valid_targets}), "
-                f"but found '{optimizer['_target_']}'"
-            )
+    _VALID_TARGETS = {
+        "AdamWScheduleFree",
+        "SGDScheduleFree",
+        "RAdamScheduleFree",
+    }
 
-        self._optimizer_config = optimizer
-        self._sf_opt_state_dict = None
+    def __init__(self, optimizer: Dict[str, Any], **kwargs):
+        target = optimizer.get("_target_")
+        if not target or not any(target.endswith(t) for t in self._VALID_TARGETS):
+            raise MisconfigurationException(
+                f"ScheduleFreeLightningModule received invalid optimiser "
+                f"target '{target}'. Expected one of {sorted(self._VALID_TARGETS)}."
+            )
+        self._schedulefree_state_dict: Dict[str, Any] = {}
+        self._inference_opt = None
+
         super().__init__(optimizer=optimizer, **kwargs)
 
-    def on_save_checkpoint(self, checkpoint: dict):
+    def on_save_checkpoint(self, checkpoint: dict) -> None:
         opt = self.optimizers()
         if opt is not None:
             checkpoint["schedulefree_optimizer_state_dict"] = opt.state_dict()
 
-    def on_load_checkpoint(self, checkpoint: dict):
-        self._sf_opt_state_dict = checkpoint.get(
-            "schedulefree_optimizer_state_dict", None
-        )
-        if self._sf_opt_state_dict is not None:
-            logger.info("Deferred loading of Schedule-Free optimizer state.")
+    def on_load_checkpoint(self, checkpoint: dict) -> None:
+        state = checkpoint.get("schedulefree_optimizer_state_dict")
+        if not state:
+            return
+        self._schedulefree_state_dict = state
+        if self.trainer is None:
+            logger.info("Applying Schedule‑Free evaluation weights on load.")
+            opt = super().configure_optimizers()
+            try:
+                opt.load_state_dict(state)
+                opt.eval()
+            except Exception as err:
+                logger.warning(f"Schedule‑Free weight swap failed: {err!r}")
+            self._inference_opt = opt
 
     @property
     def evaluation_model(self) -> torch.nn.Module:
-        logger.info("Applying Schedule-Free optimizer smoothing for evaluation.")
-        opt = self.optimizers()
-        if self._sf_opt_state_dict is not None:
-            try:
-                opt.load_state_dict(self._sf_opt_state_dict)
-                self._sf_opt_state_dict = None
-                logger.info("Successfully restored Schedule-Free optimizer state.")
-            except Exception as e:
-                logger.warning(f"Failed to restore optimizer state: {e}")
-        try:
-            opt.eval()
-        except Exception as e:
-            logger.warning(f"Schedule-Free optimizer eval() failed: {e}")
+        # weights are in self.model already
         return self.model
 
     def on_fit_start(self) -> None:
