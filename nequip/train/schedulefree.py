@@ -15,7 +15,7 @@ class ScheduleFreeLightningModule(NequIPLightningModule):
     See: https://github.com/facebookresearch/schedule_free
 
     Args:
-        optimizer (Dict[str, Any]): Dictionary that must include a `_target_`
+        optimizer (Dict[str, Any]): Dictionary that must include a _target_
             corresponding to one of the Schedule-Free optimizers and other keyword arguments
             compatible with the Schedule-Free variants.
     """
@@ -26,74 +26,63 @@ class ScheduleFreeLightningModule(NequIPLightningModule):
             "SGDScheduleFree",
             "RAdamScheduleFree",
         }
-        if "_target_" not in optimizer or not any(
-            optimizer["_target_"].endswith(name) for name in valid_targets
-        ):
+        target = optimizer.get("_target_")
+        if not target or not any(target.endswith(name) for name in valid_targets):
             raise MisconfigurationException(
                 f"Invalid optimizer: expected Schedule-Free optimizer (_target_ ending with one of {valid_targets}), "
-                f"but found '{optimizer['_target_']}'"
+                f"but found '{target}'"
             )
 
-        self._optimizer_config = optimizer
-        self._schedulefree_optimizer_state_dict = None
-        self._saved_train_modes = None
+        self._schedulefree_state_dict: Dict[str, Any] = {}
         super().__init__(optimizer=optimizer, **kwargs)
 
-    def on_fit_start(self) -> None:
-        self._schedulefree_optimizer = self.optimizers()
-        self._schedulefree_optimizer.train()
-
-    def on_before_optimizer_step(self, optimizer, *_):
-        for group in optimizer.param_groups:
-            group["train_mode"] = True
-
-    def on_save_checkpoint(self, checkpoint: dict) -> None:
-        opt = getattr(self, "_schedulefree_optimizer", None)
+    def on_save_checkpoint(self, checkpoint: dict):
+        opt = self.optimizers()
         if opt is not None:
-            self._saved_train_modes = [
-                group.get("train_mode", False) for group in opt.param_groups
-            ]
+            logger.info("Applying smoothing before saving checkpoint...")
+            # Save current train_mode state
+            train_modes = [group.get("train_mode", False) for group in opt.param_groups]
+            # Ensure smoothing happens
             for group in opt.param_groups:
                 group["train_mode"] = True
             with torch.no_grad():
                 opt.eval()
-
+            # Overwrite optimizer and model state in checkpoint
+            checkpoint["optimizer_states"] = [opt.state_dict()]
+            checkpoint["state_dict"] = self.state_dict()
+            # Restore train_mode flags
+            for group, mode in zip(opt.param_groups, train_modes):
+                group["train_mode"] = mode
             checkpoint["schedulefree_optimizer_state_dict"] = opt.state_dict()
 
-            for group, was_train in zip(opt.param_groups, self._saved_train_modes):
-                group["train_mode"] = was_train
-
-    def on_load_checkpoint(self, checkpoint: dict) -> None:
-        if "schedulefree_optimizer_state_dict" in checkpoint:
+    def on_load_checkpoint(self, checkpoint: dict):
+        state = checkpoint.get("schedulefree_optimizer_state_dict")
+        if state is not None:
             logger.info(
-                "Storing Schedule-Free optimizer state dict for later restoration."
+                "Storing Schedule-Free optimizer state from checkpoint for lazy loading."
             )
-            self._schedulefree_optimizer_state_dict = checkpoint[
-                "schedulefree_optimizer_state_dict"
-            ]
+            self._schedulefree_state_dict = state
 
     @property
     def evaluation_model(self) -> torch.nn.Module:
-        logger.info("Preparing evaluation model with Schedule-Free optimizer weights.")
-
-        if not hasattr(self, "_schedulefree_optimizer"):
-            self._schedulefree_optimizer = self.configure_optimizers()
-
-        if self._schedulefree_optimizer_state_dict is not None:
+        logger.info("Loading Schedule-Free optimizer weights for evaluation.")
+        opt = super().configure_optimizers()
+        if self._schedulefree_state_dict:
             try:
-                self._schedulefree_optimizer.load_state_dict(
-                    self._schedulefree_optimizer_state_dict
-                )
-                logger.info("Loaded optimizer state dict into Schedule-Free optimizer.")
-                with torch.no_grad():
-                    self._schedulefree_optimizer.eval()
+                opt.load_state_dict(self._schedulefree_state_dict)
+                logger.info("Loaded Schedule-Free optimizer state.")
             except Exception as e:
-                logger.warning(f"Failed to load optimizer state or call eval(): {e}")
-        else:
-            logger.warning("No optimizer state found — skipping smoothing.")
-
+                logger.warning(f"Failed to load Schedule-Free optimizer state: {e}")
+        try:
+            with torch.no_grad():
+                opt.eval()
+        except Exception as e:
+            logger.warning(f"Schedule-Free optimizer eval() failed: {e}")
         self.model.eval()
         return self.model
+
+    def on_fit_start(self) -> None:
+        self.optimizers().train()
 
     def on_validation_model_eval(self) -> None:
         self.model.eval()
