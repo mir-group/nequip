@@ -20,6 +20,7 @@ Present and past contributors include, in alphabetical order by last name:
  - Lixin Sun
  - [Myles Stapelberg](https://github.com/mstapelberg)
  - [Chuin Wei Tan](https://cw-tan.github.io/)
+ - Ulrik Unneberg
  - Menghang (David) Wang
  - William C. Witt
  - Albert Zhu
