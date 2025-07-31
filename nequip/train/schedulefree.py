@@ -38,12 +38,22 @@ class ScheduleFreeLightningModule(NequIPLightningModule):
         self._schedulefree_optimizer_state_dict = None
         super().__init__(optimizer=optimizer, **kwargs)
 
+    def on_fit_start(self) -> None:
+        # Cache optimizer instance explicitly for later saving
+        self._schedulefree_optimizer = self.optimizers()
+        self._schedulefree_optimizer.train()
+
     def on_save_checkpoint(self, checkpoint: dict) -> None:
-        opt = getattr(self, "_schedulefree_optimizer", None)
-        if opt is not None:
-            checkpoint["schedulefree_optimizer_state_dict"] = opt.state_dict()
+        if (
+            hasattr(self, "_schedulefree_optimizer")
+            and self._schedulefree_optimizer is not None
+        ):
+            checkpoint["schedulefree_optimizer_state_dict"] = (
+                self._schedulefree_optimizer.state_dict()
+            )
 
     def on_load_checkpoint(self, checkpoint: dict) -> None:
+        # Do not recreate the optimizer here
         if "schedulefree_optimizer_state_dict" in checkpoint:
             logger.info(
                 "Storing Schedule-Free optimizer state dict for later restoration."
@@ -66,19 +76,14 @@ class ScheduleFreeLightningModule(NequIPLightningModule):
                     self._schedulefree_optimizer_state_dict
                 )
                 logger.info("Loaded optimizer state dict into Schedule-Free optimizer.")
-                self._schedulefree_optimizer.eval()
+                self._schedulefree_optimizer.eval()  # Apply smoothing
             except Exception as e:
-                logger.warning(
-                    f"Failed to load Schedule-Free optimizer state or call eval(): {e}"
-                )
+                logger.warning(f"Failed to load optimizer state or call eval(): {e}")
         else:
             logger.warning("No optimizer state found — skipping smoothing.")
 
+        self.model.eval()
         return self.model
-
-    def on_fit_start(self) -> None:
-        self._schedulefree_optimizer = self.optimizers()
-        self._schedulefree_optimizer.train()
 
     def on_validation_model_eval(self) -> None:
         self.model.eval()
