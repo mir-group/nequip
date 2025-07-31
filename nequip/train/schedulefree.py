@@ -40,9 +40,7 @@ class ScheduleFreeLightningModule(NequIPLightningModule):
         opt = self.optimizers()
         if opt is not None:
             logger.info("Applying smoothing before saving checkpoint...")
-            # Save current train_mode state
             train_modes = [group.get("train_mode", False) for group in opt.param_groups]
-            # Ensure smoothing happens
             for group in opt.param_groups:
                 group["train_mode"] = True
             with torch.no_grad():
