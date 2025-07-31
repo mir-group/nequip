@@ -74,29 +74,17 @@ class ScheduleFreeLightningModule(NequIPLightningModule):
                     self._schedulefree_optimizer_state_dict
                 )
                 logger.info("Loaded optimizer state dict into Schedule-Free optimizer.")
-                self._apply_schedulefree_smoothing(self._schedulefree_optimizer)
+
+                with torch.no_grad():
+                    self._schedulefree_optimizer.eval()
+
             except Exception as e:
-                logger.warning(
-                    f"Failed to load optimizer state or apply smoothing: {e}"
-                )
+                logger.warning(f"Failed to load optimizer state or call eval(): {e}")
         else:
             logger.warning("No optimizer state found — skipping smoothing.")
 
         self.model.eval()
         return self.model
-
-    @staticmethod
-    @torch.no_grad()
-    def _apply_schedulefree_smoothing(optimizer):
-        for group in optimizer.param_groups:
-            train_mode = group.get("train_mode", False)
-            beta1, _ = group["betas"]
-            if train_mode:
-                for p in group["params"]:
-                    state = optimizer.state.get(p, {})
-                    if "z" in state:
-                        p.lerp_(end=state["z"].to(p.device), weight=1 - 1 / beta1)
-                group["train_mode"] = False
 
     def on_validation_model_eval(self) -> None:
         self.model.eval()
