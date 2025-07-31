@@ -39,6 +39,12 @@ class ScheduleFreeLightningModule(NequIPLightningModule):
     def on_save_checkpoint(self, checkpoint: dict):
         opt = self.optimizers()
         if opt is not None:
+            try:
+                opt.eval()  # Ensure smoothed weights are active before saving
+            except Exception as e:
+                logger.warning(
+                    f"Schedule-Free optimizer eval() before save failed: {e}"
+                )
             checkpoint["schedulefree_optimizer_state_dict"] = opt.state_dict()
 
     def on_load_checkpoint(self, checkpoint: dict):
@@ -51,10 +57,9 @@ class ScheduleFreeLightningModule(NequIPLightningModule):
 
     @property
     def evaluation_model(self) -> torch.nn.Module:
-        logger.info("Loading Schedule-Free optimizer weights for evaluation.")
+        logger.info("Loading Schedule-Free optimizer smoothed weights for evaluation.")
 
-        # Instantiate optimizer lazily
-        opt = super().configure_optimizers()
+        opt = self.optimizers()
 
         if getattr(self, "_schedulefree_state_dict", None):
             try:
@@ -66,24 +71,6 @@ class ScheduleFreeLightningModule(NequIPLightningModule):
             opt.eval()
         except Exception as e:
             logger.warning(f"Schedule-Free optimizer eval() failed: {e}")
-
-        try:
-            if hasattr(opt, "copy_model_weights_to"):
-                opt.copy_model_weights_to(self.model)
-            elif hasattr(opt, "ema_model"):
-                # Fallback: copy state_dict directly
-                self.model.load_state_dict(opt.ema_model.state_dict())
-            elif hasattr(opt, "swap_swa_sgd"):
-                # Swap weights if SWA-style interface
-                opt.swap_swa_sgd()
-            else:
-                logger.warning(
-                    "Schedule-Free optimizer does not expose averaged weights for evaluation."
-                )
-        except Exception as e:
-            logger.warning(
-                f"Failed to load averaged weights from Schedule-Free optimizer: {e}"
-            )
 
         return self.model
 
