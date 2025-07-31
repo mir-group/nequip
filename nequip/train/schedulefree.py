@@ -75,8 +75,22 @@ class ScheduleFreeLightningModule(NequIPLightningModule):
                 )
                 logger.info("Loaded optimizer state dict into Schedule-Free optimizer.")
 
+                for group in self._schedulefree_optimizer.param_groups:
+                    logger.info(
+                        f"Before smoothing: train_mode={group.get('train_mode')}"
+                    )
+                    for p in group["params"]:
+                        state = self._schedulefree_optimizer.state.get(p, {})
+                        has_z = "z" in state
+                        logger.info(f"Param {p.shape}: has_z={has_z}")
+
+                for group in self._schedulefree_optimizer.param_groups:
+                    group["train_mode"] = True
+
                 with torch.no_grad():
                     self._schedulefree_optimizer.eval()
+
+                logger.info("Applied Schedule-Free smoothing via optimizer.eval().")
 
             except Exception as e:
                 logger.warning(f"Failed to load optimizer state or call eval(): {e}")
