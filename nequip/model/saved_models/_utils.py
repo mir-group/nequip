@@ -14,9 +14,9 @@ def _check_compile_mode(compile_mode: str, client: str, exclude_keys: List[str] 
     allowed_options = [
         mode for mode in _COMPILE_MODE_OPTIONS if mode not in exclude_keys
     ]
-    assert (
-        compile_mode in allowed_options
-    ), f"`compile_mode={compile_mode}` is not recognized for `{client}`, only the following are supported: {allowed_options}"
+    assert compile_mode in allowed_options, (
+        f"`compile_mode={compile_mode}` is not recognized for `{client}`, only the following are supported: {allowed_options}"
+    )
 
 
 def _check_file_exists(file_path: str, file_type: str):

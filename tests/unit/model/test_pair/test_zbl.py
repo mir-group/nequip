@@ -33,7 +33,6 @@ class TestZBLModel(BaseEnergyModelTests):
 
     @pytest.fixture(scope="class")
     def config(self):
-
         config = {
             "_target_": "nequip.model.ZBLPairPotential",
             "seed": 123,

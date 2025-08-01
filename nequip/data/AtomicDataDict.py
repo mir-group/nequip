@@ -153,9 +153,9 @@ def frame_from_batched(batched_data: Type, index: int) -> Type:
         return batched_data
     # use zero-indexing as per python norm
     N_frames = num_frames(batched_data)
-    assert (
-        0 <= index < N_frames
-    ), f"Input data consists of {N_frames} frames so index can run from 0 to {N_frames-1} -- but given index of {index}!"
+    assert 0 <= index < N_frames, (
+        f"Input data consists of {N_frames} frames so index can run from 0 to {N_frames - 1} -- but given index of {index}!"
+    )
     batches = batched_data[_keys.BATCH_KEY]
     node_idx_offset = (
         0

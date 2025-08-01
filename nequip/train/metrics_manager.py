@@ -71,15 +71,15 @@ class MetricsManager(torch.nn.ModuleDict):
             # === sanity checks ===
             # == check that keys present are expected ==
             for key in metric_dict.keys():
-                assert (
-                    key in _METRICS_MANAGER_INPUT_KEYS
-                ), f"unrecognized key `{key}` found as input in `MetricsManager`"
+                assert key in _METRICS_MANAGER_INPUT_KEYS, (
+                    f"unrecognized key `{key}` found as input in `MetricsManager`"
+                )
 
             # == check that mandatory keys are present ==
             for mandatory_key in _METRICS_MANAGER_MANDATORY_INPUT_KEYS:
-                assert (
-                    mandatory_key in metric_dict.keys()
-                ), f"Each dictionary in `MetricManager`'s `metrics` argument must possess at least the following mandatory keys: {_METRICS_MANAGER_MANDATORY_INPUT_KEYS}"
+                assert mandatory_key in metric_dict.keys(), (
+                    f"Each dictionary in `MetricManager`'s `metrics` argument must possess at least the following mandatory keys: {_METRICS_MANAGER_MANDATORY_INPUT_KEYS}"
+                )
 
             # === field ===
             # field can be
@@ -102,27 +102,27 @@ class MetricsManager(torch.nn.ModuleDict):
                     if field is not None
                     else str(metric)
                 )
-            assert (
-                name != "weighted_sum"
-            ), "`weighted_sum` is a specially reserved metric name that should not be configured."
-            assert (
-                name not in self.metrics.keys()
-            ), f"Repeated names found ({name}) -- names must be unique. It is recommended to give custom names instead of relying on the automatic naming."
+            assert name != "weighted_sum", (
+                "`weighted_sum` is a specially reserved metric name that should not be configured."
+            )
+            assert name not in self.metrics.keys(), (
+                f"Repeated names found ({name}) -- names must be unique. It is recommended to give custom names instead of relying on the automatic naming."
+            )
 
             # === sanity check `field=None` case ===
             if field is None:
                 for key in ("ignore_nan", "per_type"):
-                    assert (
-                        key not in metric_dict
-                    ), f"When field is not provided or `field: None`, `{key}` should not be provided."
+                    assert key not in metric_dict, (
+                        f"When field is not provided or `field: None`, `{key}` should not be provided."
+                    )
                 # NOTE that we still go through the `ignore_nan` and `per_type` handling below so they get the default values
                 # so special metrics will have to handle NaNs on their own, and cannot be used with the automatic `per_type` system
 
             # == ignore Nan ==
             ignore_nan = metric_dict.get("ignore_nan", False)
-            assert isinstance(
-                ignore_nan, bool
-            ), f"`ignore_nan` should be a bool, but found {ignore_nan} of type {type(ignore_nan)}"
+            assert isinstance(ignore_nan, bool), (
+                f"`ignore_nan` should be a bool, but found {ignore_nan} of type {type(ignore_nan)}"
+            )
 
             # == per_type metrics ==
             per_type = metric_dict.get("per_type", False)
@@ -130,9 +130,9 @@ class MetricsManager(torch.nn.ModuleDict):
             # to only do the assert once
             if per_type and not per_type_encountered:
                 per_type_encountered = True
-                assert (
-                    type_names is not None
-                ), "`type_names` must be provided if any `per_type=True`"
+                assert type_names is not None, (
+                    "`type_names` must be provided if any `per_type=True`"
+                )
                 self.type_names = type_names
             # logic to proliferate metrics objects
             if per_type:
@@ -435,9 +435,9 @@ def EnergyForceMetrics(
     Args:
         coeffs (Dict[str, float]): ``dict`` that stores the relative contribution of the different energy and forces metrics to the ``weighted_sum`` version of the metric as in ``nequip.train.MetricsManager`` (default ``{'total_energy_rmse': 1.0, 'per_atom_energy_rmse': None, 'forces_rmse': 1.0, 'total_energy_mae': None, 'per_atom_energy_mae': None, 'forces_mae': None}``)
     """
-    assert all(
-        [k in _EF_METRICS_COEFFS_KEYS for k in coeffs.keys()]
-    ), f"Unrecognized key found in `coeffs`, only the following are recognized: {_EF_METRICS_COEFFS_KEYS}"
+    assert all([k in _EF_METRICS_COEFFS_KEYS for k in coeffs.keys()]), (
+        f"Unrecognized key found in `coeffs`, only the following are recognized: {_EF_METRICS_COEFFS_KEYS}"
+    )
     metrics = [
         {
             "name": "total_energy_rmse",
@@ -576,9 +576,9 @@ def EnergyForceStressMetrics(
     Args:
         coeffs (Dict[str, float]): ``dict`` that stores the relative contribution of the different energy and forces metrics to the ``weighted_sum`` version of the metric as in ``nequip.train.MetricsManager`` (default ``{'total_energy_rmse': 1.0, 'per_atom_energy_rmse': None, 'forces_rmse': 1.0, 'stress_rmse': 1.0, 'total_energy_mae': None, 'per_atom_energy_mae': None, 'forces_mae': None, 'stress_mae': None}``)
     """
-    assert all(
-        [k in _EFS_METRICS_COEFFS_KEYS for k in coeffs.keys()]
-    ), f"Unrecognized key found in `coeffs`, only the following are recognized: {_EFS_METRICS_COEFFS_KEYS}"
+    assert all([k in _EFS_METRICS_COEFFS_KEYS for k in coeffs.keys()]), (
+        f"Unrecognized key found in `coeffs`, only the following are recognized: {_EFS_METRICS_COEFFS_KEYS}"
+    )
     metrics = [
         {
             "name": "total_energy_rmse",
@@ -707,9 +707,9 @@ def EnergyOnlyMetrics(
     Args:
         coeffs (Dict[str, float]): ``dict`` that stores the relative contribution of the different energy metrics to the ``weighted_sum`` version of the metric as in ``nequip.train.MetricsManager`` (default ``{'total_energy_rmse': 1.0, 'per_atom_energy_rmse': None, 'total_energy_mae': None, 'per_atom_energy_mae': None}``)
     """
-    assert all(
-        [k in _ENERGY_ONLY_METRICS_COEFFS_KEYS for k in coeffs.keys()]
-    ), f"Unrecognized key found in `coeffs`, only the following are recognized: {_ENERGY_ONLY_METRICS_COEFFS_KEYS}"
+    assert all([k in _ENERGY_ONLY_METRICS_COEFFS_KEYS for k in coeffs.keys()]), (
+        f"Unrecognized key found in `coeffs`, only the following are recognized: {_ENERGY_ONLY_METRICS_COEFFS_KEYS}"
+    )
     metrics = [
         {
             "name": "total_energy_rmse",

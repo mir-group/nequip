@@ -73,9 +73,9 @@ def register_libraries_as_external_for_packaging(
     """
     extern_modules = set(extern_modules) if extern_modules is not None else set()
     mock_modules = set(mock_modules) if mock_modules is not None else set()
-    assert extern_modules.isdisjoint(
-        mock_modules
-    ), "Cannot register the same library as both external and mock modules."
+    assert extern_modules.isdisjoint(mock_modules), (
+        "Cannot register the same library as both external and mock modules."
+    )
 
     # TODO: should there be a way to extern only submodules of a library, which is supported by the underlying PyTorch package system?
     global _EXTERNAL_MODULES

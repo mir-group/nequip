@@ -83,7 +83,6 @@ def model_builder(func):
 
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
-
         # to handle nested model building
         global _IS_BUILDING_MODEL
 
@@ -100,17 +99,17 @@ def model_builder(func):
         try:
             model_cfg = kwargs.copy()
             # === sanity checks ===
-            assert (
-                global_state_initialized()
-            ), "global state must be initialized before building models"
+            assert global_state_initialized(), (
+                "global state must be initialized before building models"
+            )
             assert all(
                 key in kwargs for key in ["seed", "model_dtype", "type_names"]
             ), "`seed`, `model_dtype`, and `type_names` are mandatory model arguments."
 
             if get_latest_global_state().get(TF32_KEY, False):
-                assert (
-                    kwargs["model_dtype"] == "float32"
-                ), "`allow_tf32=True` only works with `model_dtype=float32`"
+                assert kwargs["model_dtype"] == "float32", (
+                    "`allow_tf32=True` only works with `model_dtype=float32`"
+                )
 
             # seed and model_dtype are removed from kwargs, so they will NOT get passed to inner models
             seed = kwargs.pop("seed")
@@ -127,9 +126,9 @@ def model_builder(func):
             # compile mode overriding logic
             if _OVERRIDE_COMPILE_MODE.get():
                 compile_mode = _CURRENT_COMPILE_MODE.get()
-            assert (
-                compile_mode in _COMPILE_MODE_OPTIONS
-            ), f"`compile_mode` can only be any of {_COMPILE_MODE_OPTIONS}, but `{compile_mode}` found"
+            assert compile_mode in _COMPILE_MODE_OPTIONS, (
+                f"`compile_mode` can only be any of {_COMPILE_MODE_OPTIONS}, but `{compile_mode}` found"
+            )
 
             # use `CompileGraphModel` if doing train-time compile build
             if compile_mode == _TRAIN_TIME_COMPILE_KEY:

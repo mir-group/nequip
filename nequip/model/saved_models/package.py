@@ -88,9 +88,9 @@ def ModelFromPackage(package_path: str, compile_mode: str = _EAGER_MODEL_KEY):
     """
     # === sanity checks ===
     _check_file_exists(file_path=package_path, file_type="package")
-    assert str(package_path).endswith(
-        ".nequip.zip"
-    ), f"NequIP framework packaged files must have the `.nequip.zip` extension but found {str(package_path)}"
+    assert str(package_path).endswith(".nequip.zip"), (
+        f"NequIP framework packaged files must have the `.nequip.zip` extension but found {str(package_path)}"
+    )
 
     # === account for checkpoint loading ===
     # if `ModelFromPackage` is used by itself, `override=False` and the input `compile_mode` argument is used

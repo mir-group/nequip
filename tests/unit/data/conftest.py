@@ -104,9 +104,7 @@ def dataset(request):
 
 @pytest.fixture(scope="function")
 def TolueneDataModule(num_trainval_test, batch_size):
-
     with tempfile.TemporaryDirectory() as tmpdir:
-
         # this fixture is used in statistics tests
         config = """\
         data:

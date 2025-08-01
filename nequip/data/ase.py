@@ -105,7 +105,9 @@ def from_ase(
                     assert add_fields[key].shape == (
                         3,
                         3,
-                    ), f"graph cartesian tensor {key} should be (3, 3) after reshaping, got {add_fields[key].shape}"
+                    ), (
+                        f"graph cartesian tensor {key} should be (3, 3) after reshaping, got {add_fields[key].shape}"
+                    )
                 elif key in _key_registry._NODE_FIELDS:
                     # node tensors: born charges per atom
                     if (
@@ -122,7 +124,9 @@ def from_ase(
                     assert add_fields[key].ndim == 3 and add_fields[key].shape[1:] == (
                         3,
                         3,
-                    ), f"node cartesian tensor {key} should be (N_atoms, 3, 3) after reshaping, got {add_fields[key].shape}"
+                    ), (
+                        f"node cartesian tensor {key} should be (N_atoms, 3, 3) after reshaping, got {add_fields[key].shape}"
+                    )
 
             # add batch dimension for graph-level fields
             if key in _key_registry._GRAPH_FIELDS:
@@ -133,7 +137,9 @@ def from_ase(
                         1,
                         3,
                         3,
-                    ), f"graph cartesian tensor {key} should be (1, 3, 3) after adding batch dim, got {add_fields[key].shape}"
+                    ), (
+                        f"graph cartesian tensor {key} should be (1, 3, 3) after adding batch dim, got {add_fields[key].shape}"
+                    )
 
     data = {
         AtomicDataDict.POSITIONS_KEY: atoms.positions,
@@ -181,9 +187,9 @@ def to_ase(
         AtomicDataDict.PER_ATOM_ENERGY_KEY,
         AtomicDataDict.STRESS_KEY,
     ]
-    assert (
-        len(set(extra_fields).intersection(special_handling_keys)) == 0
-    ), f"Cannot specify keys handled in special ways ({special_handling_keys}) as `extra_fields` for atoms output--- they are output by default"
+    assert len(set(extra_fields).intersection(special_handling_keys)) == 0, (
+        f"Cannot specify keys handled in special ways ({special_handling_keys}) as `extra_fields` for atoms output--- they are output by default"
+    )
 
     # == sort out logic for atomic numbers ==
     if AtomicDataDict.ATOMIC_NUMBERS_KEY in data:

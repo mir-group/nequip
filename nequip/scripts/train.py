@@ -35,47 +35,47 @@ def main(config: DictConfig) -> None:
 
     # check that all base sections are present
     for section in _REQUIRED_CONFIG_SECTIONS:
-        assert (
-            section in config
-        ), f"the `{section}` was not found in the config -- nequip config files must have the following section keys {_REQUIRED_CONFIG_SECTIONS}"
+        assert section in config, (
+            f"the `{section}` was not found in the config -- nequip config files must have the following section keys {_REQUIRED_CONFIG_SECTIONS}"
+        )
 
     assert "model" in config.training_module
 
     # determine run types
-    assert (
-        "run" in config
-    ), "`run` must provided in the config -- it is a list that could include `train`, `val`, and/or `test`."
+    assert "run" in config, (
+        "`run` must provided in the config -- it is a list that could include `train`, `val`, and/or `test`."
+    )
     if isinstance(config.run, ListConfig) or isinstance(config.run, list):
         runs = list(config.run)
     else:
         runs = [config.run]
     for run_type in runs:
         # don't have to be too safe for the `function` run type since it's advanced usage anyway
-        assert (
-            run_type in ["train", "val", "test"] or "function" in run_type.keys()
-        ), f"`run` list can only contain `train`, `val`, or `test`, but found {run_type}"
+        assert run_type in ["train", "val", "test"] or "function" in run_type.keys(), (
+            f"`run` list can only contain `train`, `val`, or `test`, but found {run_type}"
+        )
 
     # ensure only single train at most, to protect restart and checkpointing logic later
-    assert (
-        sum([run_type == "train" for run_type in runs]) <= 1
-    ), "only up to a single `train` instance can be present in `run`"
+    assert sum([run_type == "train" for run_type in runs]) <= 1, (
+        "only up to a single `train` instance can be present in `run`"
+    )
 
     # ensure that the relevant metrics are present
     if "train" in runs:
-        assert (
-            "loss" in config.training_module
-        ), "`training_module.loss` must be provided in the config to perform a `train` run."
-        assert (
-            "val_metrics" in config.training_module
-        ), "`training_module.val_metrics` must be provided in the config to perform a `train` run."
+        assert "loss" in config.training_module, (
+            "`training_module.loss` must be provided in the config to perform a `train` run."
+        )
+        assert "val_metrics" in config.training_module, (
+            "`training_module.val_metrics` must be provided in the config to perform a `train` run."
+        )
     if "val" in runs:
-        assert (
-            "val_metrics" in config.training_module
-        ), "`training_module.val_metrics` must be provided in the config to perform a `train` run."
+        assert "val_metrics" in config.training_module, (
+            "`training_module.val_metrics` must be provided in the config to perform a `train` run."
+        )
     if "test" in runs:
-        assert (
-            "test_metrics" in config.training_module
-        ), "`training_module.test_metrics` must be provided in the config to perform a `test` run."
+        assert "test_metrics" in config.training_module, (
+            "`training_module.test_metrics` must be provided in the config to perform a `test` run."
+        )
 
     versions = get_current_code_versions()
 
@@ -119,7 +119,6 @@ def main(config: DictConfig) -> None:
     # `run_index` is used to restore the run stage from a checkpoint if restarting from one
     run_index = 0
     if "ckpt_path" in config:
-
         logger.info(
             f"`training_module` (and `model`) from the checkpoint file `{config.ckpt_path}` will be used, and the `training_module` details from the config used for this restart will be ignored. If you wish to alter training hyperparameters or anything in the config, start a new training run and use the `ModelFromCheckpoint` builder to load a pretrained model instead. There can be various obscure errors that arise during checkpoint state restoration when restarting with an altered config file."
         )
@@ -144,9 +143,9 @@ def main(config: DictConfig) -> None:
         # check that runs from checkpoint match runs from config
         ckpt_runs = checkpoint["hyper_parameters"]["info_dict"]["runs"]
         # only check up to `len(ckpt_runs)` to allow for additional run stages added after
-        assert all(
-            [runs[idx] == ckpt_runs[idx] for idx in range(len(ckpt_runs))]
-        ), f"`run` from checkpoint  must match the `run` from the config up to the length of the checkpoint `run` list, but mismatch found -- checkpoint: `{ckpt_runs}`, config: `{runs}`"
+        assert all([runs[idx] == ckpt_runs[idx] for idx in range(len(ckpt_runs))]), (
+            f"`run` from checkpoint  must match the `run` from the config up to the length of the checkpoint `run` list, but mismatch found -- checkpoint: `{ckpt_runs}`, config: `{runs}`"
+        )
 
         # get run index
         # "run_stage" is registered as a buffer in NequIPLightningModule to preserve run state

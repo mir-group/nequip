@@ -37,9 +37,9 @@ class LAMMPSMLIAPGhostExchangeModule(GhostExchangeModule):
     def forward(
         self, data: AtomicDataDict.Type, ghost_included=False
     ) -> AtomicDataDict.Type:
-        assert (
-            AtomicDataDict.LMP_MLIAP_DATA_KEY in data
-        ), "`LAMMPSMLIAPGhostExchangeModule` shouldn't be used if LAMMPS ML-IAP data is not provided as input."
+        assert AtomicDataDict.LMP_MLIAP_DATA_KEY in data, (
+            "`LAMMPSMLIAPGhostExchangeModule` shouldn't be used if LAMMPS ML-IAP data is not provided as input."
+        )
 
         node_features = data[self.field]
         lmp_data = data[AtomicDataDict.LMP_MLIAP_DATA_KEY]

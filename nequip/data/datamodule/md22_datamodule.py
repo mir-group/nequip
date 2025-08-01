@@ -65,10 +65,9 @@ class MD22DataModule(NequIPDataModule):
         train_val_split: Sequence[Union[int, float]],
         **kwargs,
     ):
-
-        assert (
-            dataset in self.dataset_map.keys()
-        ), f"`dataset={dataset}` not supported, `dataset` can be any of {list(self.dataset_map.keys())}"
+        assert dataset in self.dataset_map.keys(), (
+            f"`dataset={dataset}` not supported, `dataset` can be any of {list(self.dataset_map.keys())}"
+        )
 
         data_file_path = "/".join([data_source_dir, self.dataset_map[dataset][0]])
         base_config = {

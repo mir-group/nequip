@@ -101,14 +101,18 @@ def from_dict(data: Dict) -> AtomicDataDict.Type:
                     N_frames,
                     3,
                     3,
-                ), f"graph cartesian tensor {k} should have shape ({N_frames}, 3, 3), got {v.shape}"
+                ), (
+                    f"graph cartesian tensor {k} should have shape ({N_frames}, 3, 3), got {v.shape}"
+                )
             elif k in _key_registry._NODE_FIELDS:
                 # expect (N_nodes, 3, 3) for node cartesian tensors
                 assert v.dim() == 3 and v.shape == (
                     N_nodes,
                     3,
                     3,
-                ), f"node cartesian tensor {k} should have shape ({N_nodes}, 3, 3), got {v.shape}"
+                ), (
+                    f"node cartesian tensor {k} should have shape ({N_nodes}, 3, 3), got {v.shape}"
+                )
 
     # == general shape checks ==
     for k, v in data.items():
@@ -117,18 +121,18 @@ def from_dict(data: Dict) -> AtomicDataDict.Type:
             v = data[k]
 
         if k in _key_registry._GRAPH_FIELDS:
-            assert (
-                v.shape[0] == N_frames
-            ), f"Leading dimension of registered graph field {k} should be {N_frames}, but found shape {v.shape}."
+            assert v.shape[0] == N_frames, (
+                f"Leading dimension of registered graph field {k} should be {N_frames}, but found shape {v.shape}."
+            )
 
             # NOTE: special tensors that we keep as (num_frames,)
             if v.dim() == 1 and k not in [AtomicDataDict.NUM_NODES_KEY]:
                 data[k] = v.reshape((N_frames, 1))
 
         elif k in _key_registry._NODE_FIELDS:
-            assert (
-                v.shape[0] == N_nodes
-            ), f"Leading dimension of registered node field {k} should be {N_nodes}, but found shape {v.shape}."
+            assert v.shape[0] == N_nodes, (
+                f"Leading dimension of registered node field {k} should be {N_nodes}, but found shape {v.shape}."
+            )
 
             # NOTE: special tensors that we keep as (num_nodes,)
             if v.dim() == 1 and k not in [
@@ -144,9 +148,9 @@ def from_dict(data: Dict) -> AtomicDataDict.Type:
                     f"Inconsistent data -- {k} was registered as an edge field, but no edge indices found."
                 )
             else:
-                assert (
-                    v.shape[0] == N_edges
-                ), f"Leading dimension of registered edge field {k} should be {N_edges}, but found shape {v.shape}."
+                assert v.shape[0] == N_edges, (
+                    f"Leading dimension of registered edge field {k} should be {N_edges}, but found shape {v.shape}."
+                )
 
     # == specific checks for basic properties (pos, cell) ==
     pos = data[AtomicDataDict.POSITIONS_KEY]

@@ -17,7 +17,6 @@ from nequip.train.metrics import MaximumAbsoluteError
 
 
 class TestMetricsManager:
-
     @pytest.mark.parametrize(
         "ratio", [(1, 1), (1, 2), (1, 3), (10, 10), (1, 100), (1, 1e5)]
     )
@@ -411,7 +410,6 @@ def data_w_NaN(data):
 
 
 class TestMetricsManagerBuilders:
-
     @pytest.mark.parametrize(
         "ratio", [(1, 1), (1, 2), (1, 3), (10, 10), (1, 100), (1, 1e5)]
     )

@@ -64,9 +64,9 @@ class NequIPCalculator(Calculator):
         self.results = {}
 
         # === handle model ===
-        assert (
-            not model.training
-        ), "make sure to call .eval() on model before building NequIPCalculator"
+        assert not model.training, (
+            "make sure to call .eval() on model before building NequIPCalculator"
+        )
         self.model = model
 
         # === handle device ===

@@ -18,7 +18,6 @@ def test_type_mapper():
 
 
 class TestDataset:
-
     def test_subset(self, dataset):
         Subset(dataset, [1, 3])
 

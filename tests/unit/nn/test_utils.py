@@ -41,7 +41,6 @@ def test_periodic_edge():
 
 @pytest.mark.parametrize("periodic", [True, False])
 def test_positions_grad(periodic, CH3CHO, Cu_bulk):
-
     if periodic:
         atoms, data = Cu_bulk
     else:
@@ -95,7 +94,6 @@ def test_some_periodic():
 def test_basic(model_dtype):
     type_names = ["A", "B", "C", "D"]
     with torch_default_dtype(dtype_from_name(model_dtype)):
-
         node_type = NodeTypeEmbed(type_names=type_names, num_features=13)
         save = SaveForOutput(
             field=AtomicDataDict.NODE_FEATURES_KEY,

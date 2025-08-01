@@ -49,10 +49,9 @@ class sGDML_CCSD_DataModule(NequIPDataModule):
         trainval_test_subset: Optional[List[int]] = None,
         **kwargs,
     ):
-
-        assert (
-            dataset in self.DATASET_MAP.keys()
-        ), f"`dataset={dataset}` not supported, `dataset` can be any of {list(self.DATASET_MAP.keys())}"
+        assert dataset in self.DATASET_MAP.keys(), (
+            f"`dataset={dataset}` not supported, `dataset` can be any of {list(self.DATASET_MAP.keys())}"
+        )
 
         train_file_path = "/".join(
             [data_source_dir, self.DATASET_MAP[dataset] + "-train.npz"]

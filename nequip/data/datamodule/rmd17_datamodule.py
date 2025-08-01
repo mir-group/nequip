@@ -65,10 +65,9 @@ class rMD17DataModule(NequIPDataModule):
         subset_len: Optional[int] = None,
         **kwargs,
     ):
-
-        assert (
-            dataset in self.DATASET_MAP.keys()
-        ), f"`dataset={dataset}` not supported, `dataset` can be any of {list(self.DATASET_MAP.keys())}"
+        assert dataset in self.DATASET_MAP.keys(), (
+            f"`dataset={dataset}` not supported, `dataset` can be any of {list(self.DATASET_MAP.keys())}"
+        )
 
         file_path = "/".join(
             [data_source_dir, "rmd17/npz_data", self.DATASET_MAP[dataset]]

@@ -13,7 +13,6 @@ from nequip.utils.compile import conditional_torchscript_jit
 
 
 class _LJParam(torch.nn.Module):
-
     def __init__(self):
         super().__init__()
 
@@ -206,7 +205,6 @@ class SimpleLennardJones(GraphModuleMixin, torch.nn.Module):
 
 
 class _ZBL(torch.nn.Module):
-
     def __init__(self):
         super().__init__()
 

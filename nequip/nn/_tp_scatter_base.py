@@ -7,7 +7,6 @@ from .model_modifier_utils import replace_submodules, model_modifier
 
 
 class TensorProductScatter(torch.nn.Module):
-
     def __init__(
         self,
         feature_irreps_in,

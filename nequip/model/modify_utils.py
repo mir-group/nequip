@@ -22,9 +22,9 @@ def only_apply_persistent_modifiers(persistent_only: bool):
     """
     global _ONLY_APPLY_PERSISTENT
     init_state = _ONLY_APPLY_PERSISTENT.get()
-    assert (
-        not init_state
-    ), "this error implies that the `only_apply_persistent_modifiers` context manager is being nested, which is unexpected behavior"
+    assert not init_state, (
+        "this error implies that the `only_apply_persistent_modifiers` context manager is being nested, which is unexpected behavior"
+    )
     _ONLY_APPLY_PERSISTENT.set(persistent_only)
     try:
         yield
@@ -52,9 +52,9 @@ def get_all_modifiers(
             if name in _all_modifiers:
                 # confirm (indirectly) that these are @classmethods (bound instance methods will not be equal)
                 # this ensures that having a globally unique name for each modifier does not hide differences between different copies of the same modifier hiding in a single module tree
-                assert (
-                    _all_modifiers[name] == member
-                ), f"Found at least two non-unique modifiers with same name `{name}`: {_all_modifiers[name]:r} and {member:r}"
+                assert _all_modifiers[name] == member, (
+                    f"Found at least two non-unique modifiers with same name `{name}`: {_all_modifiers[name]:r} and {member:r}"
+                )
             _all_modifiers[name] = member
 
     for _, child in module.named_children():

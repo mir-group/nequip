@@ -116,7 +116,6 @@ class CompileGraphModel(GraphModel):
         self.buffer_names = None
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
-
         # short-circuit if one of the batch dims is 1 (0 would be an error)
         # this is related to the 0/1 specialization problem
         # see https://docs.google.com/document/d/16VPOa3d-Liikf48teAOmxLc92rgvJdfosIy-yoT38Io/edit?fbclid=IwAR3HNwmmexcitV0pbZm_x1a4ykdXZ9th_eJWK-3hBtVgKnrkmemz6Pm5jRQ&tab=t.0#heading=h.ez923tomjvyk
@@ -135,7 +134,6 @@ class CompileGraphModel(GraphModel):
         # === compile ===
         # compilation happens on the first data pass when there are at least two atoms (hard to pre-emp pathological data)
         if not self._compiled_model:
-
             # get weight names and buffers
             self.weight_names = [n for n, _ in self.model.named_parameters()]
             self.buffer_names = [n for n, _ in self.model.named_buffers()]

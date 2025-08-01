@@ -80,9 +80,9 @@ def test_oeq_package_compile_workflow(fake_model_training_session):
         stderr=subprocess.PIPE,
     )
     _check_and_print(retcode)
-    assert os.path.exists(
-        package_path
-    ), f"Package file `{package_path}` does not exist!"
+    assert os.path.exists(package_path), (
+        f"Package file `{package_path}` does not exist!"
+    )
 
     # === Step 2: Compile checkpoint to torchscript with OEQ ===
     compiled_from_ckpt_path = str(
@@ -109,9 +109,9 @@ def test_oeq_package_compile_workflow(fake_model_training_session):
         stderr=subprocess.PIPE,
     )
     _check_and_print(retcode)
-    assert os.path.exists(
-        compiled_from_ckpt_path
-    ), f"Compiled model from checkpoint `{compiled_from_ckpt_path}` does not exist!"
+    assert os.path.exists(compiled_from_ckpt_path), (
+        f"Compiled model from checkpoint `{compiled_from_ckpt_path}` does not exist!"
+    )
 
     # === Step 3: Compile package to torchscript with OEQ ===
     compiled_from_pkg_path = str(
@@ -138,9 +138,9 @@ def test_oeq_package_compile_workflow(fake_model_training_session):
         stderr=subprocess.PIPE,
     )
     _check_and_print(retcode)
-    assert os.path.exists(
-        compiled_from_pkg_path
-    ), f"Compiled model from package `{compiled_from_pkg_path}` does not exist!"
+    assert os.path.exists(compiled_from_pkg_path), (
+        f"Compiled model from package `{compiled_from_pkg_path}` does not exist!"
+    )
 
     # === Step 4: Create ASE calculators (all on CUDA) ===
     # Reference calculator from checkpoint (with OEQ modifiers)
@@ -196,17 +196,17 @@ def test_oeq_package_compile_workflow(fake_model_training_session):
             del atoms, ref_atoms, compiled_ckpt_atoms, compiled_pkg_atoms
 
             # Test energies match
-            assert np.allclose(
-                ref_E, compiled_ckpt_E, rtol=tol, atol=tol
-            ), f"Energy mismatch between reference and compiled from checkpoint: {np.abs(ref_E - compiled_ckpt_E)}"
-            assert np.allclose(
-                ref_E, compiled_pkg_E, rtol=tol, atol=tol
-            ), f"Energy mismatch between reference and compiled from package: {np.abs(ref_E - compiled_pkg_E)}"
+            assert np.allclose(ref_E, compiled_ckpt_E, rtol=tol, atol=tol), (
+                f"Energy mismatch between reference and compiled from checkpoint: {np.abs(ref_E - compiled_ckpt_E)}"
+            )
+            assert np.allclose(ref_E, compiled_pkg_E, rtol=tol, atol=tol), (
+                f"Energy mismatch between reference and compiled from package: {np.abs(ref_E - compiled_pkg_E)}"
+            )
 
             # Test forces match
-            assert np.allclose(
-                ref_F, compiled_ckpt_F, rtol=tol, atol=tol
-            ), f"Force mismatch between reference and compiled from checkpoint: {np.max(np.abs(ref_F - compiled_ckpt_F))}"
-            assert np.allclose(
-                ref_F, compiled_pkg_F, rtol=tol, atol=tol
-            ), f"Force mismatch between reference and compiled from package: {np.max(np.abs(ref_F - compiled_pkg_F))}"
+            assert np.allclose(ref_F, compiled_ckpt_F, rtol=tol, atol=tol), (
+                f"Force mismatch between reference and compiled from checkpoint: {np.max(np.abs(ref_F - compiled_ckpt_F))}"
+            )
+            assert np.allclose(ref_F, compiled_pkg_F, rtol=tol, atol=tol), (
+                f"Force mismatch between reference and compiled from package: {np.max(np.abs(ref_F - compiled_pkg_F))}"
+            )

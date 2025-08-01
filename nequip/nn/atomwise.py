@@ -201,9 +201,9 @@ class PerTypeScaleShift(GraphModuleMixin, torch.nn.Module):
                     torch.ones(self.num_types, dtype=scales.dtype, device=scales.device)
                     * scales
                 )
-            assert (
-                scales.shape == (self.num_types,) or scales.numel() == 1
-            ), f"Scales expected to have shape ({self.num_types},), but found {scales.shape}"
+            assert scales.shape == (self.num_types,) or scales.numel() == 1, (
+                f"Scales expected to have shape ({self.num_types},), but found {scales.shape}"
+            )
             scales = scales.reshape(-1, 1)
             if self.scales_trainable:
                 self.scales = torch.nn.Parameter(scales)
@@ -224,9 +224,9 @@ class PerTypeScaleShift(GraphModuleMixin, torch.nn.Module):
                     torch.ones(self.num_types, dtype=shifts.dtype, device=shifts.device)
                     * shifts
                 )
-            assert (
-                shifts.shape == (self.num_types,) or shifts.numel() == 1
-            ), f"Shifts expected to have shape ({self.num_types},), but found {shifts.shape}"
+            assert shifts.shape == (self.num_types,) or shifts.numel() == 1, (
+                f"Shifts expected to have shape ({self.num_types},), but found {shifts.shape}"
+            )
             shifts = shifts.reshape(-1, 1)
             if self.shifts_trainable:
                 self.shifts = torch.nn.Parameter(shifts)
@@ -329,9 +329,9 @@ class PerTypeScaleShift(GraphModuleMixin, torch.nn.Module):
                 if isinstance(sc_var, float) or isinstance(sc_var, int):
                     sc_var = {name: sc_var for name in old.type_names}
                 assert isinstance(sc_var, dict)
-                assert all(
-                    k in old.type_names for k in sc_var.keys()
-                ), f"Provided `{vname}` dict keys ({sc_var.keys()}) do not match the expected type names of the model ({old.type_names})."
+                assert all(k in old.type_names for k in sc_var.keys()), (
+                    f"Provided `{vname}` dict keys ({sc_var.keys()}) do not match the expected type names of the model ({old.type_names})."
+                )
                 # update original model's dict with new dict entries
                 new_sc_var.update(sc_var)
             # if no new values provided, we default to the original model's dict entries
@@ -358,7 +358,6 @@ class PerTypeScaleShift(GraphModuleMixin, torch.nn.Module):
 def _format_type_vals(
     vals: List[float], type_names: List[str], element_formatter: str = ".6f"
 ) -> str:
-
     if vals is None or not vals:
         return f"[{', '.join(type_names)}: None]"
 

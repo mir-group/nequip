@@ -73,7 +73,6 @@ class HuberLoss(_MeanX):
     """
 
     def __init__(self, reduction="mean", delta=1.0, **kwargs):
-
         assert reduction in ["mean", "sum"]
 
         def _huber(x):
@@ -120,9 +119,9 @@ class StratifiedHuberForceLoss(_MeanX):
 
         self.delta_dict = delta_dict  # dict of lower bound: delta parameter
         assert reduction in ["mean", "sum"]
-        assert (
-            len(self.delta_dict) >= 2
-        ), "At least two delta values are required, otherwise use standard HuberLoss instead."
+        assert len(self.delta_dict) >= 2, (
+            "At least two delta values are required, otherwise use standard HuberLoss instead."
+        )
 
         super().__init__(**kwargs)
         self.reduction = reduction

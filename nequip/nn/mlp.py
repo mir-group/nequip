@@ -127,7 +127,6 @@ class ScalarMLPFunction(torch.nn.Module):
         # === build the MLP + weight init ===
         mlp = torch.nn.Sequential()
         for layer, (h_in, h_out) in enumerate(zip(self.dims, self.dims[1:])):
-
             # === weight initialization ===
             # normalize to preserve variance of forward activations or backward derivatives
             # we use "relu" gain (sqrt(2)) as a stand-in for the smooth nonlinearities we use, and only apply them if there is a nonlinearity
@@ -176,9 +175,7 @@ class ScalarMLPFunction(torch.nn.Module):
 
 
 class DeepLinearMLP(torch.nn.Module):
-
     def __init__(self, mlp) -> None:
-
         super().__init__()
         self.weights = torch.nn.ParameterList()
         alphas = []

@@ -42,7 +42,6 @@ class ASEDataModule(NequIPDataModule):
         key_mapping: Optional[Dict[str, str]] = {},
         **kwargs,
     ):
-
         # == first convert all dataset paths to lists if not already lists ==
         dataset_paths = []
         for paths in [
@@ -87,9 +86,9 @@ class ASEDataModule(NequIPDataModule):
         # == populate split dataset ==
         split_config = []
         for path_and_splits in dataset_paths[-1]:
-            assert (
-                "file_path" in path_and_splits
-            ), "`file_path` key must be present in each dict of `split_dataset`"
+            assert "file_path" in path_and_splits, (
+                "`file_path` key must be present in each dict of `split_dataset`"
+            )
             dataset_config = dataset_config_template.copy()
             file_path = path_and_splits.pop("file_path")
             dataset_config.update({"file_path": file_path})

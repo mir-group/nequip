@@ -21,7 +21,6 @@ import pytest
 
 
 class TestStatistics:
-
     # implicitly testing automatic naming convention, i.e.
     # energy (E), forces (F), etc
 

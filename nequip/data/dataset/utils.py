@@ -22,9 +22,9 @@ class SubsetByRandomSlice(torch.utils.data.Subset):
         seed: int,
     ):
         data_len = len(dataset)
-        assert (
-            length <= data_len
-        ), f"Unable to get a subset (length {length}) larger than the size of the dataset (length {data_len}) provided"
+        assert length <= data_len, (
+            f"Unable to get a subset (length {length}) larger than the size of the dataset (length {data_len}) provided"
+        )
         generator = torch.Generator().manual_seed(seed)
         indices = torch.randperm(len(dataset), generator=generator)
 

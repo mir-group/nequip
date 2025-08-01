@@ -49,9 +49,9 @@ class SAMD23DataModule(ASEDataModule):
         **kwargs,
     ):
         system = system.strip()
-        assert (
-            system in _URLS
-        ), f"Unknown system `{system}`; must be one of {list(_URLS)}"
+        assert system in _URLS, (
+            f"Unknown system `{system}`; must be one of {list(_URLS)}"
+        )
 
         self.system = system
         self.data_source_dir = data_source_dir

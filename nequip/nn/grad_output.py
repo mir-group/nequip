@@ -101,7 +101,6 @@ class ForceStressOutput(GraphModuleMixin, torch.nn.Module):
         self.register_buffer("_empty", torch.Tensor())
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
-
         # === LOGIC BRANCHING NOTES ===
         # if edge vectors not present, we assume that positions are present
         # and proceed with the usual procedure to compute forces, virials, stress
@@ -110,7 +109,6 @@ class ForceStressOutput(GraphModuleMixin, torch.nn.Module):
         # NOTE: if edge vectors are not present, we assume that it is for non-batched inference with no cell
         # at the point of making this change, it is specifically for LAMMPS-MLIAP compatibility
         if AtomicDataDict.EDGE_VECTORS_KEY not in data:
-
             if AtomicDataDict.BATCH_KEY in data:
                 batch = data[AtomicDataDict.BATCH_KEY]
                 num_batch: int = AtomicDataDict.num_frames(data)

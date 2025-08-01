@@ -83,16 +83,16 @@ class DataStatisticsManager(torch.nn.ModuleList):
             if name is None:
                 name = "_".join([str(self.fields[idx]), str(self[idx])])
             self.names.append(name)
-        assert len(self.names) == len(
-            set(self.names)
-        ), f"Repeated names found ({self.names}) -- names must be unique. It is recommended to give custom names instead of relying on the automatic naming."
+        assert len(self.names) == len(set(self.names)), (
+            f"Repeated names found ({self.names}) -- names must be unique. It is recommended to give custom names instead of relying on the automatic naming."
+        )
 
         # === per_type metrics ===
         self.per_type = [metric.get("per_type", False) for metric in metrics]
         if any(self.per_type):
-            assert (
-                type_names is not None
-            ), "`type_names` must be provided if any `per_type=True`"
+            assert type_names is not None, (
+                "`type_names` must be provided if any `per_type=True`"
+            )
         self.type_names = type_names
 
         for idx in range(self.num_metrics):
@@ -101,7 +101,9 @@ class DataStatisticsManager(torch.nn.ModuleList):
                 assert field_type in [
                     "node",
                     "edge",
-                ], f"`per_type` metrics only apply to node or edge fields, but {field_type} field found for {self.names[idx]}."
+                ], (
+                    f"`per_type` metrics only apply to node or edge fields, but {field_type} field found for {self.names[idx]}."
+                )
                 # set up per_type metrics as a ModuleList
                 # one copy of the base Metric for each type in forward() and compute()
                 ptm_list = torch.nn.ModuleList([])

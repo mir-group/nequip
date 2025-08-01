@@ -51,7 +51,6 @@ def _process_per_edge_type_cutoff(
 
 @compile_mode("script")
 class EdgeLengthNormalizer(GraphModuleMixin, torch.nn.Module):
-
     num_types: int
     r_max: float
     _per_edge_type: bool
@@ -153,9 +152,7 @@ class BesselEdgeLengthEncoding(GraphModuleMixin, torch.nn.Module):
             end=self.num_bessels,
             steps=self.num_bessels,
             dtype=_GLOBAL_DTYPE,
-        ).unsqueeze(
-            0
-        )  # (1, num_bessel)
+        ).unsqueeze(0)  # (1, num_bessel)
         if self.trainable:
             self.bessel_weights = torch.nn.Parameter(bessel_weights)
         else:

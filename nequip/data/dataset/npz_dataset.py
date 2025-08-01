@@ -42,9 +42,9 @@ class NPZDataset(AtomicDataset):
         for k, v in key_mapping.items():
             if v == AtomicDataDict.TOTAL_ENERGY_KEY:
                 E_key = k
-        assert (
-            E_key is not None
-        ), "No key corresponding to `total_energy` found in npz dataset"
+        assert E_key is not None, (
+            "No key corresponding to `total_energy` found in npz dataset"
+        )
         with np.load(self.file_path, mmap_mode="r") as npz_data:
             self.num_frames = npz_data[E_key].shape[0]
 
@@ -55,7 +55,6 @@ class NPZDataset(AtomicDataset):
         self,
         indices: Union[List[int], torch.Tensor, slice],
     ) -> List[AtomicDataDict.Type]:
-
         if isinstance(indices, slice):
             indices = list(range(*indices.indices(self.num_frames)))
 

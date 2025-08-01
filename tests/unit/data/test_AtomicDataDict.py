@@ -66,7 +66,6 @@ def test_to_ase_batches(atomic_batch):
 
 
 def test_process_dict_invariance(H2, CuFcc, CH3CHO):
-
     for system in [H2, CuFcc, CH3CHO]:
         _, data = system
         data1 = from_dict(data.copy())
@@ -125,7 +124,6 @@ def test_silicon_neighbors(Si):
 
 @pytest.mark.parametrize("alt_nl_method", ALT_NL_METHODS)
 def test_neighborlist_consistency(alt_nl_method, CH3CHO, CuFcc, Si):
-
     CH3CHO_atoms, _ = CH3CHO
     CuFcc_atoms, _ = CuFcc
     _, Si_points, _ = Si

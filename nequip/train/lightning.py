@@ -126,9 +126,9 @@ class NequIPLightningModule(lightning.LightningModule):
             }
         )
 
-        assert (
-            self.num_datasets["train"] == 1
-        ), "currently only support one training dataset"
+        assert self.num_datasets["train"] == 1, (
+            "currently only support one training dataset"
+        )
 
         # == DDP concerns for loss ==
 
@@ -139,9 +139,9 @@ class NequIPLightningModule(lightning.LightningModule):
         # == instantiate loss ==
         self.loss = instantiate(loss, type_names=type_names)
         if self.loss is not None:
-            assert (
-                self.loss.do_weighted_sum
-            ), "`coeff` must be set for entries of the `loss` MetricsManager for a weighted sum of metrics components to be used as the loss."
+            assert self.loss.do_weighted_sum, (
+                "`coeff` must be set for entries of the `loss` MetricsManager for a weighted sum of metrics components to be used as the loss."
+            )
 
         # set `dist_sync_on_step=True` for loss metrics
         # to ensure correct DDP syncing of loss function for batch steps

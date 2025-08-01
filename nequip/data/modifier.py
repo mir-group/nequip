@@ -18,7 +18,6 @@ from typing import Optional, Union, List
 
 
 class BaseModifier:
-
     def __init__(self, field: str) -> None:
         self.field = field
 

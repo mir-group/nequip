@@ -30,9 +30,9 @@ class NeighborListTransform:
         # set up normalizer for per-edge-type cutoffs if provided
         self._per_edge_type = False
         if per_edge_type_cutoff is not None:
-            assert (
-                type_names is not None
-            ), "`type_names` required for `per_edge_type_cutoff`"
+            assert type_names is not None, (
+                "`type_names` required for `per_edge_type_cutoff`"
+            )
             self._per_edge_type = True
             from nequip.nn.embedding import EdgeLengthNormalizer
 

@@ -65,7 +65,6 @@ def test_save_load_and_metadata(tmp_path):
 
 # To ensure old LMDB files without metadata still work
 def test_lmdb_without_metadata(tmp_path):
-
     # Define LMDB file path
     lmdb_path = str(tmp_path / "test_data.lmdb")
 

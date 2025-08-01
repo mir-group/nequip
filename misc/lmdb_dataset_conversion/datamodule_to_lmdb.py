@@ -12,11 +12,10 @@ os.environ["HYDRA_FULL_ERROR"] = "1"
 
 @hydra.main(version_base=None, config_path=os.getcwd(), config_name="data")
 def main(config: DictConfig):
-
     # === determine run types ===
-    assert (
-        "run" in config
-    ), "`run` must provided in the config -- it is a list that could include `train`, `val`, `test`, and/or `predict`."
+    assert "run" in config, (
+        "`run` must provided in the config -- it is a list that could include `train`, `val`, `test`, and/or `predict`."
+    )
     if isinstance(config.run, ListConfig) or isinstance(config.run, list):
         runs = config.run
     else:

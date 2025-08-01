@@ -46,9 +46,9 @@ def _training_session(
     # find the config file in the same directory as this utils file
     current_file = pathlib.Path(__file__)
     config_path = current_file.parent / conffile
-    assert (
-        config_path.exists()
-    ), f"Could not find config file: {conffile} in path: {config_path}"
+    assert config_path.exists(), (
+        f"Could not find config file: {conffile} in path: {config_path}"
+    )
 
     config = OmegaConf.load(config_path)
 
@@ -127,9 +127,9 @@ def _training_session(
                             env=env,
                         )
                         _check_and_print(retcode)
-                        assert pathlib.Path(
-                            package_path
-                        ).is_file(), "`nequip-package` didn't create file"
+                        assert pathlib.Path(package_path).is_file(), (
+                            "`nequip-package` didn't create file"
+                        )
                         # update config
                         with open_dict(new_config):
                             new_config["training_module"]["model"] = {

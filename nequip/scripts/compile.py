@@ -46,7 +46,6 @@ def _parse_bounds_to_Dim(name: str, bounds_str: str):
 
 
 def main(args=None):
-
     # === parse inputs ===
     parser = argparse.ArgumentParser(
         description="Compiles NequIP/Allegro models from checkpoint or package files.",
@@ -174,13 +173,13 @@ def main(args=None):
 
     # == output path extension ==
     if args.mode == "torchscript":
-        assert str(args.output_path).endswith(
-            ".nequip.pth"
-        ), "`output-path` must end with the `.nequip.pth` extension for `torchscript` compile mode"
+        assert str(args.output_path).endswith(".nequip.pth"), (
+            "`output-path` must end with the `.nequip.pth` extension for `torchscript` compile mode"
+        )
     elif args.mode == "aotinductor":
-        assert str(args.output_path).endswith(
-            ".nequip.pt2"
-        ), "`output-path` must end with the `.nequip.pt2` extension for `aotinductor` compile mode"
+        assert str(args.output_path).endswith(".nequip.pt2"), (
+            "`output-path` must end with the `.nequip.pt2` extension for `aotinductor` compile mode"
+        )
 
     # === load model ===
     # only eager models are loaded
@@ -219,7 +218,6 @@ def main(args=None):
 
     # === AOTInductor ===
     if args.mode == "aotinductor":
-
         # === sanity check and guarded imports ===
         from nequip.utils.versions import check_pt2_compile_compatibility
 
@@ -249,9 +247,9 @@ def main(args=None):
 
         # === get target specific settings ===
         if args.target is None:
-            assert (
-                args.input_fields is not None and args.output_fields is not None
-            ), "Either `target` or `input-fields` and `output-fields` must be provided for `aotinductor` compile mode"
+            assert args.input_fields is not None and args.output_fields is not None, (
+                "Either `target` or `input-fields` and `output-fields` must be provided for `aotinductor` compile mode"
+            )
             input_fields = args.input_fields
             output_fields = args.output_fields
         else:

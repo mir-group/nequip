@@ -15,9 +15,9 @@ def model_modifier(persistent: bool):
     """
 
     def decorator(func):
-        assert isinstance(
-            func, classmethod
-        ), "@model_modifier must be applied after @classmethod"
+        assert isinstance(func, classmethod), (
+            "@model_modifier must be applied after @classmethod"
+        )
         assert not hasattr(func.__func__, _MODEL_MODIFIER_ATTR_NAME)
         setattr(func.__func__, _MODEL_MODIFIER_ATTR_NAME, persistent)
         return func

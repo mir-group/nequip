@@ -144,7 +144,9 @@ class LinearLossCoefficientScheduler(Callback):
             # sanity check that all `final_coeffs` keys are present in the metrics
             assert set(self.final_coeffs.keys()) == set(
                 self.captured_initial_coeffs.keys()
-            ), f"Mismatch between `final_coeffs` keys {set(self.final_coeffs.keys())} and available metrics {set(self.captured_initial_coeffs.keys())}"
+            ), (
+                f"Mismatch between `final_coeffs` keys {set(self.final_coeffs.keys())} and available metrics {set(self.captured_initial_coeffs.keys())}"
+            )
 
         if (
             self.start_epoch
@@ -152,9 +154,9 @@ class LinearLossCoefficientScheduler(Callback):
             <= self.start_epoch + self.transition_epochs
         ):
             # linear interpolation during transition period
-            assert (
-                self.captured_initial_coeffs is not None
-            ), "Initial coefficients should have been captured"
+            assert self.captured_initial_coeffs is not None, (
+                "Initial coefficients should have been captured"
+            )
             epochs_into_transition = current_epoch - self.start_epoch
             alpha = epochs_into_transition / self.transition_epochs
             interpolated_coeffs = {}

@@ -31,9 +31,9 @@ class NequIPLAMMPSMLIAPWrapper(MLIAPUnified):
         **kwargs,
     ):
         # this is a white lie, unsure if strictly necessary, but just in case
-        assert (
-            _TORCH_GE_2_6
-        ), "PyTorch >= 2.6 required for NequIP's LAMMPS ML-IAP interface"
+        assert _TORCH_GE_2_6, (
+            "PyTorch >= 2.6 required for NequIP's LAMMPS ML-IAP interface"
+        )
         super().__init__()
         self.model_path = model_path
         self.model_key = model_key
@@ -115,7 +115,6 @@ class NequIPLAMMPSMLIAPWrapper(MLIAPUnified):
             self.model = model
 
     def compute_forces(self, lmp_data):
-
         # === lazily load model ===
         if self.model is None:
             self._initialize_model(lmp_data)

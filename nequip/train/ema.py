@@ -175,9 +175,9 @@ class EMAWeights(torch.nn.Module):
         Args:
             model (:class:`torch.nn.Module`): base model
         """
-        assert (
-            self.is_holding_ema_weights
-        ), "EMA module is not holding EMA weights. If using `nequip-train` from a checkpoint, the checkpoint is likely corrupted. Otherwise, there is something wrong and a GitHub issue should be reported."
+        assert self.is_holding_ema_weights, (
+            "EMA module is not holding EMA weights. If using `nequip-train` from a checkpoint, the checkpoint is likely corrupted. Otherwise, there is something wrong and a GitHub issue should be reported."
+        )
 
         ema_param_detached: List[Optional[torch.Tensor]] = []
         model_param_detached: List[Optional[torch.Tensor]] = []
@@ -223,9 +223,9 @@ class EMAWeights(torch.nn.Module):
         """"""
         self.num_updates = state["num_updates"]
         self.is_holding_ema_weights = state["is_holding_ema_weights"]
-        assert (
-            self.is_holding_ema_weights
-        ), "EMA module loaded in a state where it does not contain EMA weights -- the checkpoint file is likely corrupted."
+        assert self.is_holding_ema_weights, (
+            "EMA module loaded in a state where it does not contain EMA weights -- the checkpoint file is likely corrupted."
+        )
 
         # handle possibility of restarts overwriting `decay`
         state_dict_decay = state["decay"]

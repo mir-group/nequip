@@ -71,9 +71,9 @@ class ConFIGLightningModule(NequIPLightningModule):
         del param_dict
 
         # === process loss functions ===
-        assert (
-            len(self.loss) >= 1
-        ), f"`ConFIGLightningModule` is used for cases with multiple loss components, but {len(self.loss)} found"
+        assert len(self.loss) >= 1, (
+            f"`ConFIGLightningModule` is used for cases with multiple loss components, but {len(self.loss)} found"
+        )
         self.ConFIG_loss_component_keys: Dict[str, str] = {
             metric_name: f"train_loss_step{self.logging_delimiter}" + metric_name
             for metric_name in self.loss.keys()
@@ -86,16 +86,16 @@ class ConFIGLightningModule(NequIPLightningModule):
         # temporary narrow solution to accommodate only ReduceLROnPlateau LR scheduling
         if self.lr_scheduler_config is not None:
             scheduler = self.lr_scheduler_config["scheduler"]["_target_"]
-            assert (
-                "ReduceLROnPlateau" in scheduler
-            ), f"only `ReduceLROnPlateau` LR scheduler is usable with `ConFIGLightningModule` but found `{scheduler}`"
+            assert "ReduceLROnPlateau" in scheduler, (
+                f"only `ReduceLROnPlateau` LR scheduler is usable with `ConFIGLightningModule` but found `{scheduler}`"
+            )
             monitor = self.lr_scheduler_config["monitor"]
-            assert (
-                "val" in monitor
-            ), f"Only validation metrics can be monitored for LR scheduling with `ConFIGLightningModule`, but found {monitor}"
-            assert (
-                self.lr_scheduler_config["interval"] == "epoch"
-            ), "only `interval=epoch` allowed for LR scheduling with `ConFIGLightningModule`"
+            assert "val" in monitor, (
+                f"Only validation metrics can be monitored for LR scheduling with `ConFIGLightningModule`, but found {monitor}"
+            )
+            assert self.lr_scheduler_config["interval"] == "epoch", (
+                "only `interval=epoch` allowed for LR scheduling with `ConFIGLightningModule`"
+            )
             self.ConFIG_monitor = monitor
 
         # gradient clipping
@@ -157,7 +157,6 @@ class ConFIGLightningModule(NequIPLightningModule):
         return loss
 
     def _ConFIG_backwards(self, loss_dict):
-
         # account for loss contributions that can be `None`
         coeff_dict: Dict[str, float] = {
             metric_name: metric_dict["coeff"]

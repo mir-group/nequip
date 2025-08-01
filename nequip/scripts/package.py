@@ -55,7 +55,6 @@ _CURRENT_NEQUIP_PACKAGE_VERSION = 2
 
 
 def main(args=None):
-
     parser = argparse.ArgumentParser(description="Package NequIP ecosystem models.")
 
     subparsers = parser.add_subparsers(dest="command", title="commands")
@@ -95,9 +94,9 @@ def main(args=None):
     args = parser.parse_args(args=args)
 
     if args.command == "info":
-        assert str(args.pkg_path).endswith(
-            ".nequip.zip"
-        ), "packed model file to inspect must end with the `.nequip.zip` extension"
+        assert str(args.pkg_path).endswith(".nequip.zip"), (
+            "packed model file to inspect must end with the `.nequip.zip` extension"
+        )
 
         with _suppress_package_importer_warnings():
             imp = torch.package.PackageImporter(args.pkg_path)
@@ -151,18 +150,17 @@ def main(args=None):
         return
 
     elif args.command == "build":
-
         set_workflow_state("package")
 
-        assert str(args.output_path).endswith(
-            ".nequip.zip"
-        ), "output path must end with the `.nequip.zip` extension"
+        assert str(args.output_path).endswith(".nequip.zip"), (
+            "output path must end with the `.nequip.zip` extension"
+        )
 
         # === handle internal and external modules ===
         overlap = set(_INTERNAL_MODULES) & set(_EXTERNAL_MODULES)
-        assert (
-            not overlap
-        ), f"Internal and external modules overlap with the following module(s): {overlap}"
+        assert not overlap, (
+            f"Internal and external modules overlap with the following module(s): {overlap}"
+        )
 
         logger.debug("Internal Modules: " + str(_INTERNAL_MODULES))
         logger.debug("External Modules: " + str(_EXTERNAL_MODULES))
@@ -250,7 +248,6 @@ def main(args=None):
 
         # == package ==
         with _suppress_package_importer_warnings():
-
             with torch.package.PackageExporter(
                 args.output_path, importer=importers, debug=True
             ) as exp:

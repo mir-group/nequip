@@ -34,9 +34,9 @@ class WandbWatch(Callback):
         pl_module: NequIPLightningModule,
     ) -> None:
         """"""
-        assert isinstance(
-            trainer.logger, WandbLogger
-        ), "NequIP's `WandbWatch` callback only works for `WandbLogger` loggers"
+        assert isinstance(trainer.logger, WandbLogger), (
+            "NequIP's `WandbWatch` callback only works for `WandbLogger` loggers"
+        )
         # see https://docs.wandb.ai/ref/python/watch/
         trainer.logger.watch(
             pl_module.model,

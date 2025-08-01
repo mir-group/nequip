@@ -23,7 +23,6 @@ def test_mlp(
     bias,
     model_dtype,
 ):
-
     tol = {
         "float32": 1e-5,
         "float64": 1e-12,
@@ -44,7 +43,6 @@ def test_mlp(
         )
 
         if compare_with_e3nn:
-
             assert not mlp_module.is_nonlinear
             print(mlp_module.mlp)
 

@@ -19,7 +19,6 @@ from typing import Optional
 
 
 class InteractionBlock(GraphModuleMixin, torch.nn.Module):
-
     use_sc: bool
 
     def __init__(

@@ -113,9 +113,9 @@ def assert_permutation_equivariant(
     out_orig = func(data_in)
     out_perm = func(perm_data_in)
 
-    assert set(out_orig.keys()) == set(
-        out_perm.keys()
-    ), "Permutation changed the set of fields returned by model"
+    assert set(out_orig.keys()) == set(out_perm.keys()), (
+        "Permutation changed the set of fields returned by model"
+    )
 
     messages = []
     num_problems: int = 0

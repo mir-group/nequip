@@ -65,7 +65,9 @@ class SoftAdapt(Callback):
                 metric_dict["coeff"] is not None
                 for metric_dict in pl_module.loss.metrics.values()
             ]
-        ), "all components of loss must have `coeff!=None` to use the SoftAdapt callback"
+        ), (
+            "all components of loss must have `coeff!=None` to use the SoftAdapt callback"
+        )
 
         if self.interval == "epoch":
             step = trainer.current_epoch  # use epochs

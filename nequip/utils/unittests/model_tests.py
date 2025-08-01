@@ -161,12 +161,12 @@ class BaseModelTests:
     @pytest.fixture(scope="class")
     def model(self, config, device, model_dtype):
         # === sanity check contracts with subclasses ===
-        assert (
-            "model_dtype" not in config
-        ), "model test subclasses should not include `model_dtype` in the configs -- the test class will handle it (looping over `float32` and `float64`)"
-        assert (
-            "compile_mode" not in config
-        ), "model test subclasses should not include `compile_mode` in the configs -- the test class will handle it"
+        assert "model_dtype" not in config, (
+            "model test subclasses should not include `model_dtype` in the configs -- the test class will handle it (looping over `float32` and `float64`)"
+        )
+        assert "compile_mode" not in config, (
+            "model test subclasses should not include `compile_mode` in the configs -- the test class will handle it"
+        )
         config = copy.deepcopy(config)
         config.update({"model_dtype": model_dtype})
         model = self.make_model(config, device=device)
@@ -358,9 +358,9 @@ class BaseModelTests:
             stderr=subprocess.PIPE,
         )
         _check_and_print(retcode)
-        assert os.path.exists(
-            output_path
-        ), f"Compiled model `{output_path}` does not exist!"
+        assert os.path.exists(output_path), (
+            f"Compiled model `{output_path}` does not exist!"
+        )
 
         # == get ase calculator for checkpoint and compiled models ==
         # we only ever load it into the same device that we `nequip-compile`d for
@@ -555,7 +555,9 @@ class BaseModelTests:
                     continue
                 assert torch.allclose(
                     out_ref[out_field], out_unwrapped[out_field], atol=tolerance
-                ), f'failed for key "{out_field}" with max absolute diff {torch.abs(out_ref[out_field] - out_unwrapped[out_field]).max().item():.5g} (tol={tolerance:.5g})'
+                ), (
+                    f'failed for key "{out_field}" with max absolute diff {torch.abs(out_ref[out_field] - out_unwrapped[out_field]).max().item():.5g} (tol={tolerance:.5g})'
+                )
 
     def test_batch(self, model, model_test_data):
         """Confirm that the results for individual examples are the same regardless of whether they are batched."""
@@ -830,9 +832,9 @@ class BaseEnergyModelTests(BaseModelTests):
 
                     assert torch.isclose(
                         numeric, analytical, atol=2e-2
-                    ) or torch.isclose(
-                        numeric, analytical, rtol=5e-3
-                    ), f"numeric: {numeric.item()}, analytical: {analytical.item()}"
+                    ) or torch.isclose(numeric, analytical, rtol=5e-3), (
+                        f"numeric: {numeric.item()}, analytical: {analytical.item()}"
+                    )
 
                     # Reset the position
                     data[AtomicDataDict.POSITIONS_KEY][iatom, idir] += epsilon
@@ -930,9 +932,9 @@ class BaseEnergyModelTests(BaseModelTests):
 
                     assert torch.allclose(
                         numeric, analytical, atol=2e-2
-                    ) or torch.allclose(
-                        numeric, analytical, rtol=5e-2
-                    ), f"numeric: {numeric.item()}, analytical: {analytical.item()}"
+                    ) or torch.allclose(numeric, analytical, rtol=5e-2), (
+                        f"numeric: {numeric.item()}, analytical: {analytical.item()}"
+                    )
 
                     # Reset the position
                     data[AtomicDataDict.POSITIONS_KEY][iatom, idir] += epsilon
@@ -982,7 +984,6 @@ class BaseEnergyModelTests(BaseModelTests):
         if "per_edge_type_cutoff" not in config:
             for node_idx in range(num_types):
                 for nbor_idx in range(num_types):
-
                     # Control group: force is non-zero within the cutoff radius
                     forces = pair_force(node_idx, nbor_idx, 0.5 * r_max, 1.5 * r_max)
                     # expect some nonzero terms on the two connected atoms
@@ -1018,7 +1019,7 @@ class BaseEnergyModelTests(BaseModelTests):
 
         # Whether the cutoff radius is specified per edge type
         per_edge_type_cutoff = config.get("per_edge_type_cutoff")
-        per_edge_type = not (per_edge_type_cutoff is None)
+        per_edge_type = per_edge_type_cutoff is not None
 
         # Check each edge type
         for node_idx, node_type in enumerate(type_names):
@@ -1044,9 +1045,9 @@ class BaseEnergyModelTests(BaseModelTests):
                 node_partial_forces = partial_forces[0]
 
                 # NOTE: sometimes it can be zero if the model has so little features such that the nonlinearity causes the activation to be ~0
-                assert (
-                    node_partial_forces.abs().sum() > 1e-4
-                ), f"partial forces: {node_partial_forces}"
+                assert node_partial_forces.abs().sum() > 1e-4, (
+                    f"partial forces: {node_partial_forces}"
+                )
 
                 # For Test 1 and 2:
                 # No need to enforce `strictly_local`. Message passing models such as NequiIP should not receive information from beyond the cutoff radius.
@@ -1223,8 +1224,8 @@ class BaseEnergyModelTests(BaseModelTests):
 
             # potential
             pair_style mliap unified {mliap_path} 0
-            pair_coeff * * {' '.join(sorted(set(config["chemical_symbols"])))}
-            {newline.join([f"mass {i+1} 1.0" for i in range(num_types)])}
+            pair_coeff * * {" ".join(sorted(set(config["chemical_symbols"])))}
+            {newline.join([f"mass {i + 1} 1.0" for i in range(num_types)])}
 
             neighbor	1.0 bin
             neigh_modify    delay 0 every 1 check no
