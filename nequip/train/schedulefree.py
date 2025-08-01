@@ -37,12 +37,12 @@ class ScheduleFreeLightningModule(NequIPLightningModule):
 
     def on_save_checkpoint(self, checkpoint: Dict[str, Any]) -> Dict[str, Any]:
         opt = self.optimizers()
-        try:
-            opt.eval()
-        except Exception:
-            pass
-        new_state = self.trainer.strategy.optimizer_state(opt)
-        return {"optimizer_states": [new_state]}
+        opt.train()
+        opt.eval()
+        state = self.trainer.strategy.optimizer_state(opt)
+        checkpoint["schedulefree_optimizer_state_dict"] = state
+        opt.train()
+        return {"optimizer_states": [state]}
 
     def on_load_checkpoint(self, checkpoint: Dict[str, Any]):
         state = checkpoint.get("schedulefree_optimizer_state_dict")
