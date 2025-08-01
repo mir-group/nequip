@@ -48,10 +48,8 @@ packages = {find = {include = ["nequip", "nequip.*"]}}
 [tool.setuptools.dynamic]  # get version from nequip/_version.py
 version = {attr = "nequip._version.__version__"}
 
-[tool.flake8]
-max-line-length = 127
-select = ["E", "F", "W", "C"]
-ignore = ["E226", "E501", "E741", "E743", "C901", "W503", "E203"]
+[tool.ruff]
+line-length = 88
 exclude = [
     ".eggs",
     "*.egg",
@@ -63,3 +61,11 @@ exclude = [
     "examples",
     "tmp"
 ]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "C90"]
+ignore = ["E226", "E501", "E741", "E743", "C901", "E203"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"

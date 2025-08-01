@@ -34,9 +34,9 @@ jobs:
           python3 -m pip install --upgrade pip
       - name: Linting
         run: |
-          pip install flake8==7.1.0 Flake8-pyproject black yamllint
-          flake8 . --count --show-source --statistics
-          black . --check
+          pip install ruff yamllint
+          ruff check .
+          ruff format --check .
           yamllint .
       - name: Install PyTorch
         env:
