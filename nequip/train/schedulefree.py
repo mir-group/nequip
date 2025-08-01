@@ -41,9 +41,12 @@ class ScheduleFreeLightningModule(NequIPLightningModule):
         if opt is not None:
             try:
                 opt.eval()
+                checkpoint["schedulefree_optimizer_state_dict"] = opt.state_dict()
+
             except Exception as e:
                 logger.warning(f"Schedule-Free eval() failed: {e}")
-            checkpoint["schedulefree_optimizer_state_dict"] = opt.state_dict()
+            finally:
+                opt.train()
 
     def on_load_checkpoint(self, checkpoint: dict):
         state = checkpoint.get("schedulefree_optimizer_state_dict")
@@ -67,6 +70,12 @@ class ScheduleFreeLightningModule(NequIPLightningModule):
             opt.eval()
         except Exception as e:
             logger.warning(f"Schedule-Free optimizer eval() failed: {e}")
+        finally:
+            try:
+                opt.train()
+            except Exception as e:
+                logger.warning(f"Failed to reset optimizer to train mode: {e}")
+
         return self.model
 
     def on_fit_start(self) -> None:
