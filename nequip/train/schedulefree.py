@@ -32,19 +32,19 @@ class ScheduleFreeLightningModule(NequIPLightningModule):
                 f"Invalid optimizer: expected Schedule-Free optimizer (_target_ ending with one of {valid_targets}), "
                 f"but found '{target}'"
             )
+
         self._schedulefree_state_dict: Dict[str, Any] = {}
         super().__init__(optimizer=optimizer, **kwargs)
 
-    def on_save_checkpoint(self, checkpoint: Dict[str, Any]) -> Dict[str, Any]:
+    def on_train_end(self) -> None:
         opt = self.optimizers()
-        opt.train()
-        opt.eval()
-        state = self.trainer.strategy.optimizer_state(opt)
-        checkpoint["schedulefree_optimizer_state_dict"] = state
-        opt.train()
-        return {"optimizer_states": [state]}
+        if opt is not None:
+            try:
+                opt.eval()
+            except Exception as e:
+                logger.warning(f"ScheduleFree eval() in on_train_end failed: {e}")
 
-    def on_load_checkpoint(self, checkpoint: Dict[str, Any]):
+    def on_load_checkpoint(self, checkpoint: dict):
         state = checkpoint.get("schedulefree_optimizer_state_dict")
         if state is not None:
             logger.info(
@@ -55,18 +55,18 @@ class ScheduleFreeLightningModule(NequIPLightningModule):
     @property
     def evaluation_model(self) -> torch.nn.Module:
         logger.info("Loading Schedule-Free optimizer weights for evaluation.")
+        # Instantiate optimizer lazily using base class
         opt = super().configure_optimizers()
+        # Load saved state and switch to eval mode for smoothing
         if getattr(self, "_schedulefree_state_dict", None):
             try:
                 opt.load_state_dict(self._schedulefree_state_dict)
             except Exception as e:
                 logger.warning(f"Failed to load Schedule-Free optimizer state: {e}")
         try:
-            opt.train()
             opt.eval()
         except Exception as e:
-            logger.warning(f"Schedule-Free optimizer train()/eval() failed: {e}")
-        self.model.eval()
+            logger.warning(f"Schedule-Free optimizer eval() failed: {e}")
         return self.model
 
     def on_fit_start(self) -> None:
