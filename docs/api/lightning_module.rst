@@ -12,3 +12,6 @@ NequIPLightningModule
 
 .. autoclass:: nequip.train.EMAConFIGLightningModule
     :members:
+
+.. autoclass:: nequip.train.ScheduleFreeLightningModule
+    :members:
