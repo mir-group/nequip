@@ -316,6 +316,12 @@ class ZBL(GraphModuleMixin, torch.nn.Module):
         data = with_edge_vectors_(data, with_lengths=True)
         edge_center = data[AtomicDataDict.EDGE_INDEX_KEY][0]
 
+        # account for possibility of reduced num nodes in atomic energy in a local-ghost atom context
+        if AtomicDataDict.PER_ATOM_ENERGY_KEY in data:
+            num_nodes = data[AtomicDataDict.PER_ATOM_ENERGY_KEY].size(0)
+        else:
+            num_nodes = AtomicDataDict.num_nodes(data)
+
         zbl_edge_eng = self._zbl(
             Z=self.atomic_numbers,
             r=data[AtomicDataDict.EDGE_LENGTH_KEY].view(-1),
@@ -329,7 +335,7 @@ class ZBL(GraphModuleMixin, torch.nn.Module):
             zbl_edge_eng,
             edge_center,
             dim=0,
-            dim_size=AtomicDataDict.num_nodes(data),
+            dim_size=num_nodes,
         )
         if AtomicDataDict.PER_ATOM_ENERGY_KEY in data:
             atomic_eng = atomic_eng + data[AtomicDataDict.PER_ATOM_ENERGY_KEY]
