@@ -188,7 +188,8 @@ class DeepLinearMLP(torch.nn.Module):
         # the constant has to be a buffer for constant-folding to happen with `torch.compile(...dynamic=True)`
         # `persistent=False` for backwards compatibility of checkpoint files
         # (and technically preserves the old behavior when using a float in that it's also not persistent)
-        self.register_buffer("alpha", torch.tensor(alpha), persistent=False)
+        # `alpha` is already a torch.Tensor here
+        self.register_buffer("alpha", alpha, persistent=False)
         del alphas
 
     def forward(self, input: torch.Tensor) -> torch.Tensor:
