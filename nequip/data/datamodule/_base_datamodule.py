@@ -162,31 +162,10 @@ class NequIPDataModule(lightning.LightningDataModule):
         self.generator_state = state_dict["generator_state"]
 
         for varname in ["train", "val", "test", "predict"]:
-            batch_sampler_sd = state_dict.get(f"{varname}_batch_sampler", {})
-            if not batch_sampler_sd:
-                continue  # skip empty state_dicts
-            dloader_config = getattr(self, f"{varname}_dataloader_config")
-            # If we have a provided a custom batch sampler (i.e. that implements load_state_dict)
-            # we instantiate it and load the state_dict
-            if "batch_sampler" in dloader_config:
-                # instantiate the batch sampler with the config from __init__
-                # TODO: this will instantiate the batch sampler at this point,
-                # instead of when the dataloader is created, regardless of whether the
-                # sampler has a load_state_dict method
-                bsampler = instantiate(dloader_config["batch_sampler"])
-                assert isinstance(
-                    bsampler,
-                    Union[torch.utils.data.BatchSampler, torch.utils.data.Sampler],
-                ), (
-                    "Batch sampler must be a torch.utils.data.BatchSampler or torch.utils.data.Sampler"
-                )
-
-                # check if we have a load_state_dict method
-                if callable(getattr(bsampler, "load_state_dict", None)):
-                    # load the state dict to resume from last checkpoint
-                    bsampler.load_state_dict(batch_sampler_sd)
-                # replace the batch sampler in the dataloader config
-                dloader_config["batch_sampler"] = bsampler
+            for i in range(self.num_datasets[varname]):
+                dataloader_sd = state_dict.get(f"_{varname}_dataloader_{i}", {})
+                # Save the state dict to be loaded when the dataloader is created
+                setattr(self, f"_{varname}_dataloader_state_dict_{i}", dataloader_sd)
 
     def state_dict(self) -> Dict[str, Any]:
         """"""
@@ -205,18 +184,18 @@ class NequIPDataModule(lightning.LightningDataModule):
         }
 
         for varname in ["train", "val", "test", "predict"]:
-            dloader = getattr(self, f"{varname}_dataloader", None)
-            key = f"{varname}_batch_sampler"
-            # check if dloader exists, has bsampler, and that it has a state_dict method
-            if (
-                not dloader
-                or not hasattr(dloader, "batch_sampler")
-                or not callable(getattr(dloader.batch_sampler, "state_dict", None))
-            ):  # user has not specified restartable batch sampler
-                sd[key] = {}
-                continue
-
-            sd[key] = dloader.batch_sampler.state_dict()
+            dloader = getattr(self, f"_{varname}_dataloader", None)
+            for i in range(self.num_datasets[varname]):
+                key = f"_{varname}_dataloader_{i}"
+                # check if dloader exists and has a state_dict method
+                if (
+                    not dloader
+                    or not dloader[i]
+                    or not callable(getattr(dloader[i], "state_dict", None))
+                ):  # user has not specified restartable dataloader
+                    sd[key] = {}
+                else:
+                    sd[key] = dloader[i].state_dict()
 
         return sd
 
@@ -268,15 +247,25 @@ class NequIPDataModule(lightning.LightningDataModule):
             if hasattr(self, "train_generator"):
                 self.train_generator_state = self.train_generator.get_state()
                 del self.train_generator
+            if hasattr(self, "_train_dataloader"):
+                del self._train_dataloader
+            if hasattr(self, "_val_dataloader"):
+                del self._val_dataloader
         elif stage == "validate":
             if hasattr(self, "val_dataset"):
                 del self.val_dataset
+            if hasattr(self, "_val_dataloader"):
+                del self._val_dataloader
         elif stage == "test":
             if hasattr(self, "test_dataset"):
                 del self.test_dataset
+            if hasattr(self, "_test_dataloader"):
+                del self._test_dataloader
         elif stage == "predict":
             if hasattr(self, "predict_dataset"):
                 del self.predict_dataset
+            if hasattr(self, "_predict_dataloader"):
+                del self._predict_dataloader
 
     def train_dataloader(self):
         """"""
@@ -285,6 +274,7 @@ class NequIPDataModule(lightning.LightningDataModule):
         self._train_dataloader = self._get_dloader(
             self.train_dataset, self.train_generator, self.train_dataloader_config
         )
+        self._maybe_load_dataloader_state_dict(self._train_dataloader, "train")
         return self._train_dataloader[0]
 
     def val_dataloader(self):
@@ -292,6 +282,7 @@ class NequIPDataModule(lightning.LightningDataModule):
         self._val_dataloader = self._get_dloader(
             self.val_dataset, self.generator, self.val_dataloader_config
         )
+        self._maybe_load_dataloader_state_dict(self._val_dataloader, "val")
         return self._val_dataloader
 
     def test_dataloader(self):
@@ -299,6 +290,7 @@ class NequIPDataModule(lightning.LightningDataModule):
         self._test_dataloader = self._get_dloader(
             self.test_dataset, self.generator, self.test_dataloader_config
         )
+        self._maybe_load_dataloader_state_dict(self._test_dataloader, "test")
         return self._test_dataloader
 
     def predict_dataloader(self):
@@ -310,7 +302,19 @@ class NequIPDataModule(lightning.LightningDataModule):
         self._predict_dataloader = self._get_dloader(
             self.predict_dataset, self.generator, self.predict_dataloader_config
         )
+        self._maybe_load_dataloader_state_dict(self._predict_dataloader, "predict")
+
         return self._predict_dataloader
+
+    def _maybe_load_dataloader_state_dict(self, dloader, varname):
+        for i in range(self.num_datasets[varname]):
+            # load the state dict if it exists
+            if hasattr(dloader[i], "load_state_dict") and hasattr(
+                self, f"_{varname}_dataloader_state_dict_{i}"
+            ):
+                dloader[i].load_state_dict(
+                    getattr(self, f"_{varname}_dataloader_state_dict_{i}")
+                )
 
     def _get_dloader(self, datasets, generator, dataloader_dict):
         if "_target_" not in dataloader_dict:
