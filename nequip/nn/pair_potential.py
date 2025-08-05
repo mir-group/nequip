@@ -227,13 +227,15 @@ class _ZBL(torch.nn.Module):
         d2: float = -0.40290
         d3: float = -0.94229
         d4: float = -3.19980
-        # compute
-        edge_types = torch.index_select(atom_types, 0, edge_index.reshape(-1))
-        Z = torch.index_select(Z, 0, edge_types.view(-1)).view(
+        # (num_atoms,) -> (num_atoms, 1)
+        node_Zs = torch.nn.functional.embedding(atom_types.view(-1), Z.view(-1, 1))
+        # (num_atoms,) -> (2 * num_edges,)
+        edge_Zs = torch.nn.functional.embedding(edge_index.view(-1), node_Zs).view(
             2, -1
-        )  # [center/neigh, n_edge]
-        Zi, Zj = Z[0], Z[1]
-        del edge_types, Z
+        )
+        Zi = torch.select(edge_Zs, 0, 0)
+        Zj = torch.select(edge_Zs, 0, 1)
+        del node_Zs, edge_Zs
         x = ((torch.pow(Zi, pzbl) + torch.pow(Zj, pzbl)) * r) / a0
         psi = (
             c1 * (d1 * x).exp()
