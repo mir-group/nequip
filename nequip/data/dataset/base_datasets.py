@@ -2,6 +2,8 @@
 from typing import Union, List, Callable
 
 import torch
+import numpy as np
+from numbers import Integral
 from .. import AtomicDataDict
 
 
@@ -31,8 +33,13 @@ class AtomicDataset(torch.utils.data.Dataset):
 
     def __getitem__(
         self,
-        index: Union[int, List[int], torch.Tensor, slice],
+        index: Union[int, List[int], torch.Tensor, np.ndarray, slice],
     ) -> AtomicDataDict.Type:
+        if isinstance(index, torch.Tensor) and index.dim() == 0:
+            index = index.item()
+        if isinstance(index, Integral):
+            index = int(index)
+
         if isinstance(index, slice):
             return self.__getitems__(index)
         elif isinstance(index, int):
@@ -42,7 +49,7 @@ class AtomicDataset(torch.utils.data.Dataset):
 
     def __getitems__(
         self,
-        indices: Union[List[int], torch.Tensor, slice],
+        indices: Union[List[int], torch.Tensor, np.ndarray, slice],
     ) -> List[AtomicDataDict.Type]:
         data_list: List[AtomicDataDict.Type] = self.get_data_list(indices)
         return [self._transform(data) for data in data_list]
@@ -66,7 +73,7 @@ class AtomicDataset(torch.utils.data.Dataset):
 
     def get_data_list(
         self,
-        indices: Union[List[int], slice],
+        indices: Union[List[int], torch.Tensor, np.ndarray, slice],
     ) -> List[AtomicDataDict.Type]:
         raise NotImplementedError(
             "Subclasses of AtomicDataset should define get_data_list"
