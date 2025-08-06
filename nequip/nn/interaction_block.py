@@ -145,11 +145,20 @@ class InteractionBlock(GraphModuleMixin, torch.nn.Module):
             field=AtomicDataDict.NODE_FEATURES_KEY, irreps_in=self.irreps_in
         )
 
+    @torch.jit.unused
+    def _get_mliap_num_local(self, data: AtomicDataDict.Type) -> int:
+        return data[AtomicDataDict.LMP_MLIAP_DATA_KEY].nlocal
+
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
-        x = data[AtomicDataDict.NODE_FEATURES_KEY]
+        if AtomicDataDict.LMP_MLIAP_DATA_KEY in data:
+            num_local_nodes = self._get_mliap_num_local(data)
+        else:
+            num_local_nodes = AtomicDataDict.num_nodes(data)
+
+        x = data[AtomicDataDict.NODE_FEATURES_KEY][:num_local_nodes]
 
         if self.sc is not None:
-            sc = self.sc(x, data[AtomicDataDict.NODE_ATTRS_KEY])
+            sc = self.sc(x, data[AtomicDataDict.NODE_ATTRS_KEY][:num_local_nodes])
 
         x = self.linear_1(x)
 
@@ -161,7 +170,7 @@ class InteractionBlock(GraphModuleMixin, torch.nn.Module):
 
         # === comms for ghost-exchange ===
         data[AtomicDataDict.NODE_FEATURES_KEY] = x
-        data = self.ghost_exchange(data, ghost_included=True)
+        data = self.ghost_exchange(data, ghost_included=False)
         x = data[AtomicDataDict.NODE_FEATURES_KEY]
 
         # === TP and scatter ===
@@ -171,7 +180,7 @@ class InteractionBlock(GraphModuleMixin, torch.nn.Module):
             edge_weight=self.edge_mlp(data[AtomicDataDict.EDGE_EMBEDDING_KEY]),
             edge_dst=data[AtomicDataDict.EDGE_INDEX_KEY][0],
             edge_src=data[AtomicDataDict.EDGE_INDEX_KEY][1],
-        )
+        )[:num_local_nodes]
 
         x = self.linear_2(x)
 
