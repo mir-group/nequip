@@ -54,6 +54,7 @@ jobs:
         run: |
           # install packages that aren't required dependencies but that the tests do need
           pip install h5py vesin
+          #pip install schedulefree  #Disabled to reduce CI runtime; uncomment to test ScheduleFreeLightningModule
           # install OpenEquivariance only if torch >= 2.4 and CUDA is available
           if python3 -c "import torch; import packaging.version; exit(0 if packaging.version.parse(torch.__version__).base_version >= '2.4' else 1)"; then
             if python3 -c "import torch; exit(0 if torch.cuda.is_available() else 1)"; then

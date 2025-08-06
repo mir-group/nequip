@@ -9,6 +9,14 @@ from omegaconf import OmegaConf, open_dict
 from nequip.utils.unittests.utils import _training_session, _check_and_print
 
 
+try:
+    import schedulefree  # noqa: F401
+
+    _SCHEDULEFREE_INSTALLED = True
+except ImportError:
+    _SCHEDULEFREE_INSTALLED = False
+
+
 # available training modules for integration tests
 # to save time, we only check the EMA ones for now
 _ALL_TRAINING_MODULES = [
@@ -17,6 +25,8 @@ _ALL_TRAINING_MODULES = [
     # "nequip.train.ConFIGLightningModule",
     "nequip.train.EMAConFIGLightningModule",
 ]
+if _SCHEDULEFREE_INSTALLED:
+    _ALL_TRAINING_MODULES.append("nequip.train.ScheduleFreeLightningModule")
 
 
 @pytest.fixture(
@@ -29,9 +39,27 @@ def conffile(request):
 
 @pytest.fixture(
     scope="session",
-    params=_ALL_TRAINING_MODULES,
+    params=[
+        *(
+            [
+                {
+                    "_target_": "nequip.train.ScheduleFreeLightningModule",
+                    "optimizer": {
+                        "_target_": "schedulefree.AdamWScheduleFree",
+                        "lr": 0.01,
+                        "weight_decay": 0.0,
+                        "warmup_steps": 10,
+                    },
+                }
+            ]
+            if _SCHEDULEFREE_INSTALLED
+            else []
+        ),
+        {"_target_": "nequip.train.EMALightningModule"},
+        {"_target_": "nequip.train.EMAConFIGLightningModule"},
+    ],
 )
-def training_module(request):
+def training_module_override_dict(request):
     return request.param
 
 
@@ -45,13 +73,13 @@ def extra_train_from_save(request):
 
 @pytest.fixture(scope="session")
 def fake_model_training_session(
-    conffile, training_module, model_dtype, extra_train_from_save
+    conffile, training_module_override_dict, model_dtype, extra_train_from_save
 ):
     session = _training_session(
         conffile,
         model_dtype,
         extra_train_from_save=extra_train_from_save,
-        training_module=training_module,
+        training_module_override_dict=training_module_override_dict,
     )
     config, tmpdir, env = next(session)
     yield config, tmpdir, env, model_dtype
