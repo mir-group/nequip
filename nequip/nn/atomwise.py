@@ -246,6 +246,8 @@ class PerTypeScaleShift(GraphModuleMixin, torch.nn.Module):
         # === set up ===
         in_field = data[self.field]
         types = data[AtomicDataDict.ATOM_TYPE_KEY].view(-1)
+        # to account for local-ghost truncation in ML-IAP
+        types = types[: in_field.size(0)]
 
         if self.has_scales:
             if self.scales_shortcut:
