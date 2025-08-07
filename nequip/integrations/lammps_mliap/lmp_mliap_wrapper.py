@@ -123,6 +123,22 @@ class NequIPLAMMPSMLIAPWrapper(MLIAPUnified):
             return
 
         # === create input data ===
+
+        # NOTE
+        # This LAMMPS ML-IAP integration introduces a new dimension of having `num_local` vs `num_local + num_ghost` number of nodes.
+        # There are three crucial dimensions to be aware of `num_edges`, `num_local`, `num_local + num_ghost`.
+        # The following input tensors have the following shapes.
+        # - `edge_vectors`: (num_edges, 3)
+        # - `edge_idxs`: (2, num_edges)
+        # - `atom_types`: (num_local + num_ghost)
+
+        # This LAMMPS ML-IAP wrapper can handle output `atomic_energy` having either shape `num_local` or `num_local + num_ghost` based on the (uncompiled) size check.
+
+        # Models can perform optimizations based on an understanding of when ghost atoms matter or not and are responsible for carefully handling internal shape logic.
+        # Examples include:
+        # - edge -> node scatter operations / nodewise operations (e.g. in `nequip/nn/interaction_block.py`)
+        # - nodewise operations that involve `atom_types` (since `atom_types` is `num_local + num_ghost`), e.g. in `PerTypeScaleShift` and `ZBL`.
+
         # TODO: we have yet to exploit per-edge-type cutoffs by pruning the edge vectors and neighborlist
         # make sure edge vectors `requires_grad`
         edge_vectors = torch.as_tensor(lmp_data.rij, dtype=torch.float64).to(
