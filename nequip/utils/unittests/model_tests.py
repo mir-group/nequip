@@ -248,7 +248,7 @@ class BaseModelTests:
             # use resolvers for data-dependent parameters
             "avg_num_neighbors": "${training_data_stats:num_neighbors_mean}",
             "per_type_energy_shifts": "${training_data_stats:per_atom_energy_mean}",
-            "per_type_energy_scales": "${training_data_stats:forces_rms}",
+            "per_type_energy_scales": "${training_data_stats:per_type_forces_rms}",
             # use top-level config variable references
             "type_names": "${model_type_names}",
         }
