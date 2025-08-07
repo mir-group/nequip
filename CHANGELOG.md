@@ -8,8 +8,17 @@ Most recent change on the top.
 
 ## Unreleased
 
+## [0.13.1]
+
 ### Added
 - ScheduleFreeLightningModule: New LightningModule subclass that integrates Facebook's Schedule-Free optimizer to enable schedule-free training in NequIP.
+
+### Changed
+- NequIP GNN models now exploit ghost node truncation in LAMMPS ML-IAP
+
+### Fixed
+- `nequip-compile --mode aotinductor` failure with PyTorch 2.8 (because of constant-folding -- so AOTI constant-folding is always off now)
+
 
 ## [0.13.0]
 
