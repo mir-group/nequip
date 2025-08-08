@@ -9,6 +9,14 @@ try:
 except ImportError:
     _OEQ_INSTALLED = False
 
+try:
+    import cuequivariance  # noqa: F401
+    import cuequivariance_torch  # noqa: F401
+
+    _CUEQ_INSTALLED = True
+except ImportError:
+    _CUEQ_INSTALLED = False
+
 BASIC_INFO = {
     "seed": 123,
     "type_names": ["H", "C", "O"],
@@ -92,7 +100,8 @@ class TestNequIPModel(BaseEnergyModelTests):
     @pytest.fixture(
         scope="class",
         params=[None]
-        + (["enable_OpenEquivariance"] if _TORCH_GE_2_4 and _OEQ_INSTALLED else []),
+        + (["enable_OpenEquivariance"] if _TORCH_GE_2_4 and _OEQ_INSTALLED else [])
+        + (["enable_CuEquivariance"] if _CUEQ_INSTALLED else []),
     )
     def nequip_compile_acceleration_modifiers(self, request):
         """Test acceleration modifiers in nequip-compile workflows."""
@@ -111,6 +120,17 @@ class TestNequIPModel(BaseEnergyModelTests):
                     pytest.skip("OEQ tests skipped for CPU")
 
                 return ["enable_OpenEquivariance"]
+            elif request.param == "enable_CuEquivariance":
+                import cuequivariance  # noqa: F401,F811
+                import cuequivariance_torch  # noqa: F401,F811
+
+                if model_dtype == "float64":
+                    pytest.skip("CuEq tests skipped for f64 models")
+
+                if device == "cpu":
+                    pytest.skip("CuEq tests skipped for CPU")
+
+                return ["enable_CuEquivariance"]
             else:
                 raise ValueError(f"Unknown modifier: {request.param}")
 
@@ -120,6 +140,8 @@ class TestNequIPModel(BaseEnergyModelTests):
         scope="class",
         params=[None]
         + (["enable_OpenEquivariance"] if _TORCH_GE_2_4 and _OEQ_INSTALLED else []),
+        # + (["enable_CuEquivariance"] if _CUEQ_INSTALLED else []),
+        # NOTE: ^ some tests fail with CuEq
     )
     def train_time_compile_acceleration_modifiers(self, request):
         """Test acceleration modifiers in train-time compile workflows."""
@@ -134,6 +156,14 @@ class TestNequIPModel(BaseEnergyModelTests):
                     pytest.skip("OEQ tests skipped for CPU")
 
                 return [{"modifier": "enable_OpenEquivariance"}]
+            elif request.param == "enable_CuEquivariance":
+                import cuequivariance  # noqa: F401,F811
+                import cuequivariance_torch  # noqa: F401,F811
+
+                if device == "cpu":
+                    pytest.skip("CuEq tests skipped for CPU")
+
+                return [{"modifier": "enable_CuEquivariance"}]
             else:
                 raise ValueError(f"Unknown modifier: {request.param}")
 
@@ -142,7 +172,8 @@ class TestNequIPModel(BaseEnergyModelTests):
     @pytest.fixture(
         scope="class",
         params=[None]
-        + (["enable_OpenEquivariance"] if _TORCH_GE_2_4 and _OEQ_INSTALLED else []),
+        + (["enable_OpenEquivariance"] if _TORCH_GE_2_4 and _OEQ_INSTALLED else [])
+        + (["enable_CuEquivariance"] if _CUEQ_INSTALLED else []),
     )
     def mliap_acceleration_modifiers(self, request):
         """Test acceleration modifiers in MLIAP workflows."""
@@ -158,6 +189,14 @@ class TestNequIPModel(BaseEnergyModelTests):
                 import openequivariance  # noqa: F401,F811
 
                 return ["enable_OpenEquivariance"]
+            elif request.param == "enable_CuEquivariance":
+                import cuequivariance  # noqa: F401,F811
+                import cuequivariance_torch  # noqa: F401,F811
+
+                if model_dtype == "float64":
+                    pytest.skip("CuEq tests skipped for f64 models")
+
+                return ["enable_CuEquivariance"]
             else:
                 raise ValueError(f"Unknown modifier: {request.param}")
 
