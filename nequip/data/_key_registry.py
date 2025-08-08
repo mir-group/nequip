@@ -144,7 +144,7 @@ def register_fields(
 
 
 def deregister_fields(*fields: Sequence[str]) -> None:
-    r"""Deregister a field registered with ``register_fields``.
+    r"""Deregister a field registered with :func:`register_fields`.
 
     Silently ignores fields that were never registered to begin with.
 
