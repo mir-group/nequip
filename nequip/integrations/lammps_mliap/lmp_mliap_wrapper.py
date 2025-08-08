@@ -48,7 +48,6 @@ class NequIPLAMMPSMLIAPWrapper(MLIAPUnified):
         self.tf32 = tf32
         self.model = None
         self.device = None
-        self.type_mapper = None
 
         # to placate the interface
         self.nparams = 1
