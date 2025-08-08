@@ -25,36 +25,99 @@ _METRICS_MANAGER_MANDATORY_INPUT_KEYS: Final[List[str]] = [
 
 
 class MetricsManager(torch.nn.ModuleDict):
-    """Manages ``nequip`` metrics that can be applied to ``AtomicDataDict`` to compute error metrics.
+    """Manages metrics for ``AtomicDataDict`` objects in loss functions and monitored error metrics.
 
-    This class manages both metrics for loss functions and metrics for monitoring and reporting purposes. The main input argument ``metrics`` is a list of dictionaries, where each dictionary contains the following keys.
+    This class handles both loss computation and monitored error metrics through a unified interface.
+    Each metric is defined by a dictionary with mandatory and optional keys.
 
-    There are two mandatory keys:
+    The ``metrics`` parameter is a list of dictionaries defining individual metrics.
+    Each dictionary can contain keys: ``field``, ``metric``, ``coeff``, ``name``, ``per_type``, ``ignore_nan``.
+    The ``type_names`` parameter is a list of atom type names, required if ANY metric uses ``per_type=True``.
+    When this class is instantiated in :class:`~nequip.train.NequIPLightningModule`
+    (which is the case when using ``nequip-train``), ``type_names`` is automatically
+    provided from the dataset configuration and users need not specify it explicitly.
 
-    - ``field`` refers to the quantity of interest for metric computation. It has two formats:
+    Mandatory Keys
+    --------------
+    ``metric`` : ``torchmetrics.Metric``
+        The metric class to compute (e.g., :class:`~nequip.train.MeanSquaredError`,
+        :class:`~nequip.train.MeanAbsoluteError`, :class:`~nequip.train.RootMeanSquaredError`).
 
-      - a ``str`` for a ``nequip`` defined field (e.g. ``total_energy``, ``forces``, ``stress``), or
-      - a ``Callable`` that performs some additional operations before returning a :class:`torch.Tensor`
-        for metric computation (e.g. :class:`~nequip.data.PerAtomModifier`).
+    Optional Keys
+    -------------
+    ``field`` : ``str`` or ``Callable``, optional
+        Data field to extract for metric computation.
+        Can be:
 
-    - ``metric`` is a :class:`torchmetrics.Metric`. Users are expected to mostly use :class:`~nequip.train.MeanSquaredError` and :class:`~nequip.train.MeanAbsoluteError` for MSEs (for loss), RMSEs, and MAEs (for monitoring).
+        - ``str``: A nequip field name (e.g., ``'total_energy'``, ``'forces'``, ``'stress'``)
+        - ``Callable``: A field modifier like :class:`~nequip.data.PerAtomModifier`
+        - ``None``: For custom metrics that need full :class:`AtomicDataDict` objects
 
-    The remaining keys are optional:
+        When ``None``, the metric receives ``(preds, target)`` as complete data dictionaries
+        instead of extracted field values.
+        The metric must handle all data processing, type filtering, and NaN handling internally.
 
-    - ``per_type`` is a ``bool`` (defaults to ``False`` if not provided). If ``True``, node fields (such as ``forces``) will have their metrics computed separately for each atom type based on the ``type_names`` argument. A simple average over the per-type metrics will be used as the "effective" metric returned. There are some subtleties:
+    ``coeff`` : ``float``, optional
+        Weight for ``weighted_sum`` calculation.
+        If any metric has a coefficient, ``weighted_sum`` is computed as the weighted average of all metrics with coefficients.
+        Coefficients are automatically normalized to sum to 1.
 
-      1) During batch steps, the per-type metric for a particular type may be ``NaN`` (by design) if the batch does not contain that atom type. Correspondingly, the per-batch effective metric does not account for that particular type, and is only averaged over the number of atom types that were in that batch.
-      2) The per-epoch effective metric will always consider all atom types configured in its computation (i.e. when taking the simple average) since all atom types are expected to have contributed to at least one batch step over an epoch.
+    ``name`` : ``str``, optional
+        Custom name for logging.
+        Auto-generated from field and metric if not provided.
+        Must be unique across all metrics.
 
-    - ``coeff`` is a ``float`` that determines the relative weight of the metric contribution to an overall ``weighted_sum`` of metrics. A ``weighted_sum`` is automatically computed if any input dictionary contains a float-valued ``coeff``. This feature is important for loss functions for multitask problems (e.g. training on ``total_energy`` and ``forces`` simultaneously), and for constructing an effective validation metrics for monitoring (e.g. for early stopping and lr scheduling). Entries without ``coeff`` will still have their metrics computed, but they will not be incorporated into the ``weighted_sum``. An example for the utility of this feature is for monitoring additional metrics of the same nature (e.g. energy MSE and MAE) but only wanting one of them be in the effective metric used for lr scheduling. Note that these coefficients will be **automatically normalized** to sum up to one, e.g. if one has an energy metric with ``coeff=3`` and a force metric with ``coeff=1``, the ``weighted_sum`` is computed with coefficients ``[0.75, 0.25]`` for the energy and force metric respectively.
+    ``per_type`` : ``bool``, default=False
+        Compute separate metrics for each atom type, then average them.
+        Only valid for node fields (like ``forces``).
+        Requires ``type_names`` parameter.
 
-    - ``ignore_nan`` is a ``bool`` (defaults to ``False`` if not provided). This should be set to true if one expects the underlying ``target`` data to contain ``NaN`` entries. An example use case is when one has a dataset with ``stress`` labels for only a portion of the dataset. One can still train on ``stress`` for data that contain it and the others can be set as ``NaN`` entries to be handled appropriately during metric computation with this key.
+    ``ignore_nan`` : ``bool``, default=False
+        Handle NaN values in target data by masking them out.
+        Useful for datasets with partial labels (e.g., stress data available only for some structures).
 
-    - ``name`` is the name that the metric is logged as. Default names are used if not provided, but it is recommended for users to set custom names for clarity and control.
+    Key Behaviors
+    -------------
+    **Coefficient Normalization**: Coefficients are automatically normalized to sum to 1.
+    For example, ``{energy: 3.0, forces: 1.0}`` becomes ``{energy: 0.75, forces: 0.25}``.
 
-    Args:
-        metrics (list): list of dictionaries with keys ``field``, ``metric``, ``per_type``, ``coeff``, ``ignore_nan``, and ``name``
-        type_names (list): required for ``per_type`` metrics (if this class is instantiated in :class:`~nequip.train.NequIPLightningModule`, which is the case if one uses ``nequip-train``, this is automatically handled such that users need not explicitly fill in this field in the config)
+    **Per-Type Requirements**: If ANY metric uses ``per_type=True``, the ``type_names``
+    parameter is mandatory for the entire MetricsManager instance.
+
+    **Per-Type Averaging**: During batch steps, per-type metrics may be NaN if that atom
+    type is absent from the batch.
+    The effective metric averages only over types present in that batch.
+    During epoch computation, all configured types contribute to the average.
+
+    **Special Field=None Mode**: When ``field=None``, the metric receives the complete
+    ``AtomicDataDict`` objects ``(preds, target)`` directly.
+    This enables custom metrics that need access to multiple fields or geometric information.
+    However, ``per_type`` and ``ignore_nan`` features are disabled—the custom metric must handle type filtering
+    and NaN processing itself if needed.
+
+    **Weighted Sum**: A ``weighted_sum`` metric is automatically computed when any metric
+    has a coefficient.
+    This serves as the effective loss (for training) or monitoring metric (for validation).
+    Metrics without coefficients are computed but excluded from the weighted sum.
+
+    E.g., custom ``MetricsManager`` equivalent to ``EnergyForceLoss``:
+
+    .. code-block:: yaml
+
+        _target_: nequip.train.MetricsManager
+        metrics:
+            - name: per_atom_energy_mse
+            field:
+                _target_: nequip.data.PerAtomModifier
+                field: total_energy
+            coeff: 1
+            metric:
+                _target_: nequip.train.MeanSquaredError
+            - name: forces_mse
+            field: forces
+            coeff: 1
+            metric:
+                _target_: nequip.train.MeanSquaredError
     """
 
     def __init__(

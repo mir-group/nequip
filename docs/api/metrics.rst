@@ -34,25 +34,6 @@ Advanced Configuration: MetricsManager
 
 For users who need custom configurations beyond the simplified wrappers, the full :class:`~nequip.train.MetricsManager` API is available.
 
-Example: Custom MetricsManager equivalent to EnergyForceLoss:
-
-.. code-block:: yaml
-
-    _target_: nequip.train.MetricsManager
-    metrics:
-      - name: per_atom_energy_mse
-        field:
-          _target_: nequip.data.PerAtomModifier
-          field: total_energy
-        coeff: 1
-        metric:
-          _target_: nequip.train.MeanSquaredError
-      - name: forces_mse
-        field: forces
-        coeff: 1
-        metric:
-          _target_: nequip.train.MeanSquaredError
-
 .. autoclass:: nequip.train.MetricsManager
    :members:
 
