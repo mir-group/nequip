@@ -28,7 +28,7 @@ The following table summarizes key differences between the integration approache
 | <center>**LAMMPS Compilation**</center> | <center>See [`pair_nequip_allegro` repo](https://github.com/mir-group/pair_nequip_allegro)</center> | <center>See ["Building ML-IAP"](mliap.md#building-ml-iap)</center> |
 | <center>**Multirank Support**</center> | <center>`pair_nequip`: Single rank only<br>`pair_allegro`: Multirank</center> | <center>Multirank </center> |
 | <center>**Model Preparation**</center> | <center>[`nequip-compile`](../../guide/getting-started/workflow.md#compilation)</center> | <center>[`nequip-prepare-lmp-mliap`](mliap.md#preparing-models-with-nequip-prepare-lmp-mliap)</center> |
-| <center>**Acceleration Modifiers**</center> | <center>`pair_nequip`: None<br>`pair_allegro`: `enable_TritonContracter`</center> | <center>NequIP: `enable_OpenEquivariance`<br>Allegro: `enable_CuEquivarianceContracter`, `enable_TritonContracter`</center> |
+| <center>**Acceleration Modifiers**</center> | <center>`pair_nequip`: None<br>`pair_allegro`: [`enable_TritonContracter`](https://nequip.readthedocs.io/projects/allegro/en/latest/guide/triton.html)</center> | <center>NequIP: [`enable_OpenEquivariance`](../../guide/accelerations/openequivariance.md)<br>Allegro: [`enable_CuEquivarianceContracter`](https://nequip.readthedocs.io/projects/allegro/en/latest/guide/cuequivariance.html), [`enable_TritonContracter`](https://nequip.readthedocs.io/projects/allegro/en/latest/guide/triton.html)</center> |
 
 ```{toctree}
 :maxdepth: 1

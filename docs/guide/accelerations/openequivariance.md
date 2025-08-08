@@ -46,15 +46,9 @@ OpenEquivariance composes with [`torch.compile`](https://pytorch.org/docs/stable
 
 ## Inference with OpenEquivariance
 
-For inference, you need to [`nequip-compile`](../getting-started/workflow.md#compilation) your trained model with OpenEquivariance enabled.
-Currently, OpenEquivariance only works with TorchScript compilation for use in [ASE](../../integrations/ase.md) (Atomic Simulation Environment).
-
-### Supported Integrations
-
-| [Compilation Mode](../getting-started/workflow.md#compilation) | [ASE](../../integrations/ase.md) | [LAMMPS](../../integrations/lammps/index.md) |
-|:-------------------------------------------:|:------------------------------:|:-----------------------------------:|
-| TorchScript (`.nequip.pth`) | ✅ Stable | 🔨 Work in Progress |
-| AOT Inductor (`.nequip.pt2`) | 🔨 Work in Progress | 🔨 Work in Progress |
+OpenEquivariance is supported for inference with:
+- **[ASE](../../integrations/ase.md)** via TorchScript compilation using [`nequip-compile`](../getting-started/workflow.md#compilation) (AOT Inductor support is work in progress)
+- **[LAMMPS](../../integrations/lammps/index.md)** via [ML-IAP integration](../../integrations/lammps/mliap.md)
 
 ### ASE-TorchScript Integration
 
@@ -86,4 +80,25 @@ energy = atoms.get_potential_energy()
 forces = atoms.get_forces()
 ```
 
-If `openequivariance` is not imported before model loading, this error will be thrown: `RuntimeError: Couldn't resolve type '{}', did you forget to add its build dependency?__torch__.torch.classes.libtorch_tp_jit.TorchJITConv`.
+If `openequivariance` is not imported before model loading, you will encounter this error:
+```
+RuntimeError: Couldn't resolve type '{}', did you forget to add its build dependency?__torch__.torch.classes.libtorch_tp_jit.TorchJITConv
+```
+
+### LAMMPS ML-IAP Integration
+
+OpenEquivariance can also be used with LAMMPS through the [ML-IAP interface](../../integrations/lammps/mliap.md).
+This provides a stable integration path for production molecular dynamics simulations with OpenEquivariance acceleration.
+
+To prepare a model for LAMMPS ML-IAP with OpenEquivariance:
+
+```bash
+nequip-prepare-lmp-mliap \
+  /path/to/model_file \
+  /path/to/output.nequip.lmp.pt \
+  --modifiers enable_OpenEquivariance
+```
+
+Where `model_file` can be either a [checkpoint file](../getting-started/files.md#checkpoint-files) (`.ckpt`) or [package file](../getting-started/files.md#package-files).
+The resulting `.nequip.lmp.pt` file can be used directly in LAMMPS scripts with the `pair_style mliap` command.
+See the [ML-IAP documentation](../../integrations/lammps/mliap.md) for complete usage instructions and examples.

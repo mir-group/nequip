@@ -67,6 +67,8 @@ nequip-prepare-lmp-mliap \
   --modifiers modifier_to_apply
 ```
 
+NequIP models support [OpenEquivariance acceleration](../../guide/accelerations/openequivariance.md) via `--modifiers enable_OpenEquivariance`.
+
 Using `$PWD` can be helpful to meet the absolute path requirement:
 ```bash
 nequip-prepare-lmp-mliap \
