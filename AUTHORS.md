@@ -5,6 +5,7 @@ Present and past contributors include, in alphabetical order by last name:
  - [Simon Batzner](https://simonbatzner.github.io/)
  - [Vivek Bharadwaj](https://vivek-bharadwaj.com)
  - [Marc Descoteaux](https://www.marcdescoteaux.com/)
+ - Olav Førland
  - [Mario Geiger](https://mariogeiger.ch/)
  - Austin Glover
  - Y. Richard Hu
