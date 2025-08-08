@@ -11,7 +11,13 @@ from nequip.utils.global_state import set_global_state
 from nequip.utils.compile import prepare_model_for_compile
 from nequip.utils.versions import _TORCH_GE_2_6
 
-from lammps.mliap.mliap_unified_abc import MLIAPUnified
+try:
+    from lammps.mliap.mliap_unified_abc import MLIAPUnified
+except ModuleNotFoundError:
+    raise ImportError(
+        "LAMMPS ML-IAP has to be installed in the Python environment for NequIP's ML-IAP integration. "
+        "See https://nequip.readthedocs.io/en/latest/integrations/lammps/mliap.html for installation instructions."
+    )
 
 from typing import List
 
@@ -60,6 +66,14 @@ class NequIPLAMMPSMLIAPWrapper(MLIAPUnified):
         # but this might not be true
         # but a fundamental change is required to be more flexible
         self.element_types = model.type_names.copy()
+
+        # === sanity checks for UX ===
+        available_modifiers = list(get_all_modifiers(model).keys())
+        for modifier in self.modifiers:
+            if modifier not in available_modifiers:
+                raise ValueError(
+                    f"Provided modifier `{modifier}` is not available in the model; only the following are available for the provided model: {available_modifiers}"
+                )
 
     def _initialize_model(self, lmp_data) -> None:
         # initialize global state
