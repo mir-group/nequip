@@ -85,7 +85,7 @@ To see all available command line options, use `nequip-prepare-lmp-mliap -h`.
 
 Below is part of a LAMMPS script example for using NequIP models with ML-IAP:
 
-```bash
+```lammps
 # general settings
 units         metal
 boundary      p p p
