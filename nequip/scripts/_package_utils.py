@@ -20,8 +20,11 @@ _DEFAULT_EXTERNAL_MODULES: Final[Set[str]] = {
     # included by e3nn TPs
     "opt_einsum_fx",
     "numpy",
-    # for NequIP GNN OpenEquivariance OpenEquivarianceTensorProductScatter
+    # for NequIP GNN OpenEquivarianceTensorProductScatter
     "openequivariance",
+    # for NequIP GNN CuEquivarianceTensorProductScatter
+    "cuequivariance",
+    "cuequivariance_torch",
     # for version parsing in torch_versions.py
     "packaging",
 }
