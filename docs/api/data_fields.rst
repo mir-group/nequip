@@ -13,8 +13,4 @@ There are additional categories used for the internal data processing in the Neq
 
 .. autodata:: nequip.data._CARTESIAN_TENSOR_FIELDS
 
-Custom fields must be registered with the following field registration methods to be compatible with the internal logic of NequIP's data processing infrastructure.
-
-.. autofunction:: nequip.data.register_fields
-
-.. autofunction:: nequip.data.deregister_fields
+Custom fields must be registered to be compatible with the internal logic of NequIP's data processing infrastructure. See the :doc:`developer documentation <../dev/understanding_nequip/data>` for registration details.

@@ -13,7 +13,7 @@ A package file contains:
 - Metadata and configuration
 - Example data for compilation
 
-For user-facing information on packaging workflows and CLI usage, see the [packaging workflow](../../guide/getting-started/workflow.md#packaging) and [package files overview](../../guide/getting-started/files.md#package-files) in the user guide.
+For user-facing information on packaging workflows and CLI usage, see the [packaging workflow](../../../guide/getting-started/workflow.md#packaging) and [package files overview](../../../guide/getting-started/files.md#package-files) in the user guide.
 
 ## Developer Notes
 
@@ -41,7 +41,7 @@ The system includes complex logic to handle creating packages from other package
 
 ### Sharp Edges with Model Modifiers
 
-[`nequip-package`](../../guide/getting-started/workflow.md#packaging) will pick up files as long as there are no errors loading the files. However, certain coding patterns can cause loading errors that prevent packaging. Common pitfalls include:
+[`nequip-package`](../../../guide/getting-started/workflow.md#packaging) will pick up files as long as there are no errors loading the files. However, certain coding patterns can cause loading errors that prevent packaging. Common pitfalls include:
 
 **External dependencies not installed at package-time**: Top-level imports of optional dependencies will cause packaging to fail if those dependencies aren't available during packaging. Use lazy imports instead:
 

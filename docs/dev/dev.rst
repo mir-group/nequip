@@ -4,7 +4,6 @@ Developer Guide
 .. toctree::
 
    contributing
-   training_infrastructure
-   custom_models/index
-   workflows/index
+   understanding_nequip
+   extension_packages
    ../README

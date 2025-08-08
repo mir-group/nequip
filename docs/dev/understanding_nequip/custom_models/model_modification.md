@@ -37,8 +37,8 @@ There are two ways to use model modifiers:
 
 ### 1. Train-time usage
 
-Use {func}`~nequip.model.modify` in your [training config file](../../guide/getting-started/workflow.md#training) to wrap your model.
-This can be used for train-time acceleration (e.g. [OpenEquivariance](../../guide/accelerations/openequivariance.md)) or fine-tuning utilities (e.g. `modify_PerTypeScaleShift`):
+Use {func}`~nequip.model.modify` in your [training config file](../../../guide/getting-started/workflow.md#training) to wrap your model.
+This can be used for train-time acceleration (e.g. [OpenEquivariance](../../../guide/accelerations/openequivariance.md)) or fine-tuning utilities (e.g. `modify_PerTypeScaleShift`):
 
 ```yaml
 model:
@@ -55,7 +55,7 @@ model:
 
 ### 2. Compile-time usage
 
-Use `nequip-compile --modifiers` for **accelerations** during [compilation](../../guide/getting-started/workflow.md#compilation):
+Use `nequip-compile --modifiers` for **accelerations** during [compilation](../../../guide/getting-started/workflow.md#compilation):
 
 ```bash
 nequip-compile model.ckpt compiled.pth --modifiers enable_OpenEquivariance ...
