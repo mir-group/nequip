@@ -44,6 +44,7 @@ class TestTimeXYZFileWriter(Callback):
     Args:
         out_file (str): path to output file (must NOT contain ``.xyz`` or ``.extxyz`` extension)
         output_fields_from_original_dataset (List[str]): values from the original dataset to save in the ``out_file``
+        extra_fields (List[str]): extra fields to save in addition to ASE's default fields
         chemical_species (List[str]): chemical species in the same order as model's ``type_names``
     """
 
@@ -51,6 +52,7 @@ class TestTimeXYZFileWriter(Callback):
         self,
         out_file: str,
         output_fields_from_original_dataset: Optional[List[str]] = [],
+        extra_fields: List[str] = [],
         chemical_symbols: Optional[List[str]] = None,
     ):
         assert not (out_file.endswith(".xyz") or out_file.endswith(".extxyz"))
@@ -75,7 +77,7 @@ class TestTimeXYZFileWriter(Callback):
         self.extra_fields = [
             "original_dataset_" + field
             for field in self.output_fields_from_original_dataset
-        ]
+        ] + extra_fields
         self.chemical_symbols = chemical_symbols
 
     def on_test_batch_end(

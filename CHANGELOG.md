@@ -12,6 +12,7 @@ Most recent change on the top.
 
 ### Added
 - ScheduleFreeLightningModule: New LightningModule subclass that integrates Facebook's Schedule-Free optimizer to enable schedule-free training in NequIP.
+- `TestTimeXYZFileWriter` now accepts `extra_fields` argument
 
 ### Changed
 - NequIP GNN models now exploit ghost node truncation in LAMMPS ML-IAP
