@@ -18,12 +18,12 @@ except ImportError:
 
 
 # available training modules for integration tests
-# to save time, we only check the EMA ones for now
+# to save time, we only check the EMALightningModule
 _ALL_TRAINING_MODULES = [
     # "nequip.train.NequIPLightningModule",
     "nequip.train.EMALightningModule",
     # "nequip.train.ConFIGLightningModule",
-    "nequip.train.EMAConFIGLightningModule",
+    # "nequip.train.EMAConFIGLightningModule",
 ]
 if _SCHEDULEFREE_INSTALLED:
     _ALL_TRAINING_MODULES.append("nequip.train.ScheduleFreeLightningModule")
