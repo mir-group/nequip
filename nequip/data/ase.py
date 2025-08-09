@@ -283,7 +283,10 @@ def to_ase(
         for key in extra_fields:
             if key in _key_registry._NODE_FIELDS:
                 # mask it
-                mol.arrays[key] = frame[key].numpy()
+                entry = frame[key]
+                if key in _key_registry._CARTESIAN_TENSOR_FIELDS:
+                    entry = entry.view(entry.size(0), -1)
+                mol.arrays[key] = entry.numpy()
             elif key in _key_registry._EDGE_FIELDS:
                 mol.info[key] = frame[key].numpy()
             elif key == AtomicDataDict.EDGE_INDEX_KEY:
