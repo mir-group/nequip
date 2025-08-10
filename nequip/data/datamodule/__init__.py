@@ -8,6 +8,7 @@ from .rmd17_datamodule import rMD17DataModule
 from .md22_datamodule import MD22DataModule
 from .samd23_datamodule import SAMD23DataModule
 from .water_datamodule import WaterDataModule
+from .coll_datamodule import COLLDataModule
 
 __all__ = [
     NequIPDataModule,
@@ -19,4 +20,5 @@ __all__ = [
     ASEDataModule,
     SAMD23DataModule,
     WaterDataModule,
+    COLLDataModule,
 ]
