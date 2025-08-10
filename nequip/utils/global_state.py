@@ -6,6 +6,7 @@ from lightning.pytorch import seed_everything
 import e3nn
 
 from .global_dtype import _GLOBAL_DTYPE
+from .versions.torch_versions import _TORCH_GE_2_9
 
 import warnings
 import os
@@ -124,23 +125,41 @@ def set_global_state(
 
         # === initialize TF32 to False ===
         if torch.cuda.is_available():
-            torch.backends.cuda.matmul.allow_tf32 = False
-            torch.backends.cudnn.allow_tf32 = False
+            if _TORCH_GE_2_9:
+                # use new API for PyTorch >= 2.9
+                torch.backends.fp32_precision = "ieee"
+            else:
+                # use legacy API for PyTorch < 2.9
+                torch.backends.cuda.matmul.allow_tf32 = False
+                torch.backends.cudnn.allow_tf32 = False
 
         _GLOBAL_STATE_INITIALIZED = True
 
     # === TF32 ===
     # See https://pytorch.org/docs/stable/notes/cuda.html#tensorfloat-32-tf32-on-ampere-devices
     # NOTE: it is also possible to use https://pytorch.org/docs/stable/generated/torch.set_float32_matmul_precision.html
+    # NOTE: PyTorch 2.9 API change - https://docs.pytorch.org/docs/main/notes/cuda.html#tensorfloat-32-tf32-on-ampere-and-later-devices
     if torch.cuda.is_available():
-        if torch.torch.backends.cuda.matmul.allow_tf32 is not allow_tf32:
-            # update the setting
-            if warn_on_override:
-                warnings.warn(
-                    f"Setting the GLOBAL value for allow_tf32 to {allow_tf32} which is different than the previous value of {torch.torch.backends.cuda.matmul.allow_tf32}"
-                )
-            torch.backends.cuda.matmul.allow_tf32 = allow_tf32
-            torch.backends.cudnn.allow_tf32 = allow_tf32
+        if _TORCH_GE_2_9:
+            # use new API for PyTorch >= 2.9
+            current_precision = torch.backends.fp32_precision
+            desired_precision = "tf32" if allow_tf32 else "ieee"
+            if current_precision != desired_precision:
+                if warn_on_override:
+                    warnings.warn(
+                        f"Setting the GLOBAL value for fp32_precision to {desired_precision} which is different than the previous value of {current_precision}"
+                    )
+                torch.backends.fp32_precision = desired_precision
+        else:
+            # use legacy API for PyTorch < 2.9
+            if torch.torch.backends.cuda.matmul.allow_tf32 is not allow_tf32:
+                # update the setting
+                if warn_on_override:
+                    warnings.warn(
+                        f"Setting the GLOBAL value for allow_tf32 to {allow_tf32} which is different than the previous value of {torch.torch.backends.cuda.matmul.allow_tf32}"
+                    )
+                torch.backends.cuda.matmul.allow_tf32 = allow_tf32
+                torch.backends.cudnn.allow_tf32 = allow_tf32
 
     # === update global config ===
     # NOTE: fixed fields are not reflected in the global config
