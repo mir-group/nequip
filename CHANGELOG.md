@@ -13,9 +13,11 @@ Most recent change on the top.
 ### Added
 - ScheduleFreeLightningModule: New LightningModule subclass that integrates Facebook's Schedule-Free optimizer to enable schedule-free training in NequIP.
 - `TestTimeXYZFileWriter` now accepts `extra_fields` argument
+- Add `WaterDataModule` and `COLLDataModule`
 
 ### Changed
-- NequIP GNN models now exploit ghost node truncation in LAMMPS ML-IAP
+- NequIP GNN models now exploit ghost node truncation in LAMMPS ML-IAP (optimization)
+- Better ML-IAP error handling
 
 ### Fixed
 - `nequip-compile --mode aotinductor` failure with PyTorch 2.8 (because of constant-folding -- so AOTI constant-folding is always off now)
