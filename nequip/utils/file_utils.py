@@ -6,6 +6,7 @@ import os.path as osp
 import urllib
 import zipfile
 import tarfile
+from pathlib import Path
 from typing import Optional
 
 import logging
@@ -61,3 +62,7 @@ def extract_tar(
     """
     with tarfile.open(path, mode) as f:
         f.extractall(folder)
+
+
+def get_project_root() -> Path:
+    return Path(__file__).parent.parent
