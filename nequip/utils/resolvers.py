@@ -3,7 +3,9 @@
 """Custom OmegaConf resolvers for nequip."""
 
 from omegaconf import OmegaConf
-from typing import Dict, Callable, Set
+from typing import Dict, Callable, Set, Any
+
+from nequip.utils import get_project_root
 
 
 def _sanitize_int(x, client: str):
@@ -35,11 +37,45 @@ def int_mul(a, b):
     return a * b
 
 
+def float_to_str(x: float, fmt: str = ".1f") -> str:
+    """Format a float to string using a given format."""
+    if not fmt.startswith("."):
+        raise ValueError(f"Format string must start with '.', got '{fmt}'")
+    return format(x, fmt)
+
+
+def big_dataset_stats(name: str, cutoff_radius: float) -> Dict[str, Any]:
+    """Get precomputed dataset statistics for large datasets."""
+    root = get_project_root()
+    stats_path = root / "data" / "dataset_stats" / f"{name}.yaml"
+    if not stats_path.exists():
+        raise ValueError(f"No precomputed dataset stats for dataset '{name}'")
+
+    stats = OmegaConf.load(stats_path)
+    cutoff_radius = float_to_str(cutoff_radius)
+    # Retrieve the stats for the given cutoff radius
+    stats["num_neighbors_mean"] = stats["num_neighbors_mean"].get(cutoff_radius, None)
+    if stats["num_neighbors_mean"] is None:
+        raise ValueError(
+            f"No precomputed dataset stats for dataset '{name}' with cutoff radius {cutoff_radius} (tried key '{cutoff_radius}')"
+        )
+    stats["per_type_num_neighbours_mean"] = stats["per_type_num_neighbours_mean"].get(
+        cutoff_radius, None
+    )
+    if stats["per_type_num_neighbours_mean"] is None:
+        raise ValueError(
+            f"No precomputed dataset stats for dataset '{name}' with cutoff radius {cutoff_radius} (tried key '{cutoff_radius}')"
+        )
+
+    return stats
+
+
 # === Resolver Registry ===
 
 _DEFAULT_RESOLVERS: Dict[str, Callable] = {
     "int_div": int_div,
     "int_mul": int_mul,
+    "big_dataset_stats": big_dataset_stats,
 }
 
 _REGISTERED_RESOLVERS: Set[str] = set()
