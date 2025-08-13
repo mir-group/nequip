@@ -2,6 +2,7 @@
 """Train a network."""
 
 import torch
+import warnings
 
 from ._workflow_utils import set_workflow_state
 from nequip.utils import get_current_code_versions, RankedLogger
@@ -24,7 +25,6 @@ _REQUIRED_CONFIG_SECTIONS: Final[List[str]] = [
     "data",
     "trainer",
     "training_module",
-    "global_options",
 ]
 
 
@@ -85,7 +85,23 @@ def main(config: DictConfig) -> None:
     )
 
     logger.debug("Setting global options ...")
-    set_global_state(**OmegaConf.to_container(config.global_options, resolve=True))
+
+    # as of NequIP v0.14.0, we removed the need to provide `global_options` in the config file
+    # we provide this warning to help users migrate
+    if "global_options" in config:
+        warnings.warn(
+            "\n\n!!! WARNING !!!\n"
+            "The `global_options` section is no longer a required section in config files and will be ignored. "
+            "TF32 settings should now be configured using the TF32Scheduler callback:\n\n"
+            "callbacks:\n"
+            "  - _target_: nequip.train.callbacks.TF32Scheduler\n"
+            "    schedule:\n"
+            "      0: true\n\n"
+            "See the documentation for more details.\n",
+        )
+
+    # === initialize global state ===
+    set_global_state()
 
     # === instantiate datamodule ===
     logger.info("Building datamodule ...")

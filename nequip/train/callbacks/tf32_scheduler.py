@@ -1,13 +1,9 @@
-# This file is a part of the `nequip` package.
-# Please see LICENSE and README at the root for information on using it.
+# This file is a part of the `nequip` package. Please see LICENSE and README at the root for information on using it.
 import lightning
 from lightning.pytorch.callbacks import Callback
 from nequip.train import NequIPLightningModule
-from nequip.utils.global_state import (
-    set_global_state,
-    get_latest_global_state,
-    TF32_KEY,
-)
+from nequip.utils.global_state import set_global_state
+
 from typing import Dict, Optional
 
 
@@ -21,7 +17,16 @@ class TF32Scheduler(Callback):
     - ``True``: Enable TF32 (faster but less precise)
     - ``False``: Disable TF32 (slower but more precise)
 
-    Example usage in config:
+    Basic example to enable TF32 for all training:
+
+    .. code-block:: yaml
+
+        callbacks:
+          - _target_: nequip.train.callbacks.TF32Scheduler
+            schedule:
+              0: true      # Enable TF32 throughout training
+
+    Dynamic scheduling example for two-stage training:
 
     .. code-block:: yaml
 
@@ -33,8 +38,8 @@ class TF32Scheduler(Callback):
               200: true    # Re-enable TF32 at epoch 200
 
     .. note::
-        The schedule must start at epoch 0, and the initial setting must match
-        your ``global_options.allow_tf32`` configuration.
+        The schedule must start at epoch 0. The initial setting will be applied
+        at the beginning of training.
 
     .. note::
         This callback is currently in beta testing. Please report any unexpected behavior or issues.
@@ -50,13 +55,7 @@ class TF32Scheduler(Callback):
         # sanity check - epochs are >= 0
         assert all([epoch >= 0 for epoch in self.schedule.keys()])
         assert 0 in self.schedule, "First epoch in TF32 scheduler must be 0"
-        # NOTE: callback is instantiated only during training context,
-        # and after global state has been loaded,
-        # so this check should always work
-        assert self.schedule[0] == get_latest_global_state()[TF32_KEY], (
-            "Initial TF32Scheduler setting (epoch 0) must match global state "
-            "(found under global_options in yaml config)"
-        )
+        # The TF32Scheduler is now the sole authority for TF32 settings during training.
 
         # Initialize state for restarts
         self.last_tf32_setting = self.schedule[0]
