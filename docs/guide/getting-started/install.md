@@ -1,7 +1,7 @@
 # Installation
 
 ## Requirements
-* Python >= 3.9
+* Python >= 3.10
 * PyTorch >= 2.2. PyTorch can be installed following the [instructions from their documentation](https://pytorch.org/get-started/locally/). Note that neither `torchvision` nor `torchaudio`, included in the default install command, are needed for NequIP.
 
 ```{note}
