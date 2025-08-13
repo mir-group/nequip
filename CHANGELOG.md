@@ -19,6 +19,7 @@ Most recent change on the top.
 - NequIP GNN models now exploit ghost node truncation in LAMMPS ML-IAP (optimization)
 - Better ML-IAP error handling
 - [Breaking] Disallow list input for per-type energy scales and shifts (only scalars or dicts allowed)
+- [Breaking] Ignore `global_options` in config file; `TF32Scheduler` is the only way to configure TF32 settings during training
 
 ### Fixed
 - `nequip-compile --mode aotinductor` failure with PyTorch 2.8 (because of constant-folding -- so AOTI constant-folding is always off now)
