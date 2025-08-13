@@ -3,9 +3,6 @@
 [OpenEquivariance](https://github.com/PASSIONLab/OpenEquivariance), presented in ["An Efficient Sparse Kernel Generator for O(3)-Equivariant Deep Networks"](https://arxiv.org/abs/2501.13986), is an open-source GPU kernel generator for Clebsch-Gordon tensor products in rotation-equivariant deep neural networks.
 It provides up to an order of magnitude acceleration over standard implementations by generating fast GPU kernels for tensor product operations.
 
-```{important}
-OpenEquivariance only works with {func}`~nequip.model.NequIPGNNModel`.
-```
 
 **Requirements:**
 
