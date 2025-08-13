@@ -8,5 +8,5 @@ Performance optimization techniques for faster training and inference.
 
    pt2_compilation
    ddp_training
-   tf32
    gpu_kernel_modifiers
+   precision
