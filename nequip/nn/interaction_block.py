@@ -29,6 +29,7 @@ class InteractionBlock(GraphModuleMixin, torch.nn.Module):
         radial_mlp_width: int = 8,
         avg_num_neighbors: Optional[float] = None,
         use_sc: bool = True,
+        is_first_layer: bool = False,
     ) -> None:
         """InteractionBlock.
 
@@ -145,6 +146,8 @@ class InteractionBlock(GraphModuleMixin, torch.nn.Module):
             field=AtomicDataDict.NODE_FEATURES_KEY, irreps_in=self.irreps_in
         )
 
+        self.is_first_layer = is_first_layer
+
     @torch.jit.unused
     def _get_mliap_num_local(self, data: AtomicDataDict.Type) -> int:
         return data[AtomicDataDict.LMP_MLIAP_DATA_KEY].nlocal
@@ -155,10 +158,18 @@ class InteractionBlock(GraphModuleMixin, torch.nn.Module):
         else:
             num_local_nodes = AtomicDataDict.num_nodes(data)
 
-        x = data[AtomicDataDict.NODE_FEATURES_KEY][:num_local_nodes]
+        x = data[AtomicDataDict.NODE_FEATURES_KEY]
+
+        # truncate if not first layer
+        if not self.is_first_layer:
+            x = x[:num_local_nodes]
 
         if self.sc is not None:
-            sc = self.sc(x, data[AtomicDataDict.NODE_ATTRS_KEY][:num_local_nodes])
+            node_attrs = data[AtomicDataDict.NODE_ATTRS_KEY]
+            # truncate if not first layer
+            if not self.is_first_layer:
+                node_attrs = node_attrs[:num_local_nodes]
+            sc = self.sc(x, node_attrs)
 
         x = self.linear_1(x)
 
@@ -169,9 +180,12 @@ class InteractionBlock(GraphModuleMixin, torch.nn.Module):
             x = alpha * x
 
         # === comms for ghost-exchange ===
-        data[AtomicDataDict.NODE_FEATURES_KEY] = x
-        data = self.ghost_exchange(data, ghost_included=False)
-        x = data[AtomicDataDict.NODE_FEATURES_KEY]
+        # only done if not first layer
+        # because initial embedding include ghosts since atom types come with ghosts
+        if not self.is_first_layer:
+            data[AtomicDataDict.NODE_FEATURES_KEY] = x
+            data = self.ghost_exchange(data, ghost_included=False)
+            x = data[AtomicDataDict.NODE_FEATURES_KEY]
 
         # === TP and scatter ===
         x = self.tp_scatter(

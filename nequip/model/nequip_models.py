@@ -238,6 +238,7 @@ def FullNequIPGNNEnergyModel(
                 "avg_num_neighbors": avg_num_neighbors,
                 # to ensure isolated atom limit
                 "use_sc": layer_i != 0,
+                "is_first_layer": layer_i == 0,
             },
             resnet=(layer_i != 0) and convnet_resnet,
             nonlinearity_type=convnet_nonlinearity_type,
