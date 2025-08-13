@@ -11,6 +11,7 @@ Most recent change on the top.
 ## [0.14.0]
 
 ### Added
+- CuEquivariance acceleration for NequIP GNN models
 - ScheduleFreeLightningModule: New LightningModule subclass that integrates Facebook's Schedule-Free optimizer to enable schedule-free training in NequIP.
 - `TestTimeXYZFileWriter` now accepts `extra_fields` argument
 - Add `WaterDataModule` and `COLLDataModule`
