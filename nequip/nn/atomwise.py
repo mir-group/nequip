@@ -12,7 +12,6 @@ from .model_modifier_utils import model_modifier, replace_submodules
 from nequip.utils.global_dtype import _GLOBAL_DTYPE
 
 from typing import Optional, List, Dict, Union
-import warnings
 
 
 class AtomwiseOperation(GraphModuleMixin, torch.nn.Module):
@@ -163,12 +162,10 @@ class PerTypeScaleShift(GraphModuleMixin, torch.nn.Module):
 
         # === preprocess scales and shifts ===
         # we only accept single values or dicts
-        # but we previously accepted lists, so we maintain backwards compatibility for a while
-        # TODO: strictly enforce only floats and dicts when the time comes
-        # for now, we throw a warning to get people to migrate
+        # lists are no longer supported
         if isinstance(scales, list) or isinstance(shifts, list):
-            warnings.warn(
-                "\n\n!!IMPORTANT WARNING!! \nWe will stop supporting the use of lists for per-type energy scales and shifts in the next few releases. Please begin migrating to the use of dicts that map from the model's `type_names` as keys to the relevant scale or shift values. For example, the following\n\n  per_type_energy_shifts: [1, 2, 3]\n\nshould be changed to\n\n  per_type_energy_shifts:\n    C: 1\n    H: 2\n    O: 3\n\n"
+            raise ValueError(
+                "\n\nLists are no longer supported for per-type energy scales and shifts. Please use dicts that map from the model's `type_names` as keys to the relevant scale or shift values. For example, the following\n\n  per_type_energy_shifts: [1, 2, 3]\n\nshould be changed to\n\n  per_type_energy_shifts:\n    C: 1\n    H: 2\n    O: 3\n\n"
             )
 
         # single valued case
