@@ -95,6 +95,3 @@ training_module:
     avg_num_neighbors: ${training_data_stats:num_neighbors_mean}
     per_type_energy_shifts: ${training_data_stats:per_atom_energy_mean}
     per_type_energy_scales: ${training_data_stats:per_type_forces_rms}
-
-global_options:
-  allow_tf32: false

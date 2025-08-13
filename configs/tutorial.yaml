@@ -255,12 +255,3 @@ training_module:
       _target_: nequip.nn.pair_potential.ZBL
       units: metal     # Ang and kcal/mol; LAMMPS unit names;  allowed values "metal" and "real"
       chemical_species: ${chemical_symbols}   # must tell ZBL the chemical species of the various model atom types
-
-
-# ====================
-#    GLOBAL OPTIONS
-# ====================
-global_options:
-  # whether to use TensorFloat32, which will be faster on GPUs with tensor cores at the cost of precision loss
-  # see "Accelerations" under the "User Guide" section of the docs for more details
-  allow_tf32: false
