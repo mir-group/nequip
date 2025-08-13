@@ -404,18 +404,18 @@ class BaseModelTests:
                 compile_F = compile_atoms.get_forces()
 
                 del atoms, ckpt_atoms, compile_atoms
-                assert np.allclose(
+                np.testing.assert_allclose(
                     ckpt_E,
                     compile_E,
                     rtol=nequip_compile_tol,
                     atol=nequip_compile_tol,
-                ), np.max(np.abs((ckpt_E - compile_E)))
-                assert np.allclose(
+                )
+                np.testing.assert_allclose(
                     ckpt_F,
                     compile_F,
                     rtol=nequip_compile_tol,
                     atol=nequip_compile_tol,
-                ), np.max(np.abs((ckpt_F - compile_F)))
+                )
 
     def compare_output_and_gradients(
         self, modelA, modelB, model_test_data, tol, compare_outputs=None
@@ -433,7 +433,7 @@ class BaseModelTests:
         B_out = modelB(model_test_data.copy())
         for key in compare_outputs:
             if key in A_out and key in B_out:
-                assert torch.allclose(A_out[key], B_out[key], atol=tol)
+                torch.testing.assert_close(A_out[key], B_out[key], atol=tol, rtol=tol)
 
         # test backwards pass if there are trainable weights
         if any([p.requires_grad for p in modelB.parameters()]):
@@ -445,9 +445,12 @@ class BaseModelTests:
             compile_params = dict(modelB.named_parameters())
             for k, v in modelB.named_parameters():
                 err = torch.max(torch.abs(v.grad - compile_params[k].grad))
-                assert torch.allclose(
-                    v.grad, compile_params[k].grad, atol=tol, rtol=tol
-                ), err
+                (
+                    torch.testing.assert_close(
+                        v.grad, compile_params[k].grad, atol=tol, rtol=tol
+                    ),
+                    err,
+                )
 
     @override_irreps_debug(False)
     def test_train_time_compile(
