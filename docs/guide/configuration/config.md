@@ -1,6 +1,6 @@
 # Config File
 
-The config file has five main sections: [`run`](#run), [`data`](#data), [`trainer`](#trainer), [`training_module`](#training_module), [`global_options`](#global_options). These top level config entries must always be present.
+The config file has four main sections: [`run`](#run), [`data`](#data), [`trainer`](#trainer), [`training_module`](#training_module). These top level config entries must always be present.
 
 ## Variable interpolation
 
@@ -45,9 +45,7 @@ run: [val, test, train, val, test]
 
 The `trainer` specifies arguments to instantiate a [PyTorch Lightning](https://lightning.ai/) {class}`~lightning.pytorch.trainer.trainer.Trainer` object. To understand how to configure it, see the trainer [flags](https://lightning.ai/docs/pytorch/stable/common/trainer.html#trainer-flags) and [API](https://lightning.ai/docs/pytorch/stable/common/trainer.html#trainer-class-api) documentation.
 
-```{tip}
 It is in the {class}`~lightning.pytorch.trainer.trainer.Trainer` that users can specify [callbacks](https://lightning.ai/docs/pytorch/stable/api_references.html#callbacks) used to influence the course of training. This includes the very important {class}`~lightning.pytorch.callbacks.ModelCheckpoint` callback that should be configured to save checkpoint files in the way the user so pleases. `nequip`'s own [callbacks](../../api/callbacks.rst) can also be used here.
-```
 
 ### Logging
 
@@ -102,10 +100,3 @@ lr_scheduler:
 ```
   The `scheduler` is a PyTorch-compatible learning rate scheduler. Options from PyTorch can be found in {mod}`torch.optim.lr_scheduler`.
 
-## `global_options`
-
-`global_options` is used to specify options that affect the global state of the entire `nequip-train` process. Currently, the only option is `allow_tf32` (which is `false` by default). See the [TF32 page](../accelerations/tf32.md) for more details about TF32 settings.
-```yaml
-global_options:
-  allow_tf32: false
-```
