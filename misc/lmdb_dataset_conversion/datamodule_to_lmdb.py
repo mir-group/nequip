@@ -36,7 +36,7 @@ def main(config: DictConfig):
     }
 
     # === global state (important for float64 data) ===
-    set_global_state(**OmegaConf.to_container(config.global_options, resolve=True))
+    set_global_state()
 
     # === instantiate and prepare datamodule ===
     datamodule = hydra.utils.instantiate(config.data, _recursive_=False)
