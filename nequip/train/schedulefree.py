@@ -6,6 +6,10 @@ import torch
 
 logger = RankedLogger(__name__, rank_zero_only=True)
 
+# Note: Manual `.train()`/`.eval()` mode control for optimizer is required to ensure smoothed weights are captured at the right time
+# Related discussion on Lightning timing hooks:
+# https://github.com/Lightning-AI/pytorch-lightning/discussions/19759
+
 
 class ScheduleFreeLightningModule(NequIPLightningModule):
     """
@@ -13,12 +17,6 @@ class ScheduleFreeLightningModule(NequIPLightningModule):
 
     This module wraps the model's optimizer in one of Facebook's Schedule-Free variants.
     See: https://github.com/facebookresearch/schedule_free
-
-    Note: Manual `.train()`/`.eval()` mode control for optimizer is required
-    to ensure smoothed weights are captured at the right time
-
-    Related discussion on Lightning timing hooks:
-    https://github.com/Lightning-AI/pytorch-lightning/discussions/19759
 
     Args:
         optimizer (Dict[str, Any]): Dictionary that must include a _target_
@@ -46,6 +44,7 @@ class ScheduleFreeLightningModule(NequIPLightningModule):
 
     #  Lightning Hook
     def on_save_checkpoint(self, checkpoint: dict):
+        """"""
         # Schedule-Free optimizers require .eval() to expose smoothed weights.
         # This hook is called AFTER Lightning has already saved model/optimizer state,
         # so we only store the smoothed state_dict here for packaging.
@@ -55,6 +54,7 @@ class ScheduleFreeLightningModule(NequIPLightningModule):
 
     #  Lightning Hook
     def on_load_checkpoint(self, checkpoint: dict):
+        """"""
         # We extract our custom optimizer state for later lazy loading
         state = checkpoint.get("schedulefree_optimizer_state_dict")
         if state is not None:
@@ -82,20 +82,24 @@ class ScheduleFreeLightningModule(NequIPLightningModule):
 
     #  Lightning Hook
     def on_train_epoch_start(self) -> None:
+        """"""
         # Ensures fast weights are used during training
         self.optimizers().train()
 
     #  Lightning Hook
     def on_validation_epoch_start(self) -> None:
+        """"""
         # Ensures smoothed weights are used for validation
         self.optimizers().eval()
 
     #  Lightning Hook
     def on_test_epoch_start(self) -> None:
+        """"""
         # Ensures smoothed weights are used during testing
         self.optimizers().eval()
 
     #  Lightning Hook
     def on_predict_epoch_start(self) -> None:
+        """"""
         # Ensures smoothed weights are used during prediction/inference
         self.optimizers().eval()
