@@ -112,7 +112,7 @@ class TestNequIPModel(BaseEnergyModelTests):
             if request.param == "enable_OpenEquivariance":
                 import openequivariance  # noqa: F401,F811
 
-                # TODO: test when ready (likely PyTorch 2.8.0)
+                # TODO: test when ready (maybe PyTorch 2.8.1 or 2.9.0)
                 if mode == "aotinductor":
                     pytest.skip("OEQ AOTI tests skipped for now")
 
