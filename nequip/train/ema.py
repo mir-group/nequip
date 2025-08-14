@@ -16,6 +16,8 @@ class EMALightningModule(NequIPLightningModule):
     """
     An exponential moving average (EMA) of the model weights are maintained. Validation and test metrics will be that of the EMA weight model. If EMA is used, models loaded from checkpoint files (except during restarts) will always be the model with EMA weights. Specifically, the EMA models will be the ones loaded in the :class:`~nequip.ase.NequIPCalculator`, compiled with ``nequip-compile``, or packaged with ``nequip-package``.
 
+    Note: EMA requires ``check_val_every_n_epoch`` to be 1 (the default).
+
     Args:
         ema_decay (float): decay constant for the exponential moving average (EMA) of model weights (default ``0.999``)
     """

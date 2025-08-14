@@ -78,3 +78,12 @@ nequip-train -cn config.yaml
   It's likely your GCC version does not support C++17. Try a GCC version >= 11 that supports C++17 by default (see [GCC C++17 status](https://gcc.gnu.org/projects/cxx-status.html#cxx17)) 
 
   On HPC clusters, you can usually `module load` to a newer version of GCC.
+
+### EMA checkpoint error
+
+  **Problem**: When using `EMALightningModule`, you encounter:
+  ```
+  AssertionError: EMA module loaded in a state where it does not contain EMA weights -- the checkpoint file is likely corrupted.
+  ```
+
+  **Solution**: This error can occur when using `check_val_every_n_epoch` with a value other than 1. EMA requires validation to run every epoch. No configuration change is needed if the field is unspecified in the config.
