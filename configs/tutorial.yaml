@@ -109,7 +109,6 @@ trainer:
   enable_checkpointing: true
   max_epochs: 1000
   max_time: 03:00:00:00
-  check_val_every_n_epoch: 1  # how often to validate
   log_every_n_steps: 20       # how often to log
 
   # use any Lightning supported logger
