@@ -446,3 +446,47 @@ def test_per_edge_type_cutoff_defaults():
     ]
     h_o_present = (0, 2) in edges or (2, 0) in edges
     assert h_o_present, "H-O edge should be present since H->O defaults to r_max=4.0"
+
+
+def test_neighborlist_batch_state_preservation():
+    """Test that neighborlist transforms preserve batch state."""
+    # test 1: single frame data (no BATCH_KEY) should remain unbatched
+    atoms = ase.build.bulk("Cu", "fcc", a=3.6)
+    data_single = from_ase(atoms)
+    assert AtomicDataDict.BATCH_KEY not in data_single
+
+    # apply basic neighborlist transform
+    result_basic = NeighborListTransform(r_max=4.0)(data_single.copy())
+    assert AtomicDataDict.BATCH_KEY not in result_basic, (
+        "single frame should remain unbatched"
+    )
+
+    # apply sorted neighborlist transform
+    result_sorted = SortedNeighborListTransform(r_max=4.0)(data_single.copy())
+    assert AtomicDataDict.BATCH_KEY not in result_sorted, (
+        "single frame should remain unbatched"
+    )
+
+    # test 2: batched data should remain batched
+    data_batched = AtomicDataDict.with_batch_(data_single.copy())
+    assert AtomicDataDict.BATCH_KEY in data_batched
+
+    # apply basic neighborlist transform
+    result_batched_basic = NeighborListTransform(r_max=4.0)(data_batched.copy())
+    assert AtomicDataDict.BATCH_KEY in result_batched_basic, (
+        "batched data should remain batched"
+    )
+    assert torch.equal(
+        result_batched_basic[AtomicDataDict.BATCH_KEY],
+        data_batched[AtomicDataDict.BATCH_KEY],
+    )
+
+    # apply sorted neighborlist transform
+    result_batched_sorted = SortedNeighborListTransform(r_max=4.0)(data_batched.copy())
+    assert AtomicDataDict.BATCH_KEY in result_batched_sorted, (
+        "batched data should remain batched"
+    )
+    assert torch.equal(
+        result_batched_sorted[AtomicDataDict.BATCH_KEY],
+        data_batched[AtomicDataDict.BATCH_KEY],
+    )

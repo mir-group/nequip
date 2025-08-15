@@ -160,8 +160,11 @@ def compute_neighborlist_(
 
     This can be called on alredy-batched data.
     """
+    _data_is_batched = AtomicDataDict.BATCH_KEY in data
+
     to_batch: List[AtomicDataDict.Type] = []
     for idx in range(AtomicDataDict.num_frames(data)):
+        # if data is unbatched, `frame_from_batched` should just be no-op
         data_per_frame = AtomicDataDict.frame_from_batched(data, idx)
 
         cell = data_per_frame.get(AtomicDataDict.CELL_KEY, None)
@@ -188,5 +191,11 @@ def compute_neighborlist_(
             data_per_frame[AtomicDataDict.EDGE_CELL_SHIFT_KEY] = edge_cell_shift
         to_batch.append(data_per_frame)
 
-    # rebatch to make sure neighborlist information is in a similar batched format
-    return AtomicDataDict.batched_from_list(to_batch)
+    # the following ensures that we preserve the batch state
+    # i.e. unbatched input -> unbatched output; batched input -> batched output
+    if _data_is_batched:
+        # rebatch to make sure neighborlist information is in a similar batched format
+        return AtomicDataDict.batched_from_list(to_batch)
+    else:
+        assert len(to_batch) == 1
+        return to_batch[0]
