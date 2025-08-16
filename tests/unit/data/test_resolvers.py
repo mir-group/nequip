@@ -2,7 +2,7 @@ import pytest
 from typing import Final, List
 from omegaconf import OmegaConf
 
-DATASETS: Final[List[str]] = ["MPTrj", "OMat"]
+DATASETS: Final[List[str]] = ["MPTrj", "OMat", "MatPES"]
 CUTOFFS: Final[List[float]] = [
     4.5,
     5.0,
