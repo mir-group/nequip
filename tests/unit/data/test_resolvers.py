@@ -2,7 +2,7 @@ import pytest
 from typing import Final, List
 from omegaconf import OmegaConf
 
-DATASETS: Final[List[str]] = ["MPTrj"]
+DATASETS: Final[List[str]] = ["MPTrj", "OMat"]
 CUTOFFS: Final[List[float]] = [
     4.5,
     5.0,
@@ -12,7 +12,7 @@ CUTOFFS: Final[List[float]] = [
     7.0,
     7.5,
     8.0,
-]  # add more valid cutoffs your resolver supports, e.g. 7.0, 8.0
+]
 
 REQUIRED_KEYS: Final[List[str]] = [
     "chemical_symbols",
