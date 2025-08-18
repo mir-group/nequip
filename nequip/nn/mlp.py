@@ -159,9 +159,6 @@ class ScalarMLPFunction(torch.nn.Module):
                 mlp.append(nonlinearity_module())
                 self.is_nonlinear = True
 
-        # the following attribute is only used for the "deep linear" code path in `forward`
-        # its definition is not conditioned on the "deep linear" codepath for TorchScript compatibility
-
         # use `multidot` based implementation for deep linear net (no nonlinearity, no bias, more than one layer)
         # otherwise use the `mlp` built in init
         if (not self.is_nonlinear) and (not self.bias) and (self.num_layers > 1):
