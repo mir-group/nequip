@@ -41,6 +41,7 @@ class ScalarMLP(GraphModuleMixin, torch.nn.Module):
         bias: bool = False,
         forward_weight_init: bool = True,
         init_mode: str = "uniform",
+        parametrization: Optional[str] = None,
         field: str = AtomicDataDict.NODE_FEATURES_KEY,
         out_field: Optional[str] = None,
         irreps_in=None,
@@ -64,6 +65,7 @@ class ScalarMLP(GraphModuleMixin, torch.nn.Module):
             bias=bias,
             forward_weight_init=forward_weight_init,
             init_mode=init_mode,
+            parametrization=parametrization,
         )
         self.irreps_out[self.out_field] = Irreps([(self.mlp_module.dims[-1], (0, 1))])
 
@@ -100,6 +102,7 @@ class ScalarMLPFunction(torch.nn.Module):
         bias: bool = False,
         forward_weight_init: bool = True,
         init_mode: str = "uniform",
+        parametrization: Optional[str] = None,
     ):
         super().__init__()
         self.bias = bias
@@ -150,6 +153,24 @@ class ScalarMLPFunction(torch.nn.Module):
                 bias=bias,
                 init_mode=init_mode,
             )
+
+            # apply parametrization if specified
+            if parametrization == "spectral_norm":
+                torch.nn.utils.parametrizations.spectral_norm(
+                    linear_layer, "weight", dim=1
+                )
+            elif parametrization == "weight_norm":
+                torch.nn.utils.parametrizations.weight_norm(
+                    linear_layer, "weight", dim=1
+                )
+            elif parametrization == "orthogonal":
+                torch.nn.utils.parametrizations.orthogonal(linear_layer, "weight")
+            elif parametrization is not None:
+                raise ValueError(
+                    f"Unknown parametrization '{parametrization}'. "
+                    "Available options: None, 'weight_norm', 'orthogonal', 'spectral_norm'"
+                )
+
             mlp.append(linear_layer)
             del gain, norm_dim
 
