@@ -8,7 +8,7 @@ from typing import Union, Sequence, List, Callable
 
 logger = RankedLogger(__name__, rank_zero_only=True)
 
-_URL_TM23 = "https://archive.materialscloud.org/record/file?record_id=2113&filename=benchmarking_master_collection-20240316T202423Z-001.zip"
+_URL_TM23 = "https://archive.materialscloud.org/records/tcrks-ymp88/files/benchmarking_master_collection-20240316T202423Z-001.zip?download=1"
 supported_elements = [
     "Ag",
     "Au",
