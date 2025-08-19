@@ -165,7 +165,7 @@ class ScalarMLPFunction(torch.nn.Module):
                 )
             elif parametrization == "orthogonal":
                 torch.nn.utils.parametrizations.orthogonal(linear_layer, "weight")
-            elif parametrization is not None:
+            elif parametrization not in [None, "None", "null"]:
                 raise ValueError(
                     f"Unknown parametrization '{parametrization}'. "
                     "Available options: None, 'weight_norm', 'orthogonal', 'spectral_norm'"
