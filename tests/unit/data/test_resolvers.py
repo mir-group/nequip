@@ -18,8 +18,8 @@ REQUIRED_KEYS: Final[List[str]] = [
     "chemical_symbols",
     "per_atom_energy_mean",
     "forces_rms",
-    "per_type_energy_shifts",
-    "per_type_energy_scales",
+    "isolated_atom_energies",
+    "per_type_forces_rms",
     "num_neighbors_mean",
     "per_type_num_neighbours_mean",
 ]
@@ -56,23 +56,23 @@ def test_big_dataset_stats_resolver(cutoff, dataset):
     assert isinstance(dataset_stats.forces_rms, float)
     assert isinstance(dataset_stats.num_neighbors_mean, float)
 
-    # per_type_energy_shifts: DictConfig[str, float]
-    shifts = dataset_stats.per_type_energy_shifts
+    # isolated_atom_energies: DictConfig[str, float]
+    shifts = dataset_stats.isolated_atom_energies
     assert OmegaConf.is_dict(shifts)
     assert all(isinstance(k, str) for k in shifts)
     assert all(isinstance(v, float) for v in shifts.values())
 
     assert set(shifts.keys()) == set(chem), (
-        "All chemical_symbols must be represented in per_type_energy_shifts"
+        "All chemical_symbols must be represented in isolated_atom_energies"
     )
 
-    # per_type_energy_scales: DictConfig[str, float]
-    scales = dataset_stats.per_type_energy_scales
+    # per_type_forces_rms: DictConfig[str, float]
+    scales = dataset_stats.per_type_forces_rms
     assert OmegaConf.is_dict(scales)
     assert all(isinstance(v, float) for v in scales.values())
     # This checks both that all keys are string and that all chemical symbols are represented
     assert set(scales.keys()) == set(chem), (
-        "All chemical_symbols must be represented in per_type_energy_scales"
+        "All chemical_symbols must be represented in per_type_forces_rms"
     )
 
     # per_type_num_neighbours_mean: DictConfig[str, float]
