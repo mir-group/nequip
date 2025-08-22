@@ -29,6 +29,27 @@ Installation instructions and user guides can be found in our [docs](https://neq
 
 The best way to learn how to use NequIP is through the [tutorial notebook](https://colab.research.google.com/github/mir-group/nequip-tutorial/blob/main/NequIP_Tutorial.ipynb). This will run entirely on Google Colab's cloud virtual machine; you do not need to install or run anything locally.
 
+## Highlighted Features
+
+The following are some notable features, with quick links for more details:
+
+- [Compiled training](https://nequip.readthedocs.io/en/latest/guide/accelerations/pt2_compilation.html) and [compiled inference](https://nequip.readthedocs.io/en/latest/guide/getting-started/workflow.html#compilation)  
+- [Multi-GPU training](https://nequip.readthedocs.io/en/latest/guide/accelerations/ddp_training.html)  
+- [GPU kernel accelerations](https://nequip.readthedocs.io/en/latest/guide/accelerations/gpu_kernel_modifiers.html) with [OpenEquivariance](https://github.com/PASSIONLab/OpenEquivariance) and [CuEquivariance](https://github.com/NVIDIA/cuEquivariance)  
+
+## Extension Packages
+
+The NequIP software framework is designed to be flexible and extensible: you can build custom architectures, implement new training techniques, and develop additional methods on top of it through extension packages.
+If you're interested in developing your own extension package, please refer to the [extension package docs](https://nequip.readthedocs.io/en/latest/dev/extension_packages.html) and consider [joining our Zulip](https://forms.gle/mEuonVCHdsgTtLXy7) for developer-focused discussions and collaborations.
+
+Notable examples of NequIP framework extension packages include
+
+- **Allegro** ([GitHub](https://github.com/mir-group/allegro), [Docs](https://nequip.readthedocs.io/projects/allegro/en/latest/?badge=latest), [Paper](https://www.nature.com/articles/s41467-023-36329-y)):  
+  Strictly local equivariant models with excellent scalability for multirank molecular dynamics simulations.
+- **NequIP-LES** ([GitHub](https://github.com/ChengUCB/NequIP-LES), [Paper](https://arxiv.org/abs/2507.14302)):  
+  An extension of NequIP and Allegro that adds long-range electrostatics via the Latent Ewald Summation (LES) algorithm.
+
+
 ## References & citing
 
 **Any and all use of this software, in whole or in part, should clearly acknowledge and link to this repository.**
