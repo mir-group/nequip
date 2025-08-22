@@ -13,6 +13,7 @@ Getting Started
 
    extension_packages/getting_started
    extension_packages/data
+   extension_packages/training
 
 Example Extension Packages
 ---------------------------
