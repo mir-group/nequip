@@ -8,7 +8,7 @@ Callbacks
 
 Use PyTorch Lightning `callbacks <https://lightning.ai/docs/pytorch/stable/api_references.html#callbacks>`_ for smaller training customizations that don't alter the core training loop.
 
-As an example, loss coefficients control how different loss terms (energy, forces, stress) are weighted during training - you might want to emphasize forces more heavily in later training epochs. Example callbacks for this feature include :class:`~nequip.train.callbacks.LossCoefficientScheduler` and :class:`~nequip.train.callbacks.LinearLossCoefficientScheduler`.
+As an example, loss coefficients control how different loss terms (energy, forces, stress) are weighted during training - you might want to emphasize forces more heavily in later training epochs. Example callbacks for this featurej include :class:`~nequip.train.callbacks.LossCoefficientScheduler` and :class:`~nequip.train.callbacks.LinearLossCoefficientScheduler`.
 
 Training Modules
 ----------------

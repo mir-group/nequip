@@ -78,7 +78,10 @@ def get_current_compile_mode(return_override: bool = False):
 def model_builder(func):
     """Decorator for model builder functions in the ``nequip`` ecosystem.
 
-    Builds the model based on ``seed`` and ``model_dtype``, wraps it with ``GraphModel``, and imposes the presence of the ``type_names`` argument. Implicitly, this decorator also imposes that inner models do not possess ``seed`` and ``model_dtype`` as arguments.
+    Handles model building with proper seeding, floating point precision (``float32`` or ``float64``), and wraps the result with ``GraphModel``. Requires ``seed``, ``model_dtype``, and ``type_names`` arguments.
+    Supports ``eager`` and ``compile`` modes via ``compile_mode``.
+
+    The ``seed``, ``model_dtype``, and ``compile_mode`` arguments are consumed by the decorator and not passed to the decorated function.
     """
 
     @functools.wraps(func)

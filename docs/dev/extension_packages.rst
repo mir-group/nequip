@@ -14,6 +14,7 @@ Getting Started
    extension_packages/getting_started
    extension_packages/data
    extension_packages/training
+   extension_packages/models
 
 Example Extension Packages
 ---------------------------
