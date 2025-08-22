@@ -1,7 +1,7 @@
 Getting Started
 ===============
 
-Extension packages allow you to build new functionality on top of the NequIP framework. The prime example is `Allegro <https://github.com/mir-group/allegro>`_, which extends the NequIP framework with a new model architecture.
+Extension packages allow you to build new functionality on top of the NequIP framework, such as custom model architectures, custom data handling, or training procedures.
 
 Entry Points Registration
 --------------------------
