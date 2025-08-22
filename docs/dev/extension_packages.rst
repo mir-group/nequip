@@ -12,6 +12,7 @@ Getting Started
    :maxdepth: 2
 
    extension_packages/getting_started
+   extension_packages/data
 
 Example Extension Packages
 ---------------------------
