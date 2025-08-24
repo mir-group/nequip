@@ -14,6 +14,8 @@ NequIP is an open-source code for building E(3)-equivariant interatomic potentia
  
  - [Installation and usage](#installation-and-usage)
  - [Tutorial](#tutorial)
+ - [Highlighted Features](#highlighted-features)
+ - [Extension Packages](#extension-packages)
  - [References & citing](#references--citing)
  - [Authors](#authors)
  - [Community, contact, questions, and contributing](#community-contact-questions-and-contributing)
@@ -35,7 +37,8 @@ The following are some notable features, with quick links for more details:
 
 - [Compiled training](https://nequip.readthedocs.io/en/latest/guide/accelerations/pt2_compilation.html) and [compiled inference](https://nequip.readthedocs.io/en/latest/guide/getting-started/workflow.html#compilation)  
 - [Multi-GPU training](https://nequip.readthedocs.io/en/latest/guide/accelerations/ddp_training.html)  
-- [GPU kernel accelerations](https://nequip.readthedocs.io/en/latest/guide/accelerations/gpu_kernel_modifiers.html) with [OpenEquivariance](https://github.com/PASSIONLab/OpenEquivariance) and [CuEquivariance](https://github.com/NVIDIA/cuEquivariance)  
+- [GPU kernel accelerations](https://nequip.readthedocs.io/en/latest/guide/accelerations/gpu_kernel_modifiers.html) with [OpenEquivariance](https://github.com/PASSIONLab/OpenEquivariance) and [CuEquivariance](https://github.com/NVIDIA/cuEquivariance) (alpha)
+- [ASE calculator integration](https://nequip.readthedocs.io/en/latest/integrations/ase.html) and [LAMMPS integrations](https://nequip.readthedocs.io/en/latest/integrations/lammps/index.html) through the pair styles in [`pair_nequip_allegro`](https://nequip.readthedocs.io/en/latest/integrations/lammps/pair_styles.html) and our LAMMPS [ML-IAP integration](https://nequip.readthedocs.io/en/latest/integrations/lammps/mliap.html).
 
 ## Extension Packages
 
