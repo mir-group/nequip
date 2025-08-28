@@ -201,16 +201,39 @@ class NequIPLightningModule(lightning.LightningModule):
         param_groups = instantiate(param_groups, model=self.model)
         optimizer_class = optimizer_config.pop("_target_")
         optim = get_class(optimizer_class)(params=param_groups, **optimizer_config)
-        if self.lr_scheduler_config is not None:
-            # instantiate lr scheduler object separately to pass the optimizer to it during instantiation
-            lr_scheduler_config = dict(self.lr_scheduler_config.copy())
-            scheduler = lr_scheduler_config.pop("scheduler")
-            scheduler = instantiate(scheduler, optimizer=optim)
-            lr_scheduler = dict(instantiate(lr_scheduler_config))
-            lr_scheduler.update({"scheduler": scheduler})
-            return {"optimizer": optim, "lr_scheduler": lr_scheduler}
 
-        return optim
+        if self.lr_scheduler_config is None:
+            return optim
+
+        def _instantiate_scheduler(scheduler_config: dict, optimizer):
+            scheduler_config = dict(
+                scheduler_config
+            )  # just in case, because of pop mutation
+
+            # NOTE: This assumes that nested schedulers always have a "schedulers" key
+            inner_configs = scheduler_config.pop("schedulers", None)
+
+            # Recursively instantiate inner schedulers if we use nested schedulers (e.g. ChainedScheduler, SequentialLR)
+            if inner_configs is not None:
+                inner_schedulers = [
+                    _instantiate_scheduler(inner_config, optimizer)
+                    for inner_config in inner_configs
+                ]
+                return instantiate(
+                    scheduler_config, optimizer=optimizer, schedulers=inner_schedulers
+                )
+
+            # Base case: instantiate a regular scheduler
+            return instantiate(scheduler_config, optimizer=optimizer)
+
+        # instantiate lr scheduler object separately to pass the optimizer to it during instantiation
+        lr_scheduler_config = dict(self.lr_scheduler_config.copy())
+        scheduler_config = lr_scheduler_config.pop("scheduler")
+        scheduler = _instantiate_scheduler(scheduler_config, optim)
+
+        lr_scheduler = dict(instantiate(lr_scheduler_config))
+        lr_scheduler.update({"scheduler": scheduler})
+        return {"optimizer": optim, "lr_scheduler": lr_scheduler}
 
     def forward(self, inputs: AtomicDataDict.Type):
         """"""
