@@ -21,7 +21,7 @@ REQUIRED_KEYS: Final[List[str]] = [
     "isolated_atom_energies",
     "per_type_forces_rms",
     "num_neighbors_mean",
-    "per_type_num_neighbours_mean",
+    "per_type_num_neighbors_mean",
 ]
 
 
@@ -75,12 +75,12 @@ def test_big_dataset_stats_resolver(cutoff, dataset):
         "All chemical_symbols must be represented in per_type_forces_rms"
     )
 
-    # per_type_num_neighbours_mean: DictConfig[str, float]
-    pt_nn = dataset_stats.per_type_num_neighbours_mean
+    # per_type_num_neighbors_mean: DictConfig[str, float]
+    pt_nn = dataset_stats.per_type_num_neighbors_mean
     assert OmegaConf.is_dict(pt_nn)
     assert all(isinstance(v, float) for v in pt_nn.values())
     assert set(pt_nn.keys()) == set(chem), (
-        "All chemical_symbols must be represented in per_type_num_neighbours_mean"
+        "All chemical_symbols must be represented in per_type_num_neighbors_mean"
     )
 
     # All per-type dicts must have the same length as chemical_symbols

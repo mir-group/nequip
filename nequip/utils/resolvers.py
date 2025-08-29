@@ -59,10 +59,10 @@ def big_dataset_stats(name: str, cutoff_radius: float) -> Dict[str, Any]:
         raise ValueError(
             f"No precomputed dataset stats for dataset '{name}' with cutoff radius {cutoff_radius} (tried key '{cutoff_radius}')"
         )
-    stats["per_type_num_neighbours_mean"] = stats["per_type_num_neighbours_mean"].get(
+    stats["per_type_num_neighbors_mean"] = stats["per_type_num_neighbors_mean"].get(
         cutoff_radius, None
     )
-    if stats["per_type_num_neighbours_mean"] is None:
+    if stats["per_type_num_neighbors_mean"] is None:
         raise ValueError(
             f"No precomputed dataset stats for dataset '{name}' with cutoff radius {cutoff_radius} (tried key '{cutoff_radius}')"
         )
