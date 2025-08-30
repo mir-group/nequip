@@ -152,11 +152,11 @@ def set_global_state(
                 torch.backends.fp32_precision = desired_precision
         else:
             # use legacy API for PyTorch < 2.9
-            if torch.torch.backends.cuda.matmul.allow_tf32 is not allow_tf32:
+            if torch.backends.cuda.matmul.allow_tf32 is not allow_tf32:
                 # update the setting
                 if warn_on_override:
                     warnings.warn(
-                        f"Setting the GLOBAL value for allow_tf32 to {allow_tf32} which is different than the previous value of {torch.torch.backends.cuda.matmul.allow_tf32}"
+                        f"Setting the GLOBAL value for allow_tf32 to {allow_tf32} which is different than the previous value of {torch.backends.cuda.matmul.allow_tf32}"
                     )
                 torch.backends.cuda.matmul.allow_tf32 = allow_tf32
                 torch.backends.cudnn.allow_tf32 = allow_tf32

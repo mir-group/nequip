@@ -57,26 +57,18 @@ def model_dtype(request):
 def default_dtype():
     old_dtype = torch.get_default_dtype()
     # global dtype is always set to float64
-    set_global_state()
+    # Ampere and TF32: Many of the tests for NequIP involve numerically checking
+    # algebraic properties— normalization, equivariance, continuity, etc.
+    # With the added numerical noise of TF32, some of those tests fail
+    # with the current (and usually generous) thresholds.
+    # Thus we go on the assumption that PyTorch + NVIDIA got everything
+    # right, that this setting DOES NOT AFFECT the model outputs except
+    # for increased numerical noise, and only test without it.
+    # TODO: consider running tests with and without
+    # TODO: check how much thresholds have to be changed to accommodate TF32
+    set_global_state(allow_tf32=False)
     yield torch.get_default_dtype()
     torch.set_default_dtype(old_dtype)
-
-
-# - Ampere and TF32 -
-# Many of the tests for NequIP involve numerically checking
-# algebraic properties— normalization, equivariance,
-# continuity, etc.
-# With the added numerical noise of TF32, some of those tests fail
-# with the current (and usually generous) thresholds.
-#
-# Thus we go on the assumption that PyTorch + NVIDIA got everything
-# right, that this setting DOES NOT AFFECT the model outputs except
-# for increased numerical noise, and only test without it.
-#
-# TODO: consider running tests with and without
-# TODO: check how much thresholds have to be changed to accomidate TF32
-torch.backends.cuda.matmul.allow_tf32 = False
-torch.backends.cudnn.allow_tf32 = False
 
 
 @pytest.fixture(scope="session")

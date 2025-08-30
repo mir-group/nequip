@@ -48,11 +48,20 @@ def floating_point_tolerance(model_dtype: Union[str, torch.dtype]):
 
     Assumes global dtype if ``float64``, and that TF32 will only ever be used if ``model_dtype`` is ``float32``.
     """
+    from .versions.torch_versions import _TORCH_GE_2_9
+
     using_tf32 = False
     if torch.cuda.is_available():
-        # assume that both are set to be the same
-        assert torch.backends.cuda.matmul.allow_tf32 == torch.backends.cudnn.allow_tf32
-        using_tf32 = torch.torch.backends.cuda.matmul.allow_tf32
+        if _TORCH_GE_2_9:
+            # use new API for PyTorch >= 2.9
+            using_tf32 = torch.backends.fp32_precision == "tf32"
+        else:
+            # use legacy API for PyTorch < 2.9
+            # assume that both are set to be the same
+            assert (
+                torch.backends.cuda.matmul.allow_tf32 == torch.backends.cudnn.allow_tf32
+            )
+            using_tf32 = torch.backends.cuda.matmul.allow_tf32
     return {
         torch.float32: _TF32_MODEL_TOL if using_tf32 else _FLOAT32_MODEL_TOL,
         "float32": _TF32_MODEL_TOL if using_tf32 else _FLOAT32_MODEL_TOL,
