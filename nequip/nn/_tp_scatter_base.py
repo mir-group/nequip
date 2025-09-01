@@ -44,7 +44,7 @@ class TensorProductScatter(torch.nn.Module):
 
         from ._tp_scatter_oeq import OpenEquivarianceTensorProductScatter
         from nequip.utils.dtype import torch_default_dtype
-        from nequip.utils.versions.torch_versions import _TORCH_GE_2_4, _TORCH_GE_2_8
+        from nequip.utils.versions.torch_versions import _TORCH_GE_2_4
 
         if not _TORCH_GE_2_4:
             raise RuntimeError("OpenEquivariance requires PyTorch >= 2.4.")
@@ -58,7 +58,7 @@ class TensorProductScatter(torch.nn.Module):
                     irreps_edge_attr=old.irreps_edge_attr,
                     irreps_mid=old.irreps_mid,
                     instructions=old.instructions,
-                    use_opaque=_TRAIN_TIME_COMPILE and not _TORCH_GE_2_8,
+                    use_opaque=_TRAIN_TIME_COMPILE,
                 )
             return new
 
