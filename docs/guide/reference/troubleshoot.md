@@ -87,3 +87,13 @@ nequip-train -cn config.yaml
   ```
 
   **Solution**: This error can occur when using `check_val_every_n_epoch` with a value other than 1. EMA requires validation to run every epoch. No configuration change is needed if the field is unspecified in the config.
+
+### Training Freezes or Hangs
+
+  **Problem**: Trying to run `nequip-train` as follows proceeds normally but then freezes at this point:
+```bash
+    Building model and training_module from scratch / checkpoint ...
+```
+  This seems to occur due to corruption of `torch` extension optimisation caches (such as for `OpenEquivariance`).
+
+  **Solution**: Remove the torch extensions cache folder, to force it to re-build: `rm -rf ~/.cache/torch_extensions/*`.
