@@ -12,9 +12,6 @@ from nequip.utils.logger import RankedLogger
 
 logger = RankedLogger(__name__, rank_zero_only=True)
 
-# common help suffix for absolute paths
-_ABS_PATH_TIP = " (tip: use $PWD)"
-
 
 def main(args=None):
     # === parse inputs ===
@@ -25,15 +22,13 @@ def main(args=None):
     # positional arguments:
     parser.add_argument(
         "model_path",
-        help="absolute path to a checkpoint model or packaged model file"
-        + _ABS_PATH_TIP,
+        help="path to a checkpoint model or packaged model file",
         type=pathlib.Path,
     )
 
     parser.add_argument(
         "output_path",
-        help="absolute path to write NequIP LAMMPS ML-IAP interface file (must end with `.nequip.lmp.pt`)"
-        + _ABS_PATH_TIP,
+        help="path to write NequIP LAMMPS ML-IAP interface file (must end with `.nequip.lmp.pt`)",
         type=pathlib.Path,
     )
 
@@ -70,15 +65,8 @@ def main(args=None):
     args = parser.parse_args(args=args)
 
     # === validate paths ===
-    if not args.model_path.is_absolute():
-        raise ValueError(
-            f"Model path must be absolute{_ABS_PATH_TIP}, got: {args.model_path}"
-        )
-
-    if not args.output_path.is_absolute():
-        raise ValueError(
-            f"Output path must be absolute{_ABS_PATH_TIP}, got: {args.output_path}"
-        )
+    if not args.model_path.exists():
+        raise ValueError(f"Model file does not exist: {args.model_path}")
 
     if not str(args.output_path).endswith(".nequip.lmp.pt"):
         raise ValueError(
