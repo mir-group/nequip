@@ -1,6 +1,9 @@
 # This file is a part of the `nequip` package. Please see LICENSE and README at the root for information on using it.
 
 import torch
+import tempfile
+import os
+from pathlib import Path
 
 from nequip.data import AtomicDataDict
 from nequip.nn import graph_model
@@ -25,7 +28,8 @@ from typing import List
 class NequIPLAMMPSMLIAPWrapper(MLIAPUnified):
     """LAMMPS-MLIAP interface for NequIP framework models."""
 
-    model_path: str
+    model_bytes: bytes
+    model_filename: str
 
     def __init__(
         self,
@@ -41,7 +45,14 @@ class NequIPLAMMPSMLIAPWrapper(MLIAPUnified):
             "PyTorch >= 2.6 required for NequIP's LAMMPS ML-IAP interface"
         )
         super().__init__()
-        self.model_path = model_path
+
+        # read model file and store as bytes
+        with open(model_path, "rb") as f:
+            self.model_bytes = f.read()
+
+        # store the original filename to preserve extension (just the filename, not full path)
+        self.model_filename = Path(model_path).name
+
         self.model_key = model_key
         self.modifiers = modifiers
         self.compile = compile
@@ -55,11 +66,7 @@ class NequIPLAMMPSMLIAPWrapper(MLIAPUnified):
 
         # === set model-depnedent params ===
         set_global_state()
-        model = load_saved_model(
-            self.model_path,
-            compile_mode=_EAGER_MODEL_KEY,
-            model_key=self.model_key,
-        )
+        model = self._load_model_from_bytes()
         self.rcutfac = 0.5 * float(model.metadata[graph_model.R_MAX_KEY])
         # TODO: we are assuming model type names are element names here
         # but this might not be true
@@ -74,15 +81,26 @@ class NequIPLAMMPSMLIAPWrapper(MLIAPUnified):
                     f"Provided modifier `{modifier}` is not available in the model; only the following are available for the provided model: {available_modifiers}"
                 )
 
+    def _load_model_from_bytes(self):
+        # load model from bytes by creating a temporary file.
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # preserve the original filename and extension
+            model_path = os.path.join(tmpdir, self.model_filename)
+            with open(model_path, "wb") as f:
+                f.write(self.model_bytes)
+
+            model = load_saved_model(
+                model_path,
+                compile_mode=_EAGER_MODEL_KEY,
+                model_key=self.model_key,
+            )
+        return model
+
     def _initialize_model(self, lmp_data) -> None:
         # initialize global state
         set_global_state(allow_tf32=self.tf32)
         # load eager model
-        model = load_saved_model(
-            self.model_path,
-            compile_mode=_EAGER_MODEL_KEY,
-            model_key=self.model_key,
-        )
+        model = self._load_model_from_bytes()
 
         # apply LAMMPS MLIAP ghost exchange modifier if present
         available_modifiers = get_all_modifiers(model)
