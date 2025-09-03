@@ -45,7 +45,10 @@ class TensorProductScatter(torch.nn.Module):
     )
     @classmethod
     def enable_OpenEquivariance(cls, model):
-        """Enable OpenEquivariance tensor product kernel for accelerated NequIP training and inference."""
+        """
+        Enable OpenEquivariance tensor product kernel for accelerated NequIP training and inference.
+        For usage instructions, see https://nequip.readthedocs.io/en/latest/guide/accelerations/openequivariance.html
+        """
 
         from ._tp_scatter_oeq import OpenEquivarianceTensorProductScatter
         from nequip.utils.dtype import torch_default_dtype
@@ -77,7 +80,10 @@ class TensorProductScatter(torch.nn.Module):
     )
     @classmethod
     def enable_CuEquivariance(cls, model):
-        """Enable CuEquivariance tensor product kernel for accelerated NequIP training and inference."""
+        """
+        [ALPHA SUPPORT] Enable CuEquivariance tensor product kernel for accelerated NequIP inference.
+        For usage instructions, see https://nequip.readthedocs.io/en/latest/guide/accelerations/cuequivariance.html
+        """
 
         from ._tp_scatter_cueq import CuEquivarianceTensorProductScatter
         from nequip.utils.dtype import torch_default_dtype

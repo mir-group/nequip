@@ -308,6 +308,8 @@ class PerTypeScaleShift(GraphModuleMixin, torch.nn.Module):
 
         In this case, the per-type atomic energy shifts of the original model will be used for every other atom type, except for atom types with the new shifts specified.
 
+        For more details on fine-tuning, see https://nequip.readthedocs.io/en/latest/guide/training-techniques/fine_tuning.html
+
         Args:
             scales: the new per-type atomic energy scales
             shifts: the new per-type atomic energy shifts (e.g. isolated atom energies of a dataset used for fine-tuning)
