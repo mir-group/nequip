@@ -37,7 +37,7 @@ class TensorProductScatter(torch.nn.Module):
         x = scatter(edge_features, edge_dst, dim=0, dim_size=x.size(0))
         return x
 
-    @model_modifier(persistent=False, private=False)
+    @model_modifier(persistent=False, private=False, unsupported_devices=["cpu"])
     @classmethod
     def enable_OpenEquivariance(cls, model):
         """Enable OpenEquivariance tensor product kernel for accelerated NequIP training and inference."""
@@ -64,7 +64,7 @@ class TensorProductScatter(torch.nn.Module):
 
         return replace_submodules(model, cls, factory)
 
-    @model_modifier(persistent=False, private=False)
+    @model_modifier(persistent=False, private=False, unsupported_devices=["cpu"])
     @classmethod
     def enable_CuEquivariance(cls, model):
         """Enable CuEquivariance tensor product kernel for accelerated NequIP training and inference."""
