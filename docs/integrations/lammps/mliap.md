@@ -55,12 +55,19 @@ The NequIP framework provides the `nequip-prepare-lmp-mliap` command-line tool t
 
 ### Preparing Models with nequip-prepare-lmp-mliap
 
-The `nequip-prepare-lmp-mliap` command prepares NequIP models for use with LAMMPS ML-IAP. This tool works with either [checkpoint files](../../guide/getting-started/files.md#checkpoint-files) or [package files](../../guide/getting-started/files.md#package-files) from your trained models. The output file must have a `.nequip.lmp.pt` extension.
+The `nequip-prepare-lmp-mliap` command prepares NequIP models for use with LAMMPS ML-IAP. This tool works with either [checkpoint files](../../guide/getting-started/files.md#checkpoint-files), [package files](../../guide/getting-started/files.md#package-files) from your trained models, or models from [nequip.net](https://nequip.net). The output file must have a `.nequip.lmp.pt` extension.
 
 Basic usage:
 ```bash
+# Using local checkpoint or package file
 nequip-prepare-lmp-mliap \
   ckpt_file_or_package_file \
+  output.nequip.lmp.pt \
+  --modifiers modifier_to_apply
+
+# Using model from nequip.net
+nequip-prepare-lmp-mliap \
+  nequip.net:group-name/model-name:version \
   output.nequip.lmp.pt \
   --modifiers modifier_to_apply
 ```

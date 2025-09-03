@@ -98,6 +98,12 @@ def load_saved_model(
     """
 
     with _get_model_file_path(input_path) as actual_input_path:
+        # check if the resolved file exists
+        if not actual_input_path.exists():
+            raise ValueError(
+                f"Model file does not exist: {input_path} (resolved to: {actual_input_path})"
+            )
+
         # use package load path if extension matches, otherwise assume checkpoint file
         use_ckpt = not str(actual_input_path).endswith(".nequip.zip")
 
