@@ -42,8 +42,9 @@ def test_to_ase_batches(atomic_batch):
     for batch_idx, atoms in enumerate(to_ase_atoms_batch):
         mask = atomic_batch[AtomicDataDict.BATCH_KEY] == batch_idx
         assert atoms.get_positions().shape == (len(atoms), 3)
-        assert np.allclose(
-            atoms.get_positions(), atomic_batch[AtomicDataDict.POSITIONS_KEY][mask]
+        torch.testing.assert_close(
+            torch.from_numpy(atoms.get_positions()),
+            atomic_batch[AtomicDataDict.POSITIONS_KEY][mask],
         )
         assert atoms.get_atomic_numbers().shape == (len(atoms),)
         assert np.array_equal(
@@ -71,7 +72,7 @@ def test_process_dict_invariance(H2, CuFcc, CH3CHO):
         data1 = from_dict(data.copy())
         data2 = from_dict(data1.copy())
     for k in data.keys():
-        assert torch.allclose(data1[k], data2[k])
+        torch.testing.assert_close(data1[k], data2[k])
 
 
 def test_without_nodes(CH3CHO):

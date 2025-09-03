@@ -46,7 +46,7 @@ def test_StressSignFlipTransform():
     data = from_dict(data)
     result = StressSignFlipTransform()(data)[AtomicDataDict.STRESS_KEY]
     assert result.shape == (num_frames, 3, 3)
-    assert torch.allclose(result, -stress)
+    torch.testing.assert_close(result, -stress)
 
 
 def test_neighborlist_basic():

@@ -49,9 +49,10 @@ class TestASEDataParsing:
 
         # Verify conversion using ASE's function
         expected_3x3 = voigt_6_to_full_3x3_stress(stress_voigt)
-        assert torch.allclose(
+        torch.testing.assert_close(
             data[AtomicDataDict.STRESS_KEY][0],
             torch.from_numpy(expected_3x3),
+            rtol=1e-6,
             atol=1e-6,
         )
 
@@ -65,7 +66,7 @@ class TestASEDataParsing:
         data = from_ase(atoms)
 
         assert data[AtomicDataDict.STRESS_KEY].shape == (1, 3, 3)
-        assert torch.allclose(
+        torch.testing.assert_close(
             data[AtomicDataDict.STRESS_KEY][0], torch.from_numpy(stress_3x3)
         )
 
@@ -81,7 +82,7 @@ class TestASEDataParsing:
 
         assert data[AtomicDataDict.STRESS_KEY].shape == (1, 3, 3)
         expected_3x3 = stress_flat.reshape(3, 3)
-        assert torch.allclose(
+        torch.testing.assert_close(
             data[AtomicDataDict.STRESS_KEY][0], torch.from_numpy(expected_3x3)
         )
 
@@ -119,7 +120,7 @@ class TestASEDataParsing:
         # Verify conversion
         for i in range(n_atoms):
             expected_3x3 = born_charges_flat[i].reshape(3, 3)
-            assert torch.allclose(
+            torch.testing.assert_close(
                 data["born_effective_charges"][i],
                 torch.from_numpy(expected_3x3),
             )
@@ -143,7 +144,7 @@ class TestASEDataParsing:
         stress_reconstructed = atoms_reconstructed.calc.results["stress"]
         expected_voigt = full_3x3_to_voigt_6_stress(stress_3x3)
 
-        assert np.allclose(expected_voigt, stress_reconstructed, atol=1e-6)
+        np.testing.assert_allclose(expected_voigt, stress_reconstructed, atol=1e-6)
 
     def test_multiple_cartesian_tensor_fields(self):
         """Test parsing multiple cartesian tensor fields simultaneously."""
