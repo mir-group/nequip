@@ -144,7 +144,7 @@ def test_oeq_package_compile_workflow(fake_model_training_session):
 
     # === Step 4: Create ASE calculators (all on CUDA) ===
     # Reference calculator from checkpoint (with OEQ modifiers)
-    ref_calc = NequIPCalculator._from_checkpoint_model(
+    ref_calc = NequIPCalculator._from_saved_model(
         ckpt_path,
         device=device,
         modifiers=["enable_OpenEquivariance"],

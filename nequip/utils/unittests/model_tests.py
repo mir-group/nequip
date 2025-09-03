@@ -367,17 +367,11 @@ class BaseModelTests:
         chemical_symbols = config.chemical_symbols
 
         # load reference calculator based on model source
-        if model_source == "checkpoint":
-            ref_calc = NequIPCalculator._from_checkpoint_model(
-                model_path,
-                chemical_symbols=chemical_symbols,
-            )
-        else:  # package
-            ref_calc = NequIPCalculator._from_packaged_model(
-                model_path,
-                device=device,
-                chemical_symbols=chemical_symbols,
-            )
+        ref_calc = NequIPCalculator._from_saved_model(
+            model_path,
+            device=device,
+            chemical_symbols=chemical_symbols,
+        )
         compile_calc = NequIPCalculator.from_compiled_model(
             output_path,
             device=device,
@@ -1167,16 +1161,10 @@ class BaseEnergyModelTests(BaseModelTests):
         _check_and_print(retcode)
 
         # load calculator for comparison
-        if model_source == "checkpoint":
-            calc = NequIPCalculator._from_checkpoint_model(
-                model_path,
-                chemical_symbols=config.chemical_symbols,
-            )
-        else:  # package
-            calc = NequIPCalculator._from_packaged_model(
-                model_path,
-                chemical_symbols=config.chemical_symbols,
-            )
+        calc = NequIPCalculator._from_saved_model(
+            model_path,
+            chemical_symbols=config.chemical_symbols,
+        )
 
         return tmpdir, calc, config, mliap_path
 

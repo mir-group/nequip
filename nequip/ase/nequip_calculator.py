@@ -119,90 +119,38 @@ class NequIPCalculator(Calculator):
         )
 
     @classmethod
-    def _from_checkpoint_model(
+    def _from_saved_model(
         cls,
-        ckpt_path: str,
+        model_path: str,
         device: Union[str, torch.device] = "cpu",
         chemical_symbols: Optional[Union[List[str], Dict[str, str]]] = None,
         allow_tf32: bool = False,
         model_name: str = _SOLE_MODEL_KEY,
         **kwargs,
     ):
-        """Creates a :class:`~nequip.ase.NequIPCalculator` from a checkpoint file.
+        """Creates a :class:`~nequip.ase.NequIPCalculator` from a saved model.
 
         .. note::
             This method is private and intended for internal testing only.
             Users should use `from_compiled_model` instead.
 
         Args:
-            ckpt_path (str): path to checkpoint file
+            model_path (str): path to a checkpoint file, package file, or nequip.net model ID
+                            (format: nequip.net:group-name/model-name:version)
             device (torch.device): the device to use
             chemical_symbols (List[str] or Dict[str, str]): mapping between chemical symbols and model type names
             allow_tf32 (bool): whether to allow TensorFloat32 operations (default ``False``)
+            model_name (str): key to select the model from ModuleDict (default for single model case)
         """
-        from nequip.model.saved_models import ModelFromCheckpoint
+        from nequip.model.saved_models.load_utils import load_saved_model
 
-        return cls._from_save(
-            save_path=ckpt_path,
-            model_getter=ModelFromCheckpoint,
-            device=device,
-            chemical_symbols=chemical_symbols,
-            allow_tf32=allow_tf32,
-            model_name=model_name,
-            **kwargs,
-        )
-
-    @classmethod
-    def _from_packaged_model(
-        cls,
-        package_path: str,
-        device: Union[str, torch.device] = "cpu",
-        chemical_symbols: Optional[Union[List[str], Dict[str, str]]] = None,
-        allow_tf32: bool = False,
-        model_name: str = _SOLE_MODEL_KEY,
-        **kwargs,
-    ):
-        """Creates a :class:`~nequip.ase.NequIPCalculator` from a package file.
-
-        .. note::
-            This method is private and intended for internal testing only.
-            Users should use `from_compiled_model` instead.
-
-        Args:
-            package_path (str): path to packaged model
-            device (torch.device): the device to use
-            chemical_symbols (List[str] or Dict[str, str]): mapping between chemical symbols and model type names
-            allow_tf32 (bool): whether to allow TensorFloat32 operations (default ``False``)
-        """
-        from nequip.model.saved_models import ModelFromPackage
-
-        return cls._from_save(
-            save_path=package_path,
-            model_getter=ModelFromPackage,
-            device=device,
-            chemical_symbols=chemical_symbols,
-            allow_tf32=allow_tf32,
-            model_name=model_name,
-            **kwargs,
-        )
-
-    @classmethod
-    def _from_save(
-        cls,
-        save_path: str,
-        model_getter: Callable,
-        device: Union[str, torch.device] = "cpu",
-        chemical_symbols: Optional[Union[List[str], Dict[str, str]]] = None,
-        allow_tf32: bool = False,
-        model_name: str = _SOLE_MODEL_KEY,
-        **kwargs,
-    ):
         # === set global state ===
         set_global_state(allow_tf32=allow_tf32)
 
-        # === build model ===
-        model: torch.nn.ModuleDict = model_getter(save_path)
-        model: graph_model.GraphModel = model[model_name]
+        # === load model using unified loader ===
+        model: graph_model.GraphModel = load_saved_model(
+            model_path, model_key=model_name
+        )
         model.eval()
         model.to(device)
 
