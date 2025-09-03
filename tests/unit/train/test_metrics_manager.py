@@ -55,9 +55,9 @@ class TestMetricsManager:
                 )
             )
             weighted_sum = (ratio[0] * E_MAE + ratio[1] * F_MAE) / sum(ratio)
-            assert torch.allclose(metrics_dict["E_mae"], E_MAE)
-            assert torch.allclose(metrics_dict["F_mae"], F_MAE)
-            assert torch.allclose(metrics_dict["weighted_sum"], weighted_sum)
+            torch.testing.assert_close(metrics_dict["E_mae"], E_MAE)
+            torch.testing.assert_close(metrics_dict["F_mae"], F_MAE)
+            torch.testing.assert_close(metrics_dict["weighted_sum"], weighted_sum)
 
         E_MAE = torch.mean(
             torch.abs(
@@ -87,9 +87,9 @@ class TestMetricsManager:
         )
         weighted_sum = (ratio[0] * E_MAE + ratio[1] * F_MAE) / sum(ratio)
         metrics_dict = mm.compute()
-        assert torch.allclose(metrics_dict["E_mae"], E_MAE)
-        assert torch.allclose(metrics_dict["F_mae"], F_MAE)
-        assert torch.allclose(metrics_dict["weighted_sum"], weighted_sum)
+        torch.testing.assert_close(metrics_dict["E_mae"], E_MAE)
+        torch.testing.assert_close(metrics_dict["F_mae"], F_MAE)
+        torch.testing.assert_close(metrics_dict["weighted_sum"], weighted_sum)
 
     @pytest.mark.parametrize("ratio", [(1, 1, 1), (1, 1, 2), (1, 2, 3), (1, 10, 100)])
     def test_stress_and_weighted_sum(self, data, ratio):
@@ -139,10 +139,10 @@ class TestMetricsManager:
             weighted_sum = (
                 ratio[0] * E_MAE + ratio[1] * F_MAE + ratio[2] * S_MAE
             ) / sum(ratio)
-            assert torch.allclose(metrics_dict["E_mae"], E_MAE)
-            assert torch.allclose(metrics_dict["F_mae"], F_MAE)
-            assert torch.allclose(metrics_dict["stress_mae"], S_MAE)
-            assert torch.allclose(metrics_dict["weighted_sum"], weighted_sum)
+            torch.testing.assert_close(metrics_dict["E_mae"], E_MAE)
+            torch.testing.assert_close(metrics_dict["F_mae"], F_MAE)
+            torch.testing.assert_close(metrics_dict["stress_mae"], S_MAE)
+            torch.testing.assert_close(metrics_dict["weighted_sum"], weighted_sum)
 
         E_MAE = torch.mean(
             torch.abs(
@@ -184,10 +184,10 @@ class TestMetricsManager:
             ratio
         )
         metrics_dict = mm.compute()
-        assert torch.allclose(metrics_dict["E_mae"], E_MAE)
-        assert torch.allclose(metrics_dict["F_mae"], F_MAE)
-        assert torch.allclose(metrics_dict["stress_mae"], S_MAE)
-        assert torch.allclose(metrics_dict["weighted_sum"], weighted_sum)
+        torch.testing.assert_close(metrics_dict["E_mae"], E_MAE)
+        torch.testing.assert_close(metrics_dict["F_mae"], F_MAE)
+        torch.testing.assert_close(metrics_dict["stress_mae"], S_MAE)
+        torch.testing.assert_close(metrics_dict["weighted_sum"], weighted_sum)
 
     def test_per_type(self, data):
         pred, ref, pred2, ref2 = data
@@ -435,14 +435,14 @@ class TestMetricsManagerBuilders:
             )
             F_MSE = self.compute_MSE(pred, ref, AtomicDataDict.FORCE_KEY)
             weighted_sum = (ratio[0] * E_MSE + ratio[1] * F_MSE) / sum(ratio)
-            assert torch.allclose(
+            torch.testing.assert_close(
                 metrics_dict[
                     "per_atom_energy_mse" if per_atom_energy else "total_energy_mse"
                 ],
                 E_MSE,
             )
-            assert torch.allclose(metrics_dict["forces_mse"], F_MSE)
-            assert torch.allclose(metrics_dict["weighted_sum"], weighted_sum)
+            torch.testing.assert_close(metrics_dict["forces_mse"], F_MSE)
+            torch.testing.assert_close(metrics_dict["weighted_sum"], weighted_sum)
 
     @pytest.mark.parametrize("ratio1", [1])
     @pytest.mark.parametrize("ratio2", [1, 10])
@@ -495,13 +495,17 @@ class TestMetricsManagerBuilders:
                 + ratio5 * per_atom_E_RMSE
                 + ratio6 * per_atom_E_MAE
             ) / (ratio1 + ratio2 + ratio3 + ratio4 + ratio5 + ratio6)
-            assert torch.allclose(metrics_dict["total_energy_rmse"], E_RMSE)
-            assert torch.allclose(metrics_dict["forces_rmse"], F_RMSE)
-            assert torch.allclose(metrics_dict["total_energy_mae"], E_MAE)
-            assert torch.allclose(metrics_dict["forces_mae"], F_MAE)
-            assert torch.allclose(metrics_dict["per_atom_energy_rmse"], per_atom_E_RMSE)
-            assert torch.allclose(metrics_dict["per_atom_energy_mae"], per_atom_E_MAE)
-            assert torch.allclose(metrics_dict["weighted_sum"], weighted_sum)
+            torch.testing.assert_close(metrics_dict["total_energy_rmse"], E_RMSE)
+            torch.testing.assert_close(metrics_dict["forces_rmse"], F_RMSE)
+            torch.testing.assert_close(metrics_dict["total_energy_mae"], E_MAE)
+            torch.testing.assert_close(metrics_dict["forces_mae"], F_MAE)
+            torch.testing.assert_close(
+                metrics_dict["per_atom_energy_rmse"], per_atom_E_RMSE
+            )
+            torch.testing.assert_close(
+                metrics_dict["per_atom_energy_mae"], per_atom_E_MAE
+            )
+            torch.testing.assert_close(metrics_dict["weighted_sum"], weighted_sum)
 
     @pytest.mark.parametrize(
         "ratio", [(1, 1, 1), (1, 2, 3), (10, 10, 10), (1, 100, 1000), (1, 1e3, 1e5)]
@@ -535,15 +539,15 @@ class TestMetricsManagerBuilders:
                 ratio[0] * E_MSE + ratio[1] * F_MSE + ratio[2] * S_MSE
             ) / sum(ratio)
 
-            assert torch.allclose(
+            torch.testing.assert_close(
                 metrics_dict[
                     "per_atom_energy_mse" if per_atom_energy else "total_energy_mse"
                 ],
                 E_MSE,
             )
-            assert torch.allclose(metrics_dict["forces_mse"], F_MSE)
-            assert torch.allclose(metrics_dict["stress_mse"], S_MSE)
-            assert torch.allclose(metrics_dict["weighted_sum"], weighted_sum)
+            torch.testing.assert_close(metrics_dict["forces_mse"], F_MSE)
+            torch.testing.assert_close(metrics_dict["stress_mse"], S_MSE)
+            torch.testing.assert_close(metrics_dict["weighted_sum"], weighted_sum)
 
     @pytest.mark.parametrize("ratio1", [1])
     @pytest.mark.parametrize("ratio2", [1, 10])
@@ -602,15 +606,19 @@ class TestMetricsManagerBuilders:
                 + ratio7 * per_atom_E_RMSE
                 + ratio8 * per_atom_E_MAE
             ) / (ratio1 + ratio2 + ratio3 + ratio4 + ratio5 + ratio6 + ratio7 + ratio8)
-            assert torch.allclose(metrics_dict["total_energy_rmse"], E_RMSE)
-            assert torch.allclose(metrics_dict["forces_rmse"], F_RMSE)
-            assert torch.allclose(metrics_dict["stress_rmse"], S_RMSE)
-            assert torch.allclose(metrics_dict["total_energy_mae"], E_MAE)
-            assert torch.allclose(metrics_dict["forces_mae"], F_MAE)
-            assert torch.allclose(metrics_dict["stress_mae"], S_MAE)
-            assert torch.allclose(metrics_dict["per_atom_energy_rmse"], per_atom_E_RMSE)
-            assert torch.allclose(metrics_dict["per_atom_energy_mae"], per_atom_E_MAE)
-            assert torch.allclose(metrics_dict["weighted_sum"], weighted_sum)
+            torch.testing.assert_close(metrics_dict["total_energy_rmse"], E_RMSE)
+            torch.testing.assert_close(metrics_dict["forces_rmse"], F_RMSE)
+            torch.testing.assert_close(metrics_dict["stress_rmse"], S_RMSE)
+            torch.testing.assert_close(metrics_dict["total_energy_mae"], E_MAE)
+            torch.testing.assert_close(metrics_dict["forces_mae"], F_MAE)
+            torch.testing.assert_close(metrics_dict["stress_mae"], S_MAE)
+            torch.testing.assert_close(
+                metrics_dict["per_atom_energy_rmse"], per_atom_E_RMSE
+            )
+            torch.testing.assert_close(
+                metrics_dict["per_atom_energy_mae"], per_atom_E_MAE
+            )
+            torch.testing.assert_close(metrics_dict["weighted_sum"], weighted_sum)
 
     def normalize_energy(self, atomic_dict):
         new_atomic_dict = atomic_dict.copy()
@@ -671,8 +679,8 @@ class TestMetricsManagerBuilders:
             expected_name = (
                 "per_atom_energy_mse" if per_atom_energy else "total_energy_mse"
             )
-            assert torch.allclose(metrics_dict[expected_name], E_MSE)
-            assert torch.allclose(metrics_dict["weighted_sum"], E_MSE)
+            torch.testing.assert_close(metrics_dict[expected_name], E_MSE)
+            torch.testing.assert_close(metrics_dict["weighted_sum"], E_MSE)
 
             # should only have energy metric (no forces)
             assert "forces_mse" not in metrics_dict
@@ -726,11 +734,15 @@ class TestMetricsManagerBuilders:
                 + ratio4 * per_atom_E_MAE
             ) / (ratio1 + ratio2 + ratio3 + ratio4)
 
-            assert torch.allclose(metrics_dict["total_energy_rmse"], E_RMSE)
-            assert torch.allclose(metrics_dict["per_atom_energy_rmse"], per_atom_E_RMSE)
-            assert torch.allclose(metrics_dict["total_energy_mae"], E_MAE)
-            assert torch.allclose(metrics_dict["per_atom_energy_mae"], per_atom_E_MAE)
-            assert torch.allclose(metrics_dict["weighted_sum"], weighted_sum)
+            torch.testing.assert_close(metrics_dict["total_energy_rmse"], E_RMSE)
+            torch.testing.assert_close(
+                metrics_dict["per_atom_energy_rmse"], per_atom_E_RMSE
+            )
+            torch.testing.assert_close(metrics_dict["total_energy_mae"], E_MAE)
+            torch.testing.assert_close(
+                metrics_dict["per_atom_energy_mae"], per_atom_E_MAE
+            )
+            torch.testing.assert_close(metrics_dict["weighted_sum"], weighted_sum)
 
             # should only have energy metrics (no forces)
             assert "forces_rmse" not in metrics_dict
@@ -793,4 +805,4 @@ class TestMetricsManagerBuilders:
             torch.stack([energy_max_batch1, energy_max_batch2])
         )
 
-        assert torch.allclose(epoch_metrics["energy_max_ae"], overall_energy_max)
+        torch.testing.assert_close(epoch_metrics["energy_max_ae"], overall_energy_max)

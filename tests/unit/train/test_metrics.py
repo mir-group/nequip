@@ -27,7 +27,7 @@ def test_huber(reduction, delta):
         nequip_huber.update(datax, datay)
         xs.append(datax)
         ys.append(datay)
-    assert torch.allclose(
+    torch.testing.assert_close(
         nequip_huber.compute(), torch_huber(torch.cat(xs, 0), torch.cat(ys, 0))
     )
 
@@ -94,7 +94,7 @@ def test_strat_huber(reduction, delta_dict):
         stratified_losses.mean() if reduction == "mean" else stratified_losses.sum()
     )
 
-    assert torch.allclose(nequip_strat_huber.compute(), torch_huber_val)
+    torch.testing.assert_close(nequip_strat_huber.compute(), torch_huber_val)
     assert (
         nequip_min_huber.compute()
         <= nequip_strat_huber.compute()
@@ -104,7 +104,9 @@ def test_strat_huber(reduction, delta_dict):
     if EXTREMELY_LARGE_FORCE_MAGNITUDE_MASK in nequip_strat_huber.delta_dict:
         # then reduces to basically just normal Huber behaviour, large force magnitude mask in last
         # stratum isn't being applied:
-        assert torch.allclose(nequip_strat_huber.compute(), nequip_max_huber.compute())
+        torch.testing.assert_close(
+            nequip_strat_huber.compute(), nequip_max_huber.compute()
+        )
 
 
 def test_maximum_absolute_error():
@@ -119,7 +121,7 @@ def test_maximum_absolute_error():
     max_ae.update(preds, target)
 
     expected_max = torch.max(torch.abs(preds - target))  # max([0.5, 1.0, 1.0]) = 1.0
-    assert torch.allclose(max_ae.compute(), expected_max)
+    torch.testing.assert_close(max_ae.compute(), expected_max)
 
     # test multiple batches - should track the overall maximum
     preds2 = torch.tensor([0.0, 5.0])
@@ -128,7 +130,7 @@ def test_maximum_absolute_error():
 
     # overall max should now be 2.5
     expected_max = torch.tensor(2.5)
-    assert torch.allclose(max_ae.compute(), expected_max)
+    torch.testing.assert_close(max_ae.compute(), expected_max)
 
     # test reset
     max_ae.reset()
@@ -139,7 +141,7 @@ def test_maximum_absolute_error():
     target3 = torch.tensor([1.1, 2.8])  # errors: [0.1, 0.8]
     max_ae.update(preds3, target3)
     expected_max = torch.tensor(0.8)
-    assert torch.allclose(max_ae.compute(), expected_max)
+    torch.testing.assert_close(max_ae.compute(), expected_max)
 
 
 def test_maximum_absolute_error_multidimensional():
@@ -156,7 +158,7 @@ def test_maximum_absolute_error_multidimensional():
     # flatten and compute expected max absolute error
     abs_errors = torch.abs(preds - target)  # [[0.5, 1.0], [1.0, 2.0]]
     expected_max = abs_errors.max()  # 2.0
-    assert torch.allclose(max_ae.compute(), expected_max)
+    torch.testing.assert_close(max_ae.compute(), expected_max)
 
 
 def test_maximum_absolute_error_empty_tensor():
