@@ -22,7 +22,7 @@ def test_non_periodic_edge(CH3CHO):
             atoms.positions[data[AtomicDataDict.EDGE_INDEX_KEY][1, edge]]
             - atoms.positions[data[AtomicDataDict.EDGE_INDEX_KEY][0, edge]]
         )
-        assert torch.allclose(
+        torch.testing.assert_close(
             with_edge_vectors_(data)[AtomicDataDict.EDGE_VECTORS_KEY][edge],
             torch.as_tensor(real_displacement, dtype=torch.get_default_dtype()),
         )
@@ -34,8 +34,8 @@ def test_periodic_edge():
     data = compute_neighborlist_(from_ase(atoms), r_max=1.05 * dist)
     edge_vecs = with_edge_vectors_(data)[AtomicDataDict.EDGE_VECTORS_KEY]
     assert edge_vecs.shape == (12, 3)  # 12 neighbors in close-packed bulk
-    assert torch.allclose(
-        edge_vecs.norm(dim=-1), torch.as_tensor(dist, dtype=torch.get_default_dtype())
+    torch.testing.assert_close(
+        edge_vecs.norm(dim=-1), torch.full((12,), dist, dtype=torch.get_default_dtype())
     )
 
 
@@ -82,7 +82,7 @@ def test_some_periodic():
     )
     assert (neighbor_count == 6).all()  # 6 neighbors
     # Check not periodic in z
-    assert torch.allclose(
+    torch.testing.assert_close(
         with_edge_vectors_(data)[AtomicDataDict.EDGE_VECTORS_KEY][:, 2],
         torch.zeros(
             AtomicDataDict.num_edges(data),
