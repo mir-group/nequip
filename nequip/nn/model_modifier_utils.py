@@ -9,8 +9,13 @@ _MODEL_MODIFIER_PERSISTENT_ATTR_NAME: Final[str] = (
     "_nequip_model_modifier_is_persistent"
 )
 _MODEL_MODIFIER_PRIVATE_ATTR_NAME: Final[str] = "_nequip_model_modifier_is_private"
+
+# these latter two attributes (unsupported devices and supported compile modes) are meant for acceleration modifiers
 _MODEL_MODIFIER_UNSUPPORTED_DEVICES_ATTR_NAME: Final[str] = (
     "_nequip_model_modifier_unsupported_devices"
+)
+_MODEL_MODIFIER_SUPPORTED_COMPILE_MODES_ATTR_NAME: Final[str] = (
+    "_nequip_model_modifier_supported_compile_modes"
 )
 
 
@@ -18,6 +23,7 @@ def model_modifier(
     persistent: bool,
     private: Optional[bool] = None,
     unsupported_devices: List[str] = [],
+    supported_compile_modes: Optional[List[str]] = None,
 ):
     """
     Mark a ``@classmethod`` of an ``nn.Module`` as a "model modifier" that can be applied by the user to modify a packaged or other loaded model on-the-fly. Model modifiers must be a ``@classmethod`` of one of the ``nn.Module`` objects in the model.
@@ -26,6 +32,7 @@ def model_modifier(
         persistent (bool): Whether the modifier should be applied when building the model for packaging.
         private (bool, optional): Whether the modifier is private and should not be exposed in public interfaces. Defaults to None.
         unsupported_devices (List[str], optional): List of device types that this modifier does not support. Defaults to [].
+        supported_compile_modes (List[str], optional): List of compile modes that this modifier supports. Defaults to None.
     """
 
     def decorator(func):
@@ -43,6 +50,12 @@ def model_modifier(
             func.__func__,
             _MODEL_MODIFIER_UNSUPPORTED_DEVICES_ATTR_NAME,
             unsupported_devices,
+        )
+
+        setattr(
+            func.__func__,
+            _MODEL_MODIFIER_SUPPORTED_COMPILE_MODES_ATTR_NAME,
+            supported_compile_modes,
         )
 
         return func
@@ -69,6 +82,11 @@ def is_private_model_modifier(func: callable) -> Optional[bool]:
 def get_model_modifier_unsupported_devices(func: callable) -> List[str]:
     """Get the list of unsupported devices for a model modifier. Returns empty list for backwards compatibility."""
     return getattr(func, _MODEL_MODIFIER_UNSUPPORTED_DEVICES_ATTR_NAME, [])
+
+
+def get_model_modifier_supported_compile_modes(func: callable) -> Optional[List[str]]:
+    """Get the list of supported compile modes for a model modifier. Returns None if not set."""
+    return getattr(func, _MODEL_MODIFIER_SUPPORTED_COMPILE_MODES_ATTR_NAME, None)
 
 
 def replace_submodules(
