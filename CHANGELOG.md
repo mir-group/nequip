@@ -8,10 +8,16 @@ Most recent change on the top.
 
 ## Unreleased
 
-## [0.14.0]
-
 ### Added
 - Possible to now use `ChainedScheduler` and `SequentialLR` for LR scheduling
+
+### Changed
+- Loosen LAMMPS ML-IAP constraints of using absolute paths and ensuring that original checkpoint or package file present in the same exact location during ML-IAP runtime
+
+### Fixed
+- OpenEquivariance accelerated compiled training with PyTorch 2.8 
+
+## [0.14.0]
 
 ### Added
 - CuEquivariance acceleration for NequIP GNN models
