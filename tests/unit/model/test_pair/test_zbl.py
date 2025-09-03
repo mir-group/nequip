@@ -73,7 +73,7 @@ class TestZBLModel(BaseEnergyModelTests):
                 atoms.set_atomic_numbers([int(Zi), int(Zj)])
                 # ZBL blows up for atoms being close, so the numerics differ to ours
                 # 1e-5 == 0.01 meV / Å
-                assert np.allclose(atoms.get_forces()[0, 0], fxi, atol=1e-5)
-                assert np.allclose(atoms.get_forces()[1, 0], fxj, atol=1e-5)
+                np.testing.assert_allclose(atoms.get_forces()[0, 0], fxi, atol=1e-5)
+                np.testing.assert_allclose(atoms.get_forces()[1, 0], fxj, atol=1e-5)
                 # 1e-4 == 0.1 meV system, 0.05 meV / atom
-                assert np.allclose(atoms.get_potential_energy(), pe, atol=1e-4)
+                np.testing.assert_allclose(atoms.get_potential_energy(), pe, atol=1e-4)
