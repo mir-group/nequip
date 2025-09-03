@@ -13,7 +13,10 @@ from nequip.model.utils import (
     _COMPILE_MODE_OPTIONS,
     _EAGER_MODEL_KEY,
 )
-from nequip.nn.model_modifier_utils import is_persistent_model_modifier
+from nequip.nn.model_modifier_utils import (
+    is_persistent_model_modifier,
+    is_private_model_modifier,
+)
 from nequip.model.modify_utils import get_all_modifiers, only_apply_persistent_modifiers
 from nequip.utils.logger import RankedLogger
 from nequip.utils.versions import get_current_code_versions, _TORCH_GE_2_6
@@ -119,6 +122,7 @@ def main(args=None):
                         ).strip(),
                     }
                     for name, modifier in get_all_modifiers(model).items()
+                    if not is_private_model_modifier(modifier)
                 ]
 
             # Print output

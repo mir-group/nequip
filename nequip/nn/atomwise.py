@@ -283,7 +283,7 @@ class PerTypeScaleShift(GraphModuleMixin, torch.nn.Module):
         data[self.out_field] = in_field
         return data
 
-    @model_modifier(persistent=True)
+    @model_modifier(persistent=True, private=False)
     @classmethod
     def modify_PerTypeScaleShift(
         cls,

@@ -40,7 +40,7 @@ class NoOpGhostExchangeModule(GhostExchangeModule):
     ) -> AtomicDataDict.Type:
         return data
 
-    @model_modifier(persistent=True)
+    @model_modifier(persistent=True, private=True)
     @classmethod
     def enable_LAMMPSMLIAPGhostExchange(cls, model):
         """Enable LAMMPS ML-IAP ghost exchange for inference in LAMMPS ML-IAP."""
