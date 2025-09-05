@@ -33,6 +33,12 @@
 
   **A**: Read our [Distributed Data Parallel training docs](../accelerations/ddp_training.md).
 
+## AMD GPU Compatibility
+
+  **Q**: Does the NequIP framework support AMD GPUs?
+
+  **A**: The NequIP framework is compatible with AMD GPUs. However, certain acceleration features, including [CuEquivariance](../accelerations/cuequivariance.md), require NVIDIA GPUs. When specifying device parameters, use `cuda` as the device identifier for both NVIDIA and AMD GPUs.
+
 ## Energy-Only Training
 
   **Q**: How do I train on datasets that only contain energies (no forces)?
