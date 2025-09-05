@@ -82,7 +82,8 @@ def _training_session(
                 config["hydra"] = {"run": {"dir": tmpdir}}
                 # mitigate nondeterminism for tests
                 config.trainer["num_sanity_val_steps"] = 0
-                config.trainer["deterministic"] = True
+                config.trainer["deterministic"] = "warn"
+                # ^ warn so that we can use nondeterministic kernels, e.g. from OpenEquivariance
 
             config = OmegaConf.create(config)
             config_path = tmpdir + "/conf.yaml"
