@@ -1,20 +1,36 @@
 # ASE
 
 ## Introduction
-The [Atomic Simulation Environment (ASE)](https://wiki.fysik.dtu.dk/ase/) is a popular Python package providing a framework for working with atomic data, reading and writing common formats, and running various simulations and calculations.
-
-The `nequip` package provides seamless integration of NequIP models with the standard ASE interface through an [ASE Calculator](https://wiki.fysik.dtu.dk/ase/ase/calculators/calculators.html). The {class}`~nequip.ase.NequIPCalculator` can be constructed from a model [compiled](../guide/getting-started/workflow.md#compilation) with `nequip-compile` as detailed in the [ASE calculator API](../api/ase.rst).
+The [Atomic Simulation Environment (ASE)](https://wiki.fysik.dtu.dk/ase/) is a popular Python package providing a framework for working with atomic data, reading and writing common formats, and running various simulations and calculations. 
+INequIP provides the {class}`~nequip.ase.NequIPCalculator` for integration with ASE. See the [ASE calculator API](../api/ase.rst) for detailed documentation.
 
 ## Creating an ASE Calculator
 
-The following code block shows how to build an ASE {class}`~nequip.ase.NequIPCalculator` from a compiled model file.
+To use a NequIP framework model with ASE, you need to follow these steps:
+
+1. **Start with a trained model**: You can begin with either a [checkpoint file](../guide/getting-started/files.md#checkpoint-files) (`.ckpt`) from training or a [packaged model file](../guide/getting-started/files.md#package-files) (`.nequip.zip`). See the [file types documentation](../guide/getting-started/files.md) for more details about these formats.
+
+2. **Compile the model for ASE**: Use `nequip-compile` with the `--target ase` flag to create a compiled model suitable for ASE integration:
+
+   ```bash
+   nequip-compile \
+     path/to/model.ckpt \
+     path/to/compiled_model.nequip.pt2 \
+     --device cuda \  # or "cpu"
+     --mode aotinductor \
+     --target ase
+   ```
+
+   The device specified during compilation should match the device you'll use with the calculator. For more details about compilation options and requirements, see the [compilation workflow documentation](../guide/getting-started/workflow.md#compilation).
+
+3. **Create the ASE calculator**: Build an ASE {class}`~nequip.ase.NequIPCalculator` from the compiled model file:
 
 ```python
 from nequip.ase import NequIPCalculator
 
 calculator = NequIPCalculator.from_compiled_model(
     compile_path="path/to/compiled_model.nequip.pt2",
-    device="cpu",  # "cuda" for GPUs, etc
+    device="cuda",  # or "cpu"
 )
 ```
 
@@ -28,7 +44,7 @@ from nequip.ase import NequIPCalculator
 
 calculator = NequIPCalculator.from_compiled_model(
     compile_path="path/to/compiled_model.nequip.pt2",
-    device="cpu",  # "cuda", etc.
+    device="cuda",  # or "cpu"
     chemical_symbols={"H": "myHydrogen", "C": "someCarbonType"}
 )
 ```
