@@ -2,7 +2,7 @@
 
 """Custom OmegaConf resolvers for nequip."""
 
-from omegaconf import OmegaConf
+from omegaconf import OmegaConf, ListConfig
 from typing import Dict, Callable, Set, Any
 
 from nequip.utils import get_project_root
@@ -44,6 +44,19 @@ def float_to_str(x: float, fmt: str = ".1f") -> str:
     return format(x, fmt)
 
 
+def concat_lists(list1, list2):
+    """Concatenate two lists."""
+    if not isinstance(list1, (list, tuple, ListConfig)):
+        raise ValueError(
+            f"First argument must be a list, tuple, or ListConfig, got {type(list1)}"
+        )
+    if not isinstance(list2, (list, tuple, ListConfig)):
+        raise ValueError(
+            f"Second argument must be a list, tuple, or ListConfig, got {type(list2)}"
+        )
+    return list1 + list2
+
+
 def big_dataset_stats(name: str, cutoff_radius: float) -> Dict[str, Any]:
     """Get precomputed dataset statistics for large datasets."""
     root = get_project_root()
@@ -75,6 +88,7 @@ def big_dataset_stats(name: str, cutoff_radius: float) -> Dict[str, Any]:
 _DEFAULT_RESOLVERS: Dict[str, Callable] = {
     "int_div": int_div,
     "int_mul": int_mul,
+    "concat_lists": concat_lists,
     "big_dataset_stats": big_dataset_stats,
 }
 
