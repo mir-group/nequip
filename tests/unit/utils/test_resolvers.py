@@ -88,3 +88,85 @@ def test_big_dataset_stats_resolver(cutoff, dataset):
     assert len(shifts) == expected_len
     assert len(scales) == expected_len
     assert len(pt_nn) == expected_len
+
+
+def test_concat_lists_resolver():
+    """Tests `nequip.utils.resolvers.concat_lists` resolver."""
+    # test basic concatenation
+    cfg = OmegaConf.create(
+        {
+            "list1": [1, 2, 3],
+            "list2": [4, 5, 6],
+            "concatenated": "${concat_lists:${list1},${list2}}",
+        }
+    )
+
+    result = cfg.concatenated
+    assert result == [1, 2, 3, 4, 5, 6]
+
+    # test with strings
+    cfg_strings = OmegaConf.create(
+        {
+            "list1": ["a", "b"],
+            "list2": ["c", "d"],
+            "concatenated": "${concat_lists:${list1},${list2}}",
+        }
+    )
+
+    result_strings = cfg_strings.concatenated
+    assert result_strings == ["a", "b", "c", "d"]
+
+    # test with mixed types
+    cfg_mixed = OmegaConf.create(
+        {
+            "list1": [1, "a"],
+            "list2": [2.5, True],
+            "concatenated": "${concat_lists:${list1},${list2}}",
+        }
+    )
+
+    result_mixed = cfg_mixed.concatenated
+    assert result_mixed == [1, "a", 2.5, True]
+
+    # test with empty lists
+    cfg_empty = OmegaConf.create(
+        {
+            "list1": [],
+            "list2": [1, 2],
+            "concatenated": "${concat_lists:${list1},${list2}}",
+        }
+    )
+
+    result_empty = cfg_empty.concatenated
+    assert result_empty == [1, 2]
+
+
+def test_concat_lists_resolver_errors():
+    """Tests error cases for `nequip.utils.resolvers.concat_lists` resolver."""
+    # test with non-list first argument
+    cfg = OmegaConf.create(
+        {
+            "not_list": "string",
+            "list2": [1, 2],
+            "concatenated": "${concat_lists:${not_list},${list2}}",
+        }
+    )
+
+    with pytest.raises(
+        ValueError, match="First argument must be a list, tuple, or ListConfig"
+    ):
+        _ = cfg.concatenated
+
+    # test with non-list second argument
+    cfg2 = OmegaConf.create(
+        {
+            "list1": [1, 2],
+            "not_list": 42,
+            "concatenated": "${concat_lists:${list1},${not_list}}",
+        }
+    )
+
+    with pytest.raises(
+        ValueError, match="Second argument must be a list, tuple, or ListConfig"
+    ):
+        _ = cfg2.concatenated
