@@ -34,7 +34,6 @@ def from_ase(
         include_keys (Optional[List]): list of additional keys to include in AtomicData aside from the ones defined in ``ase.calculators.calculator.all_properties``
         exclude_keys (Optional[List]): list of keys that may be present in the ``ase.Atoms`` object but the user wishes to exclude
     """
-    from nequip.ase import NequIPCalculator
 
     default_args = set(
         [
@@ -82,12 +81,9 @@ def from_ase(
                     if k in include_keys
                 }
             )
-        elif isinstance(atoms.calc, NequIPCalculator):
-            pass  # otherwise the calculator breaks
-        else:
-            raise NotImplementedError(
-                f"`from_ase` does not support calculator {atoms.calc}"
-            )
+        # we just ignore the calculator otherwise
+        # this may not work if we need to load more complex information from some unknown calculator
+        # but we can fix it if/when that happens, which is hopefully never
 
     # handle ase-specific formats for single frame (no batching yet)
     for key, value in add_fields.items():
