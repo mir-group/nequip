@@ -8,15 +8,19 @@ Most recent change on the top.
 
 ## Unreleased
 
+## [0.15.0]
+
 ### Added
 - Possible to now use `ChainedScheduler` and `SequentialLR` for LR scheduling
+- Auto-download capabilities for pretrained potentials from [nequip.net](https://www.nequip.net/)
 
 ### Changed
-- Loosen LAMMPS ML-IAP constraints of using absolute paths and ensuring that original checkpoint or package file present in the same exact location during ML-IAP runtime
+- Loosen LAMMPS ML-IAP constraints of using absolute paths and ensuring that the original checkpoint or package file is present in the same exact location during ML-IAP runtime
 
 ### Fixed
 - OpenEquivariance accelerated compiled training with PyTorch 2.8
 - `NequIPCalculator` usage restrictions are loosened, e.g. when mixing ASE calculators
+
 
 ## [0.14.0]
 
