@@ -1,5 +1,9 @@
 # CuEquivariance Acceleration
 
+```{warning}
+The NequIP CuEquivariance acceleration is still under development.
+```
+
 [CuEquivariance](https://github.com/NVIDIA/cuEquivariance), developed by NVIDIA, provides GPU-accelerated tensor product operations for equivariant neural networks.
 This integration accelerates NequIP models during inference, with training support currently a work in progress.
 
