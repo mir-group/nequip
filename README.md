@@ -50,13 +50,7 @@ The following are some notable features, with quick links for more details:
 The NequIP software framework is designed to be flexible and extensible: you can build custom architectures, implement new training techniques, and develop additional methods on top of it through extension packages.
 If you're interested in developing your own extension package, please refer to the [extension package docs](https://nequip.readthedocs.io/en/latest/dev/extension_packages.html) and consider [joining our Zulip](https://forms.gle/mEuonVCHdsgTtLXy7) for developer-focused discussions and collaborations.
 
-Notable examples of NequIP framework extension packages include
-
-- **Allegro** ([GitHub](https://github.com/mir-group/allegro), [Docs](https://nequip.readthedocs.io/projects/allegro/en/latest/?badge=latest), [Paper](https://www.nature.com/articles/s41467-023-36329-y)):  
-  Strictly local equivariant models with excellent scalability for multirank molecular dynamics simulations.
-- **NequIP-LES** ([GitHub](https://github.com/ChengUCB/NequIP-LES), [Paper](https://arxiv.org/abs/2507.14302)):  
-  An extension of NequIP and Allegro that adds long-range electrostatics via the Latent Ewald Summation (LES) algorithm.
-
+A notable example of a NequIP framework extension package is the [`allegro`](https://github.com/mir-group/allegro) package that implements the strictly local equivariant interatomic potential architecture, [Allegro](https://www.nature.com/articles/s41467-023-36329-y). More extension packages can be found at https://www.nequip.net/extensions.
 
 ## References & citing
 
