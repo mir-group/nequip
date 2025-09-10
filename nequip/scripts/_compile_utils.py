@@ -14,6 +14,11 @@ PAIR_NEQUIP_INPUTS = [
     AtomicDataDict.EDGE_CELL_SHIFT_KEY,
 ]
 
+BATCH_INPUTS = PAIR_NEQUIP_INPUTS + [
+    AtomicDataDict.BATCH_KEY,
+    AtomicDataDict.NUM_NODES_KEY,
+]
+
 LMP_OUTPUTS = [
     AtomicDataDict.PER_ATOM_ENERGY_KEY,
     AtomicDataDict.FORCE_KEY,
@@ -48,6 +53,14 @@ def single_frame_data_settings(data):
     return data
 
 
+def batched_data_settings(data):
+    assert AtomicDataDict.BATCH_KEY in data
+    assert AtomicDataDict.NUM_NODES_KEY in data
+    # just make a batch of 2 frames to avoid 0/1 specialization problem later on
+    data = AtomicDataDict.batched_from_list([data, data])
+    return data
+
+
 PAIR_NEQUIP_TARGET = {
     "input": PAIR_NEQUIP_INPUTS,
     "output": LMP_OUTPUTS,
@@ -60,11 +73,17 @@ ASE_TARGET = {
     "batch_map_settings": single_frame_batch_map_settings,
     "data_settings": single_frame_data_settings,
 }
-
+BATCH_TARGET = {
+    "input": BATCH_INPUTS,
+    "output": ASE_OUTPUTS,
+    "batch_map_settings": lambda batch_map: batch_map,  # no static shapes
+    "data_settings": batched_data_settings,
+}
 
 COMPILE_TARGET_DICT = {
     "pair_nequip": PAIR_NEQUIP_TARGET,
     "ase": ASE_TARGET,
+    "batch": BATCH_TARGET,
 }
 
 
