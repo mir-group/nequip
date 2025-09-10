@@ -15,7 +15,7 @@ class AtomicDataset(torch.utils.data.Dataset):
 
     Subclasses must implement:
         - ``__len__()`` - Return the total number of data samples
-        - ``get_data_list(indices)`` - Return raw data for the given indices
+        - ``_get_data_list(indices)`` - Return raw data for the given indices
 
     Alternatively, subclasses may directly override ``__getitem__`` and ``__getitems__``
     for custom indexing behavior.
@@ -51,7 +51,7 @@ class AtomicDataset(torch.utils.data.Dataset):
         self,
         indices: Union[List[int], torch.Tensor, np.ndarray, slice],
     ) -> List[AtomicDataDict.Type]:
-        data_list: List[AtomicDataDict.Type] = self.get_data_list(indices)
+        data_list: List[AtomicDataDict.Type] = self._get_data_list(indices)
         return [self._transform(data) for data in data_list]
 
     def _transform(self, x: AtomicDataDict.Type) -> AtomicDataDict.Type:
@@ -67,14 +67,14 @@ class AtomicDataset(torch.utils.data.Dataset):
         """
         Subclasses may override this.
         """
-        # NOTE: get_data_list does _not_ call the transforms
-        data_list = self.get_data_list(indices)
+        # NOTE: _get_data_list does _not_ call the transforms
+        data_list = self._get_data_list(indices)
         return [AtomicDataDict.num_nodes(data) for data in data_list]
 
-    def get_data_list(
+    def _get_data_list(
         self,
         indices: Union[List[int], torch.Tensor, np.ndarray, slice],
     ) -> List[AtomicDataDict.Type]:
         raise NotImplementedError(
-            "Subclasses of AtomicDataset should define get_data_list"
+            "Subclasses of AtomicDataset should define _get_data_list"
         )

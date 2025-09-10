@@ -61,7 +61,7 @@ def test_save_load_and_metadata(tmp_path):
     with pytest.raises(IndexError):
         _ = ds[n]
     with pytest.raises(IndexError):
-        ds.get_data_list([n])
+        ds._get_data_list([n])
 
 
 # To ensure old LMDB files without metadata still work

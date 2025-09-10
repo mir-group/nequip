@@ -55,7 +55,7 @@ class ASEDataset(AtomicDataset):
     def __len__(self) -> int:
         return len(self.data_list)
 
-    def get_data_list(
+    def _get_data_list(
         self,
         indices: Union[List[int], torch.Tensor, slice],
     ) -> List[AtomicDataDict.Type]:

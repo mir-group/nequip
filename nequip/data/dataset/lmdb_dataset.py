@@ -114,7 +114,7 @@ class NequIPLMDBDataset(AtomicDataset):
     def __len__(self):
         return self._length
 
-    def get_data_list(
+    def _get_data_list(
         self,
         indices: Union[List[int], torch.Tensor, slice],
     ) -> List[AtomicDataDict.Type]:

@@ -78,7 +78,7 @@ class HDF5Dataset(AtomicDataset):
     def __len__(self) -> int:
         return self.num_frames
 
-    def get_data_list(
+    def _get_data_list(
         self,
         indices: Union[List[int], torch.Tensor, slice],
     ) -> List[AtomicDataDict.Type]:
