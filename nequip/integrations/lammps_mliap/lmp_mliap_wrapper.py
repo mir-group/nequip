@@ -129,11 +129,17 @@ class NequIPLAMMPSMLIAPWrapper(MLIAPUnified):
         )
         model = prepare_model_for_compile(model, self.device)
 
-        # make the model an energy model so that we can rely on AOT Autograd for inference
-        # model is `GraphModel(StressForceOutput(EnergyModel))`
-        # we have to do it this way since `torch.compile` can't handle `x.requires_grad_(True)`
+        # make sure that derivative computation for forces, stresses is disabled
+        # such that the model is an energy model so that we can rely on AOT Autograd for inference
+        # since `torch.compile` can't handle `x.requires_grad_(True)`
         # we avoid using the `CompileGraphModel` because of potential batch dim issues, potential make_fx issues with the ghost exchange module, and because it was written specifically for train-time compile
-        model.model = model.model.func
+        if "disable_ForceStressOutput" in available_modifiers:
+            model = modify(model, [{"modifier": "disable_ForceStressOutput"}])
+        else:
+            # very bad hack, but left for backwards compatibility
+            # TODO: remove in the future as a breaking change
+            # assumes model is `GraphModel(StressForceOutput(EnergyModel))`
+            model.model = model.model.func
 
         if self.compile:
             # NOTE: it seems that we have to set `freezing` this way for constant folding
