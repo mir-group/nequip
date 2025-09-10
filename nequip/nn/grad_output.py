@@ -7,6 +7,7 @@ from e3nn.util.jit import compile_mode
 
 from nequip.data import AtomicDataDict
 from ._graph_mixin import GraphModuleMixin
+from .model_modifier_utils import model_modifier, replace_submodules
 
 
 @compile_mode("unsupported")
@@ -83,9 +84,12 @@ class ForceStressOutput(GraphModuleMixin, torch.nn.Module):
         func: the energy model to wrap
     """
 
-    def __init__(self, func: GraphModuleMixin):
+    do_derivatives: bool
+
+    def __init__(self, func: GraphModuleMixin, do_derivatives: bool = True):
         super().__init__()
         self.func = func
+        self.do_derivatives = do_derivatives
 
         # check and init irreps
         self._init_irreps(
@@ -101,6 +105,10 @@ class ForceStressOutput(GraphModuleMixin, torch.nn.Module):
         self.register_buffer("_empty", torch.Tensor())
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
+        # short-circuit
+        if not self.do_derivatives:
+            return self.func(data)
+
         # === LOGIC BRANCHING NOTES ===
         # if edge vectors not present, we assume that positions are present
         # and proceed with the usual procedure to compute forces, virials, stress
@@ -282,3 +290,25 @@ class ForceStressOutput(GraphModuleMixin, torch.nn.Module):
             data[AtomicDataDict.EDGE_FORCE_KEY] = edge_forces
 
         return data
+
+    @model_modifier(persistent=True, private=False)
+    @classmethod
+    def enable_ForceStressOutput(cls, model):
+        """Enable force and stress computation."""
+
+        def factory(old):
+            new = cls(func=old.func, do_derivatives=True)
+            return new
+
+        return replace_submodules(model, cls, factory)
+
+    @model_modifier(persistent=True, private=False)
+    @classmethod
+    def disable_ForceStressOutput(cls, model):
+        """Disable force and stress computation."""
+
+        def factory(old):
+            new = cls(func=old.func, do_derivatives=False)
+            return new
+
+        return replace_submodules(model, cls, factory)
