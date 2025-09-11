@@ -37,7 +37,7 @@ def load_aotinductor_model(
 
     # check device compatibility
     compile_device = metadata["AOTI_DEVICE_KEY"]
-    if compile_device != device:
+    if torch.device(compile_device) != torch.device(device):
         raise RuntimeError(
             f"`{compile_path}` was compiled for `{compile_device}` and won't work with device={device}, use device={compile_device} instead."
         )
