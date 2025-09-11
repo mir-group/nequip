@@ -25,7 +25,7 @@ from nequip.nn.embedding import (
 from .utils import model_builder
 from hydra.utils import instantiate
 import warnings
-from typing import Sequence, Optional, Dict, Union, Callable
+from typing import Sequence, Optional, List, Dict, Union, Callable
 
 
 def _nequip_gnn_docstring(header: str) -> str:
@@ -41,7 +41,7 @@ def _nequip_gnn_docstring(header: str) -> str:
         num_layers (int): number of interaction blocks, we find 3-5 to work best (default ``4``)
         l_max (int): the maximum rotation order for the network's features, ``1`` is a good default, ``2`` is more accurate but slower (default ``1``)
         parity (bool): whether to include features with odd mirror parity -- often turning parity off gives equally good results but faster networks, so it's worth testing (default ``True``)
-        num_features (int): multiplicity of the features, smaller is faster (default ``32``)
+        num_features (int/List[int]): multiplicity of the features, smaller is faster (default ``32``); it is also possible to provide the multiplicity for each irrep, e.g. for ``l_max=2`` and ``parity=False``, ``num_features=[5, 2, 7]`` refers to ``5x0e``, ``2x1o`` and ``7x2e`` features
         radial_mlp_depth (int): number of radial layers, usually 1-3 works best, smaller is faster (default ``2``)
         radial_mlp_width (int): number of hidden neurons in radial function, smaller is faster (default ``64``)
         num_bessels (int): number of Bessel basis functions (default ``8``)
@@ -61,7 +61,7 @@ def NequIPGNNEnergyModel(
     num_layers: int = 4,
     l_max: int = 1,
     parity: bool = True,
-    num_features: int = 32,
+    num_features: Union[int, List[int]] = 32,
     radial_mlp_depth: int = 2,
     radial_mlp_width: int = 64,
     **kwargs,
@@ -76,12 +76,19 @@ def NequIPGNNEnergyModel(
         o3.Irreps.spherical_harmonics(lmax=l_max, p=-1 if parity else 1)
     )
 
+    # === handle `num_features` ===
+    if isinstance(num_features, int):
+        num_features = [num_features] * (l_max + 1)
+    assert len(num_features) == l_max + 1, (
+        f"`num_features` should be of length `l_max + 1` ({l_max + 1}), but found `num_features={num_features}` with {len(num_features)} entries."
+    )
+
     # === convnet ===
     # convert a single set of parameters uniformly for every layer
     feature_irreps_hidden = repr(
         o3.Irreps(
             [
-                (num_features, (l, p))
+                (num_features[l], (l, p))
                 for p in ((1, -1) if parity else (1,))
                 for l in range(l_max + 1)
             ]
@@ -92,12 +99,12 @@ def NequIPGNNEnergyModel(
     radial_mlp_width_list = [radial_mlp_width] * num_layers
 
     # === post convnets ===
-    feature_irreps_hidden_list += [repr(o3.Irreps([(num_features, (0, 1))]))]
+    feature_irreps_hidden_list += [repr(o3.Irreps([(num_features[0], (0, 1))]))]
 
     # === build model ===
     model = FullNequIPGNNEnergyModel(
         irreps_edge_sh=irreps_edge_sh,
-        type_embed_num_features=num_features,
+        type_embed_num_features=num_features[0],
         feature_irreps_hidden=feature_irreps_hidden_list,
         radial_mlp_depth=radial_mlp_depth_list,
         radial_mlp_width=radial_mlp_width_list,
