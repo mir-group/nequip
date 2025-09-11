@@ -8,6 +8,11 @@ Most recent change on the top.
 
 ## Unreleased
 
+
+### Added
+- Users can specify having irreps of different multiplicites in `NequIPGNNEnergyModel` by providing `num_features` that is a list of `l_max + 1` features. E.g. for `l_max=2` and `parity=False`, `num_features=[5, 2, 7]` refers to `5x0e`, `2x1o` and `7x2e` features (see `configs/tutorial.yaml` for an example)
+
+
 ## [0.15.0]
 
 ### Added
