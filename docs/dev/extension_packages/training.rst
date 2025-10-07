@@ -22,5 +22,5 @@ Examples include :class:`~nequip.train.EMALightningModule` (exponential moving a
 When composing multiple LightningModule subclasses, follow these rules to avoid the "deadly diamond of death" multiple inheritance pattern:
 
 - Use unique, distinguishable names for class attributes to prevent overwrites during inheritance
-- Be very careful of inheritance order when creating "diamond" subclasses 
+- Be very careful of inheritance order when creating "diamond" subclasses
 - Use assertions to verify the composed module behaves as intended

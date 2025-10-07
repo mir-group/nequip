@@ -1,7 +1,7 @@
 # ASE
 
 ## Introduction
-The [Atomic Simulation Environment (ASE)](https://wiki.fysik.dtu.dk/ase/) is a popular Python package providing a framework for working with atomic data, reading and writing common formats, and running various simulations and calculations. 
+The [Atomic Simulation Environment (ASE)](https://wiki.fysik.dtu.dk/ase/) is a popular Python package providing a framework for working with atomic data, reading and writing common formats, and running various simulations and calculations.
 INequIP provides the {class}`~nequip.ase.NequIPCalculator` for integration with ASE. See the [ASE calculator API](../api/ase.rst) for detailed documentation.
 
 ## Creating an ASE Calculator
@@ -67,9 +67,9 @@ import torch
 
 # Initialize the nequip calculator
 calculator = NequIPCalculator.from_compiled_model(
-    compile_path="path/to/compiled_model.nequip.pt2", 
-    chemical_symbols=["Si"], 
-    device="cuda" if torch.cuda.is_available() else "cpu",  
+    compile_path="path/to/compiled_model.nequip.pt2",
+    chemical_symbols=["Si"],
+    device="cuda" if torch.cuda.is_available() else "cpu",
 )  # use GPUs if available
 
 # Range of scaling factors for lattice constant
@@ -132,7 +132,7 @@ force_max = 0.05  # run until the forces are smaller than this in eV/A
 
 # Initialize Nequip ASE Calculator from checkpoint
 calculator = NequIPCalculator.from_compiled_model(
-    compile_path=compile_path, 
+    compile_path=compile_path,
     device="cuda" if torch.cuda.is_available() else "cpu",
 )  # use GPUs if available
 

@@ -70,7 +70,7 @@ The full set of options are found in the documentation of the [underlying object
 `training_module` defines the {class}`~nequip.train.NequIPLightningModule` (or its subclasses). Users are directed to the [`nequip.train.NequIPLightningModule` API documentation](../../api/lightning_module.rst) to learn how to configure it. Usually the {class}`~nequip.train.EMALightningModule` is the right choice.
 
 The following important objects are configured as part of the `training_module`:
- 
+
  ### `model`
   This section configures the model itself, including hyperparameters and the choice of architecture (for example, the NequIP message-passing E(3)-equivariant GNN, or the Allegro architecture). Refer to the [model documentation page](../../api/model.rst) to learn how to configure this section.
 
@@ -79,7 +79,7 @@ The following important objects are configured as part of the `training_module`:
 
  ### `optimizer` and `lr_scheduler`
 
-  The `optimizer` can be any PyTorch-compatible optimizer. Options from PyTorch can be found in {mod}`torch.optim`. The {class}`~torch.optim.Adam` optimizer, for example, can be configured as follows: 
+  The `optimizer` can be any PyTorch-compatible optimizer. Options from PyTorch can be found in {mod}`torch.optim`. The {class}`~torch.optim.Adam` optimizer, for example, can be configured as follows:
 ```yaml
 optimizer:
   _target_: torch.optim.Adam
@@ -99,4 +99,3 @@ lr_scheduler:
   frequency: 1
 ```
   The `scheduler` is a PyTorch-compatible learning rate scheduler. Options from PyTorch can be found in {mod}`torch.optim.lr_scheduler`.
-

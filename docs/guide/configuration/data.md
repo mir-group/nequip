@@ -10,7 +10,7 @@ The data processing in NequIP follows this pipeline from raw files to model-read
 ```
 
 This entire pipeline is coordinated and managed by a {class}`~nequip.data.datamodule.NequIPDataModule` object, which also:
-- Manages train/val/test dataset splits  
+- Manages train/val/test dataset splits
 - Computes dataset statistics
 
 **Key Components:**

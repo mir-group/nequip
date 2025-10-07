@@ -1,15 +1,30 @@
 exclude: '.git|.tox'
-default_stages: [commit]
+default_stages: [pre-commit]
 fail_fast: true
 
-repos:
-  - repo: https://github.com/psf/black
-    rev: 24.4.2
-    hooks:
-      - id: black
+ci:
+  autoupdate_schedule: quarterly
 
-  - repo: https://github.com/pycqa/flake8
-    rev: 7.1.0
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.12.2
     hooks:
-      - id: flake8
-        additional_dependencies: [Flake8-pyproject]
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.37.1
+    hooks:
+      - id: yamllint
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-case-conflict
+      - id: check-symlinks
+      - id: check-yaml
+      - id: destroyed-symlinks
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+      - id: trailing-whitespace

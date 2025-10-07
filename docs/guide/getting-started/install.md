@@ -21,7 +21,7 @@ After installing `torch`, NequIP can be installed in the following ways.
     ```bash
     git clone --depth 1 https://github.com/mir-group/nequip.git
     cd nequip
-    pip install . 
+    pip install .
     ```
 
 3. from source, using the latest `develop` branch
@@ -29,7 +29,7 @@ After installing `torch`, NequIP can be installed in the following ways.
     git clone https://github.com/mir-group/nequip.git
     cd nequip
     git checkout develop
-    pip install . 
+    pip install .
     ```
 
 If you want to track your training runs with third-party services, like Weights and Biases, that are supported by [PyTorch Lightning's loggers](https://lightning.ai/docs/pytorch/stable/extensions/logging.html), you may need to install extra packages. For example, one needs to `pip install wandb` to use Lightning's {class}`~lightning.pytorch.loggers.WandbLogger`.

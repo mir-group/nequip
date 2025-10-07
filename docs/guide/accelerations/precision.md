@@ -38,7 +38,7 @@ callbacks:
 callbacks:
   - _target_: nequip.train.callbacks.TF32Scheduler
     schedule:
-      0: true      # Enable TF32 for faster early training  
+      0: true      # Enable TF32 for faster early training
       100: false   # Disable TF32 at epoch 100 for precise convergence
 ```
 
