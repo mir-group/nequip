@@ -1,7 +1,7 @@
 # Contributing to NequIP
 
 ```{note}
-If you want to make a major change, add a new feature, or have any uncertainty about where the change should go or how it should be designed, please reach out to discuss with us first. Details on contacting the development team can be found in `README.md`. 
+If you want to make a major change, add a new feature, or have any uncertainty about where the change should go or how it should be designed, please reach out to discuss with us first. Details on contacting the development team can be found in `README.md`.
 ```
 
 ## Design Philosophy
@@ -60,7 +60,7 @@ ruff format --check .
 ```
 
 The formatter can be easily set up to run automatically on file save in various editors.
-  
+
 You can also use ``pre-commit install`` to install a [pre-commit](https://pre-commit.com/) hook.
 
 ```{tip}

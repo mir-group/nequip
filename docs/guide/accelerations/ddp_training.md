@@ -6,7 +6,7 @@ There are two ways to set up multi-rank distributed data parallel (DDP) training
 
 If train-time compilation is not used, you can use PyTorch Lightning's {class}`~lightning.pytorch.strategies.DDPStrategy`.
 
-See [Lightning's docs](https://lightning.ai/docs/pytorch/stable/accelerators/gpu_intermediate.html#distributed-data-parallel) for how to set it up through Lightning's {class}`~lightning.pytorch.trainer.trainer.Trainer`. 
+See [Lightning's docs](https://lightning.ai/docs/pytorch/stable/accelerators/gpu_intermediate.html#distributed-data-parallel) for how to set it up through Lightning's {class}`~lightning.pytorch.trainer.trainer.Trainer`.
 
 **NOTE** that it is usually not necessary to explicitly set the {class}`~lightning.pytorch.strategies.DDPStrategy` as an input to the Lightning {class}`~lightning.pytorch.trainer.trainer.Trainer` if the cluster environment is set up to facilitate Lightning's automatic detection of cluster variables. The main aspect that deserves user attention is configuring the job submission script and the relevant `Trainer` arguments (`num_nodes` and sometimes `devices`) correctly.
 
@@ -28,7 +28,7 @@ A minimal SLURM example for doing DDP training with 2 nodes with 4 GPUs per node
 
 # ... set up (e.g. module load, activate Python env, etc)
 
-# ... cluster specific set up such as network interface 
+# ... cluster specific set up such as network interface
 # (e.g. MASTER_PORT, MASTER_ADDR, NCCL_SOCKET_IFNAME)
 
 srun nequip-train -cn config.yaml ++trainer.num_nodes=${SLURM_NNODES}
@@ -62,7 +62,7 @@ The `batch_size` configured under the dataloaders in the `data` [section of the 
 
 As increasing the number of ranks (while holding the per-rank batch size constant) increases the effective batch size, you should consider adjusting other hyperparameters that you would typically adjust when raising the batch size, such as the learning rate (see [Lightning's docs](https://lightning.ai/docs/pytorch/stable/accelerators/gpu_faq.html#how-should-i-adjust-the-learning-rate-when-using-multiple-devices) for similar advice).
 
-It may be helpful to use a combination of {mod}`omegaconf`'s [variable interpolation](https://omegaconf.readthedocs.io/en/latest/usage.html#variable-interpolation), [environment variable resolver](https://omegaconf.readthedocs.io/en/latest/custom_resolvers.html#oc-env) and NequIP's custom arithmetic resolver `int_div` to dynamically configure these parameters based on the runtime environment. 
+It may be helpful to use a combination of {mod}`omegaconf`'s [variable interpolation](https://omegaconf.readthedocs.io/en/latest/usage.html#variable-interpolation), [environment variable resolver](https://omegaconf.readthedocs.io/en/latest/custom_resolvers.html#oc-env) and NequIP's custom arithmetic resolver `int_div` to dynamically configure these parameters based on the runtime environment.
 
 For example, to get the world size as a SLURM environment variable and set the per-rank batch size as the desired effective global batch size divided by the world size, you can use:
 

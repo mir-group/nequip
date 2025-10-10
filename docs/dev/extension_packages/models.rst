@@ -53,7 +53,7 @@ Train-time via config:
            H: 0.12
      model:
        _target_: nequip.model.ModelFromPackage
-       # ... 
+       # ...
 
 Compile-time for accelerations:
 

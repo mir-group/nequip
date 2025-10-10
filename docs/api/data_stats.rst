@@ -23,7 +23,7 @@ As an example, we show how one can configure the full :class:`~nequip.data.DataS
        - name: num_neighbors_mean
          field:
            _target_: nequip.data.NumNeighbors
-         metric: 
+         metric:
            _target_: nequip.data.Mean
        - name: per_atom_energy_mean
          field:
@@ -55,10 +55,10 @@ As an example, we show how one can configure the full :class:`~nequip.data.DataS
 
 .. autoclass:: nequip.data.StandardDeviation
     :members:
-    
+
 .. autoclass:: nequip.data.Min
     :members:
-    
+
 .. autoclass:: nequip.data.Max
     :members:
 

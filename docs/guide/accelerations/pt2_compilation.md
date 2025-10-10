@@ -13,7 +13,7 @@ or
 model:
     _target_: allegro.model.AllegroModel
     compile_mode: compile
-    # other model hyperparameters    
+    # other model hyperparameters
 ```
 Note that `compile_mode` can only be `compile` (use [`torch.compile`](https://pytorch.org/docs/stable/generated/torch.compile.html)), or `eager` (no compilation used). If `compile_mode` is unspecified, it defaults to `eager`.
 It will take a bit of time (around a minute or more) for the model to be compiled with [`torch.compile`](https://pytorch.org/docs/stable/generated/torch.compile.html) before training proceeds, but the speed-ups are worth it.

@@ -27,7 +27,7 @@ Once statistics are configured, use the resolver syntax `${training_data_stats:s
 ```yaml
 model:
   _target_: nequip.model.NequIPGNNModel
-  
+
   # Use computed statistics for model initialization
   avg_num_neighbors: ${training_data_stats:num_neighbors_mean}
   per_type_energy_shifts: ${training_data_stats:per_atom_energy_mean}
@@ -37,7 +37,7 @@ model:
 The {class}`~nequip.data.CommonDataStatisticsManager` computes these essential statistics:
 
 - `num_neighbors_mean` - for edge normalization (`avg_num_neighbors`)
-- `per_atom_energy_mean` - for energy shifts (`per_type_energy_shifts`)  
+- `per_atom_energy_mean` - for energy shifts (`per_type_energy_shifts`)
 - `forces_rms` - for energy scales (`per_type_energy_scales`)
 - `per_type_forces_rms` - for per-type energy scales (`per_type_energy_scales`)
 
@@ -56,7 +56,7 @@ The statistic name must match exactly between the `stats_manager` configuration 
 
 ## Energy Shifts & Scales
 
-Both NequIP and Allegro models can be thought of as predicting an **unscaled** per-atom energy contribution $\tilde{E}_i$ where $i$ is an atom index. The per-atom energies are then computed as 
+Both NequIP and Allegro models can be thought of as predicting an **unscaled** per-atom energy contribution $\tilde{E}_i$ where $i$ is an atom index. The per-atom energies are then computed as
 
 $E_i = \alpha^{t_i} \tilde{E}_i + E_{0}^{t_i}$
 
@@ -69,7 +69,7 @@ It is recommended to use isolated atom energies (computed by the same reference 
   model:
     _target_: nequip.model.NequIPGNNModel
     # other args
-    per_type_energy_shifts: 
+    per_type_energy_shifts:
       C: 1.234
       H: 2.345
       O: 3.456
@@ -102,7 +102,7 @@ For practical molecular dynamics simulations, it may be favorable to train model
 ```yaml
 training_module:
   _target_: nequip.train.EMALightningModule
-  
+
   # other `EMALightningModule` arguments
 
   model:
@@ -112,8 +112,8 @@ training_module:
 
     pair_potential:
       _target_: nequip.nn.pair_potential.ZBL
-      units: metal     
-      chemical_species: ${chemical_symbols}   
+      units: metal
+      chemical_species: ${chemical_symbols}
 
 ```
 `units` refer to LAMMPS unit system names, and can be `metal` (eV and Angstroms) or `real` (kcal/mol and Angstroms). Note that one must also specify `chemical_species`, which are a list of elements in the same order as the `type_names`. Here, the config snippet assumes that the list is defined elsewhere as `chemical_symbols` and is interpolating that variable (since the variable is also needed in configuring the `data` part of the config file).

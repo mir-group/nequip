@@ -12,7 +12,7 @@ Field Types
 ~~~~~~~~~~~
 
 - **Graph fields**: per-frame (e.g., ``total_energy``, ``stress``)
-- **Node fields**: per-atom (e.g., ``forces``, ``positions``) 
+- **Node fields**: per-atom (e.g., ``forces``, ``positions``)
 - **Edge fields**: per-edge (e.g., ``edge_vectors``)
 - **Long fields**: integer dtype (e.g., ``atomic_numbers``)
 - **Cartesian tensors**: physical tensors (e.g., ``stress``)
@@ -26,7 +26,7 @@ Registration Example
 
    register_fields(
        graph_fields=["custom_energy"],
-       node_fields=["custom_forces"], 
+       node_fields=["custom_forces"],
        edge_fields=["custom_edge_attr"],
        long_fields=["custom_indices"],
        cartesian_tensor_fields={"custom_tensor": "ij=ji"}
