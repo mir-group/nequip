@@ -1,6 +1,6 @@
 import pytest
-from nequip.utils.unittests.model_tests_compilation import CompilationTestsMixin
 from nequip.utils.unittests.model_tests_lammps import LAMMPSMLIAPIntegrationMixin
+from nequip.utils.unittests.model_tests_torchsim import TorchSimIntegrationMixin
 from nequip.utils.versions import _TORCH_GE_2_7
 
 try:
@@ -70,8 +70,11 @@ minimal_config4 = dict(
 )
 
 
-class TestNequIPModel(CompilationTestsMixin, LAMMPSMLIAPIntegrationMixin):
-    """NequIP model tests."""
+class TestNequIPModel(TorchSimIntegrationMixin, LAMMPSMLIAPIntegrationMixin):
+    """NequIP model tests.
+
+    Gets compilation tests via TorchSimIntegrationMixin → CompilationTestsMixin.
+    """
 
     @pytest.fixture
     def strict_locality(self):
