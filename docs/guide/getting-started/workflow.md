@@ -110,6 +110,7 @@ The packaged model can thus be loaded and used independently even if new and dif
 ### Fine-tuning packaged models
 
 Packaged models can be used for both inference and fine-tuning.  Fine-tuning uses the {func}`~nequip.model.ModelFromPackage` [model loader](../../api/save_model.rst) in the config for a new `nequip-train` run to use the model from the package as the starting point. The checkpoint files produced by this kind of fine-tuning `nequip-train` run can be used as usual and support restarting training with `++ckpt_path path/to/ckpt`, further fine-tuning using {func}`~nequip.model.ModelFromCheckpoint`, `nequip-compile`, `nequip-package`, etc.
+See the [Fine-Tuning](../training-techniques/fine_tuning.md) training techniques section for further details.
 
 ## Compilation
 
