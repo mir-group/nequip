@@ -8,3 +8,4 @@ Python API
   nn
   model
   ase
+  torchsim

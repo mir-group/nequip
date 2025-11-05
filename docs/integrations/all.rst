@@ -5,3 +5,4 @@ Integrations
 
     lammps/index
     ase
+    torchsim
