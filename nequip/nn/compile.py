@@ -101,14 +101,27 @@ class CompileGraphModel(GraphModel):
         model_input_fields: Dict[str, Any] = {},
     ) -> None:
         super().__init__(model, model_config, model_input_fields)
-        # these will be updated when the model is compiled
-        self._compiled_model = ()
-        self.input_fields = None
-        self.output_fields = None
+        # cache for multiple compiled variants based on input/output key signatures
+        # NOTE: the cache dict is wrapped in a tuple so that it's not registered and saved in the state dict -- this is necessary to enable `GraphModel` to load `CompileGraphModel` state dicts
+        # see https://discuss.pytorch.org/t/saving-nn-module-to-parent-nn-module-without-registering-paremeters/132082/6
+        self._compiled_cache = ({},)
         # weights and buffers should be done lazily because model modification can happen after instantiation
         # such that parameters and buffers may change between class instantiation and the lazy compilation in the `forward`
         self.weight_names = None
         self.buffer_names = None
+
+    def _get_signature(self, data: AtomicDataDict.Type) -> tuple:
+        """Compute a hashable signature for the input/output key combination.
+
+        Uses intersection of data keys and GraphModel input/outputs, which assumes:
+        - correctness of irreps registration system
+        - this particular batch contains all necessary inputs and reference labels (outputs) for this variant
+        """
+        input_keys = tuple(sorted(data.keys() & self.model_input_fields))
+        # `output_keys` relies on the fact that `data` contains the necessary output keys
+        # e.g. `total_energy`, `forces`, `stress`
+        output_keys = tuple(sorted(data.keys() & self.model.irreps_out.keys()))
+        return (input_keys, output_keys)
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
         # short-circuit if one of the batch dims is 1 (0 would be an error)
@@ -126,29 +139,27 @@ class CompileGraphModel(GraphModel):
             # use parent class's forward
             return super().forward(data)
 
-        # === compile ===
-        # compilation happens on the first data pass when there are at least two atoms (hard to pre-emp pathological data)
-        if not self._compiled_model:
-            # get weight names and buffers
-            self.weight_names = [n for n, _ in self.model.named_parameters()]
-            self.buffer_names = [n for n, _ in self.model.named_buffers()]
+        # === get or compile variant for this key signature ===
+        # compilation happens lazily when we encounter a new combination of input/output keys
+        signature = self._get_signature(data)
+        cache = self._compiled_cache[0]
 
-            # == get input and output fields ==
-            # use intersection of data keys and GraphModel input/outputs, which assumes
-            # - correctness of irreps registration system
-            # - all input `data` batches have the same keys, and contain all necessary inputs and reference labels (outputs)
-            self.input_fields = sorted(list(data.keys() & self.model_input_fields))
-            # `output_fields` relies on the fact that `data` contains the necessary output keys
-            # e.g. `total_energy`, `forces`, `stress`
-            self.output_fields = sorted(
-                list(data.keys() & self.model.irreps_out.keys())
-            )
+        if signature not in cache:
+            # get weight names and buffers (only once on first compilation)
+            if self.weight_names is None:
+                self.weight_names = [n for n, _ in self.model.named_parameters()]
+                self.buffer_names = [n for n, _ in self.model.named_buffers()]
+
+            # == get input and output fields for this variant ==
+            # extract from signature (which already computed the intersection of data keys and model input/output fields)
+            input_fields = list(signature[0])
+            output_fields = list(signature[1])
 
             # == preprocess model and make_fx ==
             model_to_trace = ListInputOutputStateDictWrapper(
                 model=self.model,
-                input_keys=self.input_fields,
-                output_keys=self.output_fields,
+                input_keys=input_fields,
+                output_keys=output_fields,
                 state_dict_keys=self.weight_names + self.buffer_names,
             )
 
@@ -156,7 +167,7 @@ class CompileGraphModel(GraphModel):
             fx_model = nequip_make_fx(
                 model=model_to_trace,
                 data=data,
-                fields=self.input_fields,
+                fields=input_fields,
                 extra_inputs=weights + buffers,
             )
             del weights, buffers
@@ -164,38 +175,43 @@ class CompileGraphModel(GraphModel):
             # == compile exported program ==
             # see https://pytorch.org/tutorials/intermediate/torch_export_tutorial.html#running-the-exported-program
             # TODO: compile options
-            self._compiled_model = (
-                torch.compile(
-                    fx_model,
-                    dynamic=True,
-                    fullgraph=True,
-                ),
+            compiled_model = torch.compile(
+                fx_model,
+                dynamic=True,
+                fullgraph=True,
             )
-            # NOTE: the compiled model is wrapped in a tuple so that it's not registered and saved in the state dict -- this is necessary to enable `GraphModel` to load `CompileGraphModel` state dicts
-            # see https://discuss.pytorch.org/t/saving-nn-module-to-parent-nn-module-without-registering-paremeters/132082/6
+
+            # store in cache
+            cache[signature] = compiled_model
 
             # run original model and compiled model with data to sanity check
+            def compiled_forward_for_test(data_test):
+                return self._compiled_forward(data_test, compiled_model, signature)
+
             test_model_output_similarity_by_dtype(
-                self._compiled_forward,
+                compiled_forward_for_test,
                 self.model,
-                {k: data[k] for k in self.input_fields},
+                {k: data[k] for k in input_fields},
                 dtype_to_name(self.model_dtype),
-                fields=self.output_fields,
+                fields=output_fields,
                 error_message=_pt2_compile_error_message,
             )
 
-        # === run compiled model ===
-        out_dict = self._compiled_forward(data)
+        # === run compiled model for this variant ===
+        compiled_model = cache[signature]
+        out_dict = self._compiled_forward(data, compiled_model, signature)
         to_return = data.copy()
         to_return.update(out_dict)
         return to_return
 
-    def _compiled_forward(self, data):
+    def _compiled_forward(self, data, compiled_model, signature):
         # run compiled model with data
+        input_fields = list(signature[0])
+        output_fields = list(signature[1])
         weights, buffers = self._get_weights_buffers()
-        data_list = _list_from_dict(self.input_fields, data)
-        out_list = self._compiled_model[0](*(data_list + weights + buffers))
-        out_dict = _list_to_dict(self.output_fields, out_list)
+        data_list = _list_from_dict(input_fields, data)
+        out_list = compiled_model(*(data_list + weights + buffers))
+        out_dict = _list_to_dict(output_fields, out_list)
         return out_dict
 
     def _get_weights_buffers(self):
