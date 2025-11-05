@@ -21,6 +21,7 @@ from .ema import EMALightningModule
 from .config import ConFIGLightningModule, EMAConFIGLightningModule
 from .simple_ddp import SimpleDDPStrategy
 from .schedulefree import ScheduleFreeLightningModule
+from .muon import Muon, SingleDeviceMuon, MuonWithAuxAdam, SingleDeviceMuonWithAuxAdam
 
 __all__ = [
     "NequIPLightningModule",
@@ -42,4 +43,8 @@ __all__ = [
     "HuberLoss",
     "StratifiedHuberForceLoss",
     "SimpleDDPStrategy",
+    "Muon",
+    "SingleDeviceMuon",
+    "MuonWithAuxAdam",
+    "SingleDeviceMuonWithAuxAdam",
 ]
