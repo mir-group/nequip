@@ -106,7 +106,7 @@ data:
 # `trainer` is a `Lightning.Trainer` object (https://lightning.ai/docs/pytorch/stable/common/trainer.html#trainer-class-api)
 trainer:
   _target_: lightning.Trainer
-  accelerator: gpu
+  accelerator: cpu
   enable_checkpointing: true
   max_epochs: 1000
   max_time: 03:00:00:00
@@ -176,8 +176,15 @@ training_module:
 
   # any torch compatible optimizer: https://pytorch.org/docs/stable/optim.html#algorithms
   optimizer:
-    _target_: torch.optim.Adam
-    lr: 0.01
+    _target_: nequip.train.SingleDeviceMuonWithAuxAdam
+    param_groups:
+      _target_: nequip.model.MuonParamGroups
+      muon:
+        lr: 0.001
+        weight_decay: 0.001
+      adam:
+        lr: 0.001
+        weight_decay: 0.001
 
   # see options for lr_scheduler_config
   # https://lightning.ai/docs/pytorch/stable/api/lightning.pytorch.core.LightningModule.html#lightning.pytorch.core.LightningModule.configure_optimizers

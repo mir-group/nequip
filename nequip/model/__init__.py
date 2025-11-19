@@ -12,6 +12,7 @@ from .nequip_models import (
     FullNequIPGNNModel,
 )
 from .pair_potential import ZBLPairPotential
+from .param_groups import MuonParamGroups
 
 __all__ = [
     "model_builder",
@@ -24,4 +25,5 @@ __all__ = [
     "PresetNequIPGNNModel",
     "FullNequIPGNNModel",
     "ZBLPairPotential",
+    "MuonParamGroups"
 ]
