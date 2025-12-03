@@ -29,6 +29,7 @@ supported_elements = [
     "Pt",
     "Re",
     "Rh",
+    "Ru",
     "Ta",
     "Tc",
     "Ti",
@@ -50,7 +51,7 @@ class TM23DataModule(ASEDataModule):
 
     The combined dataset containing cold, warm, and melt frames are used as the train and test datasets. ``element`` can be any
     TM23 element, including ``Ag``, ``Au``, ``Cd``, ``Co``, ``Cr``, ``Cu``, ``Fe``, ``Hf``, ``Hg``, ``Ir``, ``Mn``, ``Mo``,
-    ``Nb``, ``Ni``, ``Os``, ``Pd``, ``Pt``, ``Re``, ``Rh``, ``Ta``, ``Tc``, ``Ti``, ``V``, ``W``, ``Zn``, and ``Zr``.
+    ``Nb``, ``Ni``, ``Os``, ``Pd``, ``Pt``, ``Re``, ``Rh``, ``Ru``, ``Ta``, ``Tc``, ``Ti``, ``V``, ``W``, ``Zn``, and ``Zr``.
 
     The ``train_val_split`` argument is required to split the training dataset into separate training and validation datasets.
 
