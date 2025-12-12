@@ -148,6 +148,7 @@ def FullNequIPGNNModel(
     do_derivatives: bool = True,
     # developmental params
     convnet_sc: bool = True,
+    learnable_shift: bool = False,
     # == things that generally shouldn't be changed ==
     # convnet
     convnet_resnet: bool = False,
@@ -159,6 +160,11 @@ def FullNequIPGNNModel(
     # === sanity checks and warnings ===
     assert all(tn.isalnum() for tn in type_names), (
         "`type_names` must contain only alphanumeric characters"
+    )
+
+    # learnable_shift requires skip connections to be enabled
+    assert not learnable_shift or (convnet_sc or convnet_resnet), (
+        "`learnable_shift=True` requires at least one of `convnet_sc` or `convnet_resnet` to be True"
     )
 
     # require every convnet layer to be specified explicitly in a list
@@ -238,13 +244,17 @@ def FullNequIPGNNModel(
                 "radial_mlp_depth": radial_mlp_depth[layer_i],
                 "radial_mlp_width": radial_mlp_width[layer_i],
                 # to ensure isolated atom limit
-                "use_sc": (layer_i != 0) and convnet_sc,
+                "use_sc": convnet_sc
+                if learnable_shift
+                else (layer_i != 0) and convnet_sc,
                 "is_first_layer": layer_i == 0,
                 # normalization parameters
                 "avg_num_neighbors": avg_num_neighbors,
                 "type_names": type_names,
             },
-            resnet=(layer_i != 0) and convnet_resnet,
+            resnet=convnet_resnet
+            if learnable_shift
+            else (layer_i != 0) and convnet_resnet,
             nonlinearity_type=convnet_nonlinearity_type,
             nonlinearity_scalars=convnet_nonlinearity_scalars,
             nonlinearity_gates=convnet_nonlinearity_gates,
