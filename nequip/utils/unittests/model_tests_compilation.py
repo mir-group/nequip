@@ -228,13 +228,14 @@ class CompilationTestsMixin(EnergyModelTestsMixin):
             A_loss = A_out[AtomicDataDict.TOTAL_ENERGY_KEY].square().sum()
             A_loss.backward()
             compile_params = dict(modelB.named_parameters())
-            for k, v in modelB.named_parameters():
+            for k, v in modelA.named_parameters():
                 err = torch.max(torch.abs(v.grad - compile_params[k].grad))
-                (
-                    torch.testing.assert_close(
-                        v.grad, compile_params[k].grad, atol=tol, rtol=tol
-                    ),
-                    err,
+                torch.testing.assert_close(
+                    v.grad,
+                    compile_params[k].grad,
+                    atol=tol,
+                    rtol=tol,
+                    msg=f"failed for {k}, with MaxAbsErr of {err:.6f}",
                 )
 
     @override_irreps_debug(False)
