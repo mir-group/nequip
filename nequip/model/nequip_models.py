@@ -54,6 +54,9 @@ def NequIPGNNModel(
         type_embed_num_features (int): number of features for the type embedding layer; if not provided, defaults to ``num_features[0]`` (default ``None``)
         radial_mlp_depth (int): number of radial layers, usually 1-3 works best, smaller is faster (default ``2``)
         radial_mlp_width (int): number of hidden neurons in radial function, smaller is faster (default ``64``)
+        readout_mlp_hidden_layers_depth (int): number of hidden layers in the readout MLP (default ``0``)
+        readout_mlp_hidden_layers_width (int): width of hidden layers in the readout MLP (default 0e contribution of ``num_features``)
+        readout_mlp_nonlinearity (str): ``silu``, ``mish``, ``gelu``, or ``None`` (default ``silu``)
         num_bessels (int): number of Bessel basis functions (default ``8``)
         bessel_trainable (bool): whether the Bessel roots are trainable (default ``False``)
         polynomial_cutoff_p (int): p-exponent used in polynomial cutoff function, smaller p corresponds to stronger decay with distance (default ``6``)
@@ -131,6 +134,10 @@ def FullNequIPGNNModel(
     irreps_edge_sh: Union[int, str, o3.Irreps],
     type_embed_num_features: int,
     categorical_graph_field_embed: Optional[List[Dict[str, int]]] = None,
+    # readout
+    readout_mlp_hidden_layers_depth: int = 0,
+    readout_mlp_hidden_layers_width: Optional[int] = None,
+    readout_mlp_nonlinearity: Optional[str] = "silu",
     # edge length encoding
     per_edge_type_cutoff: Optional[Dict[str, Union[float, Dict[str, float]]]] = None,
     num_bessels: int = 8,
@@ -263,9 +270,13 @@ def FullNequIPGNNModel(
         modules.update({f"layer{layer_i}_convnet": current_convnet})
 
     # === readout ===
-    # configure `ScalarMLP` to act as a linear scalar readout
+    if readout_mlp_hidden_layers_width is None:
+        readout_mlp_hidden_layers_width = o3.Irreps(feature_irreps_hidden[-1]).dim
     per_atom_energy_readout = ScalarMLP(
         output_dim=1,
+        hidden_layers_depth=readout_mlp_hidden_layers_depth,
+        hidden_layers_width=readout_mlp_hidden_layers_width,
+        nonlinearity=readout_mlp_nonlinearity,
         bias=False,
         forward_weight_init=True,
         field=AtomicDataDict.NODE_FEATURES_KEY,
