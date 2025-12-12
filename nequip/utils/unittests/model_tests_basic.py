@@ -22,7 +22,10 @@ from nequip.data import (
     _NODE_FIELDS,
     _EDGE_FIELDS,
 )
-from nequip.data.transforms import ChemicalSpeciesToAtomTypeMapper
+from nequip.data.transforms import (
+    ChemicalSpeciesToAtomTypeMapper,
+    NeighborListTransform,
+)
 from nequip.nn import (
     ForceStressOutput,
     PartialForceOutput,
@@ -132,7 +135,7 @@ class BasicModelTestsMixin:
         # cpu because we need to reconstruct the neighborlist
         test_data = {k: v.clone().detach().to("cpu") for k, v in test_data.items()}
         # reset neighborlist
-        test_data = compute_neighborlist_(test_data, r_max=config["r_max"])
+        test_data = NeighborListTransform(r_max=config["r_max"])(test_data)
         # return the data in the device for testing
         return AtomicDataDict.to_(test_data, device)
 
