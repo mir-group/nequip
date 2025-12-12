@@ -146,6 +146,8 @@ def FullNequIPGNNModel(
     pair_potential: Optional[Dict] = None,
     # derivatives
     do_derivatives: bool = True,
+    # developmental params
+    convnet_sc: bool = True,
     # == things that generally shouldn't be changed ==
     # convnet
     convnet_resnet: bool = False,
@@ -236,7 +238,7 @@ def FullNequIPGNNModel(
                 "radial_mlp_depth": radial_mlp_depth[layer_i],
                 "radial_mlp_width": radial_mlp_width[layer_i],
                 # to ensure isolated atom limit
-                "use_sc": layer_i != 0,
+                "use_sc": (layer_i != 0) and convnet_sc,
                 "is_first_layer": layer_i == 0,
                 # normalization parameters
                 "avg_num_neighbors": avg_num_neighbors,
