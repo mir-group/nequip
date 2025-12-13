@@ -38,14 +38,19 @@ jobs:
       matrix:
         torch-version: [2.2.0, "2.*"]
     container:
-      image: nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
+      image: nvidia/cuda:12.6.1-cudnn-devel-ubuntu24.04
       options: ${{ github.event.repository.private && '--gpus all' || ' ' }}
     steps:
       - uses: actions/checkout@v4
-      - name: Install Python
+      - name: Install Python and create venv
         run: |
-          apt update && apt install -y python3 python3-pip git
-          python3 -m pip install --upgrade pip
+          apt update && apt install -y python3 python3-pip python3-venv git
+          python3 -m venv /opt/venv
+          echo "/opt/venv/bin" >> $GITHUB_PATH
+      - name: Check Python version
+        run: |
+          python3 --version
+          which python3
       - name: Install PyTorch
         env:
           TORCH: "${{ matrix.torch-version }}"
