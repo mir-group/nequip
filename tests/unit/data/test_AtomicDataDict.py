@@ -51,18 +51,15 @@ def test_to_ase_batches(atomic_batch):
             atomic_batch[AtomicDataDict.ATOMIC_NUMBERS_KEY][mask].view(-1),
         )
 
-        assert (
-            np.max(
-                np.abs(
-                    atoms.get_cell()[:]
-                    - atomic_batch[AtomicDataDict.CELL_KEY][batch_idx].numpy()
-                )
+        if AtomicDataDict.CELL_KEY in atomic_batch:
+            np.testing.assert_allclose(
+                atoms.get_cell()[:],
+                atomic_batch[AtomicDataDict.CELL_KEY][batch_idx].numpy(),
             )
-            == 0
+        np.testing.assert_array_equal(
+            atoms.get_pbc(),
+            atomic_batch[AtomicDataDict.PBC_KEY][batch_idx].numpy(),
         )
-        assert not np.logical_xor(
-            atoms.get_pbc(), atomic_batch[AtomicDataDict.PBC_KEY][batch_idx].numpy()
-        ).all()
 
 
 def test_process_dict_invariance(H2, CuFcc, CH3CHO):
