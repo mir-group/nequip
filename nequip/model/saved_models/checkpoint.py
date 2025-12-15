@@ -12,6 +12,7 @@ from nequip.model.utils import (
     _EAGER_MODEL_KEY,
 )
 from nequip.data import AtomicDataDict
+from nequip.data.transforms import NonPeriodicCellTransform
 
 
 from nequip.utils.global_dtype import _GLOBAL_DTYPE
@@ -113,14 +114,20 @@ def data_dict_from_checkpoint(ckpt_path: str) -> AtomicDataDict.Type:
 
         # === sanitize data ===
         if AtomicDataDict.CELL_KEY not in data:
-            data[AtomicDataDict.CELL_KEY] = 1e5 * torch.eye(
-                3,
-                dtype=_GLOBAL_DTYPE,
-                device=data[AtomicDataDict.POSITIONS_KEY].device,
-            ).unsqueeze(0)
+            # try to construct sensible cell for nonperiodic system
+            transform = NonPeriodicCellTransform(padding=10.0, override_cell=False)
+            data = transform(data)
+
+            # if still no cell (transform was no-op), create a large cell
+            if AtomicDataDict.CELL_KEY not in data:
+                data[AtomicDataDict.CELL_KEY] = 1e5 * torch.eye(
+                    3,
+                    dtype=_GLOBAL_DTYPE,
+                    device=data[AtomicDataDict.POSITIONS_KEY].device,
+                ).unsqueeze(0)
 
             data[AtomicDataDict.EDGE_CELL_SHIFT_KEY] = torch.zeros(
-                (data[AtomicDataDict.EDGE_INDEX_KEY].size(1), 3),
+                (AtomicDataDict.num_edges(data), 3),
                 dtype=_GLOBAL_DTYPE,
                 device=data[AtomicDataDict.POSITIONS_KEY].device,
             )
