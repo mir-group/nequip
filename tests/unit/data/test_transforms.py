@@ -11,7 +11,9 @@ from nequip.data.transforms import (
     NeighborListTransform,
     SortedNeighborListTransform,
     ChemicalSpeciesToAtomTypeMapper,
+    NonPeriodicCellTransform,
 )
+from nequip.nn.utils import with_edge_vectors_
 
 
 def test_ChemicalSpeciesToAtomTypeMapper():
@@ -504,99 +506,170 @@ def test_neighborlist_batch_state_preservation():
     )
 
 
-def test_neighborlist_nonperiodic_cell_independence():
-    """Test that non-periodic systems produce same neighborlist regardless of cell.
+def test_nonperiodic_systems_cell_and_transform():
+    """Test nonperiodic system neighborlists with various cell configurations.
 
-    Tests three non-periodic cases (no cell, orthogonal cell, skewed cell) and verifies
-    they produce identical edge sets. Also tests periodic cases with the same cells as a
-    sanity check that PBC produces different results when periodic images matter.
+    Tests that:
+    1. Edge indices are independent of cell for nonperiodic systems
+    2. NonPeriodicCellTransform preserves edge vectors
+    3. Improper small cells lead to incorrect edge vectors
+    4. Periodic systems can produce different results (sanity check)
     """
     r_max = 5.0
 
-    # create positions where atoms are near cell boundaries
-    # this allows us to test that PBC makes a difference
-    positions = torch.tensor([[0.3, 1.0, 1.0], [2.8, 1.0, 1.0], [1.5, 3.5, 1.0]])
+    # use challenging positions with negative coordinates near cell boundaries
+    positions = torch.tensor([[-0.3, 1.0, -1.0], [2.8, -1.0, 1.0], [1.5, 3.5, 1.0]])
 
-    # test 1: no cell provided
-    data_no_cell = {
-        AtomicDataDict.POSITIONS_KEY: positions.clone(),
-        AtomicDataDict.ATOMIC_NUMBERS_KEY: torch.tensor([1, 1, 8]),
-    }
-    data_no_cell = from_dict(data_no_cell)
-    result_no_cell = NeighborListTransform(r_max=r_max)(data_no_cell)
-
-    # test 2: small orthogonal cell (atoms near boundaries)
-    # direct distances: 0-1: 2.5, 0-2: ~2.78, 1-2: ~2.82
-    data_cell1 = {
-        AtomicDataDict.POSITIONS_KEY: positions.clone(),
-        AtomicDataDict.ATOMIC_NUMBERS_KEY: torch.tensor([1, 1, 8]),
-        AtomicDataDict.CELL_KEY: torch.tensor(
-            [[3.0, 0.0, 0.0], [0.0, 5.0, 0.0], [0.0, 0.0, 5.0]]
-        ),
-        AtomicDataDict.PBC_KEY: torch.tensor([False, False, False]),
-    }
-    data_cell1 = from_dict(data_cell1)
-    result_cell1 = NeighborListTransform(r_max=r_max)(data_cell1)
-
-    # test 3: small skewed cell
-    data_cell2 = {
-        AtomicDataDict.POSITIONS_KEY: positions.clone(),
-        AtomicDataDict.ATOMIC_NUMBERS_KEY: torch.tensor([1, 1, 8]),
-        AtomicDataDict.CELL_KEY: torch.tensor(
-            [[3.5, 0.5, 0.0], [0.0, 4.5, 0.0], [0.0, 0.0, 5.0]]
-        ),
-        AtomicDataDict.PBC_KEY: torch.tensor([False, False, False]),
-    }
-    data_cell2 = from_dict(data_cell2)
-    result_cell2 = NeighborListTransform(r_max=r_max)(data_cell2)
-
-    # convert edge indices to sets for comparison
     def edges_to_set(edge_index):
         return set(zip(edge_index[0].tolist(), edge_index[1].tolist()))
 
+    def sort_edges(edge_index, edge_vecs):
+        edges = [
+            (edge_index[0, i].item(), edge_index[1, i].item(), edge_vecs[i])
+            for i in range(edge_index.shape[1])
+        ]
+        edges.sort(key=lambda x: (x[0], x[1]))
+        return torch.stack([e[2] for e in edges])
+
+    # ============================================================================
+    # test 1: baseline - nonperiodic system with no cell
+    # ============================================================================
+    data_no_cell = from_dict(
+        {
+            AtomicDataDict.POSITIONS_KEY: positions.clone(),
+            AtomicDataDict.ATOMIC_NUMBERS_KEY: torch.tensor([1, 1, 8]),
+            AtomicDataDict.PBC_KEY: torch.tensor([[False, False, False]]),
+        }
+    )
+    result_no_cell = NeighborListTransform(r_max=r_max)(data_no_cell)
+    result_no_cell = with_edge_vectors_(result_no_cell, with_lengths=True)
     edges_no_cell = edges_to_set(result_no_cell[AtomicDataDict.EDGE_INDEX_KEY])
-    edges_cell1 = edges_to_set(result_cell1[AtomicDataDict.EDGE_INDEX_KEY])
-    edges_cell2 = edges_to_set(result_cell2[AtomicDataDict.EDGE_INDEX_KEY])
-
-    print(edges_no_cell)
-    print(edges_cell1)
-    print(edges_cell2)
-
-    # all three should produce identical edge sets
-    assert edges_no_cell == edges_cell1, (
-        "Non-periodic system should have same edges with or without cell"
-    )
-    assert edges_no_cell == edges_cell2, (
-        "Non-periodic system should have same edges regardless of cell"
-    )
-    assert edges_cell1 == edges_cell2, (
-        "Non-periodic system should have same edges for different random cells"
+    vecs_no_cell = sort_edges(
+        result_no_cell[AtomicDataDict.EDGE_INDEX_KEY],
+        result_no_cell[AtomicDataDict.EDGE_VECTORS_KEY],
     )
 
-    # sanity check: with PBC enabled, results should potentially differ
-    data_pbc1 = {
-        AtomicDataDict.POSITIONS_KEY: positions.clone(),
-        AtomicDataDict.ATOMIC_NUMBERS_KEY: torch.tensor([1, 1, 8]),
-        AtomicDataDict.CELL_KEY: data_cell1[AtomicDataDict.CELL_KEY].clone(),
-        AtomicDataDict.PBC_KEY: torch.tensor([True, True, True]),
-    }
-    data_pbc1 = from_dict(data_pbc1)
-    result_pbc1 = NeighborListTransform(r_max=r_max)(data_pbc1)
+    # ============================================================================
+    # test 2: NonPeriodicCellTransform should preserve edge vectors
+    # ============================================================================
+    data_transform = from_dict(
+        {
+            AtomicDataDict.POSITIONS_KEY: positions.clone(),
+            AtomicDataDict.ATOMIC_NUMBERS_KEY: torch.tensor([1, 1, 8]),
+            AtomicDataDict.PBC_KEY: torch.tensor([[False, False, False]]),
+        }
+    )
+    data_transform = NonPeriodicCellTransform(padding=10.0)(data_transform)
+    assert AtomicDataDict.CELL_KEY in data_transform
+    result_transform = NeighborListTransform(r_max=r_max)(data_transform)
+    result_transform = with_edge_vectors_(result_transform, with_lengths=True)
+    edges_transform = edges_to_set(result_transform[AtomicDataDict.EDGE_INDEX_KEY])
+    vecs_transform = sort_edges(
+        result_transform[AtomicDataDict.EDGE_INDEX_KEY],
+        result_transform[AtomicDataDict.EDGE_VECTORS_KEY],
+    )
 
-    data_pbc2 = {
-        AtomicDataDict.POSITIONS_KEY: positions.clone(),
-        AtomicDataDict.ATOMIC_NUMBERS_KEY: torch.tensor([1, 1, 8]),
-        AtomicDataDict.CELL_KEY: data_cell2[AtomicDataDict.CELL_KEY].clone(),
-        AtomicDataDict.PBC_KEY: torch.tensor([True, True, True]),
-    }
-    data_pbc2 = from_dict(data_pbc2)
-    result_pbc2 = NeighborListTransform(r_max=r_max)(data_pbc2)
+    # edge indices and vectors should match baseline
+    assert edges_no_cell == edges_transform
+    torch.testing.assert_close(
+        vecs_transform,
+        vecs_no_cell,
+        rtol=1e-12,
+        atol=1e-12,
+        msg="NonPeriodicCellTransform should preserve edge vectors",
+    )
+    # edge_cell_shifts should be zero (no wrapping)
+    if AtomicDataDict.EDGE_CELL_SHIFT_KEY in result_transform:
+        torch.testing.assert_close(
+            result_transform[AtomicDataDict.EDGE_CELL_SHIFT_KEY],
+            torch.zeros_like(result_transform[AtomicDataDict.EDGE_CELL_SHIFT_KEY]),
+            rtol=0,
+            atol=0,
+        )
 
-    edges_pbc1 = edges_to_set(result_pbc1[AtomicDataDict.EDGE_INDEX_KEY])
-    edges_pbc2 = edges_to_set(result_pbc2[AtomicDataDict.EDGE_INDEX_KEY])
+    # ============================================================================
+    # test 3: large orthogonal cell - edge indices should match baseline
+    # ============================================================================
+    data_large = from_dict(
+        {
+            AtomicDataDict.POSITIONS_KEY: positions.clone(),
+            AtomicDataDict.ATOMIC_NUMBERS_KEY: torch.tensor([1, 1, 8]),
+            AtomicDataDict.CELL_KEY: torch.tensor(
+                [[[20.0, 0.0, 0.0], [0.0, 20.0, 0.0], [0.0, 0.0, 20.0]]]
+            ),
+            AtomicDataDict.PBC_KEY: torch.tensor([[False, False, False]]),
+        }
+    )
+    result_large = NeighborListTransform(r_max=r_max)(data_large)
+    edges_large = edges_to_set(result_large[AtomicDataDict.EDGE_INDEX_KEY])
+    assert edges_no_cell == edges_large
 
-    print(edges_pbc1)
-    print(edges_pbc2)
+    # ============================================================================
+    # test 4: skewed cell - edge indices should still match baseline
+    # ============================================================================
+    data_skewed = from_dict(
+        {
+            AtomicDataDict.POSITIONS_KEY: positions.clone(),
+            AtomicDataDict.ATOMIC_NUMBERS_KEY: torch.tensor([1, 1, 8]),
+            AtomicDataDict.CELL_KEY: torch.tensor(
+                [[[15.0, 2.0, 0.0], [0.0, 15.0, 0.0], [0.0, 0.0, 15.0]]]
+            ),
+            AtomicDataDict.PBC_KEY: torch.tensor([[False, False, False]]),
+        }
+    )
+    result_skewed = NeighborListTransform(r_max=r_max)(data_skewed)
+    edges_skewed = edges_to_set(result_skewed[AtomicDataDict.EDGE_INDEX_KEY])
+    assert edges_no_cell == edges_skewed
 
-    # sanity check: periodic systems can differ from non-periodic
-    # (they may have additional edges from periodic images)
+    # ============================================================================
+    # test 5: NEGATIVE test - small cell produces WRONG edge vectors
+    # this demonstrates the problem that NonPeriodicCellTransform solves
+    # ============================================================================
+    data_bad = from_dict(
+        {
+            AtomicDataDict.POSITIONS_KEY: positions.clone(),
+            AtomicDataDict.ATOMIC_NUMBERS_KEY: torch.tensor([1, 1, 8]),
+            AtomicDataDict.CELL_KEY: torch.tensor(
+                [[[5.0, 0.5, 0.0], [0.0, 4.0, 0.0], [0.0, 0.0, 3.0]]]
+            ),
+            AtomicDataDict.PBC_KEY: torch.tensor([[False, False, False]]),
+        }
+    )
+    result_bad = NeighborListTransform(r_max=r_max)(data_bad.copy())
+    result_bad = with_edge_vectors_(result_bad, with_lengths=True)
+    edges_bad = edges_to_set(result_bad[AtomicDataDict.EDGE_INDEX_KEY])
+    vecs_bad = sort_edges(
+        result_bad[AtomicDataDict.EDGE_INDEX_KEY],
+        result_bad[AtomicDataDict.EDGE_VECTORS_KEY],
+    )
+    # edge indices still match (connectivity is correct)
+    assert edges_no_cell == edges_bad
+    # but edge vectors are WRONG (wrapped around cell boundaries)
+    assert not torch.allclose(vecs_no_cell, vecs_bad, rtol=1e-12, atol=1e-12), (
+        "Small cell should produce WRONG edge vectors (problem NonPeriodicCellTransform solves)"
+    )
+
+    # ============================================================================
+    # test 6: override_cell should replace bad cell with proper one
+    # ============================================================================
+    # reuse the bad cell from test 5 and fix it with override_cell=True
+    data_override = NonPeriodicCellTransform(padding=10.0, override_cell=True)(
+        data_bad.copy()
+    )
+    result_override = NeighborListTransform(r_max=r_max)(data_override)
+    result_override = with_edge_vectors_(result_override, with_lengths=True)
+    edges_override = edges_to_set(result_override[AtomicDataDict.EDGE_INDEX_KEY])
+    vecs_override = sort_edges(
+        result_override[AtomicDataDict.EDGE_INDEX_KEY],
+        result_override[AtomicDataDict.EDGE_VECTORS_KEY],
+    )
+
+    # with override_cell=True, should match baseline
+    assert edges_no_cell == edges_override
+    torch.testing.assert_close(
+        vecs_override,
+        vecs_no_cell,
+        rtol=1e-12,
+        atol=1e-12,
+        msg="override_cell should fix bad cell and preserve edge vectors",
+    )
