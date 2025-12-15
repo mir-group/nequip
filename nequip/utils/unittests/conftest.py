@@ -18,6 +18,7 @@ from nequip.data.dataset import ASEDataset
 from nequip.data.transforms import (
     ChemicalSpeciesToAtomTypeMapper,
     NeighborListTransform,
+    NonPeriodicCellTransform,
 )
 from nequip.utils.test import set_irreps_debug
 from nequip.utils.global_state import set_global_state
@@ -144,6 +145,7 @@ def nequip_dataset(molecules):
                     model_type_names=["H", "C", "O"],
                     chemical_species_to_atom_type_map={"H": "H", "C": "C", "O": "O"},
                 ),
+                NonPeriodicCellTransform(padding=10.0, override_cell=True),
                 NeighborListTransform(r_max=3.0),
             ],
             file_path=fp.name,
