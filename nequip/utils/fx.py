@@ -28,6 +28,7 @@ def fx_duck_shape(enabled: bool):
         # restore state
         torch.fx.experimental._config.use_duck_shape = init_duck_shape
 
+
 @contextlib.contextmanager
 def cpu_deserialize_if_no_cuda(enabled: bool = True):
     """
