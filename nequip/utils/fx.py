@@ -1,6 +1,5 @@
 # This file is a part of the `nequip` package. Please see LICENSE and README at the root for information on using it.
 import math
-import io
 import torch
 from torch.fx.experimental.proxy_tensor import make_fx
 from nequip.data import AtomicDataDict
@@ -27,33 +26,6 @@ def fx_duck_shape(enabled: bool):
     finally:
         # restore state
         torch.fx.experimental._config.use_duck_shape = init_duck_shape
-
-
-@contextlib.contextmanager
-def cpu_deserialize_if_no_cuda(enabled: bool = True):
-    """
-    Allow loading CUDA-saved storages from torch.package on CPU-only systems.
-
-    Some packaged models contain CUDA tensors. When loading via
-    torch.package.PackageImporter.load_pickle, torch may deserialize storages
-    via torch.storage._load_from_bytes without respecting map_location.
-    This context manager temporarily forces map_location="cpu" when CUDA is
-    unavailable.
-    """
-    if (not enabled) or torch.cuda.is_available():
-        yield
-        return
-
-    orig_load_from_bytes = torch.storage._load_from_bytes
-
-    def _load_from_bytes_cpu(b):
-        return torch.load(io.BytesIO(b), map_location="cpu", weights_only=False)
-
-    torch.storage._load_from_bytes = _load_from_bytes_cpu
-    try:
-        yield
-    finally:
-        torch.storage._load_from_bytes = orig_load_from_bytes
 
 
 def nequip_make_fx(
