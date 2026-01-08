@@ -68,7 +68,7 @@ And also consider citing:
  2. The [original NequIP paper](https://www.nature.com/articles/s41467-022-29939-5)
     > Simon Batzner, Albert Musaelian, Lixin Sun, Mario Geiger, Jonathan P. Mailoa, Mordechai Kornbluth, Nicola Molinari, Tess E. Smidt, and Boris Kozinsky. <br/>
     > "E(3)-equivariant graph neural networks for data-efficient and accurate interatomic potentials." <br/>
-    > Nature communications 13, no. 1 (2022): 2453
+    > Nature Communications 13, no. 1 (2022): 2453
 
  3. The [computational scaling paper](https://dl.acm.org/doi/abs/10.1145/3581784.3627041) that discusses optimized LAMMPS MD
     > Albert Musaelian, Anders Johansson, Simon Batzner, and Boris Kozinsky. <br/>
