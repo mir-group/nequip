@@ -6,7 +6,7 @@ from lightning.pytorch import seed_everything
 import e3nn
 
 from .global_dtype import _GLOBAL_DTYPE
-from .versions.torch_versions import _TORCH_GE_2_9
+from .versions.torch_versions import _TORCH_GE_2_6, _TORCH_GE_2_9
 
 import warnings
 import os
@@ -117,6 +117,13 @@ def set_global_state(
             optimize_einsums=True,
             jit_script_fx=True,
         )
+
+        # === torch._dynamo config for PyTorch >= 2.6 ===
+        # we set this flag because we always assume dynamic shapes when we compile
+        # see relevant entries in https://github.com/pytorch/pytorch/blob/main/torch/_dynamo/config.py
+        if _TORCH_GE_2_6:
+            torch._dynamo.config.capture_dynamic_output_shape_ops = True
+            torch._dynamo.config.capture_scalar_outputs = True
 
         # ENVIRONMENT VARIABLES
         # torch.multiprocessing fix for batch_size=1
