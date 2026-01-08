@@ -9,11 +9,22 @@ Most recent change on the top.
 ## Unreleased
 
 
+## [0.16.2]
+
+### Added
+- possibility of configuring nonlinear readout MLP for NequIP GNN models
+
+### Changed
+- bumped minimum e3nn version to 0.5.9
+
+### Fixed
+- added missing `Ru` element in the `TM23DataModule`
+- https://github.com/mir-group/nequip/issues/578
+
 ## [0.16.1]
 
 ### Fixed
 - Made torch-sim integration optional: removed `torchsim` import from `nequip.integrations.__init__.py` to prevent import errors when `torch_sim` is not installed. This allows other integration tools (e.g., `nequip-prepare-lmp-mliap`) to work without requiring `torch_sim` as a dependency.
-
 
 ## [0.16.0]
 
@@ -36,6 +47,7 @@ Most recent change on the top.
 - Simplified metrics manager wrappers now include maximum absolute error metrics
 - [Breaking] `ChemicalSpeciesToAtomTypeMapper` and `NequIPCalculator` API changed for safety and better UI with regards to atom types when using pretrained models
 - [Breaking] raise minimum PyTorch version for OpenEquivariance to PyTorch >= 2.7 (previously >= 2.4)
+
 
 ## [0.15.0]
 
