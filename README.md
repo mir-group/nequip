@@ -4,7 +4,7 @@
 
 <br/>
 
-[![Documentation Status](https://readthedocs.org/projects/nequip/badge/?version=latest)](https://nequip.readthedocs.io/en/latest/?badge=latest)  [![PyPI version](https://img.shields.io/pypi/v/nequip.svg)](https://pypi.python.org/pypi/nequip/)
+[![Documentation Status](https://readthedocs.org/projects/nequip/badge/?version=latest)](https://nequip.readthedocs.io/en/latest/?badge=latest)  [![PyPI version](https://img.shields.io/pypi/v/nequip.svg)](https://pypi.python.org/pypi/nequip/)  [![DOI](https://zenodo.org/badge/348154786.svg)](https://doi.org/10.5281/zenodo.18200066)
 
 
 
