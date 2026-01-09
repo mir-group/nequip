@@ -1,5 +1,8 @@
 cff-version: "1.2.0"
-message: "If you use this software, please cite our article."
+title: "NequIP"
+type: software
+license: "MIT"
+message: "If you use this software, please it as below."
 authors:
 - family-names: Batzner
   given-names: Simon
@@ -19,7 +22,6 @@ authors:
   given-names: Tess E.
 - family-names: Kozinsky
   given-names: Boris
-doi: 10.1038/s41467-022-29939-5
 preferred-citation:
     authors:
     - family-names: Tan
@@ -53,5 +55,5 @@ preferred-citation:
     doi: 10.48550/arXiv.2504.16068
     date-published: 2025-04-24
     title: "High-performance training and inference for deep equivariant interatomic potentials"
-    type: preprint
+    type: article
     url: "https://arxiv.org/abs/2504.16068"
