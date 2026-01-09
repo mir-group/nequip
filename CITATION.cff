@@ -2,7 +2,7 @@ cff-version: "1.2.0"
 title: "NequIP"
 type: software
 license: "MIT"
-message: "If you use this software, please it as below."
+message: "If you use this software, please see our README for citation instructions."
 authors:
 - family-names: Batzner
   given-names: Simon
