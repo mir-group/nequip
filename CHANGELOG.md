@@ -9,6 +9,14 @@ Most recent change on the top.
 ## Unreleased
 
 
+## [0.16.3]
+
+### Added
+- Zenodo archiving
+
+### Fixed
+- syntax in `CITATION.cff`, verified with `cffconvert --validate -i CITATION.cff`
+
 ## [0.16.2]
 
 ### Added
