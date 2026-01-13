@@ -105,3 +105,24 @@ Example command to run the LAMMPS simulation with Kokkos GPU support:
 ```bash
 srun -n 1 /path/to/lammps/build/lmp -in in.lammps -k on g 1 -sf kk -pk kokkos newton on neigh half
 ```
+
+## Performance Optimization
+
+### Persistent Compilation Cache
+
+When using the same model repeatedly with ML-IAP, `torch.compile` can introduce significant overhead as it recompiles the model for each run.
+By default, compiled artifacts are stored in a temporary directory and discarded between runs.
+
+To enable persistent caching of compiled artifacts across runs, set the following environment variables before launching LAMMPS:
+
+```bash
+export TORCHINDUCTOR_AUTOGRAD_CACHE=1
+export TORCHINDUCTOR_FX_GRAPH_CACHE=1
+export TORCHINDUCTOR_CACHE_DIR=/path/to/cache/
+```
+
+```{important}
+Choose a cache directory with fast read/write access for optimal performance.
+```
+
+After the first run, compiled artifacts will be reused from the cache directory, potentially saving several minutes of compilation time on subsequent runs.
