@@ -1,5 +1,4 @@
 # This file is a part of the `nequip` package. Please see LICENSE and README at the root for information on using it.
-import random
 from typing import Dict, Any, Sequence, Union, Optional, Final
 from collections import OrderedDict
 
@@ -122,27 +121,6 @@ class GraphModuleMixin:
             Dict[str, str]: Metadata key-value pairs. Can override static config values (e.g., per_edge_type_cutoff) or add new keys.
         """
         return {}
-
-    def _make_tracing_inputs(self, n):
-        # We impliment this to be able to trace graph modules
-        out = []
-        for _ in range(n):
-            batch = random.randint(1, 4)
-            # TODO: handle None case
-            # TODO: do only required inputs
-            # TODO: dummy input if empty?
-            out.append(
-                {
-                    "forward": (
-                        {
-                            k: i.randn(batch, -1)
-                            for k, i in self.irreps_in.items()
-                            if i is not None
-                        },
-                    )
-                }
-            )
-        return out
 
 
 class SequentialGraphNetwork(GraphModuleMixin, torch.nn.Sequential):
