@@ -24,7 +24,6 @@ from nequip.data import (
 )
 from nequip.data.transforms import ChemicalSpeciesToAtomTypeMapper
 from nequip.nn import (
-    GraphModuleMixin,
     ForceStressOutput,
     PartialForceOutput,
     PerTypeScaleShift,
@@ -222,7 +221,10 @@ class BasicModelTestsMixin:
 
     def test_init(self, model):
         instance, _, _ = model
-        assert isinstance(instance, GraphModuleMixin)
+        assert (
+            hasattr(instance, "_is_graph_module_mixin")
+            and instance._is_graph_module_mixin
+        )
 
     def test_model_repr(self, model):
         """Test that the model can be represented as a string without errors."""

@@ -1,6 +1,6 @@
 # This file is a part of the `nequip` package. Please see LICENSE and README at the root for information on using it.
 import random
-from typing import Dict, Any, Sequence, Union, Optional
+from typing import Dict, Any, Sequence, Union, Optional, Final
 from collections import OrderedDict
 
 import torch
@@ -15,6 +15,9 @@ class GraphModuleMixin:
 
     All such classes should call ``_init_irreps`` in their ``__init__`` functions with information on the data fields they expect, require, and produce, as well as their corresponding irreps.
     """
+
+    _is_graph_module_mixin: Final[bool] = True
+    # ^ to identify `GraphModuleMixin` types from `torch.package`d models (see https://pytorch.org/docs/stable/package.html#torch-package-sharp-edges)
 
     def _init_irreps(
         self,

@@ -375,7 +375,7 @@ def set_irreps_debug(enabled: bool = False) -> None:
 
     def pre_hook(mod: GraphModuleMixin, inp):
         __tracebackhide__ = True
-        if not isinstance(mod, GraphModuleMixin):
+        if not (hasattr(mod, "_is_graph_module_mixin") and mod._is_graph_module_mixin):
             return
         mname = type(mod).__name__
         if len(inp) > 1:
@@ -409,7 +409,7 @@ def set_irreps_debug(enabled: bool = False) -> None:
 
     def post_hook(mod: GraphModuleMixin, _, out):
         __tracebackhide__ = True
-        if not isinstance(mod, GraphModuleMixin):
+        if not (hasattr(mod, "_is_graph_module_mixin") and mod._is_graph_module_mixin):
             return
         mname = type(mod).__name__
         if not (isinstance(out, dict)):

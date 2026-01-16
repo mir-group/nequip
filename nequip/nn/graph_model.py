@@ -110,7 +110,10 @@ class GraphModel(GraphModuleMixin, torch.nn.Module):
         contributed_keys = {}  # track which module provided each key
 
         for name, module in self.model.named_modules():
-            if isinstance(module, GraphModuleMixin):
+            if (
+                hasattr(module, "_is_graph_module_mixin")
+                and module._is_graph_module_mixin
+            ):
                 contributions = module._get_metadata_contributions()
                 if not contributions:
                     continue
