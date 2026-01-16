@@ -65,3 +65,29 @@ if torch.cuda.is_available():
     def gpu_kernel(...):
         # GPU implementation
 ```
+
+**Type checking with isinstance()**: PyTorch's `torch.package` creates isolated type systems where types are not shared between packages and the loading environment (see [torch.package documentation](https://pytorch.org/docs/stable/package.html#types-are-not-shared-between-packages-and-the-loading-environment)). This means `isinstance(obj, MyClass)` checks will fail when comparing objects loaded from a package against class definitions in the environment.
+
+To support packaged models, use class attribute identifiers instead of `isinstance()` checks:
+
+```python
+# bad: isinstance check fails across package boundaries
+if isinstance(module, SomeNequIPNNModule):
+    # ...
+
+# good: attribute-based check works with torch.package
+if hasattr(module, '_is_some_nequip_nn_module') and module._is_some_nequip_nn_module:
+    # ...
+```
+
+Classes should define identifying attributes:
+
+```python
+from typing import Final
+
+class SomeNequIPNNModule:
+    _is_some_nequip_nn_module: Final[bool] = True
+    # ...
+```
+
+Note: `isinstance()` checks are fine when both the class definition and instance come from the same package (e.g., model modifiers checking their own module types).
