@@ -17,16 +17,16 @@ def MuonParamGroups(
     for name, param in model.named_parameters():
         # Assumes all input and output layers are
         # not called layers.
-        if 'layer' not in name:
+        if "layer" not in name:
             adam_weights.append(param)
             continue
 
         # First, all edge_mlps should be muon
-        if 'edge_mlp' in name and param.ndim == 2:
+        if "edge_mlp" in name and param.ndim == 2:
             muon_weights.append(param)
             continue
 
-        if 'conv.linear' in name:
+        if "conv.linear" in name:
             # e3nn conv layers.
 
             # Find the e3nn Linear module this represents
@@ -36,7 +36,7 @@ def MuonParamGroups(
             # Attribute from e3nn giving the slices/shapes
             # of the corresponding linear weight
             index = len(muon_weights)
-            slices = module.weight_index_slices 
+            slices = module.weight_index_slices
 
             e3nn_reshaping[index] = slices
 

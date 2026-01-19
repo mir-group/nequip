@@ -25,5 +25,5 @@ __all__ = [
     "PresetNequIPGNNModel",
     "FullNequIPGNNModel",
     "ZBLPairPotential",
-    "MuonParamGroups"
+    "MuonParamGroups",
 ]
