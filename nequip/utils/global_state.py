@@ -6,7 +6,7 @@ from lightning.pytorch import seed_everything
 import e3nn
 
 from .global_dtype import _GLOBAL_DTYPE
-from .versions.torch_versions import _TORCH_GE_2_6, _TORCH_GE_2_9
+from .versions.torch_versions import _TORCH_GE_2_6, _TORCH_GE_2_9, _TORCH_GE_2_10
 
 import warnings
 import os
@@ -117,6 +117,12 @@ def set_global_state(
             optimize_einsums=True,
             jit_script_fx=True,
         )
+
+        # === workaround for PyTorch 2.10 codecache bug ===
+        # torch._inductor.codecache not exported but needed for aoti_load_package
+        # see https://github.com/pytorch/pytorch/issues/173706
+        if _TORCH_GE_2_10:
+            from torch._inductor import codecache as _  # noqa: F401
 
         # === torch._dynamo config for PyTorch >= 2.6 ===
         # we set this flag because we always assume dynamic shapes when we compile
