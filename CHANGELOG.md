@@ -8,6 +8,8 @@ Most recent change on the top.
 
 ## Unreleased
 
+### Fixed
+- PyTorch 2.10.0 tracing error for silu_backward
 
 ## [0.16.3]
 

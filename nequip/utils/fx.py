@@ -1,7 +1,10 @@
 # This file is a part of the `nequip` package. Please see LICENSE and README at the root for information on using it.
 import math
 import torch
+
 from torch.fx.experimental.proxy_tensor import make_fx
+from torch._decomp import core_aten_decompositions
+
 from nequip.data import AtomicDataDict
 import contextlib
 import difflib
@@ -89,10 +92,23 @@ def _nequip_make_fx(model, inputs):
     with fx_duck_shape(False):
         return make_fx(
             model,
+            # see below for explanation on decomposition table
+            decomposition_table=core_aten_decompositions(),
             tracing_mode="symbolic",
             _allow_non_fake_inputs=True,
             _error_on_data_dependent_ops=True,
         )(*[i.clone() for i in inputs])
+
+    # from PT 2.9.1 to PT 2.10.0, we get errors during training such as
+    # RuntimeError: derivative for aten::silu_backward is not implemented
+    # this is because of the double backwards and whether the fx graph is decomposed.
+    # relevant lines in PT 2.9.1: https://github.com/pytorch/pytorch/blob/d38164a545b4a4e4e0cf73ce67173f70574890b6/torch/fx/experimental/proxy_tensor.py#L898
+    # PT 2.10.0: https://github.com/pytorch/pytorch/blob/449b1768410104d3ed79d3bcfe4ba1d65c7f22c0/torch/fx/experimental/proxy_tensor.py#L1044
+    # specifically autograd_would_have_decomposed(func, flat_args_kwargs)
+    # explanation: https://github.com/pytorch/pytorch/blob/5a48148c1ab83c1e3779283d904ba5744bbe8eb3/torch/utils/_python_dispatch.py#L811
+
+    # to overcome this problem, we just always decompose
+    # minimal testing indicated that it shouldn't be a problem to always decompose
 
 
 def highlight_code_differences(code1, code2):
