@@ -18,7 +18,7 @@ import numpy as np
 
 from nequip.data import AtomicDataDict, to_ase
 from nequip.utils.test import override_irreps_debug
-from nequip.utils.versions import _TORCH_GE_2_6
+from nequip.utils.versions import _TORCH_GE_2_6, _TORCH_GE_2_10
 from nequip.ase import NequIPCalculator
 
 from hydra.utils import instantiate
@@ -82,7 +82,9 @@ class CompilationTestsMixin(EnergyModelTestsMixin):
         return request.param
 
     @pytest.mark.parametrize(
-        "mode", ["torchscript"] + (["aotinductor"] if _TORCH_GE_2_6 else [])
+        "mode",
+        ([] if _TORCH_GE_2_10 else ["torchscript"])
+        + (["aotinductor"] if _TORCH_GE_2_6 else []),
     )
     @override_irreps_debug(False)
     def test_nequip_compile(

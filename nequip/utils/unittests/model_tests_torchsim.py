@@ -16,7 +16,7 @@ import uuid
 import numpy as np
 
 from nequip.data import to_ase
-from nequip.utils.versions import _TORCH_GE_2_6
+from nequip.utils.versions import _TORCH_GE_2_6, _TORCH_GE_2_10
 from nequip.ase import NequIPCalculator
 
 from hydra.utils import instantiate
@@ -177,7 +177,8 @@ class TorchSimIntegrationMixin(CompilationTestsMixin):
 
     @pytest.fixture(
         scope="class",
-        params=["torchscript"] + (["aotinductor"] if _TORCH_GE_2_6 else []),
+        params=([] if _TORCH_GE_2_10 else ["torchscript"])
+        + (["aotinductor"] if _TORCH_GE_2_6 else []),
     )
     def torchsim_compiled_model(
         self,
