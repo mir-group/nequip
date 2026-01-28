@@ -52,7 +52,7 @@ OpenEquivariance is supported for inference with:
 
 First, compile your model with OpenEquivariance support using either TorchScript or AOT Inductor:
 
-**TorchScript compilation:**
+**TorchScript compilation (PyTorch < 2.10 only):**
 ```bash
 nequip-compile /path/to/model.ckpt /path/to/compiled_model.nequip.pth \
   --mode torchscript \

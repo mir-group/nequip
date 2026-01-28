@@ -37,7 +37,7 @@ nequip-compile \
     --modifiers enable_CuEquivariance
 ```
 
-### ASE TorchScript Compilation
+### ASE TorchScript Compilation (PyTorch < 2.10 only)
 
 ```bash
 nequip-compile \

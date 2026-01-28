@@ -13,7 +13,9 @@ This repository contains:
 There are two compiler modes: `torchscript` and `aotinductor`, which produce compiled model files with extensions `.nequip.pth` and `.nequip.pt2` respectively.
 `nequip-compile` should be performed on the same machine that the LAMMPS simulation will be run on.
 
-To compile a model with TorchScript:
+**Note:** TorchScript compilation is deprecated in PyTorch >= 2.10 (see [PyTorch 2.10 release blog](https://pytorch.org/blog/pytorch-2-10-release-blog/)). Use `--mode aotinductor` instead.
+
+To compile a model with TorchScript (PyTorch < 2.10 only):
 ```bash
 nequip-compile \
   path/to/ckpt_file/or/package_file \

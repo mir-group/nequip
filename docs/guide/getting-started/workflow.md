@@ -116,7 +116,9 @@ See the [Fine-Tuning](../training-techniques/fine_tuning.md) training techniques
 
 `nequip-compile` is the command used to compile a model (either from a checkpoint file or a package file) for [production simulations](#production-simulations) with our various [integrations](../../integrations/all.rst). There are two compiler modes: `torchscript` and `aotinductor`, which produce compiled model files with extensions `.nequip.pth` and `.nequip.pt2` respectively. We generally recommend the newer and faster `aotinductor`, but it requires PyTorch 2.6 or later.
 
-To compile a model with TorchScript:
+**Note on TorchScript deprecation:** TorchScript compilation (`--mode torchscript`) is deprecated and no longer supported in PyTorch >= 2.10 as [announced by PyTorch](https://pytorch.org/blog/pytorch-2-10-release-blog/). Please use `--mode aotinductor` instead. If you must use TorchScript, use PyTorch 2.9 or earlier.
+
+To compile a model with TorchScript (PyTorch < 2.10 only):
 ```bash
 nequip-compile \
   path/to/ckpt_file/or/package_file \

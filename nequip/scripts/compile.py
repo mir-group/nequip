@@ -10,6 +10,7 @@ from nequip.train.lightning import _SOLE_MODEL_KEY
 from nequip.data import AtomicDataDict
 from nequip.utils.logger import RankedLogger
 from nequip.utils.global_state import set_global_state, get_latest_global_state
+from nequip.utils.versions import _TORCH_GE_2_10
 from omegaconf import OmegaConf
 import hydra
 
@@ -166,6 +167,14 @@ def main(args=None):
     args = parser.parse_args(args=args)
 
     set_workflow_state("compile")
+
+    # === check for deprecated torchscript mode ===
+    if args.mode == "torchscript" and _TORCH_GE_2_10:
+        raise ValueError(
+            "TorchScript compilation is deprecated and not supported in PyTorch >= 2.10. "
+            "Please use `--mode aotinductor` instead. "
+            "See https://pytorch.org/blog/pytorch-2-10-release-blog/ for more information."
+        )
 
     # === initialize global state ===
     set_global_state(allow_tf32=args.tf32)
