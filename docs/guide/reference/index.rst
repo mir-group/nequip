@@ -8,4 +8,5 @@ Reference materials, conventions, troubleshooting, and frequently asked question
 
    conventions
    faq
+   pytorch_compatibility
    troubleshoot
