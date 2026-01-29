@@ -1,7 +1,7 @@
 import pytest
 from nequip.utils.unittests.model_tests_lammps import LAMMPSMLIAPIntegrationMixin
 from nequip.utils.unittests.model_tests_torchsim import TorchSimIntegrationMixin
-from nequip.utils.versions import _TORCH_GE_2_7
+from nequip.utils.versions import _TORCH_GE_2_7, _TORCH_IS_2_10_0
 
 try:
     import openequivariance  # noqa: F401
@@ -107,7 +107,16 @@ class TestNequIPModel(TorchSimIntegrationMixin, LAMMPSMLIAPIntegrationMixin):
     def nequip_compile_acceleration_modifiers(self, request):
         """Test acceleration modifiers in nequip-compile workflows."""
         if request.param is None:
-            return None
+            # for base NequIP models (no modifiers), skip CPU+aotinductor for PyTorch 2.10.0
+            # due to known compilation bug; left for future PyTorch versions to resolve
+            def modifier_handler(mode, device, model_dtype):
+                if device == "cpu" and mode == "aotinductor" and _TORCH_IS_2_10_0:
+                    pytest.skip(
+                        "CPU + aotinductor compilation is known to fail for NequIP models in PyTorch 2.10.0"
+                    )
+                return None
+
+            return modifier_handler
 
         def modifier_handler(mode, device, model_dtype):
             if request.param == "enable_OpenEquivariance":
