@@ -112,10 +112,11 @@ def set_global_state(
 
         # === e3nn optimization flags ===
         # we initialize them all to true
+        # torch.jit.script is deprecated in PT 2.10+, so use eager mode
         e3nn.set_optimization_defaults(
             specialized_code=True,
             optimize_einsums=True,
-            jit_script_fx=True,
+            jit_mode="eager" if _TORCH_GE_2_10 else "script",
         )
 
         # === workaround for PyTorch 2.10 codecache bug ===
