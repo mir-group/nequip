@@ -9,6 +9,15 @@ from nequip.nn.embedding import (
     BesselEdgeLengthEncoding,
 )
 from nequip.utils import dtype_from_name, torch_default_dtype
+from nequip.utils.versions import _TORCH_GE_2_10
+
+
+def _conditional_assert_auto_jitable(func, **kwargs):
+    """torch.jit.script is deprecated in PT 2.10+, so only test JIT compilation for PT < 2.10"""
+    if not _TORCH_GE_2_10:
+        return assert_auto_jitable(func, **kwargs)
+    # for PT >= 2.10, skip the test and return None
+    return None
 
 
 def test_spharm(model_dtype, CH3CHO):
@@ -17,7 +26,7 @@ def test_spharm(model_dtype, CH3CHO):
     with torch_default_dtype(mdtype):
         sph = SphericalHarmonicEdgeAttrs(irreps_edge_sh="0e + 1o + 2e")
         gm = GraphModel(sph)
-    assert_auto_jitable(sph)
+    _conditional_assert_auto_jitable(sph)
     tol = {"float32": 1e-5, "float64": 1e-9}[model_dtype]
     assert_AtomicData_equivariant(gm, data, e3_tolerance=tol)
 
@@ -34,7 +43,7 @@ def test_radial_basis(model_dtype, CH3CHO):
             }
         )
         gm = GraphModel(rad)
-    assert_auto_jitable(rad.edge_norm)
-    assert_auto_jitable(rad.bessel)
+    _conditional_assert_auto_jitable(rad.edge_norm)
+    _conditional_assert_auto_jitable(rad.bessel)
     tol = {"float32": 1e-5, "float64": 1e-9}[model_dtype]
     assert_AtomicData_equivariant(gm, data, e3_tolerance=tol)
