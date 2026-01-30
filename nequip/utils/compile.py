@@ -6,9 +6,11 @@ import contextvars
 import torch
 
 from e3nn import set_optimization_defaults, get_optimization_defaults
+from nequip.utils.versions.torch_versions import _TORCH_GE_2_10
 
+# torch.jit.script is deprecated in PT 2.10+
 _CONDITIONAL_TORCHSCRIPT_MODE = contextvars.ContextVar(
-    "_CONDITIONAL_TORCHSCRIPT_MODE", default=True
+    "_CONDITIONAL_TORCHSCRIPT_MODE", default=not _TORCH_GE_2_10
 )
 
 
