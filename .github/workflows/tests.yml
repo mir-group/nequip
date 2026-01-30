@@ -66,7 +66,11 @@ jobs:
           TORCH: "${{ matrix.torch-version }}"
         run: |
           # install packages that aren't required dependencies but that the tests do need
-          pip install h5py vesin packaging torch-sim-atomistic
+          pip install h5py vesin packaging
+          # install torch-sim-atomistic only for latest torch version
+          if [ "${{ matrix.torch-version }}" = "2.*" ]; then
+            pip install torch-sim-atomistic
+          fi
           #pip install schedulefree  #Disabled to reduce CI runtime; uncomment to test ScheduleFreeLightningModule
           # install CuEquivariance if CUDA is available
           if python3 -c "import torch; exit(0 if torch.cuda.is_available() else 1)"; then
