@@ -68,6 +68,10 @@ class TensorProductScatter(torch.nn.Module):
                     instructions=old.instructions,
                     use_opaque=_TRAIN_TIME_COMPILE,
                 )
+                # c.f. https://github.com/mir-group/nequip/issues/572
+                # reuse old.tp to preserve e3nn compiled buffers (_tensor_constant*)
+                # this ensures state dict compatibility whether the modifier is applied or notwa
+                new.tp = old.tp
             return new
 
         return replace_submodules(model, cls, factory)
@@ -96,6 +100,10 @@ class TensorProductScatter(torch.nn.Module):
                     irreps_mid=old.irreps_mid,
                     instructions=old.instructions,
                 )
+                # c.f. https://github.com/mir-group/nequip/issues/572
+                # reuse old.tp to preserve e3nn compiled buffers (_tensor_constant*)
+                # this ensures state dict compatibility whether the modifier is applied or not
+                new.tp = old.tp
             return new
 
         return replace_submodules(model, cls, factory)
