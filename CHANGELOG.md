@@ -8,8 +8,13 @@ Most recent change on the top.
 
 ## Unreleased
 
+### Added
+- possibility of holding multiple train-time compiled models with different input/output signatures
+
 ### Fixed
 - PyTorch 2.10.0 tracing error for silu_backward
+- PyTorch 2.10.0 AOTI error
+- https://github.com/mir-group/nequip/issues/572
 
 ## [0.16.3]
 
