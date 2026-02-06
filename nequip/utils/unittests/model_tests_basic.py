@@ -156,6 +156,41 @@ class BasicModelTestsMixin:
         """
         return _training_session
 
+    def model_parameter_updates(self, model_config):
+        """
+        Returns dict of parameter updates to inject into model config.
+
+        Default behavior injects training_data_stats interpolations for NequIP framework models.
+        Subclasses can override to customize injection behavior.
+
+        Args:
+            model_config: Model configuration dict to inspect
+
+        Returns:
+            dict: Parameter updates to apply
+        """
+        updates = {
+            # use resolvers for data-dependent parameters
+            "avg_num_neighbors": "${training_data_stats:num_neighbors_mean}",
+            "per_type_energy_shifts": "${training_data_stats:per_atom_energy_mean}",
+            "per_type_energy_scales": "${training_data_stats:per_type_forces_rms}",
+            # use top-level config variable references
+            "type_names": "${model_type_names}",
+        }
+
+        # handle nested chemical_species in pair_potential if present
+        if (
+            "pair_potential" in model_config
+            and "chemical_species" in model_config["pair_potential"]
+        ):
+            updates["pair_potential.chemical_species"] = "${chemical_species}"
+
+        # handle per_edge_type_cutoff - use the one from integration config if present
+        if "per_edge_type_cutoff" in model_config:
+            updates["per_edge_type_cutoff"] = "${per_edge_type_cutoff}"
+
+        return updates
+
     def _update_config_recursively(self, config, updates):
         """
         Recursively update config with nested parameter updates.
@@ -186,29 +221,9 @@ class BasicModelTestsMixin:
         """Create a fake training session using integration test configs with injected model."""
         # make a deep copy and enforce integration config parameters
         model_config = copy.deepcopy(config)
-
-        # update parameters to match integration configs and use resolvers
-        updates = {
-            # use resolvers for data-dependent parameters
-            "avg_num_neighbors": "${training_data_stats:num_neighbors_mean}",
-            "per_type_energy_shifts": "${training_data_stats:per_atom_energy_mean}",
-            "per_type_energy_scales": "${training_data_stats:per_type_forces_rms}",
-            # use top-level config variable references
-            "type_names": "${model_type_names}",
-        }
-
-        # handle nested chemical_species in pair_potential if present
-        if (
-            "pair_potential" in model_config
-            and "chemical_species" in model_config["pair_potential"]
-        ):
-            updates["pair_potential.chemical_species"] = "${chemical_species}"
-
-        # handle per_edge_type_cutoff - use the one from integration config if present
-        # this will ensure consistent type names and cutoff values
-        if "per_edge_type_cutoff" in model_config:
-            updates["per_edge_type_cutoff"] = "${per_edge_type_cutoff}"
-
+        # get parameter updates (can be overridden by subclasses)
+        updates = self.model_parameter_updates(model_config)
+        # update model config with necessary updates
         self._update_config_recursively(model_config, updates)
 
         session = train_fn(
