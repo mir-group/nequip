@@ -15,11 +15,9 @@ import os
 import uuid
 import numpy as np
 
-from nequip.data import to_ase
 from nequip.utils.versions import _TORCH_GE_2_6, _TORCH_GE_2_10
 from nequip.ase import NequIPCalculator
 
-from hydra.utils import instantiate
 from .utils import _check_and_print
 from .model_tests_compilation import CompilationTestsMixin
 
@@ -285,7 +283,9 @@ class TorchSimIntegrationMixin(CompilationTestsMixin):
         as reference, while TorchSim loads from batch-compiled model.
         """
         compiled_path, mode = torchsim_compiled_model
-        config, tmpdir, env, model_dtype, model_source, _ = fake_model_training_session
+        config, tmpdir, env, model_dtype, model_source, structures = (
+            fake_model_training_session
+        )
 
         # get model path for ASE calculator
         if model_source == "checkpoint":
@@ -308,56 +308,48 @@ class TorchSimIntegrationMixin(CompilationTestsMixin):
             chemical_species_to_atom_type_map=True,
         )
 
-        # get validation data
-        datamodule = instantiate(config.data, _recursive_=False)
-        datamodule.prepare_data()
-        datamodule.setup("validate")
-        dloader = datamodule.val_dataloader()[0]
-
         # test on validation structures
-        for data in dloader:
-            atoms_list = to_ase(data.copy())
-            for atoms in atoms_list:
-                # NequIP calculator results
-                nequip_atoms = atoms.copy()
-                nequip_atoms.calc = nequip_calc
-                nequip_E = nequip_atoms.get_potential_energy()
-                nequip_F = nequip_atoms.get_forces()
-                nequip_S = nequip_atoms.get_stress(voigt=False)
+        for atoms in structures:
+            # NequIP calculator results
+            nequip_atoms = atoms.copy()
+            nequip_atoms.calc = nequip_calc
+            nequip_E = nequip_atoms.get_potential_energy()
+            nequip_F = nequip_atoms.get_forces()
+            nequip_S = nequip_atoms.get_stress(voigt=False)
 
-                # TorchSim calculator results
-                # convert atoms to SimState
-                sim_state = ts.io.atoms_to_state(
-                    [atoms], device=device, dtype=torch.float64
-                )
-                ts_results = torchsim_calc(sim_state)
+            # TorchSim calculator results
+            # convert atoms to SimState
+            sim_state = ts.io.atoms_to_state(
+                [atoms], device=device, dtype=torch.float64
+            )
+            ts_results = torchsim_calc(sim_state)
 
-                # compare energies
+            # compare energies
+            np.testing.assert_allclose(
+                nequip_E,
+                ts_results["energy"].cpu().numpy()[0],
+                rtol=torchsim_tol,
+                atol=torchsim_tol,
+            )
+
+            # compare forces
+            np.testing.assert_allclose(
+                nequip_F,
+                ts_results["forces"].cpu().numpy(),
+                rtol=torchsim_tol,
+                atol=torchsim_tol,
+            )
+
+            # compare stress (if available)
+            if "stress" in ts_results:
                 np.testing.assert_allclose(
-                    nequip_E,
-                    ts_results["energy"].cpu().numpy()[0],
+                    nequip_S,
+                    ts_results["stress"].cpu().numpy()[0],
                     rtol=torchsim_tol,
                     atol=torchsim_tol,
                 )
 
-                # compare forces
-                np.testing.assert_allclose(
-                    nequip_F,
-                    ts_results["forces"].cpu().numpy(),
-                    rtol=torchsim_tol,
-                    atol=torchsim_tol,
-                )
-
-                # compare stress (if available)
-                if "stress" in ts_results:
-                    np.testing.assert_allclose(
-                        nequip_S,
-                        ts_results["stress"].cpu().numpy()[0],
-                        rtol=torchsim_tol,
-                        atol=torchsim_tol,
-                    )
-
-                del nequip_atoms, sim_state, ts_results
+            del nequip_atoms, sim_state, ts_results
 
     @pytest.mark.skipif(not _TORCHSIM_INSTALLED, reason="torch-sim not installed")
     @pytest.mark.parametrize("batch_size", [2, 3])
@@ -377,7 +369,7 @@ class TorchSimIntegrationMixin(CompilationTestsMixin):
         This is a key feature of torch-sim for efficient MD simulations.
         """
         compiled_path, _ = torchsim_compiled_model
-        config, _, _, _, _, _ = fake_model_training_session
+        config, _, _, _, _, structures = fake_model_training_session
 
         # load calculator
         torchsim_calc = NequIPTorchSimCalc.from_compiled_model(
@@ -386,22 +378,11 @@ class TorchSimIntegrationMixin(CompilationTestsMixin):
             chemical_species_to_atom_type_map=True,
         )
 
-        # get test structures
-        datamodule = instantiate(config.data, _recursive_=False)
-        datamodule.prepare_data()
-        datamodule.setup("validate")
-        dloader = datamodule.val_dataloader()[0]
-
-        structures = []
-        for data in dloader:
-            structures += to_ase(data.copy())
-            if len(structures) >= batch_size:
-                break
-
+        # check if we have enough structures for batched evaluation
         if len(structures) < batch_size:
             pytest.skip(f"Not enough structures for batch_size={batch_size}")
 
-        structures = structures[:batch_size]
+        test_structures = structures[:batch_size]
 
         # === test batched vs individual evaluation ===
 
@@ -410,7 +391,7 @@ class TorchSimIntegrationMixin(CompilationTestsMixin):
         individual_forces = []
         individual_stresses = []
 
-        for atoms in structures:
+        for atoms in test_structures:
             sim_state = ts.io.atoms_to_state(
                 [atoms], device=device, dtype=torch.float64
             )
@@ -422,7 +403,7 @@ class TorchSimIntegrationMixin(CompilationTestsMixin):
 
         # batched evaluation
         batched_sim_state = ts.io.atoms_to_state(
-            structures, device=device, dtype=torch.float64
+            test_structures, device=device, dtype=torch.float64
         )
         batched_result = torchsim_calc(batched_sim_state)
 
