@@ -217,6 +217,30 @@ class BasicModelTestsMixin:
         """model source for fake_model_training_session. subclasses can override params."""
         return request.param
 
+    def load_validation_structures(self, training_config, tmpdir):
+        """
+        Load validation structures for testing.
+
+        Default behavior loads from NequIP datamodule.
+        Subclasses can override for different training workflows.
+
+        Args:
+            training_config: training configuration dict
+            tmpdir: temporary directory path
+
+        Returns:
+            List of ASE Atoms objects for validation
+        """
+        datamodule = instantiate(training_config.data, _recursive_=False)
+        datamodule.prepare_data()
+        datamodule.setup("validate")
+        dloader = datamodule.val_dataloader()[0]
+
+        structures = []
+        for data in dloader:
+            structures += to_ase(data.copy())
+        return structures
+
     # this means we also check if we can `nequip-package` a specific model
     # this could reveal e.g. missing externs, etc
     @pytest.fixture(scope="class")
@@ -241,15 +265,8 @@ class BasicModelTestsMixin:
         )
         training_config, tmpdir, env = next(session)
 
-        # Load validation structures for integration tests
-        datamodule = instantiate(training_config.data, _recursive_=False)
-        datamodule.prepare_data()
-        datamodule.setup("validate")
-        dloader = datamodule.val_dataloader()[0]
-
-        structures = []
-        for data in dloader:
-            structures += to_ase(data.copy())
+        # load validation structures (can be overridden by subclasses)
+        structures = self.load_validation_structures(training_config, tmpdir)
 
         yield training_config, tmpdir, env, model_dtype, model_source, structures
         del session

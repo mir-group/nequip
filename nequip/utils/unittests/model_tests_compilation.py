@@ -16,12 +16,11 @@ import os
 import uuid
 import numpy as np
 
-from nequip.data import AtomicDataDict, to_ase
+from nequip.data import AtomicDataDict
 from nequip.utils.test import override_irreps_debug
 from nequip.utils.versions import _TORCH_GE_2_6, _TORCH_GE_2_10
 from nequip.ase import NequIPCalculator
 
-from hydra.utils import instantiate
 from .utils import _check_and_print
 from .model_tests_basic import EnergyModelTestsMixin
 
@@ -99,7 +98,9 @@ class CompilationTestsMixin(EnergyModelTestsMixin):
 
         Covers TorchScript and AOTInductor (ASE target).
         """
-        config, tmpdir, env, model_dtype, model_source, _ = fake_model_training_session
+        config, tmpdir, env, model_dtype, model_source, structures = (
+            fake_model_training_session
+        )
         assert torch.get_default_dtype() == torch.float64
 
         # handle acceleration modifiers
@@ -169,38 +170,30 @@ class CompilationTestsMixin(EnergyModelTestsMixin):
             chemical_species_to_atom_type_map=chemical_species_to_atom_type_map,
         )
 
-        # == get validation data by instantiating datamodules ==
-        datamodule = instantiate(config.data, _recursive_=False)
-        datamodule.prepare_data()
-        datamodule.setup("validate")
-        dloader = datamodule.val_dataloader()[0]
+        # == loop over validation data and do checks ==
+        for atoms in structures:
+            ckpt_atoms, compile_atoms = atoms.copy(), atoms.copy()
+            ckpt_atoms.calc = ref_calc
+            ckpt_E = ckpt_atoms.get_potential_energy()
+            ckpt_F = ckpt_atoms.get_forces()
 
-        # == loop over data and do checks ==
-        for data in dloader:
-            atoms_list = to_ase(data.copy())
-            for atoms in atoms_list:
-                ckpt_atoms, compile_atoms = atoms.copy(), atoms.copy()
-                ckpt_atoms.calc = ref_calc
-                ckpt_E = ckpt_atoms.get_potential_energy()
-                ckpt_F = ckpt_atoms.get_forces()
+            compile_atoms.calc = compile_calc
+            compile_E = compile_atoms.get_potential_energy()
+            compile_F = compile_atoms.get_forces()
 
-                compile_atoms.calc = compile_calc
-                compile_E = compile_atoms.get_potential_energy()
-                compile_F = compile_atoms.get_forces()
-
-                del atoms, ckpt_atoms, compile_atoms
-                np.testing.assert_allclose(
-                    ckpt_E,
-                    compile_E,
-                    rtol=nequip_compile_tol,
-                    atol=nequip_compile_tol,
-                )
-                np.testing.assert_allclose(
-                    ckpt_F,
-                    compile_F,
-                    rtol=nequip_compile_tol,
-                    atol=nequip_compile_tol,
-                )
+            del atoms, ckpt_atoms, compile_atoms
+            np.testing.assert_allclose(
+                ckpt_E,
+                compile_E,
+                rtol=nequip_compile_tol,
+                atol=nequip_compile_tol,
+            )
+            np.testing.assert_allclose(
+                ckpt_F,
+                compile_F,
+                rtol=nequip_compile_tol,
+                atol=nequip_compile_tol,
+            )
 
     def compare_output_and_gradients(
         self, modelA, modelB, model_test_data, tol, compare_outputs=None
