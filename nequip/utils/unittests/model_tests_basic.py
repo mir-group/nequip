@@ -147,6 +147,15 @@ class BasicModelTestsMixin:
         """Training config files."""
         return request.param
 
+    @pytest.fixture(scope="class")
+    def train_fn(self):
+        """Training session function - can be overridden by subclasses to use alternative training workflows.
+
+        Default is `_training_session` which runs `nequip-train`.
+        Subclasses can override to use different training commands.
+        """
+        return _training_session
+
     def _update_config_recursively(self, config, updates):
         """
         Recursively update config with nested parameter updates.
@@ -171,7 +180,9 @@ class BasicModelTestsMixin:
     # this means we also check if we can `nequip-package` a specific model
     # this could reveal e.g. missing externs, etc
     @pytest.fixture(scope="class", params=[None, "package"])
-    def fake_model_training_session(self, conffile, config, model_dtype, request):
+    def fake_model_training_session(
+        self, conffile, config, model_dtype, request, train_fn
+    ):
         """Create a fake training session using integration test configs with injected model."""
         # make a deep copy and enforce integration config parameters
         model_config = copy.deepcopy(config)
@@ -200,7 +211,7 @@ class BasicModelTestsMixin:
 
         self._update_config_recursively(model_config, updates)
 
-        session = _training_session(
+        session = train_fn(
             conffile,
             model_dtype,
             extra_train_from_save=request.param,
