@@ -212,11 +212,16 @@ class BasicModelTestsMixin:
             else:
                 config[key] = value
 
+    @pytest.fixture(scope="class", params=["checkpoint", "package"])
+    def model_source(self, request):
+        """model source for fake_model_training_session. subclasses can override params."""
+        return request.param
+
     # this means we also check if we can `nequip-package` a specific model
     # this could reveal e.g. missing externs, etc
-    @pytest.fixture(scope="class", params=[None, "package"])
+    @pytest.fixture(scope="class")
     def fake_model_training_session(
-        self, conffile, config, model_dtype, request, train_fn
+        self, conffile, config, model_dtype, train_fn, model_source
     ):
         """Create a fake training session using integration test configs with injected model."""
         # make a deep copy and enforce integration config parameters
@@ -229,11 +234,12 @@ class BasicModelTestsMixin:
         session = train_fn(
             conffile,
             model_dtype,
-            extra_train_from_save=request.param,
+            extra_train_from_save=None
+            if model_source == "checkpoint"
+            else model_source,
             model_config=model_config,
         )
         training_config, tmpdir, env = next(session)
-        model_source = "checkpoint" if request.param is None else "package"
 
         # Load validation structures for integration tests
         datamodule = instantiate(training_config.data, _recursive_=False)
