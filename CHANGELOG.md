@@ -8,12 +8,19 @@ Most recent change on the top.
 
 ## Unreleased
 
+## [0.17.0]
+
 ### Added
-- possibility of holding multiple train-time compiled models with different input/output signatures
+- train-time compilation support for models with different input-output key signatures - enables holding multiple compiled models with different signatures
+- documentation section on known PyTorch version issues
+
+### Changed
+- overhauled `NonperiodicCellTransform` with improved handling
+- models compiled for training now produce full set of eager output dict entries
 
 ### Fixed
-- PyTorch 2.10.0 tracing error for silu_backward
-- PyTorch 2.10.0 AOTI error
+- PyTorch 2.10.0 tracing error for `silu_backward`
+- PyTorch 2.10.0 AOTI codecache error
 - https://github.com/mir-group/nequip/issues/572
 
 ## [0.16.3]
