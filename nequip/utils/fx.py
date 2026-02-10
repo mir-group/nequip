@@ -10,7 +10,7 @@ import contextlib
 import difflib
 import uuid
 import os
-from typing import List
+from typing import List, Optional
 
 
 @contextlib.contextmanager
@@ -35,7 +35,7 @@ def nequip_make_fx(
     model: torch.nn.Module,
     data: AtomicDataDict.Type,
     fields: List[str],
-    extra_inputs: List[torch.Tensor] = [],
+    extra_inputs: Optional[List[torch.Tensor]] = None,
     seed: int = 1,
 ):
     """
@@ -48,6 +48,7 @@ def nequip_make_fx(
     """
     # === preprocess data ===
     data = data.copy()
+    extra_inputs = [] if extra_inputs is None else extra_inputs
     data = {key: data[key] for key in fields}
 
     # we do it twice
