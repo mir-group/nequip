@@ -14,7 +14,7 @@ from .dtype import (
     _pt2_compile_error_message,
 )
 
-from typing import List, Dict, Union, Any
+from typing import List, Dict, Union, Any, Optional
 
 
 def aot_export_model(
@@ -25,7 +25,7 @@ def aot_export_model(
     data: AtomicDataDict.Type,
     batch_map: Dict[str, torch.export.dynamic_shapes.Dim],
     output_path: str,
-    inductor_configs: Dict[str, Any] = {},
+    inductor_configs: Optional[Dict[str, Any]] = None,
     constant_fold: bool = False,
     seed: int = 1,
 ) -> str:
@@ -36,7 +36,7 @@ def aot_export_model(
     torch._dynamo.reset()
 
     # === preprocess `inductor_configs` ===
-    inductor_configs = inductor_configs.copy()
+    inductor_configs = {} if inductor_configs is None else inductor_configs.copy()
 
     # === constant folding ===
     if constant_fold:
