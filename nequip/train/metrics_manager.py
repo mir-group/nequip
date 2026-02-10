@@ -126,7 +126,7 @@ class MetricsManager(torch.nn.ModuleDict):
         metrics: List[
             Dict[str, Union[float, str, Dict[str, Union[str, Callable]], Metric]]
         ],
-        type_names: List[str] = None,
+        type_names: Optional[List[str]] = None,
     ):
         super().__init__()
         self.metrics: Dict[str, Dict[str, Union[float, str, bool]]] = {}
@@ -405,7 +405,7 @@ def EnergyForceLoss(
         AtomicDataDict.FORCE_KEY: 1.0,
     },
     per_atom_energy: bool = True,
-    type_names=None,
+    type_names: Optional[List[str]] = None,
 ):
     """Simplified :class:`MetricsManager` wrapper for a **loss** term containing energy and forces mean squared errors (MSEs).
 
@@ -471,7 +471,7 @@ _EFS_METRICS_COEFFS_KEYS: Final[List[str]] = _EF_METRICS_COEFFS_KEYS + [
 
 
 def EnergyForceMetrics(
-    coeffs: Dict[str, float] = {
+    coeffs: Dict[str, Optional[float]] = {
         "total_energy_rmse": 1.0,
         "per_atom_energy_rmse": None,
         "forces_rmse": 1.0,
@@ -482,7 +482,7 @@ def EnergyForceMetrics(
         "per_atom_energy_maxabserr": None,
         "forces_maxabserr": None,
     },
-    type_names=None,
+    type_names: Optional[List[str]] = None,
 ):
     """Simplified :class:`MetricsManager` wrapper for a **metric** term containing energy and force mean absolute errors (MAEs), root mean squared errors (RMSEs), and maximum absolute errors (MaxAbsErrs).
 
@@ -578,8 +578,8 @@ def EnergyForceStressLoss(
         AtomicDataDict.STRESS_KEY: 1.0,
     },
     per_atom_energy: bool = True,
-    type_names=None,
-    ignore_nan: Dict[str, bool] = {},
+    type_names: Optional[List[str]] = None,
+    ignore_nan: Optional[Dict[str, bool]] = None,
 ):
     """Simplified :class:`MetricsManager` wrapper for a **loss** term containing energy, forces and stress mean squared errors (MSEs).
 
@@ -609,6 +609,7 @@ def EnergyForceStressLoss(
         ignore_nan (Dict[str, bool], optional): ``dict`` that specifies whether to ignore NaN values for each field (default: all ``False``)
     """
 
+    ignore_nan = {} if ignore_nan is None else ignore_nan
     metrics = [
         {
             "name": "per_atom_energy_mse" if per_atom_energy else "total_energy_mse",
@@ -640,7 +641,7 @@ def EnergyForceStressLoss(
 
 
 def EnergyForceStressMetrics(
-    coeffs: Dict[str, float] = {
+    coeffs: Dict[str, Optional[float]] = {
         "total_energy_rmse": 1.0,
         "per_atom_energy_rmse": None,
         "forces_rmse": 1.0,
@@ -654,8 +655,8 @@ def EnergyForceStressMetrics(
         "forces_maxabserr": None,
         "stress_maxabserr": None,
     },
-    type_names=None,
-    ignore_nan: Dict[str, bool] = {},
+    type_names: Optional[List[str]] = None,
+    ignore_nan: Optional[Dict[str, bool]] = None,
 ):
     """Simplified :class:`MetricsManager` wrapper for a **metric** term containing energy, force and stress mean absolute errors (MAEs), root mean squared errors (RMSEs), and maximum absolute errors (MaxAbsErrs).
 
@@ -692,6 +693,7 @@ def EnergyForceStressMetrics(
     assert all([k in _EFS_METRICS_COEFFS_KEYS for k in coeffs.keys()]), (
         f"Unrecognized key found in `coeffs`, only the following are recognized: {_EFS_METRICS_COEFFS_KEYS}"
     )
+    ignore_nan = {} if ignore_nan is None else ignore_nan
     metrics = [
         {
             "name": "total_energy_rmse",
@@ -783,7 +785,7 @@ def EnergyForceStressMetrics(
 
 def EnergyOnlyLoss(
     per_atom_energy: bool = True,
-    type_names=None,
+    type_names: Optional[List[str]] = None,
 ):
     """Simplified :class:`MetricsManager` wrapper for a **loss** term containing only energy mean squared error (MSE).
 
@@ -830,7 +832,7 @@ _ENERGY_ONLY_METRICS_COEFFS_KEYS: Final[List[str]] = [
 
 
 def EnergyOnlyMetrics(
-    coeffs: Dict[str, float] = {
+    coeffs: Dict[str, Optional[float]] = {
         "total_energy_rmse": 1.0,
         "per_atom_energy_rmse": None,
         "total_energy_mae": None,
@@ -838,7 +840,7 @@ def EnergyOnlyMetrics(
         "total_energy_maxabserr": None,
         "per_atom_energy_maxabserr": None,
     },
-    type_names=None,
+    type_names: Optional[List[str]] = None,
 ):
     """Simplified :class:`MetricsManager` wrapper for a **metric** term containing only energy mean absolute errors (MAEs), root mean squared errors (RMSEs), and maximum absolute errors (MaxAbsErrs).
 
