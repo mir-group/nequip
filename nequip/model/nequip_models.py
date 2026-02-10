@@ -144,7 +144,7 @@ def FullNequIPGNNModel(
     bessel_trainable: bool = False,
     polynomial_cutoff_p: int = 6,
     # edge sum normalization
-    avg_num_neighbors: Union[float, Dict[str, float]] = None,
+    avg_num_neighbors: Optional[Union[float, Dict[str, float]]] = None,
     # per atom energy params
     per_type_energy_scales: Optional[Union[float, Sequence[float]]] = None,
     per_type_energy_shifts: Optional[Union[float, Sequence[float]]] = None,
