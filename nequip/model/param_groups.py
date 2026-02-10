@@ -1,4 +1,4 @@
-# This file is a part of the `allegro` package. Please see LICENSE and README at the root for information on using it.
+# This file is a part of the `nequip` package. Please see LICENSE and README at the root for information on using it.
 import torch
 
 
@@ -7,6 +7,30 @@ def MuonParamGroups(
     muon: dict,
     adam: dict,
 ):
+    """
+    Build optimizer parameter groups, splitting parameters between a Muon-based optimizer
+    and Adam (or Adam-like) optimizer.
+
+    Assigned to Adam group:
+      - Any parameter whose name does **not** contain the substring ``"layer"``.
+      - Any parameter not matching the Muon-specific rules below.
+
+    Assigned to Muon group:
+      - Edge MLP weights: parameters whose name contains ``"edge_mlp"`` and that are
+        2D tensors (i.e., matrix weights).
+      - e3nn convolution linear weights: parameters whose name contains ``"conv.linear"``.
+
+    For e3nn ``Linear`` layers, the returned Muon parameter group includes an
+    ``e3nn_reshaping`` dictionary mapping the index of the parameter within the Muon
+    group to the module's ``weight_index_slices``. This metadata will be used by the
+     to reshape or operate on corresponding matrix weights.
+
+    Args:
+        model (torch.nn.Module): The model to optimize.
+        muon (dict): Muon config parameters.
+        adam (dict): Adam config parameters.
+
+    """
     muon_weights = []
     adam_weights = []
 
@@ -47,7 +71,7 @@ def MuonParamGroups(
 
     param_groups = [
         dict(params=muon_weights, use_muon=True, e3nn_reshaping=e3nn_reshaping, **muon),
-        dict(params=adam_weights, use_muon=False, e3nn_reshaping=None, **adam),
+        dict(params=adam_weights, use_muon=False, **adam),
     ]
 
     return param_groups
