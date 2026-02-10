@@ -58,13 +58,13 @@ class NequIPLightningModule(lightning.LightningModule):
     def __init__(
         self,
         model: Dict,
+        num_datasets: Dict[str, int],
         optimizer: Optional[Dict] = None,
         lr_scheduler: Optional[Dict] = None,
         loss: Optional[Dict] = None,
         train_metrics: Optional[Dict] = None,
         val_metrics: Optional[Dict] = None,
         test_metrics: Optional[Dict] = None,
-        num_datasets: Optional[Dict[str, int]] = None,
         # for caching training info
         info_dict: Optional[Dict] = None,
     ):
@@ -115,17 +115,7 @@ class NequIPLightningModule(lightning.LightningModule):
         # === instantiate MetricsManager objects ===
         # must have separate MetricsManagers for each dataloader
         # num_datasets goes in order [train, val, test, predict]
-        self.num_datasets = (
-            num_datasets
-            if num_datasets is not None
-            else {
-                "train": 0,
-                "val": 0,
-                "test": 0,
-                "predict": 0,
-            }
-        )
-
+        self.num_datasets = num_datasets
         assert self.num_datasets["train"] == 1, (
             "currently only support one training dataset"
         )
