@@ -4,6 +4,7 @@
 
 import torch
 
+
 # This function is adapted from Muon (https://github.com/KellerJordan/Muon/).
 # Original source: https://github.com/KellerJordan/Muon/blob/master/muon.py#L5.
 # Changes: none.
@@ -39,6 +40,7 @@ def zeropower_via_newtonschulz5(G, steps: int):
         X = X.mT
     return X
 
+
 # This function is adapted from Muon (https://github.com/KellerJordan/Muon/).
 # Original source: https://github.com/KellerJordan/Muon/blob/master/muon.py#L34.
 # Changes: added `e3nn_reshaping` conditional to handle  e3nn ``Linear`` layer weights,
@@ -73,6 +75,7 @@ def muon_update(
         update *= max(1, grad.size(-2) / grad.size(-1)) ** 0.5
     return update
 
+
 # This function is adapted from Muon (https://github.com/KellerJordan/Muon/).
 # Original source: https://github.com/KellerJordan/Muon/blob/master/muon.py#L130.
 # Changes: none.
@@ -83,6 +86,7 @@ def adam_update(grad, buf1, buf2, step, betas, eps):
     buf2c = buf2 / (1 - betas[1] ** step)
     return buf1c / (buf2c.sqrt() + eps)
 
+
 # This function is adapted from Muon (https://github.com/KellerJordan/Muon/).
 # Original source: https://github.com/KellerJordan/Muon/blob/master/muon.py#L138.
 # Changes: added `e3nn_reshaping` element in parameter group keys for e3nn ``Linear``
@@ -91,6 +95,7 @@ class MuonWithAuxAdam(torch.optim.Optimizer):
     """
     Non-distributed variant of MuonWithAuxAdam (Originally SingleDeviceMuonWithAuxAdam).
     """
+
     def __init__(self, params):
         for group in params:
             assert "use_muon" in group
