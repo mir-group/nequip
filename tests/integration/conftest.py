@@ -63,7 +63,7 @@ def training_module_override_dict(request):
     return request.param
 
 
-@pytest.fixture(scope="session", params=[None, "checkpoint", "package"])
+@pytest.fixture(scope="session", params=["fresh", "checkpoint", "package"])
 def extra_train_from_save(request):
     """
     Whether the checkpoints for the tests come from a fresh model, `ModelFromCheckpoint`, or `ModelFromPackage`.

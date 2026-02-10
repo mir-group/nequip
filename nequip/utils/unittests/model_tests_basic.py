@@ -212,7 +212,7 @@ class BasicModelTestsMixin:
             else:
                 config[key] = value
 
-    @pytest.fixture(scope="class", params=["checkpoint", "package"])
+    @pytest.fixture(scope="class", params=["fresh", "package"])
     def model_source(self, request):
         """model source for fake_model_training_session. subclasses can override params."""
         return request.param
@@ -258,9 +258,7 @@ class BasicModelTestsMixin:
         session = train_fn(
             conffile,
             model_dtype,
-            extra_train_from_save=None
-            if model_source == "checkpoint"
-            else model_source,
+            extra_train_from_save=model_source,
             model_config=model_config,
         )
         training_config, tmpdir, env = next(session)

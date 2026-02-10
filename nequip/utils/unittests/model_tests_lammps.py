@@ -86,7 +86,7 @@ class LAMMPSMLIAPIntegrationMixin(EnergyModelTestsMixin):
         config, tmpdir, env, model_dtype, model_source, _ = fake_model_training_session
 
         # use checkpoint or packaged model path that fixture provides
-        if model_source == "checkpoint":
+        if model_source in ("fresh", "checkpoint"):
             model_path = str(pathlib.Path(f"{tmpdir}/best.ckpt"))
         else:  # package
             model_path = str(pathlib.Path(f"{tmpdir}/orig_package_model.nequip.zip"))

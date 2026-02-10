@@ -112,7 +112,7 @@ class CompilationTestsMixin(EnergyModelTestsMixin):
 
         # === test nequip-compile ===
         # use checkpoint or package based on fixture
-        if model_source == "checkpoint":
+        if model_source in ("fresh", "checkpoint"):
             model_path = str(pathlib.Path(f"{tmpdir}/best.ckpt"))
         else:  # package
             model_path = str(pathlib.Path(f"{tmpdir}/orig_package_model.nequip.zip"))

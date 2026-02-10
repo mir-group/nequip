@@ -24,7 +24,7 @@ def _check_and_print(retcode, encoding="ascii"):
 def _training_session(
     conffile,
     model_dtype,
-    extra_train_from_save=None,
+    extra_train_from_save="fresh",
     model_config=None,
     training_module_override_dict=None,
 ):
@@ -36,12 +36,18 @@ def _training_session(
     Args:
         conffile: Name of config file (e.g., "minimal_aspirin.yaml")
         model_dtype: Model dtype string (e.g., "float32", "float64")
-        extra_train_from_save: Optional, None/"checkpoint"/"package" for additional training
+        extra_train_from_save: One of "fresh", "checkpoint", or "package" for additional training
         model_config: Optional model config dict to inject (for unit tests)
         training_module_override_dict: Optional dict with training_module override, including optimizer (e.g. for ScheduleFreeLightningModule)
     Yields:
         tuple: (config, tmpdir, env) - training config, temp directory, and env vars
     """
+    if extra_train_from_save not in ("fresh", "checkpoint", "package"):
+        raise ValueError(
+            "extra_train_from_save must be one of 'fresh', 'checkpoint', or 'package'. "
+            f"Got: {extra_train_from_save}"
+        )
+
     # find the config file in the same directory as this utils file
     current_file = pathlib.Path(__file__)
     config_path = current_file.parent / conffile
@@ -102,7 +108,7 @@ def _training_session(
             _check_and_print(retcode)
 
             # handle extra training from save
-            if extra_train_from_save is None:
+            if extra_train_from_save == "fresh":
                 yield config, tmpdir, env
             else:
                 with tempfile.TemporaryDirectory() as new_tmpdir:
