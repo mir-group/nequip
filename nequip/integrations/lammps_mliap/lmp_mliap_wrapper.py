@@ -112,6 +112,18 @@ class NequIPLAMMPSMLIAPWrapper(MLIAPUnified):
         if _HAS_MLIAP_GHOST_EXCHANGE:
             model = modify(model, [{"modifier": "enable_LAMMPSMLIAPGhostExchange"}])
 
+        # make sure that derivative computation for forces, stresses is disabled
+        # such that the model is an energy model so that we can rely on AOT Autograd for inference
+        # since `torch.compile` can't handle `x.requires_grad_(True)`
+        # we avoid using the `CompileGraphModel` because of potential batch dim issues, potential make_fx issues with the ghost exchange module, and because it was written specifically for train-time compile
+        if "disable_ForceStressOutput" in available_modifiers:
+            model = modify(model, [{"modifier": "disable_ForceStressOutput"}])
+        else:
+            # very bad hack, but left for backwards compatibility
+            # TODO: remove in the future as a breaking change
+            # assumes model is `GraphModel(StressForceOutput(EnergyModel))`
+            model.model = model.model.func
+
         # NOTE: this is a hack/workaround because modifiers like NequIP-OEQ condition modification logic around whether `torch.compile` will be called
         # even though we load an eager model, we just set this attribute to True for the acceleration modifiers
         # and reset to False after modification
@@ -130,18 +142,6 @@ class NequIPLAMMPSMLIAPWrapper(MLIAPUnified):
             "cuda" if "kokkos" in lmp_data.__class__.__module__.lower() else "cpu"
         )
         model = prepare_model_for_compile(model, self.device)
-
-        # make sure that derivative computation for forces, stresses is disabled
-        # such that the model is an energy model so that we can rely on AOT Autograd for inference
-        # since `torch.compile` can't handle `x.requires_grad_(True)`
-        # we avoid using the `CompileGraphModel` because of potential batch dim issues, potential make_fx issues with the ghost exchange module, and because it was written specifically for train-time compile
-        if "disable_ForceStressOutput" in available_modifiers:
-            model = modify(model, [{"modifier": "disable_ForceStressOutput"}])
-        else:
-            # very bad hack, but left for backwards compatibility
-            # TODO: remove in the future as a breaking change
-            # assumes model is `GraphModel(StressForceOutput(EnergyModel))`
-            model.model = model.model.func
 
         if self.compile:
             # NOTE: it seems that we have to set `freezing` this way for constant folding
