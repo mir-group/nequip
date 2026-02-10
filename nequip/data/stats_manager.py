@@ -5,7 +5,7 @@ from . import AtomicDataDict
 
 from .modifier import BaseModifier, PerAtomModifier, NumNeighbors
 from .stats import Mean, RootMeanSquare, StandardDeviation
-from typing import List, Dict, Union, Callable, Iterable
+from typing import List, Dict, Union, Callable, Iterable, Optional, Any
 
 from nequip.utils.logger import RankedLogger
 
@@ -46,11 +46,13 @@ class DataStatisticsManager(torch.nn.ModuleList):
         metrics: List[
             Dict[str, Union[float, str, Dict[str, Union[str, Callable]], Metric]]
         ],
-        dataloader_kwargs: Dict = {},
-        type_names: List[str] = None,
+        dataloader_kwargs: Optional[Dict[str, Any]] = None,
+        type_names: Optional[List[str]] = None,
     ):
         super().__init__()
         assert len(metrics) != 0
+
+        dataloader_kwargs = {} if dataloader_kwargs is None else dataloader_kwargs
 
         assert all(
             key not in dataloader_kwargs
@@ -225,8 +227,8 @@ class DataStatisticsManager(torch.nn.ModuleList):
 
 
 def CommonDataStatisticsManager(
-    dataloader_kwargs: Dict = {},
-    type_names: List[str] = None,
+    dataloader_kwargs: Optional[Dict[str, Any]] = None,
+    type_names: Optional[List[str]] = None,
 ):
     """:class:`~nequip.data.DataStatisticsManager` wrapper that implements common dataset statistics.
 
@@ -285,8 +287,8 @@ def CommonDataStatisticsManager(
 
 
 def EnergyOnlyDataStatisticsManager(
-    dataloader_kwargs: Dict = {},
-    type_names: List[str] = None,
+    dataloader_kwargs: Optional[Dict[str, Any]] = None,
+    type_names: Optional[List[str]] = None,
 ):
     """:class:`~nequip.data.DataStatisticsManager` wrapper for energy-only datasets.
 
