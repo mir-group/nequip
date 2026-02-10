@@ -14,8 +14,8 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def download_url(url: str, folder: str, filename: Optional[str] = None) -> None:
-    """Downloads the content of an URL to a specific folder.
+def download_url(url: str, folder: str, filename: Optional[str] = None) -> str:
+    """Downloads the content of an URL to a specific folder and returns the file path.
 
     Args:
         url (str)     : the url
