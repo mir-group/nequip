@@ -12,7 +12,7 @@ def dtype_from_name(name: Union[str, torch.dtype]) -> torch.dtype:
     return {"float32": torch.float32, "float64": torch.float64}[name]
 
 
-def dtype_to_name(name: Union[str, torch.dtype]) -> torch.dtype:
+def dtype_to_name(name: Union[str, torch.dtype]) -> str:
     if isinstance(name, str):
         return name
     return {torch.float32: "float32", torch.float64: "float64"}[name]
