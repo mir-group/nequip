@@ -9,7 +9,7 @@ from .metrics import (
     MaximumAbsoluteError,
 )
 
-from typing import List, Dict, Union, Callable, Final, Optional
+from typing import Any, List, Dict, Union, Callable, Final, Optional
 
 _METRICS_MANAGER_INPUT_KEYS: Final[List[str]] = [
     "field",
@@ -384,7 +384,7 @@ class MetricsManager(torch.nn.ModuleDict):
                 metric_dict["coeff"] = None
             self.do_weighted_sum = False
 
-    def get_extra_state(self) -> None:
+    def get_extra_state(self) -> Dict[str, Any]:
         """"""
         return {
             "coeff_dict": {k: v["coeff"] for k, v in self.metrics.items()},
