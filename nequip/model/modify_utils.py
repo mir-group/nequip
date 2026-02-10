@@ -53,7 +53,7 @@ def get_all_modifiers(
                 # confirm (indirectly) that these are @classmethods (bound instance methods will not be equal)
                 # this ensures that having a globally unique name for each modifier does not hide differences between different copies of the same modifier hiding in a single module tree
                 assert _all_modifiers[name] == member, (
-                    f"Found at least two non-unique modifiers with same name `{name}`: {_all_modifiers[name]:r} and {member:r}"
+                    f"Found at least two non-unique modifiers with same name `{name}`: {_all_modifiers[name]!r} and {member!r}"
                 )
             _all_modifiers[name] = member
 
