@@ -45,10 +45,10 @@ If the pretrained model used custom type names (e.g., "my_H", "carbon"), you wou
 
 When fine-tuning, you must use the same cutoff radius (`r_max`) that the pretrained model was trained with. Using a different cutoff radius will result in incorrect neighbor list construction and poor model performance.
 
-For models from [nequip.net](https://www.nequip.net/), the `r_max` value is provided in the model's metadata on the website. Set this value explicitly in your config:
+Use the `cutoff_radius_from_package` resolver to extract this value directly from the package:
 
 ```yaml
-cutoff_radius: 6.0  # must be the same r_max as the pretrained model
+cutoff_radius: ${cutoff_radius_from_package:path/to/model.nequip.zip}
 
 data:
   # ...

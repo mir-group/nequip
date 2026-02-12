@@ -2,10 +2,13 @@
 
 """Custom OmegaConf resolvers for nequip."""
 
+import logging
 from omegaconf import OmegaConf, ListConfig
-from typing import Dict, Callable, Set, Any
+from typing import Dict, Callable, Set, Any, Optional
 
 from nequip.utils import get_project_root
+
+logger = logging.getLogger(__name__)
 
 
 def _sanitize_int(x, client: str):
@@ -108,6 +111,32 @@ def type_names_from_package(package_path: str):
     return ModelTypeNamesFromPackage(package_path)
 
 
+def cutoff_radius_from_package(
+    package_path: str, model_key: Optional[str] = None
+) -> float:
+    """Extract cutoff radius (r_max) from a packaged model file.
+
+    For packages containing multiple models (ModuleDict), ``model_key`` can be
+    provided to select which model to inspect.
+    """
+    from nequip.model.saved_models import load_saved_model
+    from nequip.nn import graph_model
+    from nequip.train.lightning import _SOLE_MODEL_KEY
+
+    if model_key is None:
+        model_key = _SOLE_MODEL_KEY
+    model = load_saved_model(
+        package_path,
+        compile_mode="eager",
+        model_key=model_key,
+    )
+    r_max = float(model.metadata[graph_model.R_MAX_KEY])
+    logger.info(
+        f"Extracted cutoff radius {r_max} from path {package_path} (model_key={model_key})"
+    )
+    return r_max
+
+
 # === Resolver Registry ===
 
 _DEFAULT_RESOLVERS: Dict[str, Callable] = {
@@ -118,6 +147,7 @@ _DEFAULT_RESOLVERS: Dict[str, Callable] = {
     "list_to_constant_dict": list_to_constant_dict,
     "big_dataset_stats": big_dataset_stats,
     "type_names_from_package": type_names_from_package,
+    "cutoff_radius_from_package": cutoff_radius_from_package,
 }
 
 _REGISTERED_RESOLVERS: Set[str] = set()
