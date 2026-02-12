@@ -104,9 +104,6 @@ POLARIZATION_KEY: Final[str] = "polarization"
 TOTAL_CHARGE_KEY: Final[str] = "charge"
 TOTAL_SPIN_KEY: Final[str] = "spin"
 
-# metadata for a frame/graph
-FRAME_SUBSET_KEY: Final[str] = "subset"
-
 # === LAMMPS MLIAP integration keys ===
 LMP_MLIAP_DATA_KEY: Final[str] = "lmp_mliap_data"
 # (2,) tensor containing [num_local_atoms, num_ghost_atoms]
