@@ -30,6 +30,7 @@ from nequip.nn import (
     ForceStressOutput,
     PartialForceOutput,
     PerTypeScaleShift,
+    graph_model,
 )
 from nequip.utils import dtype_to_name, find_first_of_type
 from nequip.utils.test import (
@@ -107,6 +108,17 @@ class BasicModelTestsMixin:
         # we return the config with the correct `model_dtype`
         return model, config, out_fields
 
+    @staticmethod
+    def _r_max_from_model(instance) -> float:
+        assert getattr(instance, "is_graph_model", False), (
+            "test model must be a GraphModel to expose metadata"
+        )
+        metadata = instance.metadata
+        assert graph_model.R_MAX_KEY in metadata, (
+            f"model metadata missing required key `{graph_model.R_MAX_KEY}`"
+        )
+        return float(metadata[graph_model.R_MAX_KEY])
+
     @pytest.fixture(scope="class")
     def partial_model(self, model, device):
         _, config, _ = model
@@ -123,19 +135,22 @@ class BasicModelTestsMixin:
         return aux_model, out_fields
 
     @pytest.fixture(scope="class", params=["molecules", "bulk"])
-    def model_test_data(self, config, atomic_batch, diamond_carbon, device, request):
+    def model_test_data(self, model, atomic_batch, diamond_carbon, device, request):
         if request.param == "molecules":
             test_data = atomic_batch
         elif request.param == "bulk":
             test_data = diamond_carbon
         else:
             raise ValueError(f"Unknown test data parameter: {request.param}")
+        instance, _, _ = model
 
         # clone the data to avoid mutating the original batch
         # cpu because we need to reconstruct the neighborlist
         test_data = {k: v.clone().detach().to("cpu") for k, v in test_data.items()}
         # reset neighborlist
-        test_data = NeighborListTransform(r_max=config["r_max"])(test_data)
+        test_data = NeighborListTransform(r_max=self._r_max_from_model(instance))(
+            test_data
+        )
         # return the data in the device for testing
         return AtomicDataDict.to_(test_data, device)
 
@@ -468,7 +483,7 @@ class EnergyModelTestsMixin(BasicModelTestsMixin):
     def test_large_separation(self, model, molecules, device):
         instance, config, _ = model
         atol = {torch.float32: 1e-4, torch.float64: 1e-10}[instance.model_dtype]
-        r_max = config["r_max"]
+        r_max = self._r_max_from_model(instance)
         atoms1 = molecules[0].copy()
         atoms2 = molecules[1].copy()
         # translate atoms2 far away
@@ -767,8 +782,8 @@ class EnergyModelTestsMixin(BasicModelTestsMixin):
         return wrapped
 
     def test_force_smoothness(self, model, device, pair_force):
-        _, config, _ = model
-        r_max = config["r_max"]
+        instance, config, _ = model
+        r_max = self._r_max_from_model(instance)
         type_names = config["type_names"]
         num_types = len(type_names)
 
@@ -805,8 +820,8 @@ class EnergyModelTestsMixin(BasicModelTestsMixin):
         # fixed cutoff models. This works on the assumption that the partial energies on the node should not be affected
         # by the presence of a neighbor outside the cutoff radius, thus making the corresponding forces zero.
 
-        _, config, _ = model  # Just to get the config
-        r_max = config["r_max"]
+        instance, config, _ = model  # Just to get the config
+        r_max = self._r_max_from_model(instance)
         type_names = config["type_names"]
 
         # Whether the cutoff radius is specified per edge type
@@ -825,10 +840,10 @@ class EnergyModelTestsMixin(BasicModelTestsMixin):
                                 r_max = r_max[nbor_type]
                             else:
                                 # default missing target types to global r_max
-                                r_max = config["r_max"]
+                                r_max = self._r_max_from_model(instance)
                     else:
                         # default missing source types to global r_max
-                        r_max = config["r_max"]
+                        r_max = self._r_max_from_model(instance)
 
                 # Control group: force is non-zero within the cutoff radius
                 partial_forces = pair_force(
@@ -897,7 +912,7 @@ class EnergyModelTestsMixin(BasicModelTestsMixin):
                 data = AtomicDataDict.to_(
                     compute_neighborlist_(
                         AtomicDataDict.batched_from_list(data_list),
-                        r_max=config["r_max"],
+                        r_max=self._r_max_from_model(instance),
                     ),
                     device,
                 )
@@ -914,7 +929,7 @@ class EnergyModelTestsMixin(BasicModelTestsMixin):
     def test_embedding_cutoff(self, model, device):
         """Test that edge embeddings/features go to zero at cutoff and gradients are correct."""
         instance, config, _ = model
-        r_max = config["r_max"]
+        r_max = self._r_max_from_model(instance)
 
         # make a synthetic three atom example
         data = {
