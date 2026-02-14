@@ -4,7 +4,7 @@
 import torch
 from e3nn.io._cartesian_tensor import CartesianTensor
 from . import _keys
-from typing import Dict, Set, Sequence
+from typing import Dict, Set, Sequence, Optional
 
 
 # === Key Registration ===
@@ -77,11 +77,11 @@ _CARTESIAN_TENSOR_FIELDS: Dict[str, str] = dict(_DEFAULT_CARTESIAN_TENSOR_FIELDS
 
 
 def register_fields(
-    graph_fields: Sequence[str] = [],
-    node_fields: Sequence[str] = [],
-    edge_fields: Sequence[str] = [],
-    long_fields: Sequence[str] = [],
-    cartesian_tensor_fields: Dict[str, str] = {},
+    graph_fields: Optional[Sequence[str]] = None,
+    node_fields: Optional[Sequence[str]] = None,
+    edge_fields: Optional[Sequence[str]] = None,
+    long_fields: Optional[Sequence[str]] = None,
+    cartesian_tensor_fields: Optional[Dict[str, str]] = None,
 ) -> None:
     """Register custom fields as being per-frame, per-atom, per-edge, long dtype and/or Cartesian tensors.
 
@@ -92,6 +92,15 @@ def register_fields(
         long_fields (Sequence[str]): long ``dtype`` fields
         cartesian_tensor_fields (Dict[str, str]): Cartesian tensor fields (both the name, and the ``formula`` must be provided, e.g. ``"ij=ji"``, see `e3nn docs <https://docs.e3nn.org/en/stable/api/io/cartesian_tensor.html>`_)
     """
+    # normalize optional inputs to avoid shared mutable defaults
+    graph_fields = [] if graph_fields is None else graph_fields
+    node_fields = [] if node_fields is None else node_fields
+    edge_fields = [] if edge_fields is None else edge_fields
+    long_fields = [] if long_fields is None else long_fields
+    cartesian_tensor_fields = (
+        {} if cartesian_tensor_fields is None else cartesian_tensor_fields
+    )
+
     # Because str is itself a Sequence[str], we need to avoid hard-to-debug errors due to register_fields(graph_fields="field")
     # which tries to register five fields named "f", "i", etc.
     message = " must be a sequence of strings, each representing a field name, rather than a single string"
