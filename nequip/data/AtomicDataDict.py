@@ -12,20 +12,8 @@ class, if there was such a class---"self" is just passed explicitly:
 
     AtomicDataDict.some_method(my_data)
 
-Some standard fields:
-
-    pos (Tensor [n_nodes, 3]): Positions of the nodes.
-    edge_index (LongTensor [2, n_edges]): ``edge_index[0]`` is the per-edge
-        index of the source node and ``edge_index[1]`` is the target node.
-    edge_cell_shift (Tensor [n_edges, 3], optional): which periodic image
-        of the target point each edge goes to, relative to the source point.
-    cell (Tensor [1, 3, 3], optional): the periodic cell for
-        ``edge_cell_shift`` as the three triclinic cell vectors.
-    node_features (Tensor [n_atom, ...]): the input features of the nodes, optional
-    node_attrs (Tensor [n_atom, ...]): the attributes of the nodes, for instance the atom type, optional
-    batch (Tensor [n_atom]): the graph to which the node belongs, optional
-    atomic_numbers (Tensor [n_atom]): optional
-    atom_type (Tensor [n_atom]): optional
+Canonical field names and shape conventions are defined in ``_keys.py`` and
+enforced through field registries in ``_key_registry.py``.
 """
 
 from typing import Dict, Union, Tuple, List, Optional, Any
