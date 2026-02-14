@@ -12,7 +12,7 @@ from .nonlinearities import shifted_softplus
 from .utils import tp_path_exists
 
 
-from typing import Dict, Callable
+from typing import Any, Dict, Optional, Callable
 
 
 acts = {
@@ -36,7 +36,7 @@ class ConvNetLayer(GraphModuleMixin, torch.nn.Module):
         irreps_in,
         feature_irreps_hidden,
         convolution=InteractionBlock,
-        convolution_kwargs: dict = {},
+        convolution_kwargs: Optional[Dict[str, Any]] = None,
         resnet: bool = False,
         nonlinearity_type: str = "gate",
         nonlinearity_scalars: Dict[int, Callable] = {"e": "silu", "o": "tanh"},
@@ -54,6 +54,10 @@ class ConvNetLayer(GraphModuleMixin, torch.nn.Module):
             1: nonlinearity_gates["e"],
             -1: nonlinearity_gates["o"],
         }
+        # normalize optional inputs to avoid shared mutable defaults
+        convolution_kwargs = (
+            {} if convolution_kwargs is None else dict(convolution_kwargs)
+        )
 
         self.feature_irreps_hidden = Irreps(feature_irreps_hidden)
         self.resnet = resnet
