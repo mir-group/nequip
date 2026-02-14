@@ -20,10 +20,10 @@ class GraphModuleMixin:
 
     def _init_irreps(
         self,
-        irreps_in: Dict[str, Any] = {},
-        my_irreps_in: Dict[str, Any] = {},
-        required_irreps_in: Sequence[str] = [],
-        irreps_out: Dict[str, Any] = {},
+        irreps_in: Optional[Dict[str, Any]] = None,
+        my_irreps_in: Optional[Dict[str, Any]] = None,
+        required_irreps_in: Optional[Sequence[str]] = None,
+        irreps_out: Optional[Dict[str, Any]] = None,
     ):
         """Setup the expected data fields and their irreps for this graph module.
 
@@ -39,8 +39,12 @@ class GraphModuleMixin:
             irreps_out (dict): mapping names of fields that are modified/output by
                 this graph module to their irreps.
         """
-        # Coerce
+        # pattern to handle mutable defaults
         irreps_in = {} if irreps_in is None else irreps_in
+        my_irreps_in = {} if my_irreps_in is None else my_irreps_in
+        required_irreps_in = () if required_irreps_in is None else required_irreps_in
+        irreps_out = {} if irreps_out is None else irreps_out
+
         irreps_in = AtomicDataDict._fix_irreps_dict(irreps_in)
 
         # positions are *always* 1o, and always present
