@@ -73,6 +73,13 @@ def to_(
     return data
 
 
+def detach_(data: Type) -> Type:
+    """Detach all tensors in an AtomicDataDict in place."""
+    for k, v in data.items():
+        data[k] = v.detach()
+    return data
+
+
 def batched_from_list(data_list: List[Type]) -> Type:
     """Batch multiple AtomicDataDict.Type into one.
 
@@ -297,6 +304,7 @@ def with_batch_(data: Type) -> Type:
 # For autocomplete in IDEs, don't expose our various imports
 __all__ = [
     to_,
+    detach_,
     without_nodes,
     num_nodes,
     num_edges,
