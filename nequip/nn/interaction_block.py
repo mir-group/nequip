@@ -15,7 +15,7 @@ from ._ghost_exchange_base import NoOpGhostExchangeModule
 from ._tp_scatter_base import TensorProductScatter
 from .norm import AvgNumNeighborsNorm
 
-from typing import Sequence, Union, Dict
+from typing import Optional, Sequence, Union, Dict
 
 
 class InteractionBlock(GraphModuleMixin, torch.nn.Module):
@@ -29,8 +29,8 @@ class InteractionBlock(GraphModuleMixin, torch.nn.Module):
         radial_mlp_width: int = 8,
         use_sc: bool = True,
         is_first_layer: bool = False,
-        avg_num_neighbors: Union[float, Dict[str, float]] = None,
-        type_names: Sequence[str] = None,
+        type_names: Optional[Sequence[str]] = None,
+        avg_num_neighbors: Optional[Union[float, Dict[str, float]]] = None,
     ) -> None:
         """InteractionBlock.
 
