@@ -19,7 +19,7 @@ dependencies = [
     "ase",
     "lmdb",
     "tqdm",
-    "e3nn>=0.5.9,<0.6.0",
+    "e3nn>=0.6.0,<0.7.0",
     "pyyaml",
     "importlib_metadata; python_version<'3.10'",
     "hydra-core",
