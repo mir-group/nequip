@@ -1,6 +1,5 @@
 # This file is a part of the `nequip` package. Please see LICENSE and README at the root for information on using it.
 import torch
-import torch.nn.functional
 
 from e3nn.o3._irreps import Irreps
 
@@ -8,7 +7,7 @@ from nequip.data import AtomicDataDict
 from nequip.data._key_registry import _GRAPH_FIELDS
 from .._graph_mixin import GraphModuleMixin
 
-from typing import Optional, Final, List, Dict
+from typing import Optional, Final, List, Dict, Any
 
 
 _CATEGORICAL_FIELD_EMBED_KEYS: Final[List[str]] = [
@@ -38,9 +37,11 @@ class NodeTypeEmbed(GraphModuleMixin, torch.nn.Module):
         num_features: int,
         set_features: bool = True,
         categorical_graph_field_embed: Optional[List[Dict[str, int]]] = None,
-        irreps_in={},
+        irreps_in: Optional[Dict[str, Any]] = None,
     ):
         super().__init__()
+        # normalize optional inputs to avoid shared mutable defaults
+        irreps_in = {} if irreps_in is None else dict(irreps_in)
         # === bookkeeping ===
         self.num_types = len(type_names)
         self.set_features = set_features
@@ -86,7 +87,7 @@ class NodeTypeEmbed(GraphModuleMixin, torch.nn.Module):
                 # == bookkeeping ==
                 total_features += field_embed["num_features"]
 
-                # register `irreps_in`` if not already done
+                # register `irreps_in` if not already done
                 # needed to ensure that the field is propagated into the model
                 if field_embed["field"] not in irreps_in:
                     # categorical, so no irreps
