@@ -22,6 +22,10 @@ import contextlib
 from typing import Optional, Final
 
 _IS_BUILDING_MODEL = contextvars.ContextVar("_IS_BUILDING_MODEL", default=False)
+_CURRENT_MODEL_BUILDER_DEFAULTS = contextvars.ContextVar(
+    "_CURRENT_MODEL_BUILDER_DEFAULTS",
+    default=None,
+)
 
 # the following is the set of model build types for specific purposes
 _EAGER_MODEL_KEY = "eager"
@@ -63,6 +67,28 @@ def override_model_compile_mode(compile_mode: Optional[str]):
         finally:
             _OVERRIDE_COMPILE_MODE.set(init_state)
             _CURRENT_COMPILE_MODE.set(init_mode)
+
+
+@contextlib.contextmanager
+def fresh_model_builder_context():
+    """Temporarily treat nested model-builder calls as fresh top-level builds.
+
+    This is an explicit escape hatch for composing models where an inner builder
+    should run with full `@model_builder` behavior (dtype/seed/wrapping),
+    instead of being returned as a raw nested module.
+
+    Required builder args (`seed`, `model_dtype`, `type_names`) are inherited
+    from the active outer model-builder context when not explicitly provided.
+    """
+    # TODO: decide compile_mode semantics for fresh nested builds:
+    # should they inherit outer builder compile_mode or use current default/override?
+    global _IS_BUILDING_MODEL
+    init_state = _IS_BUILDING_MODEL.get()
+    _IS_BUILDING_MODEL.set(False)
+    try:
+        yield
+    finally:
+        _IS_BUILDING_MODEL.set(init_state)
 
 
 def get_current_compile_mode(return_override: bool = False):
@@ -115,7 +141,14 @@ def model_builder(func=None, *, wrapper_class=None, compile_wrapper_class=None):
 
             # this means we're in the outer model, and have to apply the model builder operations
             _IS_BUILDING_MODEL.set(True)
+            prev_builder_defaults = _CURRENT_MODEL_BUILDER_DEFAULTS.get()
             try:
+                default_builder_kwargs = _CURRENT_MODEL_BUILDER_DEFAULTS.get()
+                if default_builder_kwargs is not None:
+                    for key in ("seed", "model_dtype", "type_names"):
+                        if key not in kwargs and key in default_builder_kwargs:
+                            kwargs[key] = default_builder_kwargs[key]
+
                 model_cfg = kwargs.copy()
                 # === sanity checks ===
                 assert global_state_initialized(), (
@@ -136,6 +169,12 @@ def model_builder(func=None, *, wrapper_class=None, compile_wrapper_class=None):
                 seed = kwargs.pop("seed")
                 model_dtype = kwargs.pop("model_dtype")
                 dtype = dtype_from_name(model_dtype)
+                inherited_builder_defaults = {
+                    "seed": seed,
+                    "model_dtype": model_dtype,
+                    "type_names": kwargs["type_names"],
+                }
+                _CURRENT_MODEL_BUILDER_DEFAULTS.set(inherited_builder_defaults)
 
                 # === compilation options ===
                 # `compile_mode` dictates the optimization path chosen
@@ -176,6 +215,7 @@ def model_builder(func=None, *, wrapper_class=None, compile_wrapper_class=None):
                             )
                 return graph_model
             finally:
+                _CURRENT_MODEL_BUILDER_DEFAULTS.set(prev_builder_defaults)
                 # reset to default in case of failure
                 _IS_BUILDING_MODEL.set(False)
 
