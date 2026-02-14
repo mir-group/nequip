@@ -280,9 +280,18 @@ def num_edges(data: Type) -> int:
 
 
 def with_batch_(data: Type) -> Type:
-    """Get batch Tensor.
+    """Add explicit batching keys in-place for a single frame.
 
-    If this AtomicDataPrimitive has no ``batch``, one of all zeros will be allocated and returned.
+    Typically called on single-frame data that does not yet include batching metadata.
+    If batching metadata already exists, this function is a no-op that enforces
+    batched data contracts (that is, both ``BATCH_KEY`` and ``NUM_NODES_KEY``
+    are present).
+
+    Added keys for the single-frame case:
+        - ``BATCH_KEY``: ``(num_atoms,)`` long tensor; maps each atom to a frame index
+          (all zeros for a single frame)
+        - ``NUM_NODES_KEY``: ``(num_frames,)`` long tensor; number of atoms per frame
+          (``[num_atoms]`` for a single frame)
     """
     if _keys.BATCH_KEY in data:
         assert _keys.NUM_NODES_KEY in data
