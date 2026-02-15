@@ -77,6 +77,11 @@ class BasicModelTestsMixin:
         """
         raise NotImplementedError
 
+    @pytest.fixture
+    def zero_prior_at_init(self):
+        """Whether zero position-dependent prior at initialization is expected."""
+        return False
+
     @pytest.fixture(
         scope="class",
         params=(["cuda", "cpu"] if torch.cuda.is_available() else ["cpu"]),
@@ -571,7 +576,7 @@ class EnergyModelTestsMixin(BasicModelTestsMixin):
                     atol=atol,
                 ), f"Translation invariance test failed for {per_atom_energy_key}"
 
-    def test_cross_frame_grad(self, model, device, nequip_dataset):
+    def test_cross_frame_grad(self, model, device, nequip_dataset, zero_prior_at_init):
         batch = AtomicDataDict.batched_from_list(
             [nequip_dataset[i] for i in range(len(nequip_dataset))]
         )
@@ -599,9 +604,10 @@ class EnergyModelTestsMixin(BasicModelTestsMixin):
                 assert cross_frame_grad.abs().max().item() == 0, (
                     f"Cross-frame gradient test failed for {energy_key}"
                 )
-                assert in_frame_grad.abs().max().item() > 0, (
-                    f"In-frame gradient test failed for {energy_key}"
-                )
+                if not zero_prior_at_init:
+                    assert in_frame_grad.abs().max().item() > 0, (
+                        f"In-frame gradient test failed for {energy_key}"
+                    )
 
     def test_numeric_gradient(self, model, atomic_batch, device):
         """
@@ -781,7 +787,7 @@ class EnergyModelTestsMixin(BasicModelTestsMixin):
 
         return wrapped
 
-    def test_force_smoothness(self, model, device, pair_force):
+    def test_force_smoothness(self, model, device, pair_force, zero_prior_at_init):
         instance, config, _ = model
         r_max = self._r_max_from_model(instance)
         type_names = config["type_names"]
@@ -795,7 +801,8 @@ class EnergyModelTestsMixin(BasicModelTestsMixin):
                     forces = pair_force(node_idx, nbor_idx, 0.5 * r_max, 1.5 * r_max)
                     # expect some nonzero terms on the two connected atoms
                     # NOTE: sometimes it can be zero if the model has so little features such that the nonlinearity causes the activation to be ~0
-                    assert forces.abs().sum() > 1e-4, f"{forces=}"
+                    if not zero_prior_at_init:
+                        assert forces.abs().sum() > 1e-4, f"{forces=}"
 
                     # For Test 1 and 2:
                     # No need to enforce `strictly_local`. Message passing models such as NequiIP should not receive information from beyond the cutoff radius.
@@ -815,7 +822,9 @@ class EnergyModelTestsMixin(BasicModelTestsMixin):
                         torch.zeros_like(forces, device=device, dtype=forces.dtype),
                     ), f"{forces=}"
 
-    def test_partial_force_smoothness(self, model, device, pair_force):
+    def test_partial_force_smoothness(
+        self, model, device, pair_force, zero_prior_at_init
+    ):
         # NOTE: This test is designed for models that have a variable cutoff radius, though it still applicable with
         # fixed cutoff models. This works on the assumption that the partial energies on the node should not be affected
         # by the presence of a neighbor outside the cutoff radius, thus making the corresponding forces zero.
@@ -852,9 +861,10 @@ class EnergyModelTestsMixin(BasicModelTestsMixin):
                 node_partial_forces = partial_forces[0]
 
                 # NOTE: sometimes it can be zero if the model has so little features such that the nonlinearity causes the activation to be ~0
-                assert node_partial_forces.abs().sum() > 1e-4, (
-                    f"partial forces: {node_partial_forces}"
-                )
+                if not zero_prior_at_init:
+                    assert node_partial_forces.abs().sum() > 1e-4, (
+                        f"partial forces: {node_partial_forces}"
+                    )
 
                 # For Test 1 and 2:
                 # No need to enforce `strictly_local`. Message passing models such as NequiIP should not receive information from beyond the cutoff radius.
