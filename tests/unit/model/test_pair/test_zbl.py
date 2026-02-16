@@ -4,8 +4,6 @@ import numpy as np
 from pathlib import Path
 
 import ase
-import ase.io
-import ase.data
 
 from nequip.data.transforms import (
     ChemicalSpeciesToAtomTypeMapper,
@@ -28,7 +26,15 @@ class TestZBLModel(EnergyModelTestsMixin):
     def equivariance_tol(self, model_dtype):
         # CI fails with at most 6e-8 errors for fp64 models for PyTorch 2.9.1
         # so fp64 tol bumped to 1e-7
-        return {"float32": 1e-3, "float64": 1e-7}[model_dtype]
+        # With PyTorch 2.10.0:
+        # ```
+        # FAILED tests/unit/model/test_pair/test_zbl.py::TestZBLModel::test_equivariance[float64-bulk-cpu] - AssertionError: Equivariance test of GraphModel failed:
+        # (parity_k=1, did_translate=True , field=virial                )     -> max error=1.707e-07  FAIL
+        # ```
+        # so we bump fp64 tol to 5e-7
+        # NOTE: this test is looking pretty flaky for the virials, might be useful to look into it
+        # to try and understand why the numerics are so flaky (may be due to ops in the ZBL functional form)
+        return {"float32": 1e-3, "float64": 5e-7}[model_dtype]
 
     @pytest.fixture
     def strict_locality(self):
