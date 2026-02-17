@@ -1,10 +1,6 @@
 # This file is a part of the `nequip` package. Please see LICENSE and README at the root for information on using it.
 from nequip.nn import SequentialGraphNetwork, AtomwiseReduce, ForceStressOutput
-from nequip.nn.embedding import (
-    EdgeLengthNormalizer,
-    AddRadialCutoffToData,
-    PolynomialCutoff,
-)
+from nequip.nn.embedding import EdgeLengthNormalizer
 from nequip.data import AtomicDataDict
 from nequip.nn.pair_potential import ZBL
 from .utils import model_builder
@@ -29,15 +25,12 @@ def ZBLPairPotential(
         type_names=type_names,
         per_edge_type_cutoff=per_edge_type_cutoff,
     )
-    cutoff = AddRadialCutoffToData(
-        cutoff=PolynomialCutoff(polynomial_cutoff_p),
-        irreps_in=edge_norm.irreps_out,
-    )
     zbl_module = ZBL(
         type_names=type_names,
         chemical_species=chemical_species,
         units=units,
-        irreps_in=cutoff.irreps_out,
+        polynomial_cutoff_p=polynomial_cutoff_p,
+        irreps_in=edge_norm.irreps_out,
     )
     energy_sum = AtomwiseReduce(
         reduce="sum",
@@ -48,7 +41,6 @@ def ZBLPairPotential(
     energy_model = SequentialGraphNetwork(
         {
             "edge_norm": edge_norm,
-            "cutoff": cutoff,
             "pair_potential": zbl_module,
             "total_energy_sum": energy_sum,
         }

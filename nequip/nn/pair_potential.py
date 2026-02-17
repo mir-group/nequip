@@ -10,6 +10,7 @@ from nequip.data.misc import chemical_symbols_to_atomic_numbers_dict
 from ._graph_mixin import GraphModuleMixin
 from .utils import scatter, with_edge_vectors_
 from nequip.utils.compile import conditional_torchscript_jit
+from .embedding.cutoffs import PolynomialCutoff
 
 
 class _LJParam(torch.nn.Module):
@@ -257,6 +258,7 @@ class ZBL(GraphModuleMixin, torch.nn.Module):
         type_names (List[str]): list of type names known by the model, ``[atom1, atom2, atom3]``
         chemical_species (List[str]): list of chemical symbols, e.g. ``[C, H, O]``
         units (str): `LAMMPS units <https://docs.lammps.org/units.html>`_ that the data is in; ``metal`` and ``real`` are presently supported -- raise a GitHub issue if more is desired
+        polynomial_cutoff_p (float): exponent used for the polynomial cutoff (default ``6``)
     """
 
     def __init__(
@@ -264,12 +266,15 @@ class ZBL(GraphModuleMixin, torch.nn.Module):
         type_names: List[str],
         chemical_species: List[str],
         units: str,
+        polynomial_cutoff_p: float = 6.0,
         irreps_in=None,
     ):
         super().__init__()
         num_types = len(type_names)
         self._init_irreps(
-            irreps_in=irreps_in, irreps_out={AtomicDataDict.PER_ATOM_ENERGY_KEY: "0e"}
+            irreps_in=irreps_in,
+            required_irreps_in=[AtomicDataDict.NORM_LENGTH_KEY],
+            irreps_out={AtomicDataDict.PER_ATOM_ENERGY_KEY: "0e"},
         )
         assert len(chemical_species) == num_types
         atomic_numbers: List[int] = [
@@ -309,6 +314,8 @@ class ZBL(GraphModuleMixin, torch.nn.Module):
             )
             * 0.5,  # Put half the energy on each of ij, ji
         )
+        self.cutoff = conditional_torchscript_jit(PolynomialCutoff(polynomial_cutoff_p))
+        self.model_dtype = torch.get_default_dtype()
         self._zbl = conditional_torchscript_jit(_ZBL())
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
@@ -329,8 +336,12 @@ class ZBL(GraphModuleMixin, torch.nn.Module):
             edge_index=data[AtomicDataDict.EDGE_INDEX_KEY],
             qqr2exesquare=self._qqr2exesquare,
         ).unsqueeze(-1)
+
         # apply cutoff
-        zbl_edge_eng = zbl_edge_eng * data[AtomicDataDict.EDGE_CUTOFF_KEY]
+        zbl_edge_cutoff = self.cutoff(data[AtomicDataDict.NORM_LENGTH_KEY]).to(
+            self.model_dtype
+        )
+        zbl_edge_eng = zbl_edge_eng * zbl_edge_cutoff
         atomic_eng = scatter(
             zbl_edge_eng,
             edge_center,
