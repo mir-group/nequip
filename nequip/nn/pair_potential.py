@@ -49,12 +49,15 @@ class LennardJones(GraphModuleMixin, torch.nn.Module):
         lj_exponent: Optional[float] = None,
         lj_per_type: bool = True,
         lj_style: str = "lj",
+        polynomial_cutoff_p: float = 6.0,
         irreps_in=None,
     ) -> None:
         super().__init__()
         num_types = len(type_names)
         self._init_irreps(
-            irreps_in=irreps_in, irreps_out={AtomicDataDict.PER_ATOM_ENERGY_KEY: "0e"}
+            irreps_in=irreps_in,
+            required_irreps_in=[AtomicDataDict.NORM_LENGTH_KEY],
+            irreps_out={AtomicDataDict.PER_ATOM_ENERGY_KEY: "0e"},
         )
         assert lj_style in ("lj", "lj_repulsive_only", "repulsive")
         self.lj_style = lj_style
@@ -91,6 +94,8 @@ class LennardJones(GraphModuleMixin, torch.nn.Module):
             lj_exponent = 6.0
         self.exponent = lj_exponent
 
+        self.cutoff = conditional_torchscript_jit(PolynomialCutoff(polynomial_cutoff_p))
+        self.model_dtype = torch.get_default_dtype()
         self._param = conditional_torchscript_jit(_LJParam())
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
@@ -128,8 +133,11 @@ class LennardJones(GraphModuleMixin, torch.nn.Module):
                 # TODO: this is probably broken with NaNs at delta
                 lj_eng = lj_eng * (edge_len < (2 ** (1.0 / self.exponent) + delta))
 
-        # apply the cutoff for smoothness
-        lj_eng = lj_eng * data[AtomicDataDict.EDGE_CUTOFF_KEY]
+        # apply polynomial cutoff from this module's own normalized edge lengths
+        lj_edge_cutoff = self.cutoff(data[AtomicDataDict.NORM_LENGTH_KEY]).to(
+            self.model_dtype
+        )
+        lj_eng = lj_eng.to(self.model_dtype) * lj_edge_cutoff
 
         # sum edge LJ energies onto atoms
         atomic_eng = scatter(
@@ -160,24 +168,24 @@ class SimpleLennardJones(GraphModuleMixin, torch.nn.Module):
 
     lj_sigma: float
     lj_epsilon: float
-    lj_use_cutoff: bool
 
     def __init__(
         self,
         lj_sigma: float,
         lj_epsilon: float,
-        lj_use_cutoff: bool = False,
+        polynomial_cutoff_p: float = 6.0,
         irreps_in=None,
     ) -> None:
         super().__init__()
         self._init_irreps(
-            irreps_in=irreps_in, irreps_out={AtomicDataDict.PER_ATOM_ENERGY_KEY: "0e"}
+            irreps_in=irreps_in,
+            required_irreps_in=[AtomicDataDict.NORM_LENGTH_KEY],
+            irreps_out={AtomicDataDict.PER_ATOM_ENERGY_KEY: "0e"},
         )
-        self.lj_sigma, self.lj_epsilon, self.lj_use_cutoff = (
-            lj_sigma,
-            lj_epsilon,
-            lj_use_cutoff,
-        )
+        self.lj_sigma = lj_sigma
+        self.lj_epsilon = lj_epsilon
+        self.cutoff = conditional_torchscript_jit(PolynomialCutoff(polynomial_cutoff_p))
+        self.model_dtype = torch.get_default_dtype()
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
         data = with_edge_vectors_(data, with_lengths=True)
@@ -188,9 +196,11 @@ class SimpleLennardJones(GraphModuleMixin, torch.nn.Module):
         lj_eng = lj_eng.square() - lj_eng
         lj_eng = 2 * self.lj_epsilon * lj_eng
 
-        if self.lj_use_cutoff:
-            # apply the cutoff for smoothness
-            lj_eng = lj_eng * data[AtomicDataDict.EDGE_CUTOFF_KEY]
+        # apply polynomial cutoff from this module's own normalized edge lengths
+        lj_edge_cutoff = self.cutoff(data[AtomicDataDict.NORM_LENGTH_KEY]).to(
+            self.model_dtype
+        )
+        lj_eng = lj_eng.to(self.model_dtype) * lj_edge_cutoff
 
         # sum edge LJ energies onto atoms
         atomic_eng = scatter(
