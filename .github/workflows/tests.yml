@@ -36,7 +36,7 @@ jobs:
     runs-on: ${{ github.event.repository.private && 'self-hosted' || 'ubuntu-latest' }}
     strategy:
       matrix:
-        torch-version: [2.2.0, "2.*"]
+        torch-version: [2.2.0, 2.*]
     container:
       image: nvidia/cuda:12.6.1-cudnn-devel-ubuntu24.04
       options: ${{ github.event.repository.private && '--gpus all' || ' ' }}
@@ -60,6 +60,11 @@ jobs:
         run: |
           echo "PIP_NO_CACHE_DIR=1" >> $GITHUB_ENV
           echo "PIP_NO_CACHE=1" >> $GITHUB_ENV
+      - name: Configure torch cache directories
+        run: |
+          echo "TORCH_EXTENSIONS_DIR=/tmp/torch_extensions_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}" >> $GITHUB_ENV
+          echo "TORCHINDUCTOR_CACHE_DIR=/tmp/torchinductor_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}" >> $GITHUB_ENV
+          echo "TRITON_CACHE_DIR=/tmp/triton_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}" >> $GITHUB_ENV
       - name: Install PyTorch
         env:
           TORCH: "${{ matrix.torch-version }}"
@@ -107,8 +112,23 @@ jobs:
           pip install "lightning<2.6.0"
           pip install --upgrade-strategy only-if-needed .
           pip install pytest pytest-xdist[psutil]
+      #- name: Clear default torch extension cache
+      #  run: |
+      #    python3 - <<'PY'
+      #    import shutil
+      #    from torch.utils.cpp_extension import get_default_build_root
+
+      #    default_root = get_default_build_root()
+      #    print(f"default torch extension cache root: {default_root}")
+      #    shutil.rmtree(default_root, ignore_errors=True)
+      #    print("deleted default torch extension cache root")
+      #    PY
       - name: Test with pytest
         run: |
           # See https://github.com/pytest-dev/pytest/issues/1075
           PYTHONHASHSEED=0 pytest -xv -n auto tests/
+      #- name: Clean torch caches
+      #  if: always()
+      #  run: |
+      #    rm -rf "$TORCH_EXTENSIONS_DIR" "$TORCHINDUCTOR_CACHE_DIR" "$TRITON_CACHE_DIR"
 # yamllint enable
