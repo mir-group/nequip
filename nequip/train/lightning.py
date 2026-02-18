@@ -133,10 +133,10 @@ class NequIPLightningModule(lightning.LightningModule):
                 "`coeff` must be set for entries of the `loss` MetricsManager for a weighted sum of metrics components to be used as the loss."
             )
 
-        # set `dist_sync_on_step=True` for loss metrics
-        # to ensure correct DDP syncing of loss function for batch steps
-        for metric in self.loss.values():
-            metric.dist_sync_on_step = True
+            # set `dist_sync_on_step=True` for loss metrics
+            # to ensure correct DDP syncing of loss function for batch steps
+            for metric in self.loss.values():
+                metric.dist_sync_on_step = True
 
         # == instantiate other metrics ==
         self.train_metrics = instantiate(train_metrics, type_names=type_names)
