@@ -80,7 +80,14 @@ jobs:
           TORCH: "${{ matrix.torch-version }}"
         run: |
           # install packages that aren't required dependencies but that the tests do need
-          pip install h5py vesin packaging
+          pip install h5py packaging
+          # for vesin, the following is to avoid
+          # `AttributeError: module 'torch' has no attribute 'uint64'`
+          if [ "${{ matrix.torch-version }}" = "2.2.0" ]; then
+            pip install "vesin==0.4.2"
+          else
+            pip install vesin
+          fi
           # install torch-sim-atomistic only for latest torch version
           if [ "${{ matrix.torch-version }}" = "2.*" ]; then
             pip install torch-sim-atomistic
