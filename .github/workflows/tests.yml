@@ -51,6 +51,15 @@ jobs:
         run: |
           python3 --version
           which python3
+      - name: Clear pip cache
+        run: |
+          python3 -m pip cache dir
+          python3 -m pip cache purge || true
+          rm -rf ~/.cache/pip
+      - name: Disable pip cache
+        run: |
+          echo "PIP_NO_CACHE_DIR=1" >> $GITHUB_ENV
+          echo "PIP_NO_CACHE=1" >> $GITHUB_ENV
       - name: Install PyTorch
         env:
           TORCH: "${{ matrix.torch-version }}"
