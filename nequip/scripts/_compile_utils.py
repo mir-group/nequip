@@ -6,6 +6,10 @@ from typing import Dict, List, Callable, Union
 # === Inputs and Outputs for AOT Compile ===
 # standard sets of input and output fields for specific integrations
 
+AOTI_PAIR_NEQUIP_TARGET = "pair_nequip"
+AOTI_ASE_TARGET = "ase"
+AOTI_BATCH_TARGET = "batch"
+
 PAIR_NEQUIP_INPUTS = [
     AtomicDataDict.POSITIONS_KEY,
     AtomicDataDict.EDGE_INDEX_KEY,
@@ -81,9 +85,9 @@ BATCH_TARGET = {
 }
 
 COMPILE_TARGET_DICT = {
-    "pair_nequip": PAIR_NEQUIP_TARGET,
-    "ase": ASE_TARGET,
-    "batch": BATCH_TARGET,
+    AOTI_PAIR_NEQUIP_TARGET: PAIR_NEQUIP_TARGET,
+    AOTI_ASE_TARGET: ASE_TARGET,
+    AOTI_BATCH_TARGET: BATCH_TARGET,
 }
 
 
