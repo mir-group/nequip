@@ -26,8 +26,8 @@ def load_compiled_model(
     Args:
         compile_path: path to compiled model file (``.nequip.pth`` or ``.nequip.pt2``)
         device: the device to use
-        input_keys: input field names for AOTInductor models (required for ``.nequip.pt2``)
-        output_keys: output field names for AOTInductor models (required for ``.nequip.pt2``)
+        input_keys: optional input field names for AOTInductor models (for ``.nequip.pt2``)
+        output_keys: optional output field names for AOTInductor models (for ``.nequip.pt2``)
 
     Returns:
         tuple: ``(model, metadata)`` with model prepared for inference
@@ -37,10 +37,6 @@ def load_compiled_model(
     if compile_fname.endswith(".nequip.pth"):
         model, metadata = load_torchscript_model(compile_path, device)
     elif compile_fname.endswith(".nequip.pt2"):
-        if input_keys is None or output_keys is None:
-            raise ValueError(
-                "input_keys and output_keys are required for AOTInductor models"
-            )
         model, metadata = load_aotinductor_model(
             compile_path, device, input_keys, output_keys
         )
