@@ -19,6 +19,7 @@ Most recent change on the top.
 ### Changed
 - overhauled `NonperiodicCellTransform` with improved handling
 - models compiled for training now produce full set of eager output dict entries
+- `NequIPCalculator` canonical import path is now `nequip.integrations.ase.NequIPCalculator`; `nequip.ase.NequIPCalculator` remains as a deprecated compatibility shim that emits a `FutureWarning`
 
 ### Fixed
 - PyTorch 2.10.0 tracing error for `silu_backward`
