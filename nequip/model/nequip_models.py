@@ -28,6 +28,92 @@ import warnings
 from typing import Sequence, Optional, List, Dict, Union, Callable
 
 
+_NEQUIP_GNN_PRESETS = {
+    "S": {
+        "num_layers": 2,
+        "l_max": 1,
+        "num_features": [128, 64],
+    },
+    "M": {
+        "num_layers": 4,
+        "l_max": 2,
+        "num_features": [128, 64, 32],
+    },
+    "L": {
+        "num_layers": 6,
+        "l_max": 3,
+        "num_features": [128, 64, 32, 32],
+    },
+    "XL": {
+        "num_layers": 6,
+        "l_max": 4,
+        "num_features": [320, 96, 64, 32, 32],
+    },
+}
+
+_NEQUIP_GNN_STANDARD_PRESET = {
+    "parity": False,
+    "type_embed_num_features": 32,
+    "radial_mlp_depth": 1,
+    "radial_mlp_width": 128,
+}
+
+
+def _format_nequip_gnn_preset_docstring() -> str:
+    shared_defaults = "\n".join(
+        [
+            f"        - ``{key}``: ``{value!r}``"
+            for key, value in _NEQUIP_GNN_STANDARD_PRESET.items()
+        ]
+    )
+    preset_defaults = "\n".join(
+        [
+            f"        - ``{preset}``: ``{defaults!r}``"
+            for preset, defaults in _NEQUIP_GNN_PRESETS.items()
+        ]
+    )
+    return f"""Build :func:`NequIPGNNModel` from a named architecture preset.
+
+    This is a wrapper of :func:`NequIPGNNModel` that injects preset hyperparameters based on model sizes of the NequIP foundation potentials.
+    All arguments are the same as :func:`NequIPGNNModel`, except this builder also requires ``preset`` and applies preset defaults before ``**kwargs``.
+    For full argument documentation, see :func:`NequIPGNNModel`.
+    Users can override the preset defaults by providing arguments for the fields to be overriden.
+
+    Preset argument:
+        preset (str): one of {", ".join([f"``{name}``" for name in _NEQUIP_GNN_PRESETS.keys()])}
+
+    Override order:
+        1. shared defaults
+        2. per-preset defaults
+        3. explicit ``**kwargs`` (highest priority)
+
+    Shared defaults:
+{shared_defaults}
+
+    Per-preset defaults:
+{preset_defaults}
+    """
+
+
+@model_builder
+def PresetNequIPGNNModel(
+    preset: str,
+    **kwargs,
+) -> GraphModel:
+    preset = preset.upper()
+    assert preset in _NEQUIP_GNN_PRESETS, (
+        f"`preset` must be one of {list(_NEQUIP_GNN_PRESETS.keys())}, but found `{preset}`"
+    )
+    model_kwargs = {
+        **_NEQUIP_GNN_STANDARD_PRESET,
+        **_NEQUIP_GNN_PRESETS[preset],
+    }
+    # explicit kwargs override standard and preset defaults
+    model_kwargs.update(kwargs)
+
+    return NequIPGNNModel(**model_kwargs)
+
+
 @model_builder
 def NequIPGNNModel(
     num_layers: int = 4,
@@ -35,8 +121,8 @@ def NequIPGNNModel(
     parity: bool = True,
     num_features: Union[int, List[int]] = 32,
     type_embed_num_features: Optional[int] = None,
-    radial_mlp_depth: int = 2,
-    radial_mlp_width: int = 64,
+    radial_mlp_depth: int = 1,
+    radial_mlp_width: int = 128,
     **kwargs,
 ) -> GraphModel:
     """NequIP GNN model that can predict energies only or energies with forces/stresses.
@@ -52,8 +138,8 @@ def NequIPGNNModel(
         parity (bool): whether to include features with odd mirror parity -- often turning parity off gives equally good results but faster networks, so it's worth testing (default ``True``)
         num_features (int/List[int]): multiplicity of the features, smaller is faster (default ``32``); it is also possible to provide the multiplicity for each irrep, e.g. for ``l_max=2`` and ``parity=False``, ``num_features=[5, 2, 7]`` refers to ``5x0e``, ``2x1o`` and ``7x2e`` features
         type_embed_num_features (int): number of features for the type embedding layer; if not provided, defaults to ``num_features[0]`` (default ``None``)
-        radial_mlp_depth (int): number of radial layers, usually 1-3 works best, smaller is faster (default ``2``)
-        radial_mlp_width (int): number of hidden neurons in radial function, smaller is faster (default ``64``)
+        radial_mlp_depth (int): number of radial layers, usually 1-3 works best, smaller is faster (default ``1``)
+        radial_mlp_width (int): number of hidden neurons in radial function, smaller is faster (default ``128``)
         readout_mlp_hidden_layers_depth (int): number of hidden layers in the readout MLP (default ``0``)
         readout_mlp_hidden_layers_width (int): width of hidden layers in the readout MLP (default 0e contribution of ``num_features``)
         readout_mlp_nonlinearity (str): ``silu``, ``mish``, ``gelu``, or ``None`` (default ``silu``)
@@ -120,6 +206,9 @@ def NequIPGNNModel(
         **kwargs,
     )
     return model
+
+
+PresetNequIPGNNModel.__doc__ = _format_nequip_gnn_preset_docstring()
 
 
 @model_builder

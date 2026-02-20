@@ -14,6 +14,7 @@ Most recent change on the top.
 - train-time compilation support for models with different input-output key signatures - enables holding multiple compiled models with different signatures
 - documentation section on known PyTorch version issues
 - convenience resolver `${cutoff_radius_from_package:${model_path}}` to extract cutoff radius for fine-tuning directly in config file
+- `PresetNequIPGNNModel` model builder with `S`/`M`/`L`/`XL` architecture presets and explicit-argument override behavior
 
 ### Changed
 - overhauled `NonperiodicCellTransform` with improved handling
