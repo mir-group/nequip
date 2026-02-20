@@ -149,7 +149,7 @@ trainer:
 # here we use the subclass that holds an exponential moving average of the base model's weights (an EMA model)
 # one could also use the base `NequIPLightningModule` here if one does not want to use an EMA model
 # EMA allows for smoother validation curves and thus more reliable metrics for monitoring
-# Loading from a checkpoint for use in the `nequip.ase.NequIPCalculator` or during `nequip-compile` and `nequip-package` will always load the EMA model if it's present
+# When a model is prepared for inference (including `nequip-compile` and `nequip-package`), EMA weights are used when available
 training_module:
   _target_: nequip.train.EMALightningModule
 

@@ -2,7 +2,7 @@
 
 ## Introduction
 The [Atomic Simulation Environment (ASE)](https://wiki.fysik.dtu.dk/ase/) is a popular Python package providing a framework for working with atomic data, reading and writing common formats, and running various simulations and calculations.
-NequIP provides the {class}`~nequip.ase.NequIPCalculator` for integration with ASE. See the [ASE calculator API](../api/ase.rst) for detailed documentation.
+NequIP provides the {class}`~nequip.integrations.ase.NequIPCalculator` for integration with ASE. See the [ASE calculator API](../api/ase.rst) for detailed documentation.
 
 ## Creating an ASE Calculator
 
@@ -23,10 +23,10 @@ To use a NequIP framework model with ASE, you need to follow these steps:
 
    The device specified during compilation should match the device you'll use with the calculator. For more details about compilation options and requirements, see the [compilation workflow documentation](../guide/getting-started/workflow.md#compilation).
 
-3. **Create the ASE calculator**: Build an ASE {class}`~nequip.ase.NequIPCalculator` from the compiled model file:
+3. **Create the ASE calculator**: Build an ASE {class}`~nequip.integrations.ase.NequIPCalculator` from the compiled model file:
 
 ```python
-from nequip.ase import NequIPCalculator
+from nequip.integrations.ase import NequIPCalculator
 
 calculator = NequIPCalculator.from_compiled_model(
     compile_path="path/to/compiled_model.nequip.pt2",
@@ -82,7 +82,7 @@ Here we use the NequIP model trained in the tutorial to compute energies and for
 from ase.build import bulk
 import numpy as np
 import matplotlib.pyplot as plt
-from nequip.ase import NequIPCalculator
+from nequip.integrations.ase import NequIPCalculator
 import torch
 
 # Initialize the nequip calculator
@@ -139,7 +139,7 @@ from pymatgen.core.structure import Structure
 from monty.serialization import loadfn
 from tqdm import tqdm
 
-from nequip.ase import NequIPCalculator
+from nequip.integrations.ase import NequIPCalculator
 
 
 compile_path = "path/to/compiled_model.nequip.pt2"  # path to compiled model

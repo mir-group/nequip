@@ -53,7 +53,7 @@ To use the compiled model, you must import `cuequivariance_torch` before loading
 
 ```python
 import cuequivariance_torch
-from nequip.ase import NequIPCalculator
+from nequip.integrations.ase import NequIPCalculator
 
 # Load the compiled model
 calc = NequIPCalculator.from_compiled_model(

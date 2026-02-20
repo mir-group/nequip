@@ -1,5 +1,5 @@
-nequip.ase
+nequip.integrations.ase
 ###################
 
-.. autoclass:: nequip.ase.NequIPCalculator
+.. autoclass:: nequip.integrations.ase.NequIPCalculator
    :members:

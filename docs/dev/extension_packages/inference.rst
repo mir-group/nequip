@@ -11,11 +11,11 @@ The NequIP framework provides pre-built integrations that extension packages can
 ASE Integration
 ~~~~~~~~~~~~~~~
 
-The :class:`~nequip.ase.NequIPCalculator` provides ASE calculator functionality. Extension packages can:
+The :class:`~nequip.integrations.ase.NequIPCalculator` provides ASE calculator functionality. Extension packages can:
 
-- Subclass :class:`~nequip.ase.NequIPCalculator` to add custom behavior
-- Override the :meth:`~nequip.ase.NequIPCalculator.save_extra_outputs` method to process additional model outputs
-- Extend the supported properties by modifying :attr:`~nequip.ase.NequIPCalculator.implemented_properties`
+- Subclass :class:`~nequip.integrations.ase.NequIPCalculator` to add custom behavior
+- Override the :meth:`~nequip.integrations.ase.NequIPCalculator.save_extra_outputs` method to process additional model outputs
+- Extend the supported properties by modifying :attr:`~nequip.integrations.ase.NequIPCalculator.implemented_properties`
 
 See the `ASE integration documentation <../../integrations/ase.html>`__ for usage details.
 
