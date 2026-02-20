@@ -3,6 +3,7 @@ from typing import Union, Optional, Callable, Dict, List
 import warnings
 import torch
 
+from ase import Atoms
 from ase.calculators.calculator import Calculator, all_changes
 from ase.stress import full_3x3_to_voigt_6_stress
 
@@ -245,14 +246,8 @@ class NequIPCalculator(Calculator):
         # call to base-class to set atoms attribute
         Calculator.calculate(self, atoms)
 
-        # === prepare data ===
-        data = from_ase(atoms)
-        for t in self.transforms:
-            data = t(data)
-        data = AtomicDataDict.to_(data, self.device)
-
-        # === predict + extract data ===
-        out = self.model(data)
+        data = self.atoms_to_data(atoms)
+        out = self.call_model(data)
         self.results = {}
         # only store results the model actually computed to avoid KeyErrors
         if AtomicDataDict.TOTAL_ENERGY_KEY in out:
@@ -288,6 +283,15 @@ class NequIPCalculator(Calculator):
             self.results["stress"] = stress_voigt
 
         self.save_extra_outputs(out)
+
+    def atoms_to_data(self, atoms: Atoms) -> AtomicDataDict.Type:
+        data = from_ase(atoms)
+        for t in self.transforms:
+            data = t(data)
+        return AtomicDataDict.to_(data, self.device)
+
+    def call_model(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
+        return self.model(data)
 
     def save_extra_outputs(self, out: AtomicDataDict.Type):
         # subclasses can implement this method to process extra outputs without code duplication
