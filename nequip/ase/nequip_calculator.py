@@ -38,6 +38,12 @@ class NequIPCalculator(Calculator):
     implemented_properties = ["energy", "energies", "forces", "stress", "free_energy"]
 
     @classmethod
+    def get_aoti_compile_target(cls) -> Dict:
+        from nequip.scripts._compile_utils import COMPILE_TARGET_DICT, AOTI_ASE_TARGET
+
+        return COMPILE_TARGET_DICT[AOTI_ASE_TARGET]
+
+    @classmethod
     def _handle_chemical_species_map(
         cls,
         chemical_species_to_atom_type_map: Optional[Union[Dict[str, str], bool]],
@@ -133,10 +139,13 @@ class NequIPCalculator(Calculator):
             )
 
         from nequip.model.inference_models import load_compiled_model
-        from nequip.scripts._compile_utils import PAIR_NEQUIP_INPUTS, ASE_OUTPUTS
+
+        target = cls.get_aoti_compile_target()
+        input_keys = list(target["input"])
+        output_keys = list(target["output"])
 
         model, metadata = load_compiled_model(
-            compile_path, device, PAIR_NEQUIP_INPUTS, ASE_OUTPUTS
+            compile_path, device, input_keys, output_keys
         )
 
         # extract r_max and type_names for transforms

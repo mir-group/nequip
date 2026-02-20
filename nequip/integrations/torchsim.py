@@ -137,6 +137,12 @@ class NequIPTorchSimCalc(ModelInterface):
         return chemical_species_to_atom_type_map
 
     @classmethod
+    def get_aoti_compile_target(cls) -> Dict:
+        from nequip.scripts._compile_utils import COMPILE_TARGET_DICT, AOTI_BATCH_TARGET
+
+        return COMPILE_TARGET_DICT[AOTI_BATCH_TARGET]
+
+    @classmethod
     def from_compiled_model(
         cls,
         compile_path: Union[str, Path],
@@ -156,10 +162,13 @@ class NequIPTorchSimCalc(ModelInterface):
             **kwargs: additional arguments passed to :class:`~nequip.integrations.torchsim.NequIPTorchSimCalc`.
         """
         from nequip.model.inference_models import load_compiled_model
-        from nequip.scripts._compile_utils import ASE_OUTPUTS, BATCH_INPUTS
+
+        target = cls.get_aoti_compile_target()
+        input_keys = list(target["input"])
+        output_keys = list(target["output"])
 
         model, metadata = load_compiled_model(
-            str(compile_path), device, BATCH_INPUTS, ASE_OUTPUTS
+            str(compile_path), device, input_keys, output_keys
         )
 
         # extract r_max and type_names from metadata
