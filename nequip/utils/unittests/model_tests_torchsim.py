@@ -16,7 +16,7 @@ import uuid
 import numpy as np
 
 from nequip.utils.versions import _TORCH_GE_2_6, _TORCH_GE_2_10
-from nequip.ase import NequIPCalculator
+from nequip.integrations.ase import NequIPCalculator
 
 from .utils import _check_and_print
 from .model_tests_compilation import CompilationTestsMixin

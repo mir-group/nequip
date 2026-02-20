@@ -14,7 +14,7 @@ logger = RankedLogger(__name__, rank_zero_only=True)
 
 class EMALightningModule(NequIPLightningModule):
     """
-    An exponential moving average (EMA) of the model weights are maintained. Validation and test metrics will be that of the EMA weight model. If EMA is used, models loaded from checkpoint files (except during restarts) will always be the model with EMA weights. Specifically, the EMA models will be the ones loaded in the :class:`~nequip.ase.NequIPCalculator`, compiled with ``nequip-compile``, or packaged with ``nequip-package``.
+    An exponential moving average (EMA) of the model weights are maintained. Validation and test metrics will be that of the EMA weight model. If EMA is used, models loaded from checkpoint files (except during restarts) will always be the model with EMA weights. Specifically, whenever a model is prepared for inference, the EMA weights are used when available, including model loading for inference, ``nequip-compile``, and ``nequip-package``.
 
     Note: EMA requires ``check_val_every_n_epoch`` to be 1 (the default).
 

@@ -19,7 +19,7 @@ import numpy as np
 from nequip.data import AtomicDataDict
 from nequip.utils.test import override_irreps_debug
 from nequip.utils.versions import _TORCH_GE_2_6, _TORCH_GE_2_10
-from nequip.ase import NequIPCalculator
+from nequip.integrations.ase import NequIPCalculator
 
 from .utils import _check_and_print
 from .model_tests_basic import EnergyModelTestsMixin

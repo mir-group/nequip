@@ -9,7 +9,7 @@ from nequip.data.transforms import (
     ChemicalSpeciesToAtomTypeMapper,
     NeighborListTransform,
 )
-from nequip.ase import NequIPCalculator
+from nequip.integrations.ase import NequIPCalculator
 from nequip.utils.unittests.model_tests_basic import EnergyModelTestsMixin
 
 

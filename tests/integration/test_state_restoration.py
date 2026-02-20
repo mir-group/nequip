@@ -6,7 +6,7 @@ import numpy as np
 import torch
 
 from nequip.data import to_ase
-from nequip.ase import NequIPCalculator
+from nequip.integrations.ase import NequIPCalculator
 
 from ase.io import read
 
