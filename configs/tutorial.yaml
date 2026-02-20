@@ -256,5 +256,5 @@ training_module:
     # docs: https://nequip.readthedocs.io/en/latest/api/nn.html#nequip.nn.pair_potential.ZBL
     pair_potential:
       _target_: nequip.nn.pair_potential.ZBL
-      units: metal     # Ang and kcal/mol; LAMMPS unit names;  allowed values "metal" and "real"
+      units: metal     # Ang and eV; LAMMPS unit names;  allowed values "metal" and "real"
       chemical_species: ${chemical_species}   # must tell ZBL the chemical species of the various model atom types
