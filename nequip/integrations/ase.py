@@ -1,6 +1,5 @@
 # This file is a part of the `nequip` package. Please see LICENSE and README at the root for information on using it.
 from typing import Union, Optional, Callable, Dict, List
-import warnings
 import torch
 
 from ase import Atoms
@@ -15,6 +14,7 @@ from nequip.data.transforms import (
     NeighborListTransform,
 )
 from nequip.utils.global_state import set_global_state
+from .utils import handle_chemical_species_map
 
 
 class NequIPCalculator(Calculator):
@@ -43,38 +43,6 @@ class NequIPCalculator(Calculator):
         from nequip.scripts._compile_utils import COMPILE_TARGET_DICT, AOTI_ASE_TARGET
 
         return COMPILE_TARGET_DICT[AOTI_ASE_TARGET]
-
-    @classmethod
-    def _handle_chemical_species_map(
-        cls,
-        chemical_species_to_atom_type_map: Optional[Union[Dict[str, str], bool]],
-        type_names: List[str],
-    ) -> Dict[str, str]:
-        """Handle chemical species map fallback to identity map with warning.
-
-        Args:
-            chemical_species_to_atom_type_map (Dict[str, str] or bool or None): mapping from chemical species to atom type names.
-                If ``None`` (default), uses identity mapping with warning.
-                If ``True``, uses identity mapping without warning.
-                If dict, uses the provided mapping.
-            type_names (List[str]): list of model type names.
-
-        Returns:
-            Dict[str, str]: the chemical species to atom type mapping.
-        """
-        if chemical_species_to_atom_type_map is None:
-            warnings.warn(
-                "Defaulting to using model type names as chemical symbols. "
-                "If the model type names correspond exactly to chemical species (e.g., 'H', 'C', 'O'), this is correct. "
-                "Otherwise, this is wrong and will cause errors. "
-                "To silence this warning, explicitly set `chemical_species_to_atom_type_map=True` for identity mapping, "
-                "or provide the correct mapping as a dict."
-            )
-            chemical_species_to_atom_type_map = {t: t for t in type_names}
-        elif chemical_species_to_atom_type_map is True:
-            # explicitly requested identity mapping without warning
-            chemical_species_to_atom_type_map = {t: t for t in type_names}
-        return chemical_species_to_atom_type_map
 
     def __init__(
         self,
@@ -158,7 +126,7 @@ class NequIPCalculator(Calculator):
         neighbor_transform = _create_neighbor_transform(metadata, r_max, type_names)
 
         # use `type_names` metadata as identity map if not provided
-        chemical_species_to_atom_type_map = cls._handle_chemical_species_map(
+        chemical_species_to_atom_type_map = handle_chemical_species_map(
             chemical_species_to_atom_type_map, type_names
         )
 
@@ -221,7 +189,7 @@ class NequIPCalculator(Calculator):
             model.metadata, r_max, type_names
         )
 
-        chemical_species_to_atom_type_map = cls._handle_chemical_species_map(
+        chemical_species_to_atom_type_map = handle_chemical_species_map(
             chemical_species_to_atom_type_map, type_names
         )
 
