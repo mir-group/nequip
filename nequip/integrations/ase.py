@@ -92,10 +92,12 @@ class NequIPCalculator(Calculator):
         assert not model.training, (
             "make sure to call .eval() on model before building NequIPCalculator"
         )
-        self.model = model
 
         # === handle device ===
+        if isinstance(device, str):
+            device = torch.device(device)
         self.device = device
+        self.model = model.to(self.device)
 
         # === data details ===
         self.energy_units_to_eV = energy_units_to_eV
@@ -210,7 +212,6 @@ class NequIPCalculator(Calculator):
             model_path, model_key=model_name
         )
         model.eval()
-        model.to(device)
 
         r_max = float(model.metadata[graph_model.R_MAX_KEY])
         type_names = model.metadata[graph_model.TYPE_NAMES_KEY].split(" ")
