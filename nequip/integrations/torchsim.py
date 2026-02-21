@@ -10,6 +10,8 @@ from torch_sim.typing import StateDict
 from nequip.data import AtomicDataDict
 
 from nequip.nn import graph_model
+from nequip.train.lightning import _SOLE_MODEL_KEY
+from nequip.utils.global_state import set_global_state
 
 from collections.abc import Callable
 from pathlib import Path
@@ -208,6 +210,8 @@ class NequIPTorchSimCalc(ModelInterface):
         model_path: str,
         device: Union[str, torch.device] = "cpu",
         chemical_species_to_atom_type_map: Optional[Union[Dict[str, str], bool]] = None,
+        allow_tf32: bool = False,
+        model_name: str = _SOLE_MODEL_KEY,
         **kwargs,
     ):
         """Creates a :class:`~nequip.integrations.torchsim.NequIPTorchSimCalc` from a saved model.
@@ -223,14 +227,18 @@ class NequIPTorchSimCalc(ModelInterface):
                 If ``None`` (default), uses identity mapping with warning.
                 If ``True``, uses identity mapping without warning.
                 If dict, uses the provided mapping.
+            allow_tf32 (bool): whether to allow TensorFloat32 operations (default ``False``).
+            model_name (str): key to select the model from ModuleDict (default for single model case).
             **kwargs: additional arguments passed to :class:`~nequip.integrations.torchsim.NequIPTorchSimCalc`.
         """
         from nequip.model.saved_models.load_utils import load_saved_model
-        from nequip.train.lightning import _SOLE_MODEL_KEY
+
+        # set global state
+        set_global_state(allow_tf32=allow_tf32)
 
         # load model using unified loader
         model: graph_model.GraphModel = load_saved_model(
-            model_path, model_key=_SOLE_MODEL_KEY
+            model_path, model_key=model_name
         )
         model.eval()
 
