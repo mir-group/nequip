@@ -51,7 +51,8 @@ jobs:
         run: |
           python3 --version
           which python3
-      - name: Clear pip cache
+      - name: Clear pip cache on self-hosted runner
+        if: ${{ github.event.repository.private && contains(runner.labels, 'self-hosted') }}
         run: |
           python3 -m pip cache dir
           python3 -m pip cache purge || true
