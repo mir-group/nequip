@@ -74,7 +74,6 @@ class NequIPCalculator(Calculator):
         compile_path: str,
         device: Union[str, torch.device] = "cpu",
         chemical_species_to_atom_type_map: Optional[Union[Dict[str, str], bool]] = None,
-        chemical_symbols: Optional[Union[List[str], Dict[str, str]]] = None,
         neighborlist_backend: str = "matscipy",
         **kwargs,
     ):
@@ -90,24 +89,6 @@ class NequIPCalculator(Calculator):
             neighborlist_backend (str): neighborlist backend to use: ``"ase"``, ``"matscipy"``, or ``"vesin"``
                 (default: ``"matscipy"``).
         """
-        # TODO: eventually remove this check
-        # check for deprecated API usage
-        if chemical_symbols is not None:
-            raise ValueError(
-                "The `chemical_symbols` parameter is no longer supported. "
-                "Please use `chemical_species_to_atom_type_map` instead.\n\n"
-                "Old usage:\n"
-                "  calc = NequIPCalculator.from_compiled_model(\n"
-                "      'model.pth',\n"
-                "      chemical_symbols=['H', 'C', 'O']\n"
-                "  )\n\n"
-                "New usage:\n"
-                "  calc = NequIPCalculator.from_compiled_model(\n"
-                "      'model.pth',\n"
-                "      chemical_species_to_atom_type_map={'H': 'H', 'C': 'C', 'O': 'O'}\n"
-                "  )\n"
-            )
-
         from nequip.model.inference_models import load_compiled_model
 
         target = cls.get_aoti_compile_target()
