@@ -30,7 +30,6 @@ class NequIPTorchSimCalc(ModelInterface):
 
     Args:
         model (:class:`torch.nn.Module`): a model in the NequIP framework
-        r_max (float): cutoff radius for neighbor list construction
         device (str or :class:`torch.device`): device for model to evaluate on,
             e.g. ``"cpu"`` or ``"cuda"`` (default: ``"cpu"``)
         transforms (List[Callable]): list of data transforms
@@ -45,7 +44,6 @@ class NequIPTorchSimCalc(ModelInterface):
     def __init__(
         self,
         model: torch.nn.Module,
-        r_max: float,
         device: Union[str, torch.device] = "cpu",
         transforms: List[Callable] = [],
         atomic_numbers: torch.Tensor | None = None,
@@ -71,8 +69,6 @@ class NequIPTorchSimCalc(ModelInterface):
         if not isinstance(model, torch.nn.Module):
             raise TypeError("Invalid model type. Must be a torch.nn.Module.")
         self.model = model.to(self._device)
-
-        self.r_max = torch.tensor(r_max, dtype=self._dtype, device=self._device)
 
         # move transforms to device (they are torch.nn.Module's)
         self.transforms = [t.to(self._device) for t in transforms]
@@ -154,7 +150,6 @@ class NequIPTorchSimCalc(ModelInterface):
 
         return cls(
             model=model,
-            r_max=r_max,
             device=device,
             transforms=basic_transforms(
                 metadata,
@@ -221,7 +216,6 @@ class NequIPTorchSimCalc(ModelInterface):
 
         return cls(
             model=model,
-            r_max=r_max,
             device=device,
             transforms=basic_transforms(
                 model.metadata,
