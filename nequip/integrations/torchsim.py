@@ -8,17 +8,13 @@ from torch_sim.typing import StateDict
 
 from nequip.data import AtomicDataDict
 
-from nequip.nn import graph_model
-from nequip.train.lightning import _SOLE_MODEL_KEY
-from nequip.utils.global_state import set_global_state
-from .utils import handle_chemical_species_map, basic_transforms
+from .mixins import _IntegrationLoaderMixin
 
 from collections.abc import Callable
-from pathlib import Path
-from typing import Union, List, Optional, Dict
+from typing import Union, List, Dict
 
 
-class NequIPTorchSimCalc(ModelInterface):
+class NequIPTorchSimCalc(_IntegrationLoaderMixin, ModelInterface):
     """NequIP framework torch-sim calculator.
 
     This torch-sim calculator is compatible with models from the NequIP framework,
@@ -98,134 +94,10 @@ class NequIPTorchSimCalc(ModelInterface):
         self._compute_stress = value
 
     @classmethod
-    def get_aoti_compile_target(cls) -> Dict:
+    def _get_aoti_compile_target(cls) -> Dict:
         from nequip.scripts._compile_utils import COMPILE_TARGET_DICT, AOTI_BATCH_TARGET
 
         return COMPILE_TARGET_DICT[AOTI_BATCH_TARGET]
-
-    @classmethod
-    def from_compiled_model(
-        cls,
-        compile_path: Union[str, Path],
-        device: Union[str, torch.device] = "cpu",
-        chemical_species_to_atom_type_map: Optional[Union[Dict[str, str], bool]] = None,
-        neighborlist_backend: str = "matscipy",
-        **kwargs,
-    ):
-        """Creates a :class:`~nequip.integrations.torchsim.NequIPTorchSimCalc` from a compiled model file.
-
-        Args:
-            compile_path (str or :class:`pathlib.Path`): path to compiled model file.
-            device (str or :class:`torch.device`): the device to use (e.g., ``"cpu"`` or ``"cuda"``).
-            chemical_species_to_atom_type_map (Dict[str, str] or bool or None): mapping from chemical species to model type names.
-                If ``None`` (default), uses identity mapping with warning.
-                If ``True``, uses identity mapping without warning.
-                If dict, uses the provided mapping.
-            neighborlist_backend (str): neighborlist backend to use: ``"ase"``, ``"matscipy"``, or ``"vesin"``
-                (default: ``"matscipy"``).
-            **kwargs: additional arguments passed to :class:`~nequip.integrations.torchsim.NequIPTorchSimCalc`.
-        """
-        from nequip.model.inference_models import load_compiled_model
-
-        target = cls.get_aoti_compile_target()
-        input_keys = list(target["input"])
-        output_keys = list(target["output"])
-
-        model, metadata = load_compiled_model(
-            str(compile_path), device, input_keys, output_keys
-        )
-
-        # extract r_max and type_names from metadata
-        r_max = metadata[graph_model.R_MAX_KEY]
-        type_names = metadata[graph_model.TYPE_NAMES_KEY]
-
-        # handle chemical species mapping
-        chemical_species_to_atom_type_map = handle_chemical_species_map(
-            chemical_species_to_atom_type_map, type_names
-        )
-
-        # check for transforms in kwargs
-        if "transforms" in kwargs:
-            raise KeyError("`transforms` not allowed here")
-
-        return cls(
-            model=model,
-            device=device,
-            transforms=basic_transforms(
-                metadata,
-                r_max,
-                type_names,
-                chemical_species_to_atom_type_map,
-                neighborlist_backend=neighborlist_backend,
-            ),
-            **kwargs,
-        )
-
-    @classmethod
-    def _from_saved_model(
-        cls,
-        model_path: str,
-        device: Union[str, torch.device] = "cpu",
-        chemical_species_to_atom_type_map: Optional[Union[Dict[str, str], bool]] = None,
-        allow_tf32: bool = False,
-        model_name: str = _SOLE_MODEL_KEY,
-        neighborlist_backend: str = "matscipy",
-        **kwargs,
-    ):
-        """Creates a :class:`~nequip.integrations.torchsim.NequIPTorchSimCalc` from a saved model.
-
-        .. note::
-            This method is private and intended for internal testing only.
-            Users should use ``from_compiled_model`` instead.
-
-        Args:
-            model_path (str): path to a checkpoint file, package file, or ``nequip.net`` model ID.
-            device (str or :class:`torch.device`): the device to use (e.g., ``"cpu"`` or ``"cuda"``).
-            chemical_species_to_atom_type_map (Dict[str, str] or bool or None): mapping from chemical species to model type names.
-                If ``None`` (default), uses identity mapping with warning.
-                If ``True``, uses identity mapping without warning.
-                If dict, uses the provided mapping.
-            allow_tf32 (bool): whether to allow TensorFloat32 operations (default ``False``).
-            model_name (str): key to select the model from ModuleDict (default for single model case).
-            neighborlist_backend (str): neighborlist backend to use: ``"ase"``, ``"matscipy"``, or ``"vesin"``
-                (default: ``"matscipy"``).
-            **kwargs: additional arguments passed to :class:`~nequip.integrations.torchsim.NequIPTorchSimCalc`.
-        """
-        from nequip.model.saved_models.load_utils import load_saved_model
-
-        # set global state
-        set_global_state(allow_tf32=allow_tf32)
-
-        # load model using unified loader
-        model: graph_model.GraphModel = load_saved_model(
-            model_path, model_key=model_name
-        )
-        model.eval()
-
-        r_max = float(model.metadata[graph_model.R_MAX_KEY])
-        type_names = model.metadata[graph_model.TYPE_NAMES_KEY].split(" ")
-
-        # handle chemical species mapping
-        chemical_species_to_atom_type_map = handle_chemical_species_map(
-            chemical_species_to_atom_type_map, type_names
-        )
-
-        # check for transforms in kwargs
-        if "transforms" in kwargs:
-            raise KeyError("`transforms` not allowed here")
-
-        return cls(
-            model=model,
-            device=device,
-            transforms=basic_transforms(
-                model.metadata,
-                r_max,
-                type_names,
-                chemical_species_to_atom_type_map,
-                neighborlist_backend=neighborlist_backend,
-            ),
-            **kwargs,
-        )
 
     def setup_from_system_idx(
         self, atomic_numbers: torch.Tensor, system_idx: torch.Tensor
