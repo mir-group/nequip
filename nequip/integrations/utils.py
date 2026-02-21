@@ -1,6 +1,6 @@
 # This file is a part of the `nequip` package. Please see LICENSE and README at the root for information on using it.
 import warnings
-from typing import Optional, Union, Dict, List
+from typing import Optional, Union, Dict, List, Callable
 
 
 def handle_chemical_species_map(
@@ -21,3 +21,49 @@ def handle_chemical_species_map(
         # explicitly requested identity mapping without warning
         chemical_species_to_atom_type_map = {t: t for t in type_names}
     return chemical_species_to_atom_type_map
+
+
+def basic_transforms(
+    metadata: dict,
+    r_max: float,
+    type_names: List[str],
+    chemical_species_to_atom_type_map: Dict[str, str],
+    neighborlist_backend: str = "matscipy",
+) -> List[Callable]:
+    """Create transform list with neighborlist construction and optional per-edge-type cutoff pruning."""
+    from nequip.data.transforms import (
+        ChemicalSpeciesToAtomTypeMapper,
+        NeighborListTransform,
+    )
+    from nequip.nn import graph_model
+    from nequip.nn.embedding.utils import cutoff_str_to_fulldict
+
+    transforms = [
+        ChemicalSpeciesToAtomTypeMapper(
+            model_type_names=type_names,
+            chemical_species_to_atom_type_map=chemical_species_to_atom_type_map,
+        )
+    ]
+
+    # add neighborlist transform with optional per-edge-type cutoffs
+    nl_kwargs = {"NL": neighborlist_backend}
+
+    if metadata.get(graph_model.PER_EDGE_TYPE_CUTOFF_KEY, None) is not None:
+        per_edge_type_cutoff = metadata[graph_model.PER_EDGE_TYPE_CUTOFF_KEY]
+        if isinstance(per_edge_type_cutoff, str):
+            per_edge_type_cutoff = cutoff_str_to_fulldict(
+                per_edge_type_cutoff, type_names
+            )
+
+        transforms.append(
+            NeighborListTransform(
+                r_max=r_max,
+                per_edge_type_cutoff=per_edge_type_cutoff,
+                type_names=type_names,
+                **nl_kwargs,
+            )
+        )
+    else:
+        transforms.append(NeighborListTransform(r_max=r_max, **nl_kwargs))
+
+    return transforms

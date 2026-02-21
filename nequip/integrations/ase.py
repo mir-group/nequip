@@ -9,12 +9,8 @@ from ase.stress import full_3x3_to_voigt_6_stress
 from nequip.train.lightning import _SOLE_MODEL_KEY
 from nequip.nn import graph_model
 from nequip.data import AtomicDataDict, from_ase
-from nequip.data.transforms import (
-    ChemicalSpeciesToAtomTypeMapper,
-    NeighborListTransform,
-)
 from nequip.utils.global_state import set_global_state
-from .utils import handle_chemical_species_map
+from .utils import handle_chemical_species_map, basic_transforms
 
 
 class NequIPCalculator(Calculator):
@@ -79,6 +75,7 @@ class NequIPCalculator(Calculator):
         device: Union[str, torch.device] = "cpu",
         chemical_species_to_atom_type_map: Optional[Union[Dict[str, str], bool]] = None,
         chemical_symbols: Optional[Union[List[str], Dict[str, str]]] = None,
+        neighborlist_backend: str = "matscipy",
         **kwargs,
     ):
         """Creates a :class:`~nequip.integrations.ase.NequIPCalculator` from a compiled model file.
@@ -90,6 +87,8 @@ class NequIPCalculator(Calculator):
                 If ``None`` (default), uses identity mapping with warning.
                 If ``True``, uses identity mapping without warning.
                 If dict, uses the provided mapping.
+            neighborlist_backend (str): neighborlist backend to use: ``"ase"``, ``"matscipy"``, or ``"vesin"``
+                (default: ``"matscipy"``).
         """
         # TODO: eventually remove this check
         # check for deprecated API usage
@@ -122,8 +121,6 @@ class NequIPCalculator(Calculator):
         # extract r_max and type_names for transforms
         r_max = metadata[graph_model.R_MAX_KEY]
         type_names = metadata[graph_model.TYPE_NAMES_KEY]
-        # create neighbor list transform with per-edge-type cutoffs if available
-        neighbor_transform = _create_neighbor_transform(metadata, r_max, type_names)
 
         # use `type_names` metadata as identity map if not provided
         chemical_species_to_atom_type_map = handle_chemical_species_map(
@@ -133,13 +130,13 @@ class NequIPCalculator(Calculator):
         return cls(
             model=model,
             device=device,
-            transforms=[
-                ChemicalSpeciesToAtomTypeMapper(
-                    model_type_names=type_names,
-                    chemical_species_to_atom_type_map=chemical_species_to_atom_type_map,
-                ),
-                neighbor_transform,
-            ],
+            transforms=basic_transforms(
+                metadata,
+                r_max,
+                type_names,
+                chemical_species_to_atom_type_map,
+                neighborlist_backend=neighborlist_backend,
+            ),
             **kwargs,
         )
 
@@ -151,6 +148,7 @@ class NequIPCalculator(Calculator):
         chemical_species_to_atom_type_map: Optional[Union[Dict[str, str], bool]] = None,
         allow_tf32: bool = False,
         model_name: str = _SOLE_MODEL_KEY,
+        neighborlist_backend: str = "matscipy",
         **kwargs,
     ):
         """Creates a :class:`~nequip.integrations.ase.NequIPCalculator` from a saved model.
@@ -169,6 +167,8 @@ class NequIPCalculator(Calculator):
                 If dict, uses the provided mapping.
             allow_tf32 (bool): whether to allow TensorFloat32 operations (default ``False``).
             model_name (str): key to select the model from ModuleDict (default for single model case).
+            neighborlist_backend (str): neighborlist backend to use: ``"ase"``, ``"matscipy"``, or ``"vesin"``
+                (default: ``"matscipy"``).
         """
         from nequip.model.saved_models.load_utils import load_saved_model
 
@@ -184,11 +184,6 @@ class NequIPCalculator(Calculator):
         r_max = float(model.metadata[graph_model.R_MAX_KEY])
         type_names = model.metadata[graph_model.TYPE_NAMES_KEY].split(" ")
 
-        # create neighbor list transform with per-edge-type cutoffs if available
-        neighbor_transform = _create_neighbor_transform(
-            model.metadata, r_max, type_names
-        )
-
         chemical_species_to_atom_type_map = handle_chemical_species_map(
             chemical_species_to_atom_type_map, type_names
         )
@@ -200,13 +195,13 @@ class NequIPCalculator(Calculator):
         return cls(
             model=model,
             device=device,
-            transforms=[
-                ChemicalSpeciesToAtomTypeMapper(
-                    model_type_names=type_names,
-                    chemical_species_to_atom_type_map=chemical_species_to_atom_type_map,
-                ),
-                neighbor_transform,
-            ],
+            transforms=basic_transforms(
+                model.metadata,
+                r_max,
+                type_names,
+                chemical_species_to_atom_type_map,
+                neighborlist_backend=neighborlist_backend,
+            ),
             **kwargs,
         )
 
@@ -265,25 +260,3 @@ class NequIPCalculator(Calculator):
     def save_extra_outputs(self, out: AtomicDataDict.Type):
         # subclasses can implement this method to process extra outputs without code duplication
         pass
-
-
-def _create_neighbor_transform(
-    metadata: dict, r_max: float, type_names: List[str]
-) -> NeighborListTransform:
-    """Create NeighborListTransform with per-edge-type cutoffs if available."""
-    if metadata.get(graph_model.PER_EDGE_TYPE_CUTOFF_KEY, None) is not None:
-        per_edge_type_cutoff = metadata[graph_model.PER_EDGE_TYPE_CUTOFF_KEY]
-        if isinstance(per_edge_type_cutoff, str):
-            from nequip.nn.embedding.utils import cutoff_str_to_fulldict
-
-            per_edge_type_cutoff = cutoff_str_to_fulldict(
-                per_edge_type_cutoff, type_names
-            )
-
-        return NeighborListTransform(
-            r_max=r_max,
-            per_edge_type_cutoff=per_edge_type_cutoff,
-            type_names=type_names,
-        )
-    else:
-        return NeighborListTransform(r_max=r_max)

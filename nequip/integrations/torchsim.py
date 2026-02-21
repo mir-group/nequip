@@ -11,7 +11,7 @@ from nequip.data import AtomicDataDict
 from nequip.nn import graph_model
 from nequip.train.lightning import _SOLE_MODEL_KEY
 from nequip.utils.global_state import set_global_state
-from .utils import handle_chemical_species_map
+from .utils import handle_chemical_species_map, basic_transforms
 
 from collections.abc import Callable
 from pathlib import Path
@@ -34,8 +34,6 @@ class NequIPTorchSimCalc(ModelInterface):
         device (str or :class:`torch.device`): device for model to evaluate on,
             e.g. ``"cpu"`` or ``"cuda"`` (default: ``"cpu"``)
         transforms (List[Callable]): list of data transforms
-        neighbor_list_backend (str): neighborlist backend to use: ``"ase"``, ``"matscipy"``, or ``"vesin"``
-            (default: ``"matscipy"``)
         atomic_numbers (:class:`torch.Tensor` or None): atomic numbers with shape
             ``[n_atoms]``. If provided at initialization, cannot be provided
             again during forward pass
@@ -50,7 +48,6 @@ class NequIPTorchSimCalc(ModelInterface):
         r_max: float,
         device: Union[str, torch.device] = "cpu",
         transforms: List[Callable] = [],
-        neighbor_list_backend: str = "matscipy",
         atomic_numbers: torch.Tensor | None = None,
         system_idx: torch.Tensor | None = None,
     ) -> None:
@@ -70,8 +67,6 @@ class NequIPTorchSimCalc(ModelInterface):
         self._compute_forces = True
         self._compute_stress = True
         self._memory_scales_with = "n_atoms_x_density"
-
-        self.neighbor_list_backend = neighbor_list_backend
 
         if not isinstance(model, torch.nn.Module):
             raise TypeError("Invalid model type. Must be a torch.nn.Module.")
@@ -118,6 +113,7 @@ class NequIPTorchSimCalc(ModelInterface):
         compile_path: Union[str, Path],
         device: Union[str, torch.device] = "cpu",
         chemical_species_to_atom_type_map: Optional[Union[Dict[str, str], bool]] = None,
+        neighborlist_backend: str = "matscipy",
         **kwargs,
     ):
         """Creates a :class:`~nequip.integrations.torchsim.NequIPTorchSimCalc` from a compiled model file.
@@ -129,6 +125,8 @@ class NequIPTorchSimCalc(ModelInterface):
                 If ``None`` (default), uses identity mapping with warning.
                 If ``True``, uses identity mapping without warning.
                 If dict, uses the provided mapping.
+            neighborlist_backend (str): neighborlist backend to use: ``"ase"``, ``"matscipy"``, or ``"vesin"``
+                (default: ``"matscipy"``).
             **kwargs: additional arguments passed to :class:`~nequip.integrations.torchsim.NequIPTorchSimCalc`.
         """
         from nequip.model.inference_models import load_compiled_model
@@ -154,21 +152,17 @@ class NequIPTorchSimCalc(ModelInterface):
         if "transforms" in kwargs:
             raise KeyError("`transforms` not allowed here")
 
-        # extract neighbor_list_backend from kwargs if provided
-        neighbor_list_backend = kwargs.pop("neighbor_list_backend", "matscipy")
-
         return cls(
             model=model,
             r_max=r_max,
             device=device,
-            transforms=_basic_transforms(
+            transforms=basic_transforms(
                 metadata,
                 r_max,
                 type_names,
                 chemical_species_to_atom_type_map,
-                neighbor_list_backend,
+                neighborlist_backend=neighborlist_backend,
             ),
-            neighbor_list_backend=neighbor_list_backend,
             **kwargs,
         )
 
@@ -180,6 +174,7 @@ class NequIPTorchSimCalc(ModelInterface):
         chemical_species_to_atom_type_map: Optional[Union[Dict[str, str], bool]] = None,
         allow_tf32: bool = False,
         model_name: str = _SOLE_MODEL_KEY,
+        neighborlist_backend: str = "matscipy",
         **kwargs,
     ):
         """Creates a :class:`~nequip.integrations.torchsim.NequIPTorchSimCalc` from a saved model.
@@ -197,6 +192,8 @@ class NequIPTorchSimCalc(ModelInterface):
                 If dict, uses the provided mapping.
             allow_tf32 (bool): whether to allow TensorFloat32 operations (default ``False``).
             model_name (str): key to select the model from ModuleDict (default for single model case).
+            neighborlist_backend (str): neighborlist backend to use: ``"ase"``, ``"matscipy"``, or ``"vesin"``
+                (default: ``"matscipy"``).
             **kwargs: additional arguments passed to :class:`~nequip.integrations.torchsim.NequIPTorchSimCalc`.
         """
         from nequip.model.saved_models.load_utils import load_saved_model
@@ -222,21 +219,17 @@ class NequIPTorchSimCalc(ModelInterface):
         if "transforms" in kwargs:
             raise KeyError("`transforms` not allowed here")
 
-        # extract neighbor_list_backend from kwargs if provided
-        neighbor_list_backend = kwargs.pop("neighbor_list_backend", "matscipy")
-
         return cls(
             model=model,
             r_max=r_max,
             device=device,
-            transforms=_basic_transforms(
+            transforms=basic_transforms(
                 model.metadata,
                 r_max,
                 type_names,
                 chemical_species_to_atom_type_map,
-                neighbor_list_backend,
+                neighborlist_backend=neighborlist_backend,
             ),
-            neighbor_list_backend=neighbor_list_backend,
             **kwargs,
         )
 
@@ -357,48 +350,3 @@ class NequIPTorchSimCalc(ModelInterface):
     ) -> None:
         # subclasses can implement this method to process extra outputs without code duplication
         pass
-
-
-def _basic_transforms(
-    metadata: dict,
-    r_max: float,
-    type_names: List[str],
-    chemical_species_to_atom_type_map: Dict[str, str],
-    neighbor_list_backend: str = "matscipy",
-) -> List[Callable]:
-    """Create transform list with neighborlist construction and optional per-edge-type cutoff pruning."""
-    from nequip.data.transforms import (
-        ChemicalSpeciesToAtomTypeMapper,
-        NeighborListTransform,
-    )
-    from nequip.nn.embedding.utils import cutoff_str_to_fulldict
-
-    transforms = [
-        ChemicalSpeciesToAtomTypeMapper(
-            model_type_names=type_names,
-            chemical_species_to_atom_type_map=chemical_species_to_atom_type_map,
-        )
-    ]
-
-    # add neighborlist transform with optional per-edge-type cutoffs
-    nl_kwargs = {"NL": neighbor_list_backend}
-
-    if metadata.get(graph_model.PER_EDGE_TYPE_CUTOFF_KEY, None) is not None:
-        per_edge_type_cutoff = metadata[graph_model.PER_EDGE_TYPE_CUTOFF_KEY]
-        if isinstance(per_edge_type_cutoff, str):
-            per_edge_type_cutoff = cutoff_str_to_fulldict(
-                per_edge_type_cutoff, type_names
-            )
-
-        transforms.append(
-            NeighborListTransform(
-                r_max=r_max,
-                per_edge_type_cutoff=per_edge_type_cutoff,
-                type_names=type_names,
-                **nl_kwargs,
-            )
-        )
-    else:
-        transforms.append(NeighborListTransform(r_max=r_max, **nl_kwargs))
-
-    return transforms
