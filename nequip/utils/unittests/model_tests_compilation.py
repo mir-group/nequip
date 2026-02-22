@@ -19,7 +19,6 @@ import numpy as np
 from nequip.data import AtomicDataDict
 from nequip.utils.test import override_irreps_debug
 from nequip.utils.versions import _TORCH_GE_2_6, _TORCH_GE_2_10
-from nequip.integrations.ase import NequIPCalculator
 
 from .utils import _check_and_print
 from .model_tests_basic import EnergyModelTestsMixin
@@ -41,6 +40,26 @@ class CompilationTestsMixin(EnergyModelTestsMixin):
         Returns tolerance based on ``model_dtype``.
         """
         return {"float32": 5e-5, "float64": 1e-12}[model_dtype]
+
+    @pytest.fixture(scope="class")
+    def ase_calculator_cls(self):
+        """May be overriden by subclasses.
+
+        Return ASE calculator class used for saved-model and compiled-model loading.
+        """
+        from nequip.integrations.ase import NequIPCalculator
+
+        return NequIPCalculator
+
+    @pytest.fixture(scope="class")
+    def ase_aoti_compile_target(self):
+        """May be overriden by subclasses.
+
+        Return nequip-compile --target value used for ASE AOTInductor integration tests.
+        """
+        from nequip.scripts._compile_utils import AOTI_ASE_TARGET
+
+        return AOTI_ASE_TARGET
 
     @pytest.fixture(scope="class", params=[None])
     def nequip_compile_acceleration_modifiers(self, request):
@@ -93,6 +112,8 @@ class CompilationTestsMixin(EnergyModelTestsMixin):
         mode,
         nequip_compile_tol,
         nequip_compile_acceleration_modifiers,
+        ase_calculator_cls,
+        ase_aoti_compile_target,
     ):
         """Tests `nequip-compile` workflows.
 
@@ -136,7 +157,7 @@ class CompilationTestsMixin(EnergyModelTestsMixin):
             device,
             # target accepted as argument for both modes, but unused for torchscript mode
             "--target",
-            "ase",
+            ase_aoti_compile_target,
         ]
         if compile_modifiers:
             cmd.extend(["--modifiers"] + compile_modifiers)
@@ -159,12 +180,12 @@ class CompilationTestsMixin(EnergyModelTestsMixin):
         chemical_species_to_atom_type_map = {s: s for s in chemical_species}
 
         # load reference calculator based on model source
-        ref_calc = NequIPCalculator._from_saved_model(
+        ref_calc = ase_calculator_cls._from_saved_model(
             model_path,
             device=device,
             chemical_species_to_atom_type_map=chemical_species_to_atom_type_map,
         )
-        compile_calc = NequIPCalculator.from_compiled_model(
+        compile_calc = ase_calculator_cls.from_compiled_model(
             output_path,
             device=device,
             chemical_species_to_atom_type_map=chemical_species_to_atom_type_map,
