@@ -176,19 +176,17 @@ class CompilationTestsMixin(EnergyModelTestsMixin):
 
         # == get ase calculator for checkpoint and compiled models ==
         # we only ever load it into the same device that we `nequip-compile`d for
-        chemical_species = config.chemical_species
-        chemical_species_to_atom_type_map = {s: s for s in chemical_species}
 
         # load reference calculator based on model source
         ref_calc = ase_calculator_cls._from_saved_model(
             model_path,
             device=device,
-            chemical_species_to_atom_type_map=chemical_species_to_atom_type_map,
+            chemical_species_to_atom_type_map=True,
         )
         compile_calc = ase_calculator_cls.from_compiled_model(
             output_path,
             device=device,
-            chemical_species_to_atom_type_map=chemical_species_to_atom_type_map,
+            chemical_species_to_atom_type_map=True,
         )
 
         # == loop over validation data and do checks ==
