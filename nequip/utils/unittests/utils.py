@@ -6,6 +6,7 @@ import pathlib
 import subprocess
 import os
 import sys
+import uuid
 import torch
 
 from omegaconf import OmegaConf, open_dict
@@ -45,6 +46,56 @@ def resolve_saved_model_path(tmpdir: str, model_source: str) -> str:
             "model_source must be one of 'fresh', 'checkpoint', or 'package'. "
             f"Got: {model_source}"
         )
+
+
+def run_nequip_compile(
+    model_path: str,
+    tmpdir: str,
+    env: dict,
+    mode: str,
+    device: str,
+    target: str,
+    modifiers=None,
+    output_prefix: str = "compile_model",
+) -> str:
+    """Run ``nequip-compile`` and return compiled model artifact path."""
+    if modifiers is None:
+        modifiers = []
+
+    uid = uuid.uuid4()
+    compile_fname = (
+        f"{output_prefix}_{uid}.nequip.pt2"
+        if mode == "aotinductor"
+        else f"{output_prefix}_{uid}.nequip.pth"
+    )
+    output_path = str(pathlib.Path(tmpdir) / compile_fname)
+
+    cmd = [
+        "nequip-compile",
+        model_path,
+        output_path,
+        "--mode",
+        mode,
+        "--device",
+        device,
+        "--target",
+        target,
+    ]
+    if modifiers:
+        cmd.extend(["--modifiers"] + modifiers)
+
+    retcode = subprocess.run(
+        cmd,
+        cwd=tmpdir,
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    _check_and_print(retcode)
+    assert os.path.exists(output_path), (
+        f"Compiled model `{output_path}` does not exist!"
+    )
+    return output_path
 
 
 def compare_output_and_gradients(

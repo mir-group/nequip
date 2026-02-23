@@ -9,16 +9,12 @@ Tests include model output validation, calculator consistency, and batched evalu
 
 import pytest
 import torch
-import pathlib
-import subprocess
-import os
-import uuid
 import numpy as np
 
 from nequip.utils.versions import _TORCH_GE_2_6, _TORCH_GE_2_10
 from nequip.integrations.ase import NequIPCalculator
 
-from .utils import _check_and_print, resolve_saved_model_path
+from .utils import resolve_saved_model_path, run_nequip_compile
 from .model_tests_basic import EnergyModelTestsMixin
 
 
@@ -208,47 +204,20 @@ class TorchSimIntegrationMixin(EnergyModelTestsMixin):
             fake_model_training_session
         )
 
-        # handle acceleration modifiers
         compile_modifiers = []
         if torchsim_compile_modifiers is not None:
             compile_modifiers = torchsim_compile_modifiers(mode, device, model_dtype)
 
-        # get model path
         model_path = resolve_saved_model_path(tmpdir, model_source)
-
-        # compile with --target batch for torch-sim
-        uid = uuid.uuid4()
-        compile_fname = (
-            f"torchsim_model_{uid}.nequip.pt2"
-            if mode == "aotinductor"
-            else f"torchsim_model_{uid}.nequip.pth"
-        )
-        output_path = str(pathlib.Path(f"{tmpdir}/{compile_fname}"))
-
-        cmd = [
-            "nequip-compile",
-            model_path,
-            output_path,
-            "--mode",
-            mode,
-            "--device",
-            device,
-            "--target",
-            torchsim_aoti_target,
-        ]
-        if compile_modifiers:
-            cmd.extend(["--modifiers"] + compile_modifiers)
-
-        retcode = subprocess.run(
-            cmd,
-            cwd=tmpdir,
+        output_path = run_nequip_compile(
+            model_path=model_path,
+            tmpdir=tmpdir,
             env=env,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-        _check_and_print(retcode)
-        assert os.path.exists(output_path), (
-            f"Compiled model `{output_path}` does not exist!"
+            mode=mode,
+            device=device,
+            target=torchsim_aoti_target,
+            modifiers=compile_modifiers,
+            output_prefix="torchsim_model",
         )
 
         return model_path, output_path, structures
