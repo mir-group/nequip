@@ -10,7 +10,10 @@ Tests include model output validation, calculator consistency, and batched evalu
 import pytest
 import torch
 import numpy as np
+from ase.calculators.calculator import all_properties as ase_all_properties
+from ase.calculators.singlepoint import SinglePointCalculator
 
+from nequip.data import AtomicDataDict, from_ase
 from nequip.utils.versions import _TORCH_GE_2_6, _TORCH_GE_2_10
 from nequip.integrations.ase import NequIPCalculator
 
@@ -179,6 +182,59 @@ class TorchSimIntegrationMixin(EnergyModelTestsMixin):
 
         return AOTI_BATCH_TARGET
 
+    @pytest.fixture(scope="class")
+    def torchsim_calculator_cls(self):
+        """May be overridden by subclasses.
+
+        Return torch-sim calculator class used for compiled-model loading.
+        """
+        return NequIPTorchSimCalc
+
+    @pytest.fixture(scope="class")
+    def torchsim_reference_ase_calculator_cls(self):
+        """May be overridden by subclasses.
+
+        Return ASE calculator class used for saved-model reference evaluation.
+        """
+        return NequIPCalculator
+
+    @pytest.fixture(scope="class")
+    def torchsim_properties_to_compare(self):
+        """May be overridden by subclasses.
+
+        Return property names to compare between ASE and torch-sim outputs.
+
+        NOTE: assume ASE property keys and torch-sim output keys are identical.
+        """
+        return ["energy", "forces", "stress"]
+
+    def _make_ase_reference_data(self, atoms, properties_to_compare):
+        """Evaluate ASE properties and convert them into AtomicDataDict format."""
+        evaluated = {}
+        for property_name in properties_to_compare:
+            evaluated[property_name] = atoms.calc.get_property(property_name, atoms)
+
+        sp_atoms = atoms.copy()
+        # ASE standard properties go through SinglePointCalculator.
+        # Non-standard extension properties are stored in info/arrays and
+        # loaded via from_ase(..., include_keys=...).
+        calc_results = {
+            k: v for k, v in evaluated.items() if k in set(ase_all_properties)
+        }
+        if calc_results:
+            sp_atoms.calc = SinglePointCalculator(sp_atoms, **calc_results)
+
+        for key, value in evaluated.items():
+            if key in calc_results:
+                continue
+            value_np = np.asarray(value)
+            if value_np.ndim >= 1 and value_np.shape[0] == len(sp_atoms):
+                sp_atoms.arrays[key] = value_np
+            else:
+                sp_atoms.info[key] = value_np
+
+        return from_ase(sp_atoms, include_keys=list(properties_to_compare))
+
     @pytest.fixture(
         scope="class",
         params=([] if _TORCH_GE_2_10 else ["torchscript"])
@@ -250,6 +306,7 @@ class TorchSimIntegrationMixin(EnergyModelTestsMixin):
         torchsim_compiled_model,
         device,
         torchsim_tol,
+        torchsim_calculator_cls,
     ):
         """Test that NequIPTorchSimCalc follows the torch-sim ModelInterface contract.
 
@@ -260,7 +317,7 @@ class TorchSimIntegrationMixin(EnergyModelTestsMixin):
         - Batched evaluation matches individual evaluations
         """
         _, compiled_path, structures = torchsim_compiled_model
-        torchsim_calc = NequIPTorchSimCalc.from_compiled_model(
+        torchsim_calc = torchsim_calculator_cls.from_compiled_model(
             compiled_path, device=device, chemical_species_to_atom_type_map=True
         )
         validate_model_interface_contract(
@@ -273,6 +330,9 @@ class TorchSimIntegrationMixin(EnergyModelTestsMixin):
         torchsim_compiled_model,
         device,
         torchsim_tol,
+        torchsim_calculator_cls,
+        torchsim_reference_ase_calculator_cls,
+        torchsim_properties_to_compare,
     ):
         """Test that NequIPTorchSimCalc matches NequIPCalculator output.
 
@@ -284,14 +344,14 @@ class TorchSimIntegrationMixin(EnergyModelTestsMixin):
 
         # load both calculators
         # ASE calculator from saved model (reference)
-        nequip_calc = NequIPCalculator._from_saved_model(
+        nequip_calc = torchsim_reference_ase_calculator_cls._from_saved_model(
             model_path,
             device=device,
             chemical_species_to_atom_type_map=True,
         )
 
         # TorchSim calculator from batch-compiled model
-        torchsim_calc = NequIPTorchSimCalc.from_compiled_model(
+        torchsim_calc = torchsim_calculator_cls.from_compiled_model(
             compiled_path,
             device=device,
             chemical_species_to_atom_type_map=True,
@@ -299,43 +359,40 @@ class TorchSimIntegrationMixin(EnergyModelTestsMixin):
 
         # test on validation structures
         for atoms in structures:
-            # NequIP calculator results
             nequip_atoms = atoms.copy()
             nequip_atoms.calc = nequip_calc
-            nequip_E = nequip_atoms.get_potential_energy()
-            nequip_F = nequip_atoms.get_forces()
-            nequip_S = nequip_atoms.get_stress(voigt=False)
 
             # TorchSim calculator results
-            # convert atoms to SimState
             sim_state = ts.io.atoms_to_state(
                 [atoms], device=device, dtype=torch.float64
             )
             ts_results = torchsim_calc(sim_state)
-
-            # compare energies
-            np.testing.assert_allclose(
-                nequip_E,
-                ts_results["energy"].cpu().numpy()[0],
-                rtol=torchsim_tol,
-                atol=torchsim_tol,
+            ase_ref = self._make_ase_reference_data(
+                nequip_atoms, torchsim_properties_to_compare
             )
 
-            # compare forces
-            np.testing.assert_allclose(
-                nequip_F,
-                ts_results["forces"].cpu().numpy(),
-                rtol=torchsim_tol,
-                atol=torchsim_tol,
-            )
+            for property_name in torchsim_properties_to_compare:
+                if property_name not in ts_results:
+                    continue
+                atomic_key = (
+                    AtomicDataDict.TOTAL_ENERGY_KEY
+                    if property_name == "energy"
+                    else property_name
+                )
+                if atomic_key not in ase_ref:
+                    continue
 
-            # compare stress (if available)
-            if "stress" in ts_results:
+                ase_val = ase_ref[atomic_key].detach().cpu().numpy()
+                ts_val = np.reshape(
+                    ts_results[property_name].detach().cpu().numpy(), ase_val.shape
+                )
+
                 np.testing.assert_allclose(
-                    nequip_S,
-                    ts_results["stress"].cpu().numpy()[0],
+                    ase_val,
+                    ts_val,
                     rtol=torchsim_tol,
                     atol=torchsim_tol,
+                    err_msg=f"Mismatch for torch-sim property `{property_name}`",
                 )
 
             del nequip_atoms, sim_state, ts_results
@@ -348,6 +405,7 @@ class TorchSimIntegrationMixin(EnergyModelTestsMixin):
         device,
         batch_size,
         torchsim_tol,
+        torchsim_calculator_cls,
     ):
         """Test batched evaluation consistency.
 
@@ -359,7 +417,7 @@ class TorchSimIntegrationMixin(EnergyModelTestsMixin):
         _, compiled_path, structures = torchsim_compiled_model
 
         # load calculator
-        torchsim_calc = NequIPTorchSimCalc.from_compiled_model(
+        torchsim_calc = torchsim_calculator_cls.from_compiled_model(
             compiled_path,
             device=device,
             chemical_species_to_atom_type_map=True,
