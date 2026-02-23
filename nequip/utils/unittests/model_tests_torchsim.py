@@ -18,7 +18,7 @@ import numpy as np
 from nequip.utils.versions import _TORCH_GE_2_6, _TORCH_GE_2_10
 from nequip.integrations.ase import NequIPCalculator
 
-from .utils import _check_and_print
+from .utils import _check_and_print, resolve_saved_model_path
 from .model_tests_basic import EnergyModelTestsMixin
 
 
@@ -210,10 +210,7 @@ class TorchSimIntegrationMixin(EnergyModelTestsMixin):
             compile_modifiers = torchsim_compile_modifiers(mode, device, model_dtype)
 
         # get model path
-        if model_source in ("fresh", "checkpoint"):
-            model_path = str(pathlib.Path(f"{tmpdir}/best.ckpt"))
-        else:  # package
-            model_path = str(pathlib.Path(f"{tmpdir}/orig_package_model.nequip.zip"))
+        model_path = resolve_saved_model_path(tmpdir, model_source)
 
         # compile with --target batch for torch-sim
         uid = uuid.uuid4()
@@ -319,10 +316,7 @@ class TorchSimIntegrationMixin(EnergyModelTestsMixin):
         )
 
         # get model path for ASE calculator
-        if model_source in ("fresh", "checkpoint"):
-            model_path = str(pathlib.Path(f"{tmpdir}/best.ckpt"))
-        else:  # package
-            model_path = str(pathlib.Path(f"{tmpdir}/orig_package_model.nequip.zip"))
+        model_path = resolve_saved_model_path(tmpdir, model_source)
 
         # load both calculators
         # ASE calculator from saved model (reference)

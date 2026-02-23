@@ -18,7 +18,7 @@ import numpy as np
 from nequip.utils.test import override_irreps_debug
 from nequip.utils.versions import _TORCH_GE_2_6, _TORCH_GE_2_10
 
-from .utils import _check_and_print
+from .utils import _check_and_print, resolve_saved_model_path
 from .model_tests_basic import EnergyModelTestsMixin
 
 
@@ -111,10 +111,7 @@ class ASEIntegrationMixin(EnergyModelTestsMixin):
         if ase_compile_modifiers is not None:
             compile_modifiers = ase_compile_modifiers(mode, device, model_dtype)
 
-        if model_source in ("fresh", "checkpoint"):
-            model_path = str(pathlib.Path(f"{tmpdir}/best.ckpt"))
-        else:
-            model_path = str(pathlib.Path(f"{tmpdir}/orig_package_model.nequip.zip"))
+        model_path = resolve_saved_model_path(tmpdir, model_source)
 
         uid = uuid.uuid4()
         compile_fname = (

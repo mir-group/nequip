@@ -11,6 +11,9 @@ import torch
 from omegaconf import OmegaConf, open_dict
 from nequip.data import AtomicDataDict
 
+BEST_CHECKPOINT_FILENAME = "best.ckpt"
+ORIG_PACKAGE_MODEL_FILENAME = "orig_package_model.nequip.zip"
+
 
 def _check_and_print(retcode, encoding="ascii"):
     """Helper function to check subprocess return code and print output on failure."""
@@ -21,6 +24,27 @@ def _check_and_print(retcode, encoding="ascii"):
         if retcode.stderr is not None and len(retcode.stderr) > 0:
             print(retcode.stderr.decode(encoding, errors="replace"), file=sys.stderr)
         retcode.check_returncode()
+
+
+def resolve_saved_model_path(tmpdir: str, model_source: str) -> str:
+    """Resolve checkpoint/package path for saved-model loading tests.
+
+    Args:
+        tmpdir: test run directory containing training artifacts.
+        model_source: one of ``"fresh"``, ``"checkpoint"``, or ``"package"``.
+
+    Returns:
+        Absolute path string to the saved model artifact.
+    """
+    if model_source in ("fresh", "checkpoint"):
+        return str(pathlib.Path(tmpdir) / BEST_CHECKPOINT_FILENAME)
+    elif model_source == "package":
+        return str(pathlib.Path(tmpdir) / ORIG_PACKAGE_MODEL_FILENAME)
+    else:
+        raise ValueError(
+            "model_source must be one of 'fresh', 'checkpoint', or 'package'. "
+            f"Got: {model_source}"
+        )
 
 
 def compare_output_and_gradients(
@@ -163,7 +187,9 @@ def _training_session(
                             }
                     elif extra_train_from_save == "package":
                         # package model
-                        package_path = f"{new_tmpdir}/orig_package_model.nequip.zip"
+                        package_path = str(
+                            pathlib.Path(new_tmpdir) / ORIG_PACKAGE_MODEL_FILENAME
+                        )
                         retcode = subprocess.run(
                             [
                                 "nequip-package",
