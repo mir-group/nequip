@@ -5,33 +5,39 @@ Model test classes composed from hierarchical test mixins.
 The mixins are organized hierarchically:
     BasicModelTestsMixin (base fixtures + basic tests)
     └─ EnergyModelTestsMixin (adds energy-specific tests)
-       ├─ CompilationTestsMixin (adds compilation tests for energy models)
+       ├─ ASEIntegrationMixin (adds compile artifact ASE integration tests)
+       ├─ TrainTimeCompileMixin (adds train-time compile tests)
        └─ LAMMPSMLIAPIntegrationMixin (adds LAMMPS ML-IAP integration tests)
 
 This module provides standard test class compositions:
 - BaseEnergyModelTests: Everything (basic + energy + compilation + LAMMPS ML-IAP)
 
 For fine-grained control, compose from mixins directly:
-    from nequip.utils.unittests.model_tests_compilation import CompilationTestsMixin
+    from nequip.utils.unittests.model_tests_ase_integration import ASEIntegrationMixin
+    from nequip.utils.unittests.model_tests_train_time_compile import TrainTimeCompileMixin
     from nequip.utils.unittests.model_tests_lammps import LAMMPSMLIAPIntegrationMixin
 
-    class MyModelTests(CompilationTestsMixin, LAMMPSMLIAPIntegrationMixin):
+    class MyModelTests(TrainTimeCompileMixin, ASEIntegrationMixin, LAMMPSMLIAPIntegrationMixin):
         # Gets basic + energy + compilation + LAMMPS ML-IAP via inheritance
         ...
 """
 
-from .model_tests_compilation import CompilationTestsMixin
+from .model_tests_ase_integration import ASEIntegrationMixin
+from .model_tests_train_time_compile import TrainTimeCompileMixin
 from .model_tests_lammps import LAMMPSMLIAPIntegrationMixin
 
 
 # see https://github.com/pytest-dev/pytest/issues/421#issuecomment-943386533
 # to allow external packages to import tests through subclassing
-class BaseEnergyModelTests(CompilationTestsMixin, LAMMPSMLIAPIntegrationMixin):
+class BaseEnergyModelTests(
+    TrainTimeCompileMixin, ASEIntegrationMixin, LAMMPSMLIAPIntegrationMixin
+):
     """
     Standard energy model tests: includes all test types.
 
     This class composes:
-    - CompilationTestsMixin → EnergyModelTestsMixin → BasicModelTestsMixin
+    - ASEIntegrationMixin → EnergyModelTestsMixin → BasicModelTestsMixin
+    - TrainTimeCompileMixin → EnergyModelTestsMixin → BasicModelTestsMixin
     - LAMMPSMLIAPIntegrationMixin → EnergyModelTestsMixin → BasicModelTestsMixin
 
     Via the inheritance hierarchy, this includes all tests:
@@ -45,9 +51,10 @@ class BaseEnergyModelTests(CompilationTestsMixin, LAMMPSMLIAPIntegrationMixin):
     - `strict_locality` fixture: True if strictly local, False if message-passing
 
     For models without LAMMPS ML-IAP support:
-        from nequip.utils.unittests.model_tests_compilation import CompilationTestsMixin
+        from nequip.utils.unittests.model_tests_ase_integration import ASEIntegrationMixin
+        from nequip.utils.unittests.model_tests_train_time_compile import TrainTimeCompileMixin
 
-        class MyModelTests(CompilationTestsMixin):
+        class MyModelTests(TrainTimeCompileMixin, ASEIntegrationMixin):
             # basic + energy + compilation, skip LAMMPS ML-IAP
             ...
     """

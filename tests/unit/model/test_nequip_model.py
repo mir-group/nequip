@@ -1,4 +1,6 @@
 import pytest
+from nequip.utils.unittests.model_tests_ase_integration import ASEIntegrationMixin
+from nequip.utils.unittests.model_tests_train_time_compile import TrainTimeCompileMixin
 from nequip.utils.unittests.model_tests_lammps import LAMMPSMLIAPIntegrationMixin
 from nequip.utils.unittests.model_tests_torchsim import TorchSimIntegrationMixin
 from nequip.utils.versions import _TORCH_GE_2_7, _TORCH_IS_2_10_0
@@ -70,10 +72,15 @@ minimal_config4 = dict(
 )
 
 
-class TestNequIPModel(TorchSimIntegrationMixin, LAMMPSMLIAPIntegrationMixin):
+class TestNequIPModel(
+    TrainTimeCompileMixin,
+    ASEIntegrationMixin,
+    TorchSimIntegrationMixin,
+    LAMMPSMLIAPIntegrationMixin,
+):
     """NequIP model tests.
 
-    Gets compilation tests via TorchSimIntegrationMixin → CompilationTestsMixin.
+    Includes train-time compile, ASE integration, torch-sim integration, and LAMMPS ML-IAP integration tests.
     """
 
     @pytest.fixture
@@ -104,8 +111,8 @@ class TestNequIPModel(TorchSimIntegrationMixin, LAMMPSMLIAPIntegrationMixin):
         + (["enable_OpenEquivariance"] if _TORCH_GE_2_7 and _OEQ_INSTALLED else [])
         + (["enable_CuEquivariance"] if _CUEQ_INSTALLED else []),
     )
-    def nequip_compile_acceleration_modifiers(self, request):
-        """Test acceleration modifiers in nequip-compile workflows."""
+    def ase_compile_modifiers(self, request):
+        """Test acceleration modifiers in ASE integration compile workflows."""
         if request.param is None:
             # for base NequIP models (no modifiers), skip CPU+aotinductor for PyTorch 2.10.0
             # due to known compilation bug; left for future PyTorch versions to resolve
@@ -150,16 +157,59 @@ class TestNequIPModel(TorchSimIntegrationMixin, LAMMPSMLIAPIntegrationMixin):
     @pytest.fixture(
         scope="class",
         params=[None]
+        + (["enable_OpenEquivariance"] if _TORCH_GE_2_7 and _OEQ_INSTALLED else [])
+        + (["enable_CuEquivariance"] if _CUEQ_INSTALLED else []),
+    )
+    def torchsim_compile_modifiers(self, request):
+        """Test acceleration modifiers in torch-sim compile workflows."""
+        if request.param is None:
+
+            def modifier_handler(mode, device, model_dtype):
+                if device == "cpu" and mode == "aotinductor" and _TORCH_IS_2_10_0:
+                    pytest.skip(
+                        "CPU + aotinductor compilation is known to fail for NequIP models in PyTorch 2.10.0"
+                    )
+                return None
+
+            return modifier_handler
+
+        def modifier_handler(mode, device, model_dtype):
+            if request.param == "enable_OpenEquivariance":
+                import openequivariance  # noqa: F401,F811
+                from nequip.utils.versions import _TORCH_GE_2_9
+
+                if mode == "aotinductor" and not _TORCH_GE_2_9:
+                    pytest.skip("OEQ AOTI requires PyTorch >= 2.9")
+                if device == "cpu":
+                    pytest.skip("OEQ tests skipped for CPU")
+                return ["enable_OpenEquivariance"]
+            elif request.param == "enable_CuEquivariance":
+                import cuequivariance  # noqa: F401,F811
+                import cuequivariance_torch  # noqa: F401,F811
+
+                if model_dtype == "float64":
+                    pytest.skip("CuEq tests skipped for f64 models")
+                if device == "cpu":
+                    pytest.skip("CuEq tests skipped for CPU")
+                return ["enable_CuEquivariance"]
+            else:
+                raise ValueError(f"Unknown modifier: {request.param}")
+
+        return modifier_handler
+
+    @pytest.fixture(
+        scope="class",
+        params=[None]
         + (["enable_OpenEquivariance"] if _TORCH_GE_2_7 and _OEQ_INSTALLED else []),
         # + (["enable_CuEquivariance"] if _CUEQ_INSTALLED else []),
         # NOTE: ^ some tests fail with CuEq
     )
-    def train_time_compile_acceleration_modifiers(self, request):
+    def train_time_compile_modifiers(self, request):
         """Test acceleration modifiers in train-time compile workflows."""
         if request.param is None:
             return None
 
-        def modifier_handler(device):
+        def modifier_handler(device, model_dtype):
             if request.param == "enable_OpenEquivariance":
                 import openequivariance  # noqa: F401,F811
 

@@ -19,7 +19,7 @@ from nequip.utils.versions import _TORCH_GE_2_6, _TORCH_GE_2_10
 from nequip.integrations.ase import NequIPCalculator
 
 from .utils import _check_and_print
-from .model_tests_compilation import CompilationTestsMixin
+from .model_tests_basic import EnergyModelTestsMixin
 
 
 # === TorchSim availability check ===
@@ -151,11 +151,11 @@ def validate_model_interface_contract(
         atom_offset += len(struct)
 
 
-class TorchSimIntegrationMixin(CompilationTestsMixin):
+class TorchSimIntegrationMixin(EnergyModelTestsMixin):
     """
     TorchSim integration tests.
 
-    Inherits from CompilationTestsMixin, adding torch-sim-specific integration tests.
+    Inherits from EnergyModelTestsMixin, adding torch-sim-specific integration tests.
     Tests that NequIPTorchSimCalc (compiled with --target batch) produces results matching
     NequIPCalculator (reference ASE interface).
 
@@ -183,7 +183,7 @@ class TorchSimIntegrationMixin(CompilationTestsMixin):
         request,
         fake_model_training_session,
         device,
-        nequip_compile_acceleration_modifiers,
+        torchsim_compile_modifiers,
     ):
         """Compile model once for torch-sim and reuse across tests.
 
@@ -195,10 +195,8 @@ class TorchSimIntegrationMixin(CompilationTestsMixin):
 
         # handle acceleration modifiers
         compile_modifiers = []
-        if nequip_compile_acceleration_modifiers is not None:
-            compile_modifiers = nequip_compile_acceleration_modifiers(
-                mode, device, model_dtype
-            )
+        if torchsim_compile_modifiers is not None:
+            compile_modifiers = torchsim_compile_modifiers(mode, device, model_dtype)
 
         # get model path
         if model_source in ("fresh", "checkpoint"):
@@ -242,6 +240,28 @@ class TorchSimIntegrationMixin(CompilationTestsMixin):
         )
 
         return output_path, mode
+
+    @pytest.fixture(scope="class", params=[None])
+    def torchsim_compile_modifiers(self, request):
+        """Implemented by subclasses.
+
+        Returns a callable that handles model modification and constraints for
+        torch-sim compile tests.
+        The callable signature is: ``(mode, device, model_dtype) -> modifiers_list``
+
+        Args:
+            mode: compilation mode (``"torchscript"`` or ``"aotinductor"``)
+            device: target device (``"cpu"`` or ``"cuda"``)
+            model_dtype: model dtype string (``"float32"`` or ``"float64"``)
+
+        Returns:
+            modifiers_list: list of modifier names to pass to
+                ``nequip-compile --modifiers`` or calls ``pytest.skip()`` to skip
+                the test.
+
+        Default is ``None`` (no modifiers applied).
+        """
+        return request.param
 
     @pytest.mark.skipif(not _TORCHSIM_INSTALLED, reason="torch-sim not installed")
     def test_torchsim_model_interface_validation(
