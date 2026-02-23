@@ -6,8 +6,10 @@ import pathlib
 import subprocess
 import os
 import sys
+import torch
 
 from omegaconf import OmegaConf, open_dict
+from nequip.data import AtomicDataDict
 
 
 def _check_and_print(retcode, encoding="ascii"):
@@ -19,6 +21,44 @@ def _check_and_print(retcode, encoding="ascii"):
         if retcode.stderr is not None and len(retcode.stderr) > 0:
             print(retcode.stderr.decode(encoding, errors="replace"), file=sys.stderr)
         retcode.check_returncode()
+
+
+def compare_output_and_gradients(
+    modelA, modelB, model_test_data, tol, compare_outputs=None
+):
+    """Compare model outputs and parameter gradients for consistency."""
+    # default fields
+    if compare_outputs is None:
+        compare_outputs = [
+            AtomicDataDict.PER_ATOM_ENERGY_KEY,
+            AtomicDataDict.TOTAL_ENERGY_KEY,
+            AtomicDataDict.FORCE_KEY,
+            AtomicDataDict.VIRIAL_KEY,
+        ]
+
+    A_out = modelA(model_test_data.copy())
+    B_out = modelB(model_test_data.copy())
+    for key in compare_outputs:
+        if key in A_out and key in B_out:
+            torch.testing.assert_close(A_out[key], B_out[key], atol=tol, rtol=tol)
+
+    # test backwards pass if there are trainable weights
+    if any([p.requires_grad for p in modelB.parameters()]):
+        B_loss = B_out[AtomicDataDict.TOTAL_ENERGY_KEY].square().sum()
+        B_loss.backward()
+
+        A_loss = A_out[AtomicDataDict.TOTAL_ENERGY_KEY].square().sum()
+        A_loss.backward()
+        compile_params = dict(modelB.named_parameters())
+        for k, v in modelA.named_parameters():
+            err = torch.max(torch.abs(v.grad - compile_params[k].grad))
+            torch.testing.assert_close(
+                v.grad,
+                compile_params[k].grad,
+                atol=tol,
+                rtol=tol,
+                msg=f"failed for {k}, with MaxAbsErr of {err:.6f}",
+            )
 
 
 def _training_session(

@@ -16,11 +16,10 @@ import os
 import uuid
 import numpy as np
 
-from nequip.data import AtomicDataDict
 from nequip.utils.test import override_irreps_debug
 from nequip.utils.versions import _TORCH_GE_2_6, _TORCH_GE_2_10
 
-from .utils import _check_and_print
+from .utils import _check_and_print, compare_output_and_gradients
 from .model_tests_basic import EnergyModelTestsMixin
 
 
@@ -214,42 +213,6 @@ class CompilationTestsMixin(EnergyModelTestsMixin):
                 atol=nequip_compile_tol,
             )
 
-    def compare_output_and_gradients(
-        self, modelA, modelB, model_test_data, tol, compare_outputs=None
-    ):
-        # default fields
-        if compare_outputs is None:
-            compare_outputs = [
-                AtomicDataDict.PER_ATOM_ENERGY_KEY,
-                AtomicDataDict.TOTAL_ENERGY_KEY,
-                AtomicDataDict.FORCE_KEY,
-                AtomicDataDict.VIRIAL_KEY,
-            ]
-
-        A_out = modelA(model_test_data.copy())
-        B_out = modelB(model_test_data.copy())
-        for key in compare_outputs:
-            if key in A_out and key in B_out:
-                torch.testing.assert_close(A_out[key], B_out[key], atol=tol, rtol=tol)
-
-        # test backwards pass if there are trainable weights
-        if any([p.requires_grad for p in modelB.parameters()]):
-            B_loss = B_out[AtomicDataDict.TOTAL_ENERGY_KEY].square().sum()
-            B_loss.backward()
-
-            A_loss = A_out[AtomicDataDict.TOTAL_ENERGY_KEY].square().sum()
-            A_loss.backward()
-            compile_params = dict(modelB.named_parameters())
-            for k, v in modelA.named_parameters():
-                err = torch.max(torch.abs(v.grad - compile_params[k].grad))
-                torch.testing.assert_close(
-                    v.grad,
-                    compile_params[k].grad,
-                    atol=tol,
-                    rtol=tol,
-                    msg=f"failed for {k}, with MaxAbsErr of {err:.6f}",
-                )
-
     @override_irreps_debug(False)
     def test_train_time_compile(
         self, model, model_test_data, device, train_time_compile_acceleration_modifiers
@@ -294,7 +257,7 @@ class CompilationTestsMixin(EnergyModelTestsMixin):
 
         compile_model = self.make_model(config, device=device)
 
-        self.compare_output_and_gradients(
+        compare_output_and_gradients(
             modelA=instance,
             modelB=compile_model,
             model_test_data=model_test_data,
