@@ -81,27 +81,27 @@ class ASEIntegrationMixin(EnergyModelTestsMixin):
         """
         return request.param
 
-    @pytest.mark.parametrize(
-        "mode",
-        ([] if _TORCH_GE_2_10 else ["torchscript"])
+    @pytest.fixture(
+        scope="class",
+        params=([] if _TORCH_GE_2_10 else ["torchscript"])
         + (["aotinductor"] if _TORCH_GE_2_6 else []),
     )
-    @override_irreps_debug(False)
-    def test_ase_integration_from_nequip_compile(
+    def ase_compiled_model(
         self,
+        request,
         fake_model_training_session,
         device,
-        mode,
-        ase_integration_tol,
         ase_compile_modifiers,
-        ase_calculator_cls,
         ase_aoti_target,
     ):
-        """Test compiled-model ASE integration from ``nequip-compile`` artifacts.
+        """Compile model once for ASE integration tests and return saved/compiled paths.
 
-        Covers TorchScript and AOTInductor compile modes and compares model outputs
-        against a reference calculator loaded from saved model artifacts.
+        Parametrized by compilation mode (torchscript/aotinductor).
+
+        Returns:
+            tuple[str, str, list]: ``(saved_model_path, compiled_model_path, structures)``
         """
+        mode = request.param
         _, tmpdir, env, model_dtype, model_source, structures = (
             fake_model_training_session
         )
@@ -147,6 +147,19 @@ class ASEIntegrationMixin(EnergyModelTestsMixin):
         assert os.path.exists(output_path), (
             f"Compiled model `{output_path}` does not exist!"
         )
+
+        return model_path, output_path, structures
+
+    @override_irreps_debug(False)
+    def test_ase_integration_from_nequip_compile(
+        self,
+        device,
+        ase_integration_tol,
+        ase_calculator_cls,
+        ase_compiled_model,
+    ):
+        """Test compiled-model ASE integration from ``nequip-compile`` artifacts."""
+        model_path, output_path, structures = ase_compiled_model
 
         ref_calc = ase_calculator_cls._from_saved_model(
             model_path,
