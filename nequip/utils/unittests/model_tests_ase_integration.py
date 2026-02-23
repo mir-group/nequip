@@ -36,6 +36,14 @@ class ASEIntegrationMixin(EnergyModelTestsMixin):
         return {"float32": 5e-5, "float64": 1e-12}[model_dtype]
 
     @pytest.fixture(scope="class")
+    def ase_properties_to_compare(self):
+        """May be overridden by subclasses.
+
+        Return list of ASE property names to compare between saved-model and compiled-model calculators.
+        """
+        return ["energy", "forces"]
+
+    @pytest.fixture(scope="class")
     def ase_calculator_cls(self):
         """May be overridden by subclasses.
 
@@ -121,10 +129,11 @@ class ASEIntegrationMixin(EnergyModelTestsMixin):
         return model_path, output_path, structures
 
     @override_irreps_debug(False)
-    def test_ase_integration_from_nequip_compile(
+    def test_ase_compile(
         self,
         device,
         ase_integration_tol,
+        ase_properties_to_compare,
         ase_calculator_cls,
         ase_compiled_model,
     ):
@@ -145,23 +154,14 @@ class ASEIntegrationMixin(EnergyModelTestsMixin):
         for atoms in structures:
             ckpt_atoms, compile_atoms = atoms.copy(), atoms.copy()
             ckpt_atoms.calc = ref_calc
-            ckpt_E = ckpt_atoms.get_potential_energy()
-            ckpt_F = ckpt_atoms.get_forces()
-
             compile_atoms.calc = compile_calc
-            compile_E = compile_atoms.get_potential_energy()
-            compile_F = compile_atoms.get_forces()
-
-            del atoms, ckpt_atoms, compile_atoms
-            np.testing.assert_allclose(
-                ckpt_E,
-                compile_E,
-                rtol=ase_integration_tol,
-                atol=ase_integration_tol,
-            )
-            np.testing.assert_allclose(
-                ckpt_F,
-                compile_F,
-                rtol=ase_integration_tol,
-                atol=ase_integration_tol,
-            )
+            for prop in ase_properties_to_compare:
+                ckpt_val = ckpt_atoms.calc.get_property(prop, ckpt_atoms)
+                compile_val = compile_atoms.calc.get_property(prop, compile_atoms)
+                np.testing.assert_allclose(
+                    ckpt_val,
+                    compile_val,
+                    rtol=ase_integration_tol,
+                    atol=ase_integration_tol,
+                    err_msg=f"Mismatch for ASE property `{prop}`",
+                )
