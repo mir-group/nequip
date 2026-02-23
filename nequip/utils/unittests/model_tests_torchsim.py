@@ -250,7 +250,7 @@ class TorchSimIntegrationMixin(EnergyModelTestsMixin):
             f"Compiled model `{output_path}` does not exist!"
         )
 
-        return output_path, mode
+        return output_path
 
     @pytest.fixture(scope="class", params=[None])
     def torchsim_compile_modifiers(self, request):
@@ -290,7 +290,7 @@ class TorchSimIntegrationMixin(EnergyModelTestsMixin):
         - Model doesn't mutate inputs
         - Batched evaluation matches individual evaluations
         """
-        compiled_path, _ = torchsim_compiled_model
+        compiled_path = torchsim_compiled_model
         _, _, _, _, _, structures = fake_model_training_session
         torchsim_calc = NequIPTorchSimCalc.from_compiled_model(
             compiled_path, device=device, chemical_species_to_atom_type_map=True
@@ -313,7 +313,7 @@ class TorchSimIntegrationMixin(EnergyModelTestsMixin):
         ASE calculator interface. ASE calculator loads from saved model (checkpoint/package)
         as reference, while TorchSim loads from batch-compiled model.
         """
-        compiled_path, mode = torchsim_compiled_model
+        compiled_path = torchsim_compiled_model
         config, tmpdir, env, model_dtype, model_source, structures = (
             fake_model_training_session
         )
@@ -399,7 +399,7 @@ class TorchSimIntegrationMixin(EnergyModelTestsMixin):
 
         This is a key feature of torch-sim for efficient MD simulations.
         """
-        compiled_path, _ = torchsim_compiled_model
+        compiled_path = torchsim_compiled_model
         config, _, _, _, _, structures = fake_model_training_session
 
         # load calculator
