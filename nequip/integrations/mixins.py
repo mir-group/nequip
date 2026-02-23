@@ -1,6 +1,7 @@
 # This file is a part of the `nequip` package. Please see LICENSE and README at the root for information on using it.
 import torch
 
+from nequip.model.utils import _EAGER_MODEL_KEY
 from nequip.train.lightning import _SOLE_MODEL_KEY
 from nequip.nn import graph_model
 from nequip.utils.global_state import set_global_state
@@ -79,6 +80,7 @@ class _IntegrationLoaderMixin:
         chemical_species_to_atom_type_map: Optional[Union[Dict[str, str], bool]] = None,
         allow_tf32: bool = False,
         model_name: str = _SOLE_MODEL_KEY,
+        compile_mode: str = _EAGER_MODEL_KEY,
         neighborlist_backend: str = "matscipy",
         **kwargs,
     ):
@@ -90,6 +92,8 @@ class _IntegrationLoaderMixin:
             chemical_species_to_atom_type_map: optional chemical species mapping override.
             allow_tf32: whether to allow TF32 for supported math ops.
             model_name: key of the model inside the saved model artifact.
+            compile_mode: compile mode for loading the model; supported values
+                are ``"eager"`` and ``"compile"`` (default: ``"eager"``).
             neighborlist_backend: neighbor list backend used by neighbor transforms.
             **kwargs: forwarded to the integration class constructor.
         """
@@ -98,7 +102,7 @@ class _IntegrationLoaderMixin:
         set_global_state(allow_tf32=allow_tf32)
 
         model: graph_model.GraphModel = load_saved_model(
-            str(model_path), model_key=model_name
+            str(model_path), compile_mode=compile_mode, model_key=model_name
         )
         model.eval()
 
