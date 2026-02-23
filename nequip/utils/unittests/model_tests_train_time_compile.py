@@ -8,7 +8,6 @@ This mixin provides tests for train-time compilation workflows, i.e.
 
 import pytest
 import copy
-import torch
 
 from nequip.utils.test import override_irreps_debug
 from nequip.utils.versions import _TORCH_GE_2_6

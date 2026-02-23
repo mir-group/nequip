@@ -173,6 +173,16 @@ class TorchSimIntegrationMixin(EnergyModelTestsMixin):
         """
         return {"float32": 5e-5, "float64": 1e-10}[model_dtype]
 
+    @pytest.fixture(scope="class")
+    def torchsim_aoti_target(self):
+        """May be overridden by subclasses.
+
+        Return ``nequip-compile --target`` value used for AOTI compilation.
+        """
+        from nequip.scripts._compile_utils import AOTI_BATCH_TARGET
+
+        return AOTI_BATCH_TARGET
+
     @pytest.fixture(
         scope="class",
         params=([] if _TORCH_GE_2_10 else ["torchscript"])
@@ -184,6 +194,7 @@ class TorchSimIntegrationMixin(EnergyModelTestsMixin):
         fake_model_training_session,
         device,
         torchsim_compile_modifiers,
+        torchsim_aoti_target,
     ):
         """Compile model once for torch-sim and reuse across tests.
 
@@ -222,7 +233,7 @@ class TorchSimIntegrationMixin(EnergyModelTestsMixin):
             "--device",
             device,
             "--target",
-            "batch",  # Key difference from ASE compilation
+            torchsim_aoti_target,
         ]
         if compile_modifiers:
             cmd.extend(["--modifiers"] + compile_modifiers)

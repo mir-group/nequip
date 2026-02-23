@@ -53,8 +53,7 @@ class ASEIntegrationMixin(EnergyModelTestsMixin):
     def ase_aoti_target(self):
         """May be overridden by subclasses.
 
-        Return ``nequip-compile --target`` value used for AOTInductor export.
-        Note: target selection is only consumed in the AOTInductor compile path.
+        Return ``nequip-compile --target`` value used for AOTI compilation.
         """
         from nequip.scripts._compile_utils import AOTI_ASE_TARGET
 
@@ -103,7 +102,9 @@ class ASEIntegrationMixin(EnergyModelTestsMixin):
         Covers TorchScript and AOTInductor compile modes and compares model outputs
         against a reference calculator loaded from saved model artifacts.
         """
-        _, tmpdir, env, model_dtype, model_source, structures = fake_model_training_session
+        _, tmpdir, env, model_dtype, model_source, structures = (
+            fake_model_training_session
+        )
         assert torch.get_default_dtype() == torch.float64
 
         compile_modifiers = []
