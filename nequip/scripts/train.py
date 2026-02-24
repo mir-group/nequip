@@ -31,6 +31,14 @@ _REQUIRED_CONFIG_SECTIONS: Final[List[str]] = [
 @hydra.main(version_base=None, config_path=os.getcwd(), config_name="config")
 def main(config: DictConfig) -> None:
     set_workflow_state("train")
+    initial_ckpt_path = config.get("ckpt_path", None)
+    if initial_ckpt_path is None:
+        logger.info("Starting fresh training ...")
+    else:
+        logger.info(
+            f"Continuing training with checkpoint file `{initial_ckpt_path}` ..."
+        )
+
     # === sanity checks ===
 
     # check that all base sections are present
