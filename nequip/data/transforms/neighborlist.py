@@ -1,6 +1,7 @@
 # This file is a part of the `nequip` package. Please see LICENSE and README at the root for information on using it.
 import torch
 from nequip.data import AtomicDataDict, compute_neighborlist_
+from nequip.data._nl import DEFAULT_NEIGHBORLIST_BACKEND
 from nequip.data._key_registry import get_field_type
 from typing import Optional, Dict, Union, List
 
@@ -10,7 +11,7 @@ class NeighborListTransform(torch.nn.Module):
 
     Args:
         r_max (float): cutoff radius used for nearest neighbors
-        backend (str): neighbor list backend ('ase', 'matscipy', or 'vesin')
+        backend (str): neighbor list backend (`"ase"`, `"matscipy"`, or `"vesin"`)
         per_edge_type_cutoff (Dict): optional per-edge-type cutoffs (must be <= r_max)
         type_names (List[str]): list of atom type names
     """
@@ -22,7 +23,7 @@ class NeighborListTransform(torch.nn.Module):
             Dict[str, Union[float, Dict[str, float]]]
         ] = None,
         type_names: Optional[List[str]] = None,
-        backend: str = "matscipy",
+        backend: str = DEFAULT_NEIGHBORLIST_BACKEND,
     ):
         super().__init__()
 

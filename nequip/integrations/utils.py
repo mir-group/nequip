@@ -2,6 +2,8 @@
 import warnings
 from typing import Optional, Union, Dict, List, Callable
 
+from nequip.data._nl import DEFAULT_NEIGHBORLIST_BACKEND
+
 
 def handle_chemical_species_map(
     chemical_species_to_atom_type_map: Optional[Union[Dict[str, str], bool]],
@@ -28,7 +30,7 @@ def basic_transforms(
     r_max: float,
     type_names: List[str],
     chemical_species_to_atom_type_map: Dict[str, str],
-    neighborlist_backend: str = "matscipy",
+    neighborlist_backend: str = DEFAULT_NEIGHBORLIST_BACKEND,
 ) -> List[Callable]:
     """Create transform list with neighborlist construction and optional per-edge-type cutoff pruning."""
     from nequip.data.transforms import (

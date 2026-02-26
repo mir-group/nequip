@@ -19,12 +19,15 @@ from . import AtomicDataDict
 # NOTE:
 # - vesin and matscipy do not support self-interaction
 # - vesin does not allow for mixed pbcs
-_DEFAULT_NL_BACKEND: Final[str] = "matscipy"
-assert _DEFAULT_NL_BACKEND in [
-    "ase",
-    "matscipy",
-    "vesin",
-], f"Unknown neighborlist backend = {_DEFAULT_NL_BACKEND}"
+NEIGHBORLIST_BACKEND_ASE: Final[str] = "ase"
+NEIGHBORLIST_BACKEND_MATSCIPY: Final[str] = "matscipy"
+NEIGHBORLIST_BACKEND_VESIN: Final[str] = "vesin"
+NEIGHBORLIST_BACKEND_CHOICES: Final[List[str]] = [
+    NEIGHBORLIST_BACKEND_ASE,
+    NEIGHBORLIST_BACKEND_MATSCIPY,
+    NEIGHBORLIST_BACKEND_VESIN,
+]
+DEFAULT_NEIGHBORLIST_BACKEND: Final[str] = NEIGHBORLIST_BACKEND_MATSCIPY
 
 
 def _nl_fn(
@@ -32,7 +35,7 @@ def _nl_fn(
     r_max: float,
     cell: Optional[torch.Tensor] = None,
     pbc: Union[bool, Tuple[bool, bool, bool], torch.Tensor] = False,
-    backend: str = _DEFAULT_NL_BACKEND,
+    backend: str = DEFAULT_NEIGHBORLIST_BACKEND,
 ) -> Tuple[torch.Tensor, torch.Tensor]:
     """Internal function to create neighbor list and neighbor vectors based on radial cutoff.
 
@@ -49,7 +52,7 @@ def _nl_fn(
         r_max (float): Radial cutoff distance for neighbor finding.
         cell (torch.Tensor shape [3, 3] or None): Cell for periodic boundary conditions. Required if any ``pbc`` is True.
         pbc (bool or 3-tuple of bool or torch.Tensor): Whether the system is periodic in each of the three cell dimensions.
-        backend (str): Neighborlist backend to use ('ase', 'matscipy', or 'vesin').
+        backend (str): Neighborlist backend to use.
 
     Returns:
         edge_index (torch.tensor shape [2, num_edges]): List of edges.
@@ -85,7 +88,7 @@ def _nl_fn(
         temp_cell = np.zeros((3, 3), dtype=temp_pos.dtype)
     temp_cell = ase.geometry.complete_cell(temp_cell)
 
-    if backend == "vesin":
+    if backend == NEIGHBORLIST_BACKEND_VESIN:
         # use same mixed pbc logic as
         # https://github.com/Luthaf/vesin/blob/main/python/vesin/src/vesin/_ase.py
         if pbc[0] and pbc[1] and pbc[2]:
@@ -94,7 +97,7 @@ def _nl_fn(
             periodic = False
         else:
             raise ValueError(
-                "different periodic boundary conditions on different axes are not supported by vesin neighborlist, use ASE or matscipy"
+                f"different periodic boundary conditions on different axes are not supported by `{NEIGHBORLIST_BACKEND_VESIN}` neighborlist, use `{NEIGHBORLIST_BACKEND_ASE}` or `{NEIGHBORLIST_BACKEND_MATSCIPY}`"
             )
 
         first_idex, second_idex, shifts = vesin_nl(
@@ -104,7 +107,7 @@ def _nl_fn(
         first_idex = first_idex.astype(np.int64)
         second_idex = second_idex.astype(np.int64)
 
-    elif backend == "matscipy":
+    elif backend == NEIGHBORLIST_BACKEND_MATSCIPY:
         first_idex, second_idex, shifts = matscipy_nl(
             "ijS",
             pbc=pbc,
@@ -112,7 +115,7 @@ def _nl_fn(
             positions=temp_pos,
             cutoff=float(r_max),
         )
-    elif backend == "ase":
+    elif backend == NEIGHBORLIST_BACKEND_ASE:
         first_idex, second_idex, shifts = ase.neighborlist.primitive_neighbor_list(
             "ijS",
             pbc,
@@ -136,12 +139,21 @@ def _nl_fn(
 
 
 def compute_neighborlist_(
-    data: AtomicDataDict.Type, r_max: float, backend: str = _DEFAULT_NL_BACKEND
+    data: AtomicDataDict.Type,
+    r_max: float,
+    backend: str = DEFAULT_NEIGHBORLIST_BACKEND,
 ) -> AtomicDataDict.Type:
     """Add a neighborlist to `data` in-place.
 
     This can be called on already-batched data.
     """
+    backend = backend.lower()
+    if backend not in NEIGHBORLIST_BACKEND_CHOICES:
+        supported = ", ".join(f"`{b}`" for b in NEIGHBORLIST_BACKEND_CHOICES)
+        raise ValueError(
+            f"Unknown neighborlist backend = `{backend}`. Supported backends: {supported}"
+        )
+
     _data_is_batched = AtomicDataDict.BATCH_KEY in data
 
     to_batch: List[AtomicDataDict.Type] = []

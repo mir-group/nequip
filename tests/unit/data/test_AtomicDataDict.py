@@ -15,6 +15,11 @@ from nequip.data import (
     to_ase,
     compute_neighborlist_,
 )
+from nequip.data._nl import (
+    NEIGHBORLIST_BACKEND_ASE,
+    NEIGHBORLIST_BACKEND_MATSCIPY,
+    NEIGHBORLIST_BACKEND_VESIN,
+)
 from nequip.utils.test import compare_neighborlists
 
 # check for optional neighborlist libraries
@@ -26,13 +31,13 @@ except ImportError:
     VESIN_AVAILABLE = False
 
 # build parametrize lists based on available libraries
-ALT_NL_METHODS = ["matscipy"]
+ALT_NL_METHODS = [NEIGHBORLIST_BACKEND_MATSCIPY]
 if VESIN_AVAILABLE:
-    ALT_NL_METHODS.append("vesin")
+    ALT_NL_METHODS.append(NEIGHBORLIST_BACKEND_VESIN)
 
-NL_METHODS = ["ase", "matscipy"]
+NL_METHODS = [NEIGHBORLIST_BACKEND_ASE, NEIGHBORLIST_BACKEND_MATSCIPY]
 if VESIN_AVAILABLE:
-    NL_METHODS.append("vesin")
+    NL_METHODS.append(NEIGHBORLIST_BACKEND_VESIN)
 
 
 def test_to_ase_batches(atomic_batch):
@@ -127,7 +132,12 @@ def test_neighborlist_consistency(alt_nl_method, CH3CHO, CuFcc, Si):
 
     Si_data = from_dict(Si_points)
     for atoms_or_data in [CH3CHO_atoms, CuFcc_atoms, Si_data]:
-        compare_neighborlists(atoms_or_data, nl1="ase", nl2=alt_nl_method, r_max=r_max)
+        compare_neighborlists(
+            atoms_or_data,
+            nl1=NEIGHBORLIST_BACKEND_ASE,
+            nl2=alt_nl_method,
+            r_max=r_max,
+        )
 
 
 @pytest.mark.parametrize("nl_method", NL_METHODS)
@@ -197,7 +207,7 @@ def H2():
     data = compute_neighborlist_(
         from_ase(atoms),
         r_max=2.0,
-        backend="ase",
+        backend=NEIGHBORLIST_BACKEND_ASE,
     )
     return atoms, data
 
@@ -211,7 +221,7 @@ def CuFcc():
     data = compute_neighborlist_(
         from_ase(atoms),
         r_max=4.0,
-        backend="ase",
+        backend=NEIGHBORLIST_BACKEND_ASE,
     )
     return atoms, data
 
@@ -236,6 +246,6 @@ def Si():
     data = compute_neighborlist_(
         from_dict(points),
         r_max=r_max,
-        backend="ase",
+        backend=NEIGHBORLIST_BACKEND_ASE,
     )
     return r_max, points, data

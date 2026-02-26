@@ -4,6 +4,7 @@ import torch
 from nequip.model.utils import _EAGER_MODEL_KEY
 from nequip.train.lightning import _SOLE_MODEL_KEY
 from nequip.nn import graph_model
+from nequip.data._nl import DEFAULT_NEIGHBORLIST_BACKEND
 from nequip.utils.global_state import set_global_state
 
 from .utils import handle_chemical_species_map, basic_transforms
@@ -27,7 +28,7 @@ class _IntegrationLoaderMixin:
         compile_path: Union[str, Path],
         device: Union[str, torch.device] = "cpu",
         chemical_species_to_atom_type_map: Optional[Union[Dict[str, str], bool]] = None,
-        neighborlist_backend: str = "matscipy",
+        neighborlist_backend: str = DEFAULT_NEIGHBORLIST_BACKEND,
         **kwargs,
     ):
         """Build an integration calculator from a compiled model artifact.
@@ -81,7 +82,7 @@ class _IntegrationLoaderMixin:
         allow_tf32: bool = False,
         model_name: str = _SOLE_MODEL_KEY,
         compile_mode: str = _EAGER_MODEL_KEY,
-        neighborlist_backend: str = "matscipy",
+        neighborlist_backend: str = DEFAULT_NEIGHBORLIST_BACKEND,
         **kwargs,
     ):
         """Build an integration calculator from a saved NequIP model.
