@@ -13,7 +13,11 @@ from ._key_registry import (
 )
 from .dict import from_dict
 from .ase import from_ase, to_ase
-from ._nl import compute_neighborlist_, DEFAULT_NEIGHBORLIST_BACKEND
+from ._nl import (
+    compute_neighborlist_,
+    register_neighborlist_backend,
+    DEFAULT_NEIGHBORLIST_BACKEND,
+)
 from ._sampler import PartialSampler
 from .stats import (
     Count,
@@ -48,6 +52,7 @@ __all__ = [
     "from_ase",
     "to_ase",
     "compute_neighborlist_",
+    "register_neighborlist_backend",
     "DEFAULT_NEIGHBORLIST_BACKEND",
     "DataStatisticsManager",
     "CommonDataStatisticsManager",

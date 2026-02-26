@@ -1,5 +1,5 @@
 # This file is a part of the `nequip` package. Please see LICENSE and README at the root for information on using it.
-from typing import Final, List, Optional, Union, Tuple
+from typing import Callable, Dict, Final, List, Optional, Union, Tuple
 
 import numpy as np
 
@@ -22,20 +22,15 @@ from . import AtomicDataDict
 NEIGHBORLIST_BACKEND_ASE: Final[str] = "ase"
 NEIGHBORLIST_BACKEND_MATSCIPY: Final[str] = "matscipy"
 NEIGHBORLIST_BACKEND_VESIN: Final[str] = "vesin"
-NEIGHBORLIST_BACKEND_CHOICES: Final[List[str]] = [
-    NEIGHBORLIST_BACKEND_ASE,
-    NEIGHBORLIST_BACKEND_MATSCIPY,
-    NEIGHBORLIST_BACKEND_VESIN,
-]
 DEFAULT_NEIGHBORLIST_BACKEND: Final[str] = NEIGHBORLIST_BACKEND_MATSCIPY
 
 
-def _nl_fn(
+def _compute_neighborlist_single_frame(
     pos: torch.Tensor,
     r_max: float,
+    backend: str,
     cell: Optional[torch.Tensor] = None,
     pbc: Union[bool, Tuple[bool, bool, bool], torch.Tensor] = False,
-    backend: str = DEFAULT_NEIGHBORLIST_BACKEND,
 ) -> Tuple[torch.Tensor, torch.Tensor]:
     """Internal function to create neighbor list and neighbor vectors based on radial cutoff.
 
@@ -67,11 +62,6 @@ def _nl_fn(
     # get device and dtype from position tensor
     out_device = pos.device
     out_dtype = pos.dtype
-
-    # NOTE: neighborlist backends (ase, matscipy, vesin) are CPU-only
-    # - For training: data is typically on CPU, so no transfer occurs
-    # - For inference (e.g., torchsim): GPU -> CPU transfer is expected and normal
-    # TODO: potentially implement GPU-native neighborlists in the future
 
     # convert to numpy for neighborlist backends
     temp_pos = pos.detach().cpu().numpy()
@@ -125,6 +115,11 @@ def _nl_fn(
             self_interaction=False,
             use_scaled_positions=False,
         )
+    else:
+        supported = ", ".join(f"`{b}`" for b in NEIGHBORLIST_BACKEND_OPTIONS)
+        raise ValueError(
+            f"Unknown neighborlist backend = `{backend}`. Supported backends: {supported}"
+        )
 
     # construct output to return
     edge_index = torch.vstack(
@@ -138,22 +133,9 @@ def _nl_fn(
     return edge_index, shifts
 
 
-def compute_neighborlist_(
-    data: AtomicDataDict.Type,
-    r_max: float,
-    backend: str = DEFAULT_NEIGHBORLIST_BACKEND,
+def _compute_neighborlist_unbatched_backend(
+    data: AtomicDataDict.Type, r_max: float, backend: str
 ) -> AtomicDataDict.Type:
-    """Add a neighborlist to `data` in-place.
-
-    This can be called on already-batched data.
-    """
-    backend = backend.lower()
-    if backend not in NEIGHBORLIST_BACKEND_CHOICES:
-        supported = ", ".join(f"`{b}`" for b in NEIGHBORLIST_BACKEND_CHOICES)
-        raise ValueError(
-            f"Unknown neighborlist backend = `{backend}`. Supported backends: {supported}"
-        )
-
     _data_is_batched = AtomicDataDict.BATCH_KEY in data
 
     to_batch: List[AtomicDataDict.Type] = []
@@ -169,7 +151,7 @@ def compute_neighborlist_(
         if pbc is not None:
             pbc = pbc.view(3)  # remove batch dimension
 
-        edge_index, edge_cell_shift = _nl_fn(
+        edge_index, edge_cell_shift = _compute_neighborlist_single_frame(
             pos=data_per_frame[AtomicDataDict.POSITIONS_KEY],
             r_max=r_max,
             cell=cell,
@@ -193,3 +175,72 @@ def compute_neighborlist_(
     else:
         assert len(to_batch) == 1
         return to_batch[0]
+
+
+_DEFAULT_NEIGHBORLIST_BACKEND_OPTIONS: Final[
+    Dict[str, Callable[[AtomicDataDict.Type, float], AtomicDataDict.Type]]
+] = {
+    NEIGHBORLIST_BACKEND_ASE: lambda data,
+    r_max: _compute_neighborlist_unbatched_backend(
+        data=data, r_max=r_max, backend=NEIGHBORLIST_BACKEND_ASE
+    ),
+    NEIGHBORLIST_BACKEND_MATSCIPY: lambda data,
+    r_max: _compute_neighborlist_unbatched_backend(
+        data=data, r_max=r_max, backend=NEIGHBORLIST_BACKEND_MATSCIPY
+    ),
+    NEIGHBORLIST_BACKEND_VESIN: lambda data,
+    r_max: _compute_neighborlist_unbatched_backend(
+        data=data, r_max=r_max, backend=NEIGHBORLIST_BACKEND_VESIN
+    ),
+}
+
+NEIGHBORLIST_BACKEND_OPTIONS: Dict[
+    str, Callable[[AtomicDataDict.Type, float], AtomicDataDict.Type]
+] = dict(_DEFAULT_NEIGHBORLIST_BACKEND_OPTIONS)
+
+
+def register_neighborlist_backend(
+    backend: str,
+    fn: Callable[[AtomicDataDict.Type, float], AtomicDataDict.Type],
+    overwrite: bool = False,
+) -> None:
+    """Register a neighborlist backend callable.
+
+    Args:
+        backend (str): name for the backend.
+        fn (Callable): backend function with signature ``fn(data, r_max)``.
+            Contract:
+            - if input ``data`` is batched, output must be batched;
+            - if input ``data`` is unbatched, output must be unbatched;
+            - output tensors must be on the same device as input tensors.
+        overwrite (bool): whether to replace an existing backend with the same name.
+    """
+    if not isinstance(backend, str) or backend == "":
+        raise ValueError("`backend` must be a non-empty string")
+    if not callable(fn):
+        raise TypeError("`fn` must be callable")
+    if backend in NEIGHBORLIST_BACKEND_OPTIONS and not overwrite:
+        raise ValueError(
+            f"Neighborlist backend `{backend}` already registered. Set `overwrite=True` to replace it."
+        )
+    NEIGHBORLIST_BACKEND_OPTIONS[backend] = fn
+
+
+def compute_neighborlist_(
+    data: AtomicDataDict.Type,
+    r_max: float,
+    backend: str = DEFAULT_NEIGHBORLIST_BACKEND,
+) -> AtomicDataDict.Type:
+    """Add a neighborlist to `data` in-place.
+
+    Contract:
+    - batched input -> batched output;
+    - unbatched input -> unbatched output;
+    - output tensors are on the same device as input tensors.
+    """
+    if backend not in NEIGHBORLIST_BACKEND_OPTIONS:
+        supported = ", ".join(f"`{b}`" for b in NEIGHBORLIST_BACKEND_OPTIONS)
+        raise ValueError(
+            f"Unknown neighborlist backend = `{backend}`. Supported backends: {supported}"
+        )
+    return NEIGHBORLIST_BACKEND_OPTIONS[backend](data, r_max)
