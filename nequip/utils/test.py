@@ -477,11 +477,11 @@ def compare_neighborlists(
         nl1, nl2: the neighborlists to compare -- currently "ase", "matscipy", "vesin"
     """
     assert "r_max" in nl_kwargs
-    assert "NL" not in nl_kwargs
+    assert "backend" not in nl_kwargs
     if isinstance(atoms_or_data, ase.Atoms):
         data = from_ase(atoms_or_data)
     else:
         data = atoms_or_data
-    edges1 = edgeset_from_AtomicDataDict(data, NL=nl1, **nl_kwargs)
-    edges2 = edgeset_from_AtomicDataDict(data, NL=nl1, **nl_kwargs)
+    edges1 = edgeset_from_AtomicDataDict(data, backend=nl1, **nl_kwargs)
+    edges2 = edgeset_from_AtomicDataDict(data, backend=nl1, **nl_kwargs)
     assert edges1 == edges2

@@ -1,7 +1,6 @@
 # This file is a part of the `nequip` package. Please see LICENSE and README at the root for information on using it.
 from typing import Final, List, Optional, Union, Tuple
 
-import os
 import numpy as np
 
 import torch
@@ -20,12 +19,12 @@ from . import AtomicDataDict
 # NOTE:
 # - vesin and matscipy do not support self-interaction
 # - vesin does not allow for mixed pbcs
-_NEQUIP_NL: Final[str] = os.environ.get("NEQUIP_NL", "matscipy").lower()
-assert _NEQUIP_NL in [
+_DEFAULT_NL_BACKEND: Final[str] = "matscipy"
+assert _DEFAULT_NL_BACKEND in [
     "ase",
     "matscipy",
     "vesin",
-], f"Unknown neighborlist NEQUIP_NL = {_NEQUIP_NL}"
+], f"Unknown neighborlist backend = {_DEFAULT_NL_BACKEND}"
 
 
 def _nl_fn(
@@ -33,7 +32,7 @@ def _nl_fn(
     r_max: float,
     cell: Optional[torch.Tensor] = None,
     pbc: Union[bool, Tuple[bool, bool, bool], torch.Tensor] = False,
-    NL: str = _NEQUIP_NL,
+    backend: str = _DEFAULT_NL_BACKEND,
 ) -> Tuple[torch.Tensor, torch.Tensor]:
     """Internal function to create neighbor list and neighbor vectors based on radial cutoff.
 
@@ -50,7 +49,7 @@ def _nl_fn(
         r_max (float): Radial cutoff distance for neighbor finding.
         cell (torch.Tensor shape [3, 3] or None): Cell for periodic boundary conditions. Required if any ``pbc`` is True.
         pbc (bool or 3-tuple of bool or torch.Tensor): Whether the system is periodic in each of the three cell dimensions.
-        NL (str): Neighborlist backend to use ('ase', 'matscipy', or 'vesin').
+        backend (str): Neighborlist backend to use ('ase', 'matscipy', or 'vesin').
 
     Returns:
         edge_index (torch.tensor shape [2, num_edges]): List of edges.
@@ -86,7 +85,7 @@ def _nl_fn(
         temp_cell = np.zeros((3, 3), dtype=temp_pos.dtype)
     temp_cell = ase.geometry.complete_cell(temp_cell)
 
-    if NL == "vesin":
+    if backend == "vesin":
         # use same mixed pbc logic as
         # https://github.com/Luthaf/vesin/blob/main/python/vesin/src/vesin/_ase.py
         if pbc[0] and pbc[1] and pbc[2]:
@@ -105,7 +104,7 @@ def _nl_fn(
         first_idex = first_idex.astype(np.int64)
         second_idex = second_idex.astype(np.int64)
 
-    elif NL == "matscipy":
+    elif backend == "matscipy":
         first_idex, second_idex, shifts = matscipy_nl(
             "ijS",
             pbc=pbc,
@@ -113,7 +112,7 @@ def _nl_fn(
             positions=temp_pos,
             cutoff=float(r_max),
         )
-    elif NL == "ase":
+    elif backend == "ase":
         first_idex, second_idex, shifts = ase.neighborlist.primitive_neighbor_list(
             "ijS",
             pbc,
@@ -137,7 +136,7 @@ def _nl_fn(
 
 
 def compute_neighborlist_(
-    data: AtomicDataDict.Type, r_max: float, **kwargs
+    data: AtomicDataDict.Type, r_max: float, backend: str = _DEFAULT_NL_BACKEND
 ) -> AtomicDataDict.Type:
     """Add a neighborlist to `data` in-place.
 
@@ -163,7 +162,7 @@ def compute_neighborlist_(
             r_max=r_max,
             cell=cell,
             pbc=pbc,
-            **kwargs,
+            backend=backend,
         )
         # add neighborlist information
         data_per_frame[AtomicDataDict.EDGE_INDEX_KEY] = edge_index

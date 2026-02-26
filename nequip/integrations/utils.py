@@ -45,9 +45,6 @@ def basic_transforms(
         )
     ]
 
-    # add neighborlist transform with optional per-edge-type cutoffs
-    nl_kwargs = {"NL": neighborlist_backend}
-
     if metadata.get(graph_model.PER_EDGE_TYPE_CUTOFF_KEY, None) is not None:
         per_edge_type_cutoff = metadata[graph_model.PER_EDGE_TYPE_CUTOFF_KEY]
         if isinstance(per_edge_type_cutoff, str):
@@ -60,10 +57,12 @@ def basic_transforms(
                 r_max=r_max,
                 per_edge_type_cutoff=per_edge_type_cutoff,
                 type_names=type_names,
-                **nl_kwargs,
+                backend=neighborlist_backend,
             )
         )
     else:
-        transforms.append(NeighborListTransform(r_max=r_max, **nl_kwargs))
+        transforms.append(
+            NeighborListTransform(r_max=r_max, backend=neighborlist_backend)
+        )
 
     return transforms

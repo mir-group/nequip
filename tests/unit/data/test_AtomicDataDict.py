@@ -136,13 +136,13 @@ def test_no_neighbors(nl_method):
 
     # isolated atom
     H = Atoms("H", positions=[[0, 0, 0]], cell=20 * np.eye(3))
-    data = compute_neighborlist_(from_ase(H), r_max=2.5, NL=nl_method)
+    data = compute_neighborlist_(from_ase(H), r_max=2.5, backend=nl_method)
     assert data[AtomicDataDict.EDGE_INDEX_KEY].numel() == 0
     assert data[AtomicDataDict.EDGE_CELL_SHIFT_KEY].numel() == 0
 
     # cutoff smaller than interatomic distance
     Cu = ase.build.bulk("Cu", "fcc", a=3.6, cubic=True)
-    data = compute_neighborlist_(from_ase(Cu), r_max=2.5, NL=nl_method)
+    data = compute_neighborlist_(from_ase(Cu), r_max=2.5, backend=nl_method)
     assert data[AtomicDataDict.EDGE_INDEX_KEY].numel() == 0
     assert data[AtomicDataDict.EDGE_CELL_SHIFT_KEY].numel() == 0
 
@@ -197,7 +197,7 @@ def H2():
     data = compute_neighborlist_(
         from_ase(atoms),
         r_max=2.0,
-        NL="ase",
+        backend="ase",
     )
     return atoms, data
 
@@ -211,7 +211,7 @@ def CuFcc():
     data = compute_neighborlist_(
         from_ase(atoms),
         r_max=4.0,
-        NL="ase",
+        backend="ase",
     )
     return atoms, data
 
@@ -236,6 +236,6 @@ def Si():
     data = compute_neighborlist_(
         from_dict(points),
         r_max=r_max,
-        NL="ase",
+        backend="ase",
     )
     return r_max, points, data
