@@ -1,4 +1,5 @@
 # This file is a part of the `nequip` package. Please see LICENSE and README at the root for information on using it.
+from dataclasses import dataclass
 from typing import Callable, Dict, Final, List, Optional, Union, Tuple
 
 import numpy as np
@@ -35,6 +36,13 @@ NEIGHBORLIST_BACKEND_MATSCIPY: Final[str] = "matscipy"
 NEIGHBORLIST_BACKEND_VESIN: Final[str] = "vesin"
 NEIGHBORLIST_BACKEND_ALCHEMIOPS: Final[str] = "alchemiops"
 DEFAULT_NEIGHBORLIST_BACKEND: Final[str] = NEIGHBORLIST_BACKEND_MATSCIPY
+
+
+@dataclass(frozen=True)
+class NeighborlistBackendSpec:
+    fn: Callable[[AtomicDataDict.Type, float], AtomicDataDict.Type]
+    supports_cpu: bool = True
+    supports_cuda: bool = False
 
 
 def _compute_neighborlist_single_frame(
@@ -269,32 +277,45 @@ def alchemiops_batch_cell_list(
     return data
 
 
-_DEFAULT_NEIGHBORLIST_BACKEND_OPTIONS: Final[
-    Dict[str, Callable[[AtomicDataDict.Type, float], AtomicDataDict.Type]]
-] = {
-    NEIGHBORLIST_BACKEND_ASE: lambda data,
-    r_max: _compute_neighborlist_unbatched_backend(
-        data=data, r_max=r_max, backend=NEIGHBORLIST_BACKEND_ASE
+_DEFAULT_NEIGHBORLIST_BACKEND_OPTIONS: Final[Dict[str, NeighborlistBackendSpec]] = {
+    NEIGHBORLIST_BACKEND_ASE: NeighborlistBackendSpec(
+        fn=lambda data, r_max: _compute_neighborlist_unbatched_backend(
+            data=data, r_max=r_max, backend=NEIGHBORLIST_BACKEND_ASE
+        ),
+        supports_cpu=True,
+        supports_cuda=False,
     ),
-    NEIGHBORLIST_BACKEND_MATSCIPY: lambda data,
-    r_max: _compute_neighborlist_unbatched_backend(
-        data=data, r_max=r_max, backend=NEIGHBORLIST_BACKEND_MATSCIPY
+    NEIGHBORLIST_BACKEND_MATSCIPY: NeighborlistBackendSpec(
+        fn=lambda data, r_max: _compute_neighborlist_unbatched_backend(
+            data=data, r_max=r_max, backend=NEIGHBORLIST_BACKEND_MATSCIPY
+        ),
+        supports_cpu=True,
+        supports_cuda=False,
     ),
-    NEIGHBORLIST_BACKEND_VESIN: lambda data,
-    r_max: _compute_neighborlist_unbatched_backend(
-        data=data, r_max=r_max, backend=NEIGHBORLIST_BACKEND_VESIN
+    NEIGHBORLIST_BACKEND_VESIN: NeighborlistBackendSpec(
+        fn=lambda data, r_max: _compute_neighborlist_unbatched_backend(
+            data=data, r_max=r_max, backend=NEIGHBORLIST_BACKEND_VESIN
+        ),
+        supports_cpu=True,
+        supports_cuda=False,
     ),
-    NEIGHBORLIST_BACKEND_ALCHEMIOPS: alchemiops_batch_cell_list,
+    NEIGHBORLIST_BACKEND_ALCHEMIOPS: NeighborlistBackendSpec(
+        fn=alchemiops_batch_cell_list,
+        supports_cpu=True,
+        supports_cuda=True,
+    ),
 }
 
-NEIGHBORLIST_BACKEND_OPTIONS: Dict[
-    str, Callable[[AtomicDataDict.Type, float], AtomicDataDict.Type]
-] = dict(_DEFAULT_NEIGHBORLIST_BACKEND_OPTIONS)
+NEIGHBORLIST_BACKEND_OPTIONS: Dict[str, NeighborlistBackendSpec] = dict(
+    _DEFAULT_NEIGHBORLIST_BACKEND_OPTIONS
+)
 
 
 def register_neighborlist_backend(
     backend: str,
     fn: Callable[[AtomicDataDict.Type, float], AtomicDataDict.Type],
+    supports_cpu: bool = True,
+    supports_cuda: bool = False,
     overwrite: bool = False,
 ) -> None:
     """Register a neighborlist backend callable.
@@ -308,6 +329,8 @@ def register_neighborlist_backend(
             - output tensors must be on the same device as input tensors.
             - existing tensors in ``data`` must be preserved; mutation is limited
               to adding/updating neighborlist outputs.
+        supports_cpu (bool): whether the backend supports CPU execution.
+        supports_cuda (bool): whether the backend supports CUDA execution.
         overwrite (bool): whether to replace an existing backend with the same name.
     """
     if not isinstance(backend, str) or backend == "":
@@ -318,7 +341,11 @@ def register_neighborlist_backend(
         raise ValueError(
             f"Neighborlist backend `{backend}` already registered. Set `overwrite=True` to replace it."
         )
-    NEIGHBORLIST_BACKEND_OPTIONS[backend] = fn
+    NEIGHBORLIST_BACKEND_OPTIONS[backend] = NeighborlistBackendSpec(
+        fn=fn,
+        supports_cpu=supports_cpu,
+        supports_cuda=supports_cuda,
+    )
 
 
 def compute_neighborlist_(
@@ -338,4 +365,4 @@ def compute_neighborlist_(
         raise ValueError(
             f"Unknown neighborlist backend = `{backend}`. Supported backends: {supported}"
         )
-    return NEIGHBORLIST_BACKEND_OPTIONS[backend](data, r_max)
+    return NEIGHBORLIST_BACKEND_OPTIONS[backend].fn(data, r_max)
