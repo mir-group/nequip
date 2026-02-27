@@ -6,6 +6,7 @@ import ase.build
 from ase.calculators.singlepoint import SinglePointCalculator
 
 from nequip.data import AtomicDataDict, compute_neighborlist_, from_ase, from_dict
+from nequip.nn.utils import with_edge_vectors_
 from nequip.data._nl import (
     NEIGHBORLIST_BACKEND_ALCHEMIOPS,
     NEIGHBORLIST_BACKEND_ASE,
@@ -178,3 +179,48 @@ def test_neighborlist_contracts_and_consistency(
         for v in out.values():
             # assess device contract: every output tensor stays on the input device
             assert v.device.type == device
+
+
+@pytest.mark.parametrize("backend", BACKEND_CASES)
+def test_neighborlist_wrapped_unwrapped_consistency(backend, CuFcc):
+    atoms, _ = CuFcc
+    atoms = atoms.copy()
+    atoms.rattle(stdev=0.01, seed=0)
+    r_max = 4.5
+
+    atoms_wrapped = atoms.copy()
+    atoms_wrapped.wrap()
+
+    atoms_unwrapped = atoms_wrapped.copy()
+    n_atoms = len(atoms_unwrapped)
+    shift_coeffs = np.zeros((n_atoms, 3), dtype=np.int64)
+    shift_coeffs[:, 0] = np.arange(n_atoms, dtype=np.int64) % 3 - 1
+    shift_coeffs[:, 1] = np.arange(n_atoms, dtype=np.int64) % 2
+    shift_coeffs[:, 2] = -(np.arange(n_atoms, dtype=np.int64) % 2)
+    atoms_unwrapped.positions = (
+        atoms_unwrapped.positions + shift_coeffs @ atoms_unwrapped.cell.array
+    )
+
+    wrapped_data = compute_neighborlist_(
+        from_ase(atoms_wrapped), r_max=r_max, backend=backend
+    )
+    unwrapped_data = compute_neighborlist_(
+        from_ase(atoms_unwrapped), r_max=r_max, backend=backend
+    )
+
+    wrapped_data = with_edge_vectors_(wrapped_data, with_lengths=True)
+    unwrapped_data = with_edge_vectors_(unwrapped_data, with_lengths=True)
+
+    wrapped_lengths = torch.sort(wrapped_data[AtomicDataDict.EDGE_LENGTH_KEY].view(-1))[
+        0
+    ]
+    unwrapped_lengths = torch.sort(
+        unwrapped_data[AtomicDataDict.EDGE_LENGTH_KEY].view(-1)
+    )[0]
+
+    # wrapped and unwrapped configurations should produce the same neighbor count
+    assert wrapped_lengths.size(0) == unwrapped_lengths.size(0)
+    # wrapped and unwrapped configurations should produce the same neighbor distances
+    torch.testing.assert_close(
+        wrapped_lengths, unwrapped_lengths, rtol=1e-14, atol=1e-14
+    )
