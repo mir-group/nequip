@@ -29,13 +29,12 @@ def main():
     )
     args = parser.parse_args()
 
-    nl_kwargs = {"r_max": float(getattr(args, "r_max"))}
     for atoms in iread(getattr(args, "fname")):
         compare_neighborlists(
             atoms_or_data=atoms,
             nl1=getattr(args, "nl1"),
             nl2=getattr(args, "nl2"),
-            **nl_kwargs,
+            r_max=float(getattr(args, "r_max")),
         )
 
 
