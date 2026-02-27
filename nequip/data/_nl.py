@@ -13,6 +13,17 @@ try:
 except ImportError:
     pass
 
+try:
+    # TODO: update the import when v0.3.0 is released
+    # https://github.com/NVIDIA/nvalchemi-toolkit-ops/blob/82f2e70923f20cb7ada94fa55d7edfe9291c340c/nvalchemiops/neighborlist/__init__.py#L16
+    from nvalchemiops.neighborlist import batch_cell_list as alchemiops_nl
+    # ^ import for v0.2.0
+
+    ALCHEMIOPS_AVAILABLE = True
+except ImportError:
+    alchemiops_nl = None
+    ALCHEMIOPS_AVAILABLE = False
+
 from . import AtomicDataDict
 
 # use "matscipy" as default
@@ -22,6 +33,7 @@ from . import AtomicDataDict
 NEIGHBORLIST_BACKEND_ASE: Final[str] = "ase"
 NEIGHBORLIST_BACKEND_MATSCIPY: Final[str] = "matscipy"
 NEIGHBORLIST_BACKEND_VESIN: Final[str] = "vesin"
+NEIGHBORLIST_BACKEND_ALCHEMIOPS: Final[str] = "alchemiops"
 DEFAULT_NEIGHBORLIST_BACKEND: Final[str] = NEIGHBORLIST_BACKEND_MATSCIPY
 
 
@@ -116,10 +128,7 @@ def _compute_neighborlist_single_frame(
             use_scaled_positions=False,
         )
     else:
-        supported = ", ".join(f"`{b}`" for b in NEIGHBORLIST_BACKEND_OPTIONS)
-        raise ValueError(
-            f"Unknown neighborlist backend = `{backend}`. Supported backends: {supported}"
-        )
+        raise ValueError(f"Unknown neighborlist backend = `{backend}`")
 
     # construct output to return
     edge_index = torch.vstack(
@@ -177,6 +186,89 @@ def _compute_neighborlist_unbatched_backend(
         return to_batch[0]
 
 
+def alchemiops_batch_cell_list(
+    data: AtomicDataDict.Type,
+    r_max: float,
+) -> AtomicDataDict.Type:
+    """Compute a neighbor list using Alchemiops cell list algorithm.
+
+    Args:
+        data: input AtomicDataDict.
+        r_max: cutoff radius.
+
+    Returns:
+        data with neighborlist entries added in-place.
+        Only ``edge_index`` and (if ``cell`` exists) ``edge_cell_shift`` are modified.
+    """
+    if alchemiops_nl is None:
+        raise ImportError(
+            "`nvalchemiops` is not installed. Install it with: pip install nvalchemiops"
+        )
+
+    positions = data[AtomicDataDict.POSITIONS_KEY]
+    # handle batching
+    if AtomicDataDict.is_batched(data):
+        system_idx = data[AtomicDataDict.BATCH_KEY].to(torch.int32)
+        n_systems = AtomicDataDict.num_frames(data)
+    else:
+        system_idx = torch.zeros(1, dtype=torch.int32, device=positions.device).expand(
+            positions.shape[0]
+        )
+        n_systems = 1
+
+    # default to zero cell if cell not present
+    if AtomicDataDict.CELL_KEY in data:
+        cell = data[AtomicDataDict.CELL_KEY]
+    else:
+        cell = torch.zeros(
+            (n_systems, 3, 3), dtype=positions.dtype, device=positions.device
+        )
+
+    # default to no PBCs if PBCs not present
+    if AtomicDataDict.PBC_KEY in data:
+        pbc = data[AtomicDataDict.PBC_KEY]
+    else:
+        pbc = torch.zeros((n_systems, 3), dtype=torch.bool, device=positions.device)
+
+    # adapted from https://github.com/TorchSim/torch-sim/blob/main/torch_sim/neighbors/alchemiops.py
+    # for non-periodic systems with zero cells, use a nominal identity cell
+    # to avoid division by zero in alchemiops warp kernels
+    # See https://github.com/NVIDIA/nvalchemi-toolkit-ops/issues/4
+    is_non_periodic = ~pbc.any(dim=1)  # [n_systems]
+    is_zero_cell = cell.abs().sum(dim=(1, 2)) == 0  # [n_systems]
+    needs_nominal_cell = is_non_periodic & is_zero_cell
+    if needs_nominal_cell.any():
+        identity = torch.eye(3, dtype=cell.dtype, device=cell.device)
+        cell = cell.clone()  # Avoid modifying the original
+        cell[needs_nominal_cell] = identity
+
+    # call alchemiops cell list
+    # NOTE: v0.2.0 uses positions.device to dictate the device behavior of the neighborlist construction
+    res = alchemiops_nl(
+        positions=positions,
+        cutoff=r_max,
+        batch_idx=system_idx,
+        cell=cell,
+        pbc=pbc,
+        return_neighbor_list=True,
+    )
+
+    # parse results: (neighbor_list, neighbor_ptr[, neighbor_list_shifts])
+    if len(res) == 3:  # type: ignore[arg-type]
+        edge_index, _, edge_cell_shift = res  # type: ignore[misc]
+    else:
+        edge_index, _ = res  # type: ignore[misc]
+        edge_cell_shift = torch.zeros(
+            (edge_index.shape[1], 3), dtype=positions.dtype, device=positions.device
+        )
+
+    # populate data dict with neighborlist
+    data[AtomicDataDict.EDGE_INDEX_KEY] = edge_index.to(dtype=torch.long)
+    if AtomicDataDict.CELL_KEY in data:
+        data[AtomicDataDict.EDGE_CELL_SHIFT_KEY] = edge_cell_shift.to(dtype=cell.dtype)
+    return data
+
+
 _DEFAULT_NEIGHBORLIST_BACKEND_OPTIONS: Final[
     Dict[str, Callable[[AtomicDataDict.Type, float], AtomicDataDict.Type]]
 ] = {
@@ -192,6 +284,7 @@ _DEFAULT_NEIGHBORLIST_BACKEND_OPTIONS: Final[
     r_max: _compute_neighborlist_unbatched_backend(
         data=data, r_max=r_max, backend=NEIGHBORLIST_BACKEND_VESIN
     ),
+    NEIGHBORLIST_BACKEND_ALCHEMIOPS: alchemiops_batch_cell_list,
 }
 
 NEIGHBORLIST_BACKEND_OPTIONS: Dict[
@@ -213,6 +306,8 @@ def register_neighborlist_backend(
             - if input ``data`` is batched, output must be batched;
             - if input ``data`` is unbatched, output must be unbatched;
             - output tensors must be on the same device as input tensors.
+            - existing tensors in ``data`` must be preserved; mutation is limited
+              to adding/updating neighborlist outputs.
         overwrite (bool): whether to replace an existing backend with the same name.
     """
     if not isinstance(backend, str) or backend == "":
