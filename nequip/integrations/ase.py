@@ -65,6 +65,40 @@ class NequIPCalculator(_IntegrationLoaderMixin, Calculator):
         self.length_units_to_A = length_units_to_A
         self.transforms = transforms
 
+        # logic to handle when the CPU -> GPU transfer happens
+        # i.e. if neighborlist is CPU-only, we should just do the data transforms before moving data to cuda for model execution (if self.device is cuda)
+        # this logic is just to avoid unnecessary CPU -> GPU or GPU -> CPU transfers wherever possible
+        from nequip.data.transforms import NeighborListTransform
+        from nequip.data._nl import NEIGHBORLIST_BACKEND_OPTIONS
+
+        neighborlist_transforms = [
+            t for t in self.transforms if isinstance(t, NeighborListTransform)
+        ]
+        num_neighborlist_transforms = len(neighborlist_transforms)
+        assert num_neighborlist_transforms <= 1, (
+            "Expected at most one NeighborListTransform in calculator transforms."
+        )
+        if num_neighborlist_transforms == 1:
+            # if the neighborlist supports cuda, and we're running the model on cuda,
+            # we should just move the data to cuda first before the transforms so that neighborlist happens on cuda
+            nl_backend = neighborlist_transforms[0].backend
+            assert nl_backend in NEIGHBORLIST_BACKEND_OPTIONS
+            self._move_to_device_before_transforms = (
+                self.device.type == "cuda"
+                and NEIGHBORLIST_BACKEND_OPTIONS[nl_backend].supports_cuda
+            )
+        else:
+            # no neighborlist -> move to device first if device is cuda
+            self._move_to_device_before_transforms = self.device.type == "cuda"
+
+        # move transforms to the device where they execute
+        transform_device = (
+            self.device
+            if self._move_to_device_before_transforms
+            else torch.device("cpu")
+        )
+        self.transforms = [t.to(transform_device) for t in self.transforms]
+
     def calculate(self, atoms=None, properties=["energy"], system_changes=all_changes):
         """"""
         # call to base-class to set atoms attribute
@@ -110,9 +144,13 @@ class NequIPCalculator(_IntegrationLoaderMixin, Calculator):
 
     def atoms_to_data(self, atoms: Atoms) -> AtomicDataDict.Type:
         data = from_ase(atoms)
+        if self._move_to_device_before_transforms:
+            data = AtomicDataDict.to_(data, self.device)
         for t in self.transforms:
             data = t(data)
-        return AtomicDataDict.to_(data, self.device)
+        if not self._move_to_device_before_transforms:
+            data = AtomicDataDict.to_(data, self.device)
+        return data
 
     def call_model(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
         return self.model(data)
