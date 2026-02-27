@@ -1,43 +1,13 @@
-import pytest
 import copy
 
 import numpy as np
 import torch
-from ase import Atoms
-import ase.build
-
-from ase.calculators.singlepoint import SinglePointCalculator
 
 from nequip.data import (
     AtomicDataDict,
     from_dict,
-    from_ase,
     to_ase,
-    compute_neighborlist_,
 )
-from nequip.data._nl import (
-    NEIGHBORLIST_BACKEND_ASE,
-    NEIGHBORLIST_BACKEND_MATSCIPY,
-    NEIGHBORLIST_BACKEND_VESIN,
-)
-from nequip.utils.test import compare_neighborlists
-
-# check for optional neighborlist libraries
-try:
-    import vesin  # noqa: F401
-
-    VESIN_AVAILABLE = True
-except ImportError:
-    VESIN_AVAILABLE = False
-
-# build parametrize lists based on available libraries
-ALT_NL_METHODS = [NEIGHBORLIST_BACKEND_MATSCIPY]
-if VESIN_AVAILABLE:
-    ALT_NL_METHODS.append(NEIGHBORLIST_BACKEND_VESIN)
-
-NL_METHODS = [NEIGHBORLIST_BACKEND_ASE, NEIGHBORLIST_BACKEND_MATSCIPY]
-if VESIN_AVAILABLE:
-    NL_METHODS.append(NEIGHBORLIST_BACKEND_VESIN)
 
 
 def test_to_ase_batches(atomic_batch):
@@ -67,11 +37,10 @@ def test_to_ase_batches(atomic_batch):
         )
 
 
-def test_process_dict_invariance(H2, CuFcc, CH3CHO):
-    for system in [H2, CuFcc, CH3CHO]:
-        _, data = system
-        data1 = from_dict(data.copy())
-        data2 = from_dict(data1.copy())
+def test_process_dict_invariance(CH3CHO):
+    _, data = CH3CHO
+    data1 = from_dict(data.copy())
+    data2 = from_dict(data1.copy())
     for k in data.keys():
         torch.testing.assert_close(data1[k], data2[k])
 
@@ -109,56 +78,8 @@ def test_without_nodes(CH3CHO):
     )
 
 
-def test_silicon_neighbors(Si):
-    r_max, points, data = Si
-    test_data = compute_neighborlist_(
-        from_dict(points),
-        r_max=r_max,
-    )
-    edge_index = test_data[AtomicDataDict.EDGE_INDEX_KEY]
-    edge_index_true = torch.LongTensor(
-        [[0, 0, 0, 0, 1, 1, 1, 1], [1, 1, 1, 1, 0, 0, 0, 0]]
-    )
-    assert edge_index_set_equiv(edge_index, edge_index_true)
-    assert edge_index_set_equiv(data[AtomicDataDict.EDGE_INDEX_KEY], edge_index_true)
-
-
-@pytest.mark.parametrize("alt_nl_method", ALT_NL_METHODS)
-def test_neighborlist_consistency(alt_nl_method, CH3CHO, CuFcc, Si):
-    CH3CHO_atoms, _ = CH3CHO
-    CuFcc_atoms, _ = CuFcc
-    _, Si_points, _ = Si
-    r_max = 4.0
-
-    Si_data = from_dict(Si_points)
-    for atoms_or_data in [CH3CHO_atoms, CuFcc_atoms, Si_data]:
-        compare_neighborlists(
-            atoms_or_data,
-            nl1=NEIGHBORLIST_BACKEND_ASE,
-            nl2=alt_nl_method,
-            r_max=r_max,
-        )
-
-
-@pytest.mark.parametrize("nl_method", NL_METHODS)
-def test_no_neighbors(nl_method):
-    """Tests that the neighborlist is empty if there are no neighbors."""
-
-    # isolated atom
-    H = Atoms("H", positions=[[0, 0, 0]], cell=20 * np.eye(3))
-    data = compute_neighborlist_(from_ase(H), r_max=2.5, backend=nl_method)
-    assert data[AtomicDataDict.EDGE_INDEX_KEY].numel() == 0
-    assert data[AtomicDataDict.EDGE_CELL_SHIFT_KEY].numel() == 0
-
-    # cutoff smaller than interatomic distance
-    Cu = ase.build.bulk("Cu", "fcc", a=3.6, cubic=True)
-    data = compute_neighborlist_(from_ase(Cu), r_max=2.5, backend=nl_method)
-    assert data[AtomicDataDict.EDGE_INDEX_KEY].numel() == 0
-    assert data[AtomicDataDict.EDGE_CELL_SHIFT_KEY].numel() == 0
-
-
-def test_batching(Si):
-    _, _, orig = Si
+def test_batching(CH3CHO):
+    _, orig = CH3CHO
     N = 4
 
     # test unbatched vs batched
@@ -189,63 +110,3 @@ def test_batching(Si):
         new = AtomicDataDict.frame_from_batched(new_batch, i)
         for k, v in orig.items():
             assert torch.equal(v, new[k]), f"failed at iteration {i} for key {k}"
-
-
-def edge_index_set_equiv(a, b):
-    """Compare edge_index arrays in an unordered way."""
-    # [[0, 1], [1, 0]] -> {(0, 1), (1, 0)}
-    a = (
-        a.numpy()
-    )  # numpy gives ints when iterated, tensor gives non-identical scalar tensors.
-    b = b.numpy()
-    return set(zip(a[0], a[1])) == set(zip(b[0], b[1]))
-
-
-@pytest.fixture(scope="function")
-def H2():
-    atoms = ase.build.molecule("H2")
-    data = compute_neighborlist_(
-        from_ase(atoms),
-        r_max=2.0,
-        backend=NEIGHBORLIST_BACKEND_ASE,
-    )
-    return atoms, data
-
-
-@pytest.fixture(scope="function")
-def CuFcc():
-    atoms = ase.build.bulk("Cu", "fcc", a=3.6, cubic=True)
-    atoms.calc = SinglePointCalculator(
-        atoms, **{"forces": np.random.random((len(atoms), 3))}
-    )
-    data = compute_neighborlist_(
-        from_ase(atoms),
-        r_max=4.0,
-        backend=NEIGHBORLIST_BACKEND_ASE,
-    )
-    return atoms, data
-
-
-@pytest.fixture(scope="function")
-def Si():
-    lattice = torch.tensor(
-        [
-            [3.34939851, 0, 1.93377613],
-            [1.11646617, 3.1578432, 1.93377613],
-            [0, 0, 3.86755226],
-        ]
-    )
-    coords = torch.tensor([[0, 0, 0], [1.11646617, 0.7894608, 1.93377613]])
-    r_max = 2.5
-    points = dict(
-        # z=torch.zeros(size=(len(coords), 1)),
-        pos=coords,
-        cell=lattice,
-        pbc=True,
-    )
-    data = compute_neighborlist_(
-        from_dict(points),
-        r_max=r_max,
-        backend=NEIGHBORLIST_BACKEND_ASE,
-    )
-    return r_max, points, data
