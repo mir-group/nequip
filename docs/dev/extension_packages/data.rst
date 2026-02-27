@@ -67,3 +67,50 @@ Data Transforms
 Extension packages can implement custom data transforms to preprocess data during loading. Transforms are classes that implement a ``__call__`` method to modify ``AtomicDataDict`` objects.
 
 See the :doc:`transforms API documentation <../../api/data_transforms>` for available transform classes and their patterns.
+
+Custom Neighborlist Backends
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Neighborlist backends are registered by name with
+:func:`~nequip.data.register_neighborlist_backend` and can then be selected from
+:class:`~nequip.data.transforms.NeighborListTransform` via ``backend=...``.
+
+The registration schema is:
+
+- ``backend``: string key for the backend.
+- ``fn``: callable with signature ``fn(data, r_max) -> data``.
+- ``supports_cpu`` / ``supports_cuda``: backend device capability flags.
+
+Backend function contract:
+
+- batched input must return batched output; unbatched input must return unbatched output.
+- output tensors must stay on the same device as input tensors.
+- mutation should be limited to adding/updating neighborlist outputs.
+
+Example:
+
+.. code-block:: python
+
+   import torch
+   from nequip.data import (
+       AtomicDataDict,
+       register_neighborlist_backend,
+   )
+
+   def my_backend(data: AtomicDataDict.Type, r_max: float) -> AtomicDataDict.Type:
+       # compute edge_index and edge_cell_shift here
+       data[AtomicDataDict.EDGE_INDEX_KEY] = torch.empty((2, 0), dtype=torch.long)
+       data[AtomicDataDict.EDGE_CELL_SHIFT_KEY] = torch.empty((0, 3))
+       return data
+
+   register_neighborlist_backend(
+       backend="my_backend",
+       fn=my_backend,
+       supports_cpu=True,
+       supports_cuda=False,
+   )
+
+API Reference
+^^^^^^^^^^^^^
+
+.. autofunction:: nequip.data.register_neighborlist_backend

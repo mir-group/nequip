@@ -322,16 +322,17 @@ def register_neighborlist_backend(
 
     Args:
         backend (str): name for the backend.
-        fn (Callable): backend function with signature ``fn(data, r_max)``.
-            Contract:
-            - if input ``data`` is batched, output must be batched;
-            - if input ``data`` is unbatched, output must be unbatched;
-            - output tensors must be on the same device as input tensors.
-            - existing tensors in ``data`` must be preserved; mutation is limited
-              to adding/updating neighborlist outputs.
+        fn (Callable): backend function with signature ``fn(data, r_max) -> data``.
         supports_cpu (bool): whether the backend supports CPU execution.
         supports_cuda (bool): whether the backend supports CUDA execution.
         overwrite (bool): whether to replace an existing backend with the same name.
+
+    Notes:
+        Backend function contract:
+
+        - batched input must return batched output; unbatched input must return unbatched output.
+        - output tensors must stay on the same device as input tensors.
+        - existing tensors in ``data`` must be preserved; mutation is limited to neighborlist outputs.
     """
     if not isinstance(backend, str) or backend == "":
         raise ValueError("`backend` must be a non-empty string")
