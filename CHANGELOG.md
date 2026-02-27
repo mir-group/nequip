@@ -16,11 +16,14 @@ Most recent change on the top.
 - convenience resolver `${cutoff_radius_from_package:${model_path}}` to extract cutoff radius for fine-tuning directly in config file
 - `PresetNequIPGNNModel` model builder with `S`/`M`/`L`/`XL` architecture presets and explicit-argument override behavior
 - docs linking to updated OpenMM integration
+- `alchemiops` neighborlist backend support
 
 ### Changed
 - overhauled `NonperiodicCellTransform` with improved handling
 - models compiled for training now produce full set of eager output dict entries
 - `NequIPCalculator` canonical import path is now `nequip.integrations.ase.NequIPCalculator`; `nequip.ase.NequIPCalculator` remains as a deprecated compatibility shim that emits a `FutureWarning`
+- [breaking] `NEQUIP_NL` environment variable no longer controls neighborlist backend selection. Neighborlist backend can be set explicitly via `NeighborListTransform(..., backend="...")`; default behavior is unchanged (`matscipy`).
+- Added `register_neighborlist_backend` to support extensible neighborlist backend registration.
 
 ### Fixed
 - PyTorch 2.10.0 tracing error for `silu_backward`
