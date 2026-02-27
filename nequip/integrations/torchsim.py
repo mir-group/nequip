@@ -7,11 +7,13 @@ from torch_sim.models.interface import ModelInterface
 from torch_sim.typing import StateDict
 
 from nequip.data import AtomicDataDict
+from nequip.data._nl import NEIGHBORLIST_BACKEND_ALCHEMIOPS
 
 from .mixins import _IntegrationLoaderMixin
 
 from collections.abc import Callable
-from typing import Union, List, Dict
+from typing import Union, List, Dict, Optional
+from pathlib import Path
 
 
 class NequIPTorchSimCalc(_IntegrationLoaderMixin, ModelInterface):
@@ -98,6 +100,23 @@ class NequIPTorchSimCalc(_IntegrationLoaderMixin, ModelInterface):
         from nequip.scripts._compile_utils import COMPILE_TARGET_DICT, AOTI_BATCH_TARGET
 
         return COMPILE_TARGET_DICT[AOTI_BATCH_TARGET]
+
+    @classmethod
+    def from_compiled_model(
+        cls,
+        compile_path: Union[str, Path],
+        device: Union[str, torch.device] = "cpu",
+        chemical_species_to_atom_type_map: Optional[Union[Dict[str, str], bool]] = None,
+        neighborlist_backend: str = NEIGHBORLIST_BACKEND_ALCHEMIOPS,
+        **kwargs,
+    ):
+        return super().from_compiled_model(
+            compile_path=compile_path,
+            device=device,
+            chemical_species_to_atom_type_map=chemical_species_to_atom_type_map,
+            neighborlist_backend=neighborlist_backend,
+            **kwargs,
+        )
 
     def setup_from_system_idx(
         self, atomic_numbers: torch.Tensor, system_idx: torch.Tensor
