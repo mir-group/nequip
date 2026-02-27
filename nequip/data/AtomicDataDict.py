@@ -267,6 +267,13 @@ def num_edges(data: Type) -> int:
     return data[_keys.EDGE_INDEX_KEY].size(1)
 
 
+def is_batched(data: Type) -> bool:
+    out = _keys.BATCH_KEY in data
+    if out:
+        assert _keys.NUM_NODES_KEY in data
+    return out
+
+
 def with_batch_(data: Type) -> Type:
     """Add explicit batching keys in-place for a single frame.
 
@@ -303,6 +310,7 @@ __all__ = [
     to_,
     detach_,
     without_nodes,
+    is_batched,
     num_nodes,
     num_edges,
     with_batch_,
