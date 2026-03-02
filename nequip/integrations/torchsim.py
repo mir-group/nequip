@@ -4,7 +4,6 @@ import torch
 
 import torch_sim as ts
 from torch_sim.models.interface import ModelInterface
-from torch_sim.typing import StateDict
 
 from nequip.data import AtomicDataDict
 from nequip.data._nl import NEIGHBORLIST_BACKEND_ALCHEMIOPS
@@ -134,21 +133,17 @@ class NequIPTorchSimCalc(_IntegrationLoaderMixin, ModelInterface):
         self.n_systems = system_idx.max().item() + 1
         self.total_atoms = atomic_numbers.shape[0]
 
-    def forward(self, state: ts.SimState | StateDict) -> dict[str, torch.Tensor]:  # noqa: C901
+    def forward(self, state: ts.SimState) -> dict[str, torch.Tensor]:  # noqa: C901
         """Compute energies, forces, and stresses.
 
         Args:
-            state (:class:`~torch_sim.SimState` | :class:`~torch_sim.typing.StateDict`): state object containing positions, cell,
+            state (:class:`~torch_sim.SimState`): state object containing positions, cell,
                 and system information.
 
         Returns:
             dict[str, :class:`torch.Tensor`]: computed properties (``"energy"``, ``"forces"``, ``"stress"``).
         """
-        sim_state = (
-            state
-            if isinstance(state, ts.SimState)
-            else ts.SimState(**state, masses=torch.ones_like(state["positions"]))
-        )
+        sim_state = state
 
         # handle input validation for atomic numbers
         if sim_state.atomic_numbers is None and not self.atomic_numbers_in_init:
