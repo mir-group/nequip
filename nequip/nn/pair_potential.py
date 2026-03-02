@@ -3,6 +3,7 @@ from typing import Union, Optional, List
 
 import torch
 
+from e3nn.o3._irreps import Irreps
 from e3nn.util.jit import compile_mode
 
 from nequip.data import AtomicDataDict
@@ -50,15 +51,26 @@ class LennardJones(GraphModuleMixin, torch.nn.Module):
         lj_per_type: bool = True,
         lj_style: str = "lj",
         polynomial_cutoff_p: float = 6.0,
+        per_atom_energy_field: str = AtomicDataDict.PER_ATOM_ENERGY_KEY,
         irreps_in=None,
     ) -> None:
         super().__init__()
         num_types = len(type_names)
+        self.per_atom_energy_field = per_atom_energy_field
+
+        # === irreps registration ===
         self._init_irreps(
             irreps_in=irreps_in,
             required_irreps_in=[AtomicDataDict.NORM_LENGTH_KEY],
-            irreps_out={AtomicDataDict.PER_ATOM_ENERGY_KEY: "0e"},
+            irreps_out={self.per_atom_energy_field: "0e"},
         )
+        if self.per_atom_energy_field in self.irreps_in:
+            energy_irreps = Irreps(self.irreps_in[self.per_atom_energy_field])
+            assert all(ir.l == 0 for _, ir in energy_irreps), (
+                f"{self.per_atom_energy_field} must be scalar irreps, found {energy_irreps}"
+            )
+            self.irreps_out[self.per_atom_energy_field] = energy_irreps
+
         assert lj_style in ("lj", "lj_repulsive_only", "repulsive")
         self.lj_style = lj_style
 
@@ -146,9 +158,9 @@ class LennardJones(GraphModuleMixin, torch.nn.Module):
             dim=0,
             dim_size=AtomicDataDict.num_nodes(data),
         )
-        if AtomicDataDict.PER_ATOM_ENERGY_KEY in data:
-            atomic_eng = atomic_eng + data[AtomicDataDict.PER_ATOM_ENERGY_KEY]
-        data[AtomicDataDict.PER_ATOM_ENERGY_KEY] = atomic_eng
+        if self.per_atom_energy_field in data:
+            atomic_eng = atomic_eng + data[self.per_atom_energy_field]
+        data[self.per_atom_energy_field] = atomic_eng
         return data
 
     def __repr__(self) -> str:
@@ -277,15 +289,26 @@ class ZBL(GraphModuleMixin, torch.nn.Module):
         chemical_species: List[str],
         units: str,
         polynomial_cutoff_p: float = 6.0,
+        per_atom_energy_field: str = AtomicDataDict.PER_ATOM_ENERGY_KEY,
         irreps_in=None,
     ):
         super().__init__()
         num_types = len(type_names)
+        self.per_atom_energy_field = per_atom_energy_field
+
+        # === irreps registration ===
         self._init_irreps(
             irreps_in=irreps_in,
             required_irreps_in=[AtomicDataDict.NORM_LENGTH_KEY],
-            irreps_out={AtomicDataDict.PER_ATOM_ENERGY_KEY: "0e"},
+            irreps_out={self.per_atom_energy_field: "0e"},
         )
+        if self.per_atom_energy_field in self.irreps_in:
+            energy_irreps = Irreps(self.irreps_in[self.per_atom_energy_field])
+            assert all(ir.l == 0 for _, ir in energy_irreps), (
+                f"{self.per_atom_energy_field} must be scalar irreps, found {energy_irreps}"
+            )
+            self.irreps_out[self.per_atom_energy_field] = energy_irreps
+
         assert len(chemical_species) == num_types
         atomic_numbers: List[int] = [
             chemical_symbols_to_atomic_numbers_dict[chemical_species[type_i]]
@@ -334,8 +357,8 @@ class ZBL(GraphModuleMixin, torch.nn.Module):
         edge_center = data[AtomicDataDict.EDGE_INDEX_KEY][0]
 
         # account for possibility of reduced num nodes in atomic energy in a local-ghost atom context
-        if AtomicDataDict.PER_ATOM_ENERGY_KEY in data:
-            num_nodes = data[AtomicDataDict.PER_ATOM_ENERGY_KEY].size(0)
+        if self.per_atom_energy_field in data:
+            num_nodes = data[self.per_atom_energy_field].size(0)
         else:
             num_nodes = AtomicDataDict.num_nodes(data)
 
@@ -358,9 +381,9 @@ class ZBL(GraphModuleMixin, torch.nn.Module):
             dim=0,
             dim_size=num_nodes,
         )
-        if AtomicDataDict.PER_ATOM_ENERGY_KEY in data:
-            atomic_eng = atomic_eng + data[AtomicDataDict.PER_ATOM_ENERGY_KEY]
-        data[AtomicDataDict.PER_ATOM_ENERGY_KEY] = atomic_eng
+        if self.per_atom_energy_field in data:
+            atomic_eng = atomic_eng + data[self.per_atom_energy_field]
+        data[self.per_atom_energy_field] = atomic_eng
         return data
 
 
