@@ -151,10 +151,18 @@ def from_ase(
 
     # c.f. https://gitlab.com/ase/ase/-/blob/master/ase/atoms.py?ref_type=heads#L114
 
+    pbc = np.asarray(atoms.get_pbc(), dtype=bool)
+    cell = np.asarray(atoms.get_cell())
+    if bool(pbc.any()) and bool(np.allclose(cell, 0.0)):
+        raise ValueError(
+            f"Invalid ASE Atoms input: pbc={pbc} but cell is zero. "
+            "Fix upstream data so periodic structures provide a non-zero cell."
+        )
+
     data = {
         AtomicDataDict.POSITIONS_KEY: atoms.positions,
-        AtomicDataDict.CELL_KEY: np.array(atoms.get_cell()),
-        AtomicDataDict.PBC_KEY: atoms.get_pbc(),
+        AtomicDataDict.CELL_KEY: cell,
+        AtomicDataDict.PBC_KEY: pbc,
         AtomicDataDict.ATOMIC_NUMBERS_KEY: atoms.get_atomic_numbers(),
     }
     data.update(**add_fields)
