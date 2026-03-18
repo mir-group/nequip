@@ -3,29 +3,44 @@ from dataclasses import dataclass
 from typing import Callable, Dict, Final, List, Optional, Union, Tuple
 
 import numpy as np
+import packaging.version
 
 import torch
+from . import AtomicDataDict
 
 import ase.neighborlist
 from matscipy.neighbours import neighbour_list as matscipy_nl
+
 
 try:
     from vesin import NeighborList as vesin_nl
 except ImportError:
     pass
 
-try:
-    # TODO: update the import when v0.3.0 is released
-    # https://github.com/NVIDIA/nvalchemi-toolkit-ops/blob/82f2e70923f20cb7ada94fa55d7edfe9291c340c/nvalchemiops/neighborlist/__init__.py#L16
-    from nvalchemiops.neighborlist import batch_cell_list as alchemiops_nl
-    # ^ import for v0.2.0
+alchemiops_nl = None
 
-    ALCHEMIOPS_AVAILABLE = True
-except ImportError:
-    alchemiops_nl = None
-    ALCHEMIOPS_AVAILABLE = False
 
-from . import AtomicDataDict
+def _load_alchemiops_nl() -> Callable:
+    global alchemiops_nl
+    if alchemiops_nl is not None:
+        return alchemiops_nl
+    from nequip.utils.versions.version_utils import get_version_safe
+
+    alchemiops_version = get_version_safe("nvalchemiops")
+    if alchemiops_version is None:
+        raise ImportError(
+            "`nvalchemiops` is not installed. Install it with: pip install nvalchemiops"
+        )
+
+    if packaging.version.parse(alchemiops_version) >= packaging.version.parse("0.3.0"):
+        from nvalchemiops.torch.neighbors import batch_cell_list as _alchemiops_nl
+    else:
+        from nvalchemiops.neighborlist import batch_cell_list as _alchemiops_nl
+
+    alchemiops_nl = _alchemiops_nl
+
+    return alchemiops_nl
+
 
 # use "matscipy" as default
 # NOTE:
@@ -208,10 +223,7 @@ def alchemiops_batch_cell_list(
         data with neighborlist entries added in-place.
         Only ``edge_index`` and (if ``cell`` exists) ``edge_cell_shift`` are modified.
     """
-    if alchemiops_nl is None:
-        raise ImportError(
-            "`nvalchemiops` is not installed. Install it with: pip install nvalchemiops"
-        )
+    alchemiops_fn = _load_alchemiops_nl()
 
     positions = data[AtomicDataDict.POSITIONS_KEY]
     # handle batching
@@ -251,8 +263,8 @@ def alchemiops_batch_cell_list(
         cell[needs_nominal_cell] = identity
 
     # call alchemiops cell list
-    # NOTE: v0.2.0 uses positions.device to dictate the device behavior of the neighborlist construction
-    res = alchemiops_nl(
+    # nvalchemiops uses `positions.device` to select where neighborlist construction runs
+    res = alchemiops_fn(
         positions=positions,
         cutoff=r_max,
         batch_idx=system_idx,
