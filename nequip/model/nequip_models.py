@@ -8,7 +8,6 @@ from nequip.nn import (
     GraphModel,
     SequentialGraphNetwork,
     ScalarMLP,
-    AtomwiseReduce,
     PerTypeScaleShift,
     ConvNetLayer,
     ForceStressOutput,
@@ -23,7 +22,7 @@ from nequip.nn.embedding import (
 )
 
 from .utils import model_builder
-from hydra.utils import instantiate
+from .energy_modules import _append_energy_modules
 import warnings
 from typing import Sequence, Optional, List, Dict, Union, Callable
 
@@ -391,24 +390,10 @@ def FullNequIPGNNModel(
         }
     )
 
-    # === pair potentials ===
-    prev_irreps_out = per_type_energy_scale_shift.irreps_out
-    if pair_potential is not None:
-        pair_potential = instantiate(
-            pair_potential, type_names=type_names, irreps_in=prev_irreps_out
-        )
-        prev_irreps_out = pair_potential.irreps_out
-        modules.update({"pair_potential": pair_potential})
-
-    # === sum to total energy ===
-    total_energy_sum = AtomwiseReduce(
-        irreps_in=prev_irreps_out,
-        reduce="sum",
-        field=AtomicDataDict.PER_ATOM_ENERGY_KEY,
-        out_field=AtomicDataDict.TOTAL_ENERGY_KEY,
-    )
-    modules.update({"total_energy_sum": total_energy_sum})
-
-    # === finalize ===
     energy_model = SequentialGraphNetwork(modules)
+    energy_model = _append_energy_modules(
+        model=energy_model,
+        type_names=type_names,
+        pair_potential=pair_potential,
+    )
     return ForceStressOutput(energy_model, do_derivatives)
