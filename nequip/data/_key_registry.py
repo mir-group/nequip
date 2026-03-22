@@ -17,6 +17,7 @@ _DEFAULT_LONG_FIELDS: Set[str] = {
     _keys.BATCH_KEY,
     _keys.NUM_NODES_KEY,
     _keys.NUM_LOCAL_GHOST_NODES_KEY,
+    _keys.DATASET_KEY,
     _keys.TOTAL_CHARGE_KEY,
     _keys.TOTAL_SPIN_KEY,
 }
@@ -28,6 +29,7 @@ _DEFAULT_GRAPH_FIELDS: Set[str] = {
     _keys.PBC_KEY,
     _keys.CELL_KEY,
     _keys.NUM_NODES_KEY,
+    _keys.DATASET_KEY,
     _keys.TOTAL_CHARGE_KEY,
     _keys.TOTAL_SPIN_KEY,
     _keys.TOTAL_MAGMOM_KEY,

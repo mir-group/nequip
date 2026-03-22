@@ -1,5 +1,6 @@
 # This file is a part of the `nequip` package. Please see LICENSE and README at the root for information on using it.
 from .type_mapper import ChemicalSpeciesToAtomTypeMapper
+from .dataset import DatasetIndexTransform
 from .neighborlist import (
     NeighborListPruneTransform,
     NeighborListTransform,
@@ -16,6 +17,7 @@ from .cell_utils import (
 
 __all__ = [
     "ChemicalSpeciesToAtomTypeMapper",
+    "DatasetIndexTransform",
     "NeighborListPruneTransform",
     "NeighborListTransform",
     "SortedNeighborListTransform",

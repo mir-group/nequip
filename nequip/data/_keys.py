@@ -34,6 +34,8 @@ EDGE_CELL_SHIFT_KEY: Final[str] = "edge_cell_shift"
 BATCH_KEY: Final[str] = "batch"
 # (num_frames,) | long tensor giving the number of atoms in each frame/graph
 NUM_NODES_KEY: Final[str] = "num_atoms"
+# (num_frames, 1) | long tensor giving per-frame dataset index
+DATASET_KEY: Final[str] = "dataset"
 
 # === usually unused by model, but present in data ===
 # (num_frames, 3) | bool tensor corresponding to periodic boundary conditions

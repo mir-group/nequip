@@ -11,6 +11,7 @@ from nequip.data.transforms import (
     NeighborListTransform,
     SortedNeighborListTransform,
     ChemicalSpeciesToAtomTypeMapper,
+    DatasetIndexTransform,
     NonPeriodicCellTransform,
 )
 from nequip.nn.utils import with_edge_vectors_
@@ -25,6 +26,20 @@ def test_ChemicalSpeciesToAtomTypeMapper():
     data = tm(data)
     atom_types = data[AtomicDataDict.ATOM_TYPE_KEY]
     assert torch.all(atom_types == torch.as_tensor([1, 1, 0, 1, 0, 0, 0]))
+
+
+def test_DatasetIndexTransform():
+    dataset_index = 3
+    transform = DatasetIndexTransform(dataset_index=dataset_index)
+    data = {
+        AtomicDataDict.POSITIONS_KEY: torch.randn(4, 3),
+        AtomicDataDict.ATOMIC_NUMBERS_KEY: torch.as_tensor([1, 1, 6, 8]),
+    }
+    data = transform(data)
+    assert AtomicDataDict.DATASET_KEY in data
+    assert data[AtomicDataDict.DATASET_KEY].shape == (1, 1)
+    assert data[AtomicDataDict.DATASET_KEY].dtype == torch.long
+    assert data[AtomicDataDict.DATASET_KEY].item() == dataset_index
 
 
 def test_VirialToStressTransform():
