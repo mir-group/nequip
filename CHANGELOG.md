@@ -8,6 +8,13 @@ Most recent change on the top.
 
 ## Unreleased
 
+### Added
+- `dataset` as a built-in `AtomicDataDict` graph/long field (`AtomicDataDict.DATASET_KEY`) and `nequip.data.transforms.DatasetIndexTransform` for multi-dataset workflows
+
+
+### Fixed
+- compatibility with `alchemiops` v0.3.0 neighborlist
+
 ## [0.17.0]
 
 ### Added
