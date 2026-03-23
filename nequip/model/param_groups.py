@@ -23,7 +23,7 @@ def MuonParamGroups(
     For e3nn ``Linear`` layers, the returned Muon parameter group includes an
     ``e3nn_reshaping`` dictionary mapping the index of the parameter within the Muon
     group to the module's ``weight_index_slices``. This metadata will be used by the
-     to reshape or operate on corresponding matrix weights.
+    to reshape or operate on corresponding matrix weights.
 
     Args:
         model (torch.nn.Module): The model to optimize.

@@ -8,3 +8,4 @@ nequip.train
   metrics
   callbacks
   ddp
+  optimizers

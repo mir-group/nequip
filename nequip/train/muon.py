@@ -94,6 +94,20 @@ def adam_update(grad, buf1, buf2, step, betas, eps):
 class MuonWithAuxAdam(torch.optim.Optimizer):
     """
     Non-distributed variant of MuonWithAuxAdam (Originally SingleDeviceMuonWithAuxAdam).
+
+    Config example with NequIP parameter groups:
+
+    .. code-block:: yaml
+
+        _target_: nequip.train.MuonWithAuxAdam
+        param_groups:
+          _target_: nequip.model.MuonParamGroups
+          muon:
+            lr: 0.01
+            weight_decay: 1e-5
+          adam:
+            lr: 0.01
+            weight_decay: 1e-5
     """
 
     def __init__(self, params):
