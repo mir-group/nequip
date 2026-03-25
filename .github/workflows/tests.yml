@@ -36,7 +36,7 @@ jobs:
     runs-on: ${{ github.event.repository.private && 'self-hosted' || 'ubuntu-latest' }}
     strategy:
       matrix:
-        torch-version: [2.2.0, 2.*]
+        torch-version: [2.2.0, 2.10.*]
     container:
       image: nvidia/cuda:12.6.1-cudnn-devel-ubuntu24.04
       options: ${{ github.event.repository.private && '--gpus all' || ' ' }}
@@ -90,7 +90,7 @@ jobs:
             pip install vesin
           fi
           # install torch-sim-atomistic only for latest torch version
-          if [ "${{ matrix.torch-version }}" = "2.*" ]; then
+          if [ "${{ matrix.torch-version }}" = "2.10.*" ]; then
             pip install torch-sim-atomistic
           fi
           #pip install schedulefree  #Disabled to reduce CI runtime; uncomment to test ScheduleFreeLightningModule
