@@ -10,13 +10,30 @@ We recommend testing your workflow with your target PyTorch version before deplo
 
 ### PyTorch 2.10.0
 
-**Issue:** CPU + AOTInductor compilation failure
+#### Issue 1: CPU + AOTInductor compilation failure
 
 **Affected Feature:** `nequip-compile --mode aotinductor --device cpu`
 
 **Status:** Known bug, may be fixed in future versions
 
 **Workaround:** Use PyTorch 2.9.1, or use `--mode torchscript`, or compile for CUDA
+
+#### Issue 2: AOTInductor runtime load failure in Python scripts
+
+**Affected Feature:** Running AOTInductor-compiled models from Python, including [ASE](../../integrations/ase.md) and [torch-sim](../../integrations/torchsim.md) integrations
+
+**Error:**
+```text
+AttributeError: module 'torch._inductor' has no attribute 'codecache'
+```
+
+**Status:** Fixed in NequIP `>=0.17.0`
+
+**Workaround:** Upgrade to NequIP `>=0.17.0`. If this error appears in your Python script, initialize NequIP global state near the top of the script:
+```python
+from nequip.utils.global_state import set_global_state
+set_global_state()
+```
 
 ---
 
