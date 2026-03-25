@@ -108,6 +108,9 @@ def main(config: DictConfig) -> None:
     logger.debug("Setting global options ...")
     set_global_state()
 
+    # register XPU for lightning
+    import nequip.utils.xpu  # noqa: F401
+
     # === instantiate datamodule ===
     logger.info("Building datamodule ...")
     data = OmegaConf.to_container(config.data, resolve=True)
