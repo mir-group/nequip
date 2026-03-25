@@ -1,4 +1,3 @@
-from contextlib import nullcontext
 from functools import lru_cache
 import logging
 from typing import Any, Dict, List, MutableSequence
@@ -293,26 +292,23 @@ _AcceleratorConnector._choose_strategy = _xpu_choose_strategy
 def _xpu_ddp_setup_model(
     self: "DDPStrategy", model: torch.nn.Module
 ) -> DistributedDataParallel:
-    """Wrap the model in DDP without forcing a CUDA stream for non-CUDA devices."""
+    """Wrap the model in DDP without forcing non-default streams for XPU devices."""
     device_ids = self.determine_ddp_device_ids()
     _log.debug(
         "setting up DDP model with device ids: %s, kwargs: %s",
         device_ids,
         self._ddp_kwargs,
     )
-    # Use device-appropriate stream contexts when available.
-    ctx = nullcontext()
-    if device_ids is not None:
-        root_type = getattr(self.root_device, "type", None)
-        if root_type == "cuda":
-            ctx = torch.cuda.stream(torch.cuda.Stream())
-        elif root_type == "xpu":
-            ctx = torch.xpu.stream(torch.xpu.Stream())
+    # Keep CUDA behavior (Lightning default) but avoid a custom XPU stream context.
+    if device_ids is not None and getattr(self.root_device, "type", None) == "cuda":
+        with torch.cuda.stream(torch.cuda.Stream()):
+            return DistributedDataParallel(
+                module=model, device_ids=device_ids, **self._ddp_kwargs
+            )
 
-    with ctx:
-        return DistributedDataParallel(
-            module=model, device_ids=device_ids, **self._ddp_kwargs
-        )
+    return DistributedDataParallel(
+        module=model, device_ids=device_ids, **self._ddp_kwargs
+    )
 
 
 DDPStrategy._setup_model = _xpu_ddp_setup_model
