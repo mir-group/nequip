@@ -157,7 +157,7 @@ class XPUAccelerator(Accelerator):
     @override
     @staticmethod
     def is_available() -> bool:
-        return torch.xpu.is_available()
+        return hasattr(torch, "xpu") and torch.xpu.is_available()
 
     @staticmethod
     @override
@@ -177,6 +177,8 @@ class XPUAccelerator(Accelerator):
 @lru_cache(1)
 def num_xpu_devices() -> int:
     """Return the number of available XPU devices."""
+    if not hasattr(torch, "xpu"):
+        return 0
     return torch.xpu.device_count()
 
 
