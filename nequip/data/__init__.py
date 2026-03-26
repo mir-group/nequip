@@ -33,7 +33,13 @@ from .stats_manager import (
     CommonDataStatisticsManager,
     EnergyOnlyDataStatisticsManager,
 )
-from .modifier import BaseModifier, PerAtomModifier, EdgeLengths, NumNeighbors
+from .modifier import (
+    BaseModifier,
+    PerAtomModifier,
+    MappedFieldModifier,
+    EdgeLengths,
+    NumNeighbors,
+)
 
 
 __all__ = [
@@ -66,6 +72,7 @@ __all__ = [
     "Min",
     "BaseModifier",
     "PerAtomModifier",
+    "MappedFieldModifier",
     "EdgeLengths",
     "NumNeighbors",
 ]

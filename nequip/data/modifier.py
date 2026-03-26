@@ -66,6 +66,39 @@ class PerAtomModifier(BaseModifier):
         return "per_atom_" + _key_registry.ABBREV.get(self.field, self.field)
 
 
+class MappedFieldModifier(BaseModifier):
+    """Get predictions and targets from different fields."""
+
+    def __init__(self, pred_field: str, target_field: str) -> None:
+        super().__init__(pred_field)
+        self.pred_field = pred_field
+        self.target_field = target_field
+        pred_type = _key_registry.get_field_type(self.pred_field)
+        target_type = _key_registry.get_field_type(self.target_field)
+        assert pred_type == target_type, (
+            f"`pred_field` ({self.pred_field}) and `target_field` ({self.target_field}) "
+            f"must have the same field type, but got `{pred_type}` and `{target_type}`"
+        )
+        self._type = pred_type
+
+    def __call__(
+        self, data1: AtomicDataDict.Type, data2: Optional[AtomicDataDict.Type] = None
+    ) -> Union[torch.Tensor, List[torch.Tensor]]:
+        pred = data1[self.pred_field]
+        if data2 is None:
+            return pred
+        return pred, data2[self.target_field]
+
+    def __str__(self) -> str:
+        pred = _key_registry.ABBREV.get(self.pred_field, self.pred_field)
+        target = _key_registry.ABBREV.get(self.target_field, self.target_field)
+        return f"pred_{pred}_label_{target}"
+
+    @property
+    def type(self) -> str:
+        return self._type
+
+
 class EdgeLengths(BaseModifier):
     """Get edge lengths from an ``AtomicDataDict``."""
 

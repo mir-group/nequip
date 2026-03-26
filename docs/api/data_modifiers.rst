@@ -6,6 +6,9 @@ One can use modifiers to convert raw quantities from an ``AtomicDataDict`` into 
 .. autoclass:: nequip.data.PerAtomModifier
     :members:
 
+.. autoclass:: nequip.data.MappedFieldModifier
+    :members:
+
 .. autoclass:: nequip.data.EdgeLengths
     :members:
 
