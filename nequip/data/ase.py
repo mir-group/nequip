@@ -306,7 +306,7 @@ def to_ase(
                 # mask it
                 entry = frame[key]
                 if key in _key_registry._CARTESIAN_TENSOR_FIELDS:
-                    entry = entry.view(entry.size(0), -1)
+                    entry = entry.reshape(entry.size(0), -1)
                 mol.arrays[key] = entry.numpy()
             elif key in _key_registry._EDGE_FIELDS:
                 mol.info[key] = frame[key].numpy()
