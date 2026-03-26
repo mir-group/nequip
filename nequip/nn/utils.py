@@ -131,3 +131,47 @@ def with_edge_type_(
         ).view(2, -1)
         data[edge_type_field] = edge_type
     return data
+
+
+def mul_ir_to_ir_mul(x: torch.Tensor, irreps) -> torch.Tensor:
+    irreps = Irreps(irreps)
+    assert x.size(-1) == irreps.dim
+
+    if all((mul == 1 or ir.dim == 1) for mul, ir in irreps):
+        return x
+
+    base_shape = x.size()[:-1]
+    out_chunks = []
+    for sl, (mul, ir) in zip(irreps.slices(), irreps):
+        chunk = x[..., sl]
+        if mul > 1 and ir.dim > 1:
+            chunk = (
+                chunk.view(*base_shape, mul, ir.dim)
+                .transpose(-1, -2)
+                .contiguous()
+                .view(*base_shape, mul * ir.dim)
+            )
+        out_chunks.append(chunk)
+    return torch.cat(out_chunks, dim=-1).contiguous()
+
+
+def ir_mul_to_mul_ir(x: torch.Tensor, irreps) -> torch.Tensor:
+    irreps = Irreps(irreps)
+    assert x.size(-1) == irreps.dim
+
+    if all((mul == 1 or ir.dim == 1) for mul, ir in irreps):
+        return x
+
+    base_shape = x.size()[:-1]
+    out_chunks = []
+    for sl, (mul, ir) in zip(irreps.slices(), irreps):
+        chunk = x[..., sl]
+        if mul > 1 and ir.dim > 1:
+            chunk = (
+                chunk.view(*base_shape, ir.dim, mul)
+                .transpose(-1, -2)
+                .contiguous()
+                .view(*base_shape, mul * ir.dim)
+            )
+        out_chunks.append(chunk)
+    return torch.cat(out_chunks, dim=-1).contiguous()
