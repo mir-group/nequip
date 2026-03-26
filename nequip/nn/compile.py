@@ -187,7 +187,7 @@ class CompileGraphModel(GraphModel):
             compiled_model = torch.compile(
                 fx_model,
                 dynamic=True,
-                fullgraph=True,
+                fullgraph=False,
             )
 
             # store in cache: (compiled_model, output_fields)
