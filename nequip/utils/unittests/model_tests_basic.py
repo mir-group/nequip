@@ -11,6 +11,7 @@ import copy
 import functools
 import torch
 import numpy as np
+from typing import Literal
 
 from nequip.data import (
     from_dict,
@@ -65,6 +66,11 @@ class BasicModelTestsMixin:
         Returns tolerance based on ``model_dtype``.
         """
         return {"float32": 1e-3, "float64": 1e-8}[model_dtype]
+
+    @pytest.fixture(scope="class")
+    def irrep_format(self) -> Literal["mul_ir", "ir_mul"]:
+        """Irrep tensor memory layout used by the model under test."""
+        return "mul_ir"
 
     @pytest.fixture
     def strict_locality(self):
@@ -431,7 +437,9 @@ class BasicModelTestsMixin:
                     f"Found unregistered `out_field` = {out_field}"
                 )
 
-    def test_equivariance(self, model, model_test_data, device, equivariance_tol):
+    def test_equivariance(
+        self, model, model_test_data, device, equivariance_tol, irrep_format
+    ):
         instance, _, _ = model
         instance = instance.to(device=device)
 
@@ -439,6 +447,7 @@ class BasicModelTestsMixin:
             func=instance,
             data_in=model_test_data,
             e3_tolerance=equivariance_tol,
+            irrep_format=irrep_format,
         )
 
 

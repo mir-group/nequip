@@ -5,6 +5,7 @@ from e3nn import o3
 from e3nn.util.test import equivariance_error
 
 from nequip.nn import GraphModuleMixin, GraphModel
+from nequip.nn.utils import ir_mul_to_mul_ir, mul_ir_to_ir_mul
 from nequip.data import (
     from_dict,
     from_ase,
@@ -17,7 +18,7 @@ from nequip.data import (
 from .dtype import dtype_from_name
 
 from functools import wraps
-from typing import Union, Optional, List
+from typing import Literal, Optional, Union, List
 
 
 # The default float tolerance
@@ -167,6 +168,7 @@ def assert_AtomicData_equivariant(
     data_in: Union[AtomicDataDict.Type, List[AtomicDataDict.Type]],
     permutation_tolerance: Optional[float] = None,
     e3_tolerance: Optional[float] = None,
+    irrep_format: Literal["mul_ir", "ir_mul"] = "mul_ir",
     **kwargs,
 ) -> str:
     r"""Test the rotation, translation, parity, and permutation equivariance of ``func``.
@@ -206,6 +208,8 @@ def assert_AtomicData_equivariant(
     irreps_in.update(func.irreps_in)
     irreps_in = {k: v for k, v in irreps_in.items() if k in data_in[0]}
     irreps_out = func.irreps_out.copy()
+    layout_irreps_in = irreps_in.copy()
+    layout_irreps_out = irreps_out.copy()
     # Remove batch-related keys from the irreps_out, if we aren't using batched inputs
     irreps_out = {
         k: v
@@ -219,11 +223,18 @@ def assert_AtomicData_equivariant(
     ref_out = func(data_in_0_copy)
     # remove registered but absent/empty outputs from irreps out
     new_irreps_out = {}
+    new_layout_irreps_out = {}
     for k, v in irreps_out.items():
         if k in ref_out.keys():
             if ref_out[k].numel() != 0:
                 new_irreps_out.update({k: v})
+                new_layout_irreps_out.update({k: layout_irreps_out[k]})
     irreps_out = new_irreps_out
+    layout_irreps_out = new_layout_irreps_out
+
+    assert irrep_format in ("mul_ir", "ir_mul"), (
+        "irrep_format must be either 'mul_ir' or 'ir_mul'"
+    )
 
     # for certain things, we don't care what the given irreps are...
     # make sure that we test correctly for equivariance:
@@ -271,9 +282,21 @@ def assert_AtomicData_equivariant(
                 val = arg_dict[key]
                 assert val.shape[-1] == 9
                 arg_dict[key] = val.reshape(val.shape[:-1] + (3, 3))
+        # convert from equivariance-test layout (mul_ir) to model layout (ir_mul) where needed
+        if irrep_format == "ir_mul":
+            for key, val in list(arg_dict.items()):
+                ir = layout_irreps_in.get(key, None)
+                if isinstance(ir, o3.Irreps):
+                    arg_dict[key] = mul_ir_to_ir_mul(val, ir)
         output = func(arg_dict)
         # irreps_out has been purged of numel=0 fields by now
         output = {k: output[k] for k, v in irreps_out.items() if k in output}
+        # convert from model layout (ir_mul) back to equivariance-test layout (mul_ir) where needed
+        if irrep_format == "ir_mul":
+            for key, val in list(output.items()):
+                ir = layout_irreps_out.get(key, None)
+                if isinstance(ir, o3.Irreps):
+                    output[key] = ir_mul_to_mul_ir(val, ir)
         # cell is a special case
         for key in (AtomicDataDict.CELL_KEY,):
             if key in output:
