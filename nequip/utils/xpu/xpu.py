@@ -1,10 +1,11 @@
 from functools import lru_cache
 import logging
-from typing import Any, Dict, List, MutableSequence
+from typing import Any, Dict, List, MutableSequence, Optional
 from typing_extensions import override
 
 import torch
 
+from lightning.fabric.utilities.distributed import _distributed_is_initialized
 from lightning.fabric.utilities.types import _DEVICE
 from lightning.pytorch.accelerators import Accelerator
 from lightning.pytorch.utilities.exceptions import MisconfigurationException
@@ -314,3 +315,15 @@ def _xpu_ddp_setup_model(
 
 
 DDPStrategy._setup_model = _xpu_ddp_setup_model
+
+
+def _xpu_barrier(self, name: Optional[str] = None) -> None:
+    if not _distributed_is_initialized():
+        return
+    if torch.distributed.get_backend() in ["nccl", "xccl", "ccl"]:
+        torch.distributed.barrier(device_ids=self.determine_ddp_device_ids())
+    else:
+        torch.distributed.barrier()
+
+
+DDPStrategy.barrier = _xpu_barrier
