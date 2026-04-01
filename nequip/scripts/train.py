@@ -13,7 +13,8 @@ from omegaconf import OmegaConf, DictConfig, ListConfig
 from hydra.utils import instantiate
 import hydra
 import os
-from typing import Final, List
+import warnings
+from typing import Final, List, Callable
 
 # pre-emptively set this env var to get the full stack trace for convenience
 os.environ["HYDRA_FULL_ERROR"] = "1"
@@ -25,6 +26,18 @@ _REQUIRED_CONFIG_SECTIONS: Final[List[str]] = [
     "trainer",
     "training_module",
 ]
+
+
+def _run_with_suppressed_leafspec_warning(trainer_call: Callable, **kwargs) -> None:
+    # see https://github.com/Lightning-AI/pytorch-lightning/issues/21326
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            message=r"`isinstance\(treespec, LeafSpec\)` is deprecated.*",
+            category=FutureWarning,
+            module=r"lightning\.pytorch\.utilities\._pytree",
+        )
+        trainer_call(**kwargs)
 
 
 @hydra.main(version_base=None, config_path=os.getcwd(), config_name="config")
@@ -226,22 +239,42 @@ def main(config: DictConfig) -> None:
         if run_type == "train":
             ckpt_path = config.get("ckpt_path", None)
             logger.info("TRAIN RUN START")
-            trainer.fit(nequip_module, datamodule=datamodule, ckpt_path=ckpt_path)
+            _run_with_suppressed_leafspec_warning(
+                trainer.fit,
+                model=nequip_module,
+                datamodule=datamodule,
+                ckpt_path=ckpt_path,
+            )
             ckpt_path = "best"
             logger.info("TRAIN RUN END")
         elif run_type == "val":
             logger.info("VAL RUN START")
-            trainer.validate(nequip_module, datamodule=datamodule, ckpt_path=ckpt_path)
+            _run_with_suppressed_leafspec_warning(
+                trainer.validate,
+                model=nequip_module,
+                datamodule=datamodule,
+                ckpt_path=ckpt_path,
+            )
             logger.info("VAL RUN END")
         elif run_type == "test":
             logger.info("TEST RUN START")
-            trainer.test(nequip_module, datamodule=datamodule, ckpt_path=ckpt_path)
+            _run_with_suppressed_leafspec_warning(
+                trainer.test,
+                model=nequip_module,
+                datamodule=datamodule,
+                ckpt_path=ckpt_path,
+            )
             logger.info("TEST RUN END")
         elif run_type == "predict":
             # TODO: `predict` run type is hidden from users, so we should never go through this path
             # potentially remove eventually if there's no need for a `predict` functionality, but it's here for now just in case
             logger.info("PREDICT RUN START")
-            trainer.predict(nequip_module, datamodule=datamodule, ckpt_path=ckpt_path)
+            _run_with_suppressed_leafspec_warning(
+                trainer.predict,
+                model=nequip_module,
+                datamodule=datamodule,
+                ckpt_path=ckpt_path,
+            )
             logger.info("PREDICT RUN END")
         else:
             # TODO: make sure we load the correct `best` checkpoint model state dict before using `function`
