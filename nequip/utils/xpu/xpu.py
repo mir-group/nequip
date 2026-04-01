@@ -18,6 +18,8 @@ from lightning.pytorch.accelerators import (
     MPSAccelerator,
     XLAAccelerator,
 )
+from lightning.pytorch.plugins.precision import MixedPrecision
+from lightning.pytorch.plugins.precision.precision import Precision
 from lightning.pytorch.strategies import DDPStrategy, SingleDeviceStrategy, Strategy
 from lightning.pytorch.strategies.single_xla import SingleDeviceXLAStrategy
 from lightning.pytorch.trainer.connectors.accelerator_connector import (
@@ -289,6 +291,32 @@ def _xpu_choose_strategy(self: "_AcceleratorConnector") -> "Strategy | str":
 
 setup._log_device_info = _xpu_log_device_info
 _AcceleratorConnector._choose_strategy = _xpu_choose_strategy
+
+
+# Patch Lightning's precision selection so mixed precision on XPU uses xpu autocast.
+_original_check_and_init_precision = _AcceleratorConnector._check_and_init_precision
+
+
+def _xpu_check_and_init_precision(self: "_AcceleratorConnector"):
+    self._validate_precision_choice()
+
+    if isinstance(self._precision_plugin_flag, Precision):
+        return self._precision_plugin_flag
+
+    is_xpu = isinstance(self._accelerator_flag, XPUAccelerator) or (
+        isinstance(self._accelerator_flag, str) and self._accelerator_flag == "xpu"
+    )
+    if is_xpu and self._precision_flag in ("16-mixed", "bf16-mixed"):
+        rank_zero_info(
+            f"Using {'16bit' if self._precision_flag == '16-mixed' else 'bfloat16'} "
+            "Automatic Mixed Precision (AMP) on XPU"
+        )
+        return MixedPrecision(self._precision_flag, "xpu")
+
+    return _original_check_and_init_precision(self)
+
+
+_AcceleratorConnector._check_and_init_precision = _xpu_check_and_init_precision
 
 
 # Patch Lightning's DDPStrategy to avoid CUDA-only stream context on XPU.
