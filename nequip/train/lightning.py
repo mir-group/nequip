@@ -67,8 +67,6 @@ class NequIPLightningModule(lightning.LightningModule):
         test_metrics: Optional[Dict] = None,
         # for caching training info
         info_dict: Optional[Dict] = None,
-        # for working with the ValTimeXYZFileWriter
-        save_val_output: Optional[bool] = False,
     ):
         super().__init__()
 
@@ -161,8 +159,6 @@ class NequIPLightningModule(lightning.LightningModule):
 
         # for statefulness of the run stage
         self.register_buffer("run_stage", torch.zeros((1), dtype=torch.long))
-
-        self.save_val_output = save_val_output
 
     def _build_model(self, model_config: Dict) -> torch.nn.ModuleDict:
         """Constructs a ``torch.nn.ModuleDict[str, nequip.nn.GraphModel]`` from a pure Python dictionary.
@@ -300,9 +296,7 @@ class NequIPLightningModule(lightning.LightningModule):
                 target,
                 prefix=f"val{dataloader_idx}_step{self.logging_delimiter}",
             )
-
-        if self.save_val_output:
-            metric_dict.update({f"val_{dataloader_idx}_output": output})
+        metric_dict.update({f"val_{dataloader_idx}_output": output})
 
         return metric_dict
 
