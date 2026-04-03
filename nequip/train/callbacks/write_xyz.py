@@ -77,6 +77,8 @@ class XYZFileWriter(Callback):
         self.chemical_symbols = chemical_symbols
 
         self.separate_file_per_epoch = separate_file_per_epoch
+        if every_n_epochs <= 0:
+            raise ValueError("every_n_epochs must be > 0")
         self.every_n_epochs = every_n_epochs
 
         # To be overridden by children
@@ -158,7 +160,7 @@ class TestTimeXYZFileWriter(XYZFileWriter):
         dataloader_idx=0,
     ):
         """"""
-        if not (trainer.epoch % self.every_n_epochs):
+        if not (trainer.current_epoch % self.every_n_epochs):
             self._batch_end(
                 trainer=trainer,
                 outputs=outputs,
@@ -175,8 +177,8 @@ class ValTimeXYZFileWriter(XYZFileWriter):
     .. code-block:: yaml
 
         callbacks:
-          - _target_: nequip.train.callbacks.TestTimeXYZFileWriter
-            out_file: ${hydra:runtime.output_dir}/test
+          - _target_: nequip.train.callbacks.ValTimeXYZFileWriter
+            out_file: ${hydra:runtime.output_dir}/val
             output_fields_from_original_dataset: [total_energy, forces]
             chemical_symbols: ${chemical_symbols}
             separate_file_per_epoch: true
@@ -201,7 +203,7 @@ class ValTimeXYZFileWriter(XYZFileWriter):
         dataloader_idx=0,
     ):
         """"""
-        if not (trainer.epoch % self.every_n_epochs):
+        if not (trainer.current_epoch % self.every_n_epochs):
             self._batch_end(
                 trainer=trainer,
                 outputs=outputs,
