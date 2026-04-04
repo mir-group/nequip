@@ -38,8 +38,6 @@ class XYZFileWriter(Callback):
         output_fields_from_original_dataset (List[str]): values from the original dataset to save in the ``out_file``
         extra_fields (List[str]): extra fields to save in addition to ASE's default fields
         chemical_species (List[str]): chemical species in the same order as model's ``type_names``
-        separate_file_per_epoch (bool): if True, write outputs to a separate file per epoch (Useful for ``Train`` run types with ValTimeXYZFileWriter)
-        every_n_epochs (int): if nonzero, only call on epoch multiples of this variable
     """
 
     def __init__(
@@ -48,8 +46,6 @@ class XYZFileWriter(Callback):
         output_fields_from_original_dataset: Optional[List[str]] = [],
         extra_fields: List[str] = [],
         chemical_symbols: Optional[List[str]] = None,
-        separate_file_per_epoch: bool = False,
-        every_n_epochs: int = 1,
     ):
         assert not (out_file.endswith(".xyz") or out_file.endswith(".extxyz"))
         self.out_file = out_file
@@ -76,10 +72,8 @@ class XYZFileWriter(Callback):
         ] + extra_fields
         self.chemical_symbols = chemical_symbols
 
-        self.separate_file_per_epoch = separate_file_per_epoch
-        if every_n_epochs <= 0:
-            raise ValueError("every_n_epochs must be > 0")
-        self.every_n_epochs = every_n_epochs
+        # Could be overwritten by children:
+        self.separate_file_per_epoch = False
 
         # To be overridden by children
         self.prefix = None
@@ -131,6 +125,24 @@ class XYZFileWriter(Callback):
 class TestTimeXYZFileWriter(XYZFileWriter):
     """XYZFileWriter designed for saving Test Time Predictions
 
+    Users must provide an ``out_file`` that does not contain an extension. The actual output file will take
+    the form ``{out_file}_dataset{idx}[_epoch{epoch}].xyz`` where ``idx`` is the dataset index (would be ``0`` for a single
+    validation set but varies depending on number of validation sets) and ``epoch`` is the epoch when the file is produced.
+
+    To incorporate original dataset fields in the ``xyz`` file to simplify analysis, users may provide
+    ``output_fields_from_original_dataset``. Such fields will have the prefix ``original_dataset_`` in the ``xyz`` file.
+
+    To obtain correct chemical species information, users must provide ``chemical_species`` in an order consistent with
+    the model's ``type_names``.
+
+    To activate the option to save to a different file every epoch, users should set ``separate_file_per_epoch`` true.
+
+    Args:
+        out_file (str): path to output file (must NOT contain ``.xyz`` or ``.extxyz`` extension)
+        output_fields_from_original_dataset (List[str]): values from the original dataset to save in the ``out_file``
+        extra_fields (List[str]): extra fields to save in addition to ASE's default fields
+        chemical_species (List[str]): chemical species in the same order as model's ``type_names``
+
     Example usage in config to write predictions and original dataset ``total_energy`` and ``forces`` to an ``xyz`` file:
 
     .. code-block:: yaml
@@ -160,17 +172,36 @@ class TestTimeXYZFileWriter(XYZFileWriter):
         dataloader_idx=0,
     ):
         """"""
-        if not (trainer.current_epoch % self.every_n_epochs):
-            self._batch_end(
-                trainer=trainer,
-                outputs=outputs,
-                batch=batch,
-                dataloader_idx=dataloader_idx,
-            )
+        self._batch_end(
+            trainer=trainer,
+            outputs=outputs,
+            batch=batch,
+            dataloader_idx=dataloader_idx,
+        )
 
 
 class ValTimeXYZFileWriter(XYZFileWriter):
     """XYZFileWriter designed for saving Val Time Predictions
+
+    Users must provide an ``out_file`` that does not contain an extension. The actual output file will take
+    the form ``{out_file}_dataset{idx}[_epoch{epoch}].xyz`` where ``idx`` is the dataset index (would be ``0`` for a single
+    validation set but varies depending on number of validation sets) and ``epoch`` is the epoch when the file is produced.
+
+    To incorporate original dataset fields in the ``xyz`` file to simplify analysis, users may provide
+    ``output_fields_from_original_dataset``. Such fields will have the prefix ``original_dataset_`` in the ``xyz`` file.
+
+    To obtain correct chemical species information, users must provide ``chemical_species`` in an order consistent with
+    the model's ``type_names``.
+
+    To activate the option to save to a different file every epoch, users should set ``separate_file_per_epoch`` true.
+
+    Args:
+        out_file (str): path to output file (must NOT contain ``.xyz`` or ``.extxyz`` extension)
+        output_fields_from_original_dataset (List[str]): values from the original dataset to save in the ``out_file``
+        extra_fields (List[str]): extra fields to save in addition to ASE's default fields
+        chemical_species (List[str]): chemical species in the same order as model's ``type_names``
+        separate_file_per_epoch (bool): if True, write outputs to a separate file per epoch (Useful for ``Train`` run types with ValTimeXYZFileWriter)
+        every_n_epochs (int): if nonzero, only call on epoch multiples of this variable
 
     Example usage in config to write predictions and original dataset ``total_energy`` and ``forces`` to an ``xyz`` file:
 
@@ -187,11 +218,18 @@ class ValTimeXYZFileWriter(XYZFileWriter):
 
     def __init__(
         self,
+        separate_file_per_epoch: bool = False,
+        every_n_epochs: int = 1,
         *args,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
         self.prefix = "val"
+
+        if every_n_epochs <= 0:
+            raise ValueError("every_n_epochs must be > 0")
+        self.every_n_epochs = every_n_epochs
+        self.separate_file_per_epoch = separate_file_per_epoch
 
     def on_validation_batch_end(
         self,

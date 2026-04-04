@@ -16,6 +16,9 @@ nequip.train.callbacks
 .. autoclass:: nequip.train.callbacks.TestTimeXYZFileWriter
     :members:
 
+.. autoclass:: nequip.train.callbacks.ValTimeXYZFileWriter
+    :members:
+
 .. autoclass:: nequip.train.callbacks.WandbWatch
     :members:
 
