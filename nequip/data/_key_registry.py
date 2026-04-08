@@ -229,7 +229,17 @@ def get_dynamic_shapes(input_fields, batch_map):
             continue
         field_type = get_field_type(field, error_on_unregistered=False)
         if field_type is not None:
-            shape_dict = {0: batch_map[field_type], 1: torch.export.Dim.STATIC}
+            # NOTE:
+            # some core indexing fields are stored as rank-1 (difficult to change without massive backwards compatibility problems):
+            # - atom_types: (num_nodes,)
+            # - batch: (num_nodes,)
+            # - num_atoms: (num_frames,)
+            # trying to impose dim=1 static on rank-1 tensors can fail in export
+            # hence the following branches
+            if field in (_keys.ATOM_TYPE_KEY, _keys.BATCH_KEY, _keys.NUM_NODES_KEY):
+                shape_dict = {0: batch_map[field_type]}
+            else:
+                shape_dict = {0: batch_map[field_type], 1: torch.export.Dim.STATIC}
             # NOTE that the following assumes only rank-2 cartesian tensors
             if field in _CARTESIAN_TENSOR_FIELDS or field == _keys.CELL_KEY:
                 shape_dict.update({2: torch.export.Dim.STATIC})
