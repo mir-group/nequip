@@ -8,6 +8,17 @@ Most recent change on the top.
 
 ## Unreleased
 
+## [0.18.0]
+
+### Added
+- XPU support for training and inference on Aurora
+- Muon optimizer support
+- validation-time XYZ file writer callback support
+- `MappedFieldModifier` for mapped field transformations
+
+### Changed
+- train-time compilation now uses `fullgraph=False`
+
 ## [0.17.1]
 
 ### Added
