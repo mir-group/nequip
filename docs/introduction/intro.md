@@ -20,11 +20,12 @@ There is also a [tutorial notebook](https://colab.research.google.com/github/mir
 
 If you use this code in your academic work, please cite:
 
- 1. The [preprint describing the NequIP software framework](https://arxiv.org/abs/2504.16068):
+ 1. The [paper describing the NequIP software framework](https://doi.org/10.1039/D5DD00423C):
 
     > Chuin Wei Tan, Marc L. Descoteaux, Mit Kotak, Gabriel de Miranda Nascimento, Seán R. Kavanagh, Laura Zichi, Menghang Wang, Aadit Saluja, Yizhong R. Hu, Tess Smidt, Anders Johansson, William C. Witt, Boris Kozinsky, Albert Musaelian. <br/>
     > "High-performance training and inference for deep equivariant interatomic potentials." <br/>
-    > https://doi.org/10.48550/arXiv.2504.16068
+    > Digital Discovery, 2026, Advance Article. <br/>
+    > https://doi.org/10.1039/D5DD00423C
 
 And also consider citing:
 
