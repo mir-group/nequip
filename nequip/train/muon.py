@@ -57,7 +57,14 @@ def muon_update(
     # NequIP addon: handle reshaping for e3nn ``Linear`` layers
     if e3nn_reshaping is not None:
         update_list = []
-        for index_slice, shape_2D in e3nn_reshaping:  # square weight slices of updates
+        for (
+            index_slice_data,
+            shape_2D,
+        ) in e3nn_reshaping:  # square weight slices of updates
+            if isinstance(index_slice_data, slice):
+                index_slice = index_slice_data
+            else:
+                index_slice = slice(*index_slice_data)
             weight_slice = update[index_slice].reshape(shape_2D)
             grad_slice = grad[index_slice].reshape(shape_2D)
             update_weight_slice = zeropower_via_newtonschulz5(

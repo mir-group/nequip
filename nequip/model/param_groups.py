@@ -2,6 +2,24 @@
 import torch
 
 
+def _normalize_weight_index_slices(weight_index_slices):
+    normalized = []
+    for entry in weight_index_slices:
+        index_slice = getattr(entry, "slice_1D", None)
+        shape_2d = getattr(entry, "shape_2D", None)
+        if index_slice is None or shape_2d is None:
+            index_slice, shape_2d = entry
+        if isinstance(index_slice, slice):
+            index_slice = (index_slice.start, index_slice.stop, index_slice.step)
+        else:
+            index_slice = tuple(index_slice)
+        assert len(index_slice) == 3
+        shape_2d = tuple(shape_2d)
+        assert len(shape_2d) == 2
+        normalized.append((index_slice, shape_2d))
+    return normalized
+
+
 def MuonParamGroups(
     model: torch.nn.Module,
     muon: dict,
@@ -57,13 +75,15 @@ def MuonParamGroups(
             module_name, _, _ = name.rpartition(".")
             module = modules[module_name]
 
-            # Attribute from e3nn giving the slices/shapes
-            # of the corresponding linear weight
+            # use Muon only when reshape metadata is available
+            weight_index_slices = getattr(module, "weight_index_slices", None)
+            if weight_index_slices is None:
+                adam_weights.append(param)
+                continue
+
+            # store plain tuples to keep optimizer state picklable
             index = len(muon_weights)
-            slices = module.weight_index_slices
-
-            e3nn_reshaping[index] = slices
-
+            e3nn_reshaping[index] = _normalize_weight_index_slices(weight_index_slices)
             muon_weights.append(param)
             continue
 
