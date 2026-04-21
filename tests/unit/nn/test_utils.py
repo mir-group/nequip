@@ -117,3 +117,34 @@ def test_basic(model_dtype):
     )
     saved = out["saved"]
     assert saved.shape == (5, 13)
+
+
+def test_node_type_embed_categorical_missing_keys():
+    with pytest.raises(AssertionError, match="missing keys"):
+        NodeTypeEmbed(
+            type_names=["A", "B"],
+            num_features=4,
+            categorical_graph_field_embed=[
+                {
+                    "field": AtomicDataDict.DATASET_KEY,
+                    "num_features": 2,
+                    "min": 0,
+                }
+            ],
+        )
+
+
+def test_node_type_embed_categorical_invalid_range():
+    with pytest.raises(AssertionError, match="`max` must be >= `min`"):
+        NodeTypeEmbed(
+            type_names=["A", "B"],
+            num_features=4,
+            categorical_graph_field_embed=[
+                {
+                    "field": AtomicDataDict.DATASET_KEY,
+                    "num_features": 2,
+                    "min": 3,
+                    "max": 1,
+                }
+            ],
+        )

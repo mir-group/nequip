@@ -1,4 +1,5 @@
 # This file is a part of the `nequip` package. Please see LICENSE and README at the root for information on using it.
+from dataclasses import dataclass
 import torch
 
 from e3nn.o3._irreps import Irreps
@@ -10,12 +11,26 @@ from .._graph_mixin import GraphModuleMixin
 from typing import Optional, Final, List, Dict, Any
 
 
-_CATEGORICAL_FIELD_EMBED_KEYS: Final[List[str]] = [
-    "field",
-    "num_features",
-    "min",
-    "max",
-]
+@dataclass(frozen=True)
+class CategoricalGraphFieldEmbedSpec:
+    field: str
+    num_features: int
+    min: int
+    max: int
+
+    @classmethod
+    def from_dict(cls, field_embed: Dict[str, Any]) -> "CategoricalGraphFieldEmbedSpec":
+        required_keys: Final[List[str]] = ["field", "num_features", "min", "max"]
+        missing_keys = [key for key in required_keys if key not in field_embed]
+        assert len(missing_keys) == 0, (
+            f"missing keys {missing_keys} in `categorical_graph_field_embed` entry; required keys are {required_keys}."
+        )
+        return cls(
+            field=str(field_embed["field"]),
+            num_features=int(field_embed["num_features"]),
+            min=int(field_embed["min"]),
+            max=int(field_embed["max"]),
+        )
 
 
 class NodeTypeEmbed(GraphModuleMixin, torch.nn.Module):
@@ -36,7 +51,7 @@ class NodeTypeEmbed(GraphModuleMixin, torch.nn.Module):
         type_names: List[str],
         num_features: int,
         set_features: bool = True,
-        categorical_graph_field_embed: Optional[List[Dict[str, int]]] = None,
+        categorical_graph_field_embed: Optional[List[Dict[str, Any]]] = None,
         irreps_in: Optional[Dict[str, Any]] = None,
     ):
         super().__init__()
@@ -59,39 +74,37 @@ class NodeTypeEmbed(GraphModuleMixin, torch.nn.Module):
         self.do_categorical_graph_field_embed = False
         if categorical_graph_field_embed is not None:
             self.do_categorical_graph_field_embed = True
-            for field_embed in categorical_graph_field_embed:
-                # == sanity checks ==
-                for key in _CATEGORICAL_FIELD_EMBED_KEYS:
-                    assert key in field_embed.keys(), (
-                        f"`{key}` is not a recognized key for entries in `categorical_graph_field_embed`, only keys in {_CATEGORICAL_FIELD_EMBED_KEYS} are recognized."
-                    )
-                assert field_embed["field"] in _GRAPH_FIELDS, (
-                    f"`{field_embed['field']}` is not a graph field, only graph fields should be provided to `categorical_graph_field_embed`."
+            for field_embed_dict in categorical_graph_field_embed:
+                field_embed = CategoricalGraphFieldEmbedSpec.from_dict(field_embed_dict)
+                assert field_embed.field in _GRAPH_FIELDS, (
+                    f"`{field_embed.field}` is not a graph field, only graph fields should be provided to `categorical_graph_field_embed`."
                 )
-                # can probably check that `num_features`, `min`, `max` are ints but we can duck type it
+                assert field_embed.max >= field_embed.min, (
+                    f"`max` must be >= `min` for field `{field_embed.field}`."
+                )
 
                 # == important inits ==
                 self.categorical_graph_field_embed_modules.update(
                     {
-                        field_embed["field"]: torch.nn.Embedding(
-                            num_embeddings=field_embed["max"] - field_embed["min"] + 1,
-                            embedding_dim=field_embed["num_features"],
+                        field_embed.field: torch.nn.Embedding(
+                            num_embeddings=field_embed.max - field_embed.min + 1,
+                            embedding_dim=field_embed.num_features,
                         )
                     }
                 )
                 self.categorical_graph_field_embed_shifts.update(
-                    {field_embed["field"]: field_embed["min"]}
+                    {field_embed.field: field_embed.min}
                 )
                 # ^ we subtract this quantity to make sure the smallest index is 0
 
                 # == bookkeeping ==
-                total_features += field_embed["num_features"]
+                total_features += field_embed.num_features
 
                 # register `irreps_in` if not already done
                 # needed to ensure that the field is propagated into the model
-                if field_embed["field"] not in irreps_in:
+                if field_embed.field not in irreps_in:
                     # categorical, so no irreps
-                    irreps_in[field_embed["field"]] = None
+                    irreps_in[field_embed.field] = None
 
         irreps_out = {AtomicDataDict.NODE_ATTRS_KEY: Irreps([(total_features, (0, 1))])}
         if self.set_features:
