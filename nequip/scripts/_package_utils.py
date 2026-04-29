@@ -5,7 +5,7 @@ Utilities for `nequip-package`, mainly to handle externing and mocking modules.
 """
 
 from nequip.__init__ import _DISCOVERED_NEQUIP_EXTENSION
-from typing import Final, Set, Iterable, Optional
+from typing import Callable, Dict, Final, List, Set, Iterable, Optional
 
 
 _INTERNAL_MODULES: Final[Set[str]] = set(
@@ -34,6 +34,20 @@ _DEFAULT_MOCK_MODULES = {
     "matplotlib",
 }
 _MOCK_MODULES: Set[str] = set(_DEFAULT_MOCK_MODULES)
+
+
+_PACKAGING_MODES: Dict[str, Callable[[], List[str]]] = {}
+
+
+def register_packaging_mode(name: str, fn: Callable[[], List[str]]) -> None:
+    """Register a named packaging mode for use with ``nequip-package build --mode``.
+
+    ``fn`` returns the list of compile mode keys to include; must contain ``"eager"``.
+    """
+    assert name not in _PACKAGING_MODES, (
+        f"a packaging mode named '{name}' is already registered"
+    )
+    _PACKAGING_MODES[name] = fn
 
 
 def register_libraries_as_external_for_packaging(
@@ -87,3 +101,19 @@ def register_libraries_as_external_for_packaging(
     global _MOCK_MODULES
     if mock_modules is not None:
         _MOCK_MODULES.update(mock_modules)
+
+
+# === default packaging mode ===
+
+
+def _nequip_packaging_mode() -> List[str]:
+    from nequip.model.utils import _EAGER_MODEL_KEY, _COMPILE_MODE_OPTIONS
+    from nequip.utils.versions import _TORCH_GE_2_6
+
+    modes = [_EAGER_MODEL_KEY]
+    if _TORCH_GE_2_6:
+        modes += [m for m in _COMPILE_MODE_OPTIONS if m != _EAGER_MODEL_KEY]
+    return modes
+
+
+register_packaging_mode("nequip", _nequip_packaging_mode)

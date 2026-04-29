@@ -8,17 +8,14 @@ from nequip.model.saved_models.package import (
     _suppress_package_importer_exporter_warnings,
 )
 from nequip.model.saved_models import load_saved_model
-from nequip.model.utils import (
-    _COMPILE_MODE_OPTIONS,
-    _EAGER_MODEL_KEY,
-)
+from nequip.model.utils import _EAGER_MODEL_KEY
 from nequip.nn.model_modifier_utils import (
     is_persistent_model_modifier,
     is_private_model_modifier,
 )
 from nequip.model.modify_utils import get_all_modifiers
 from nequip.utils.logger import RankedLogger
-from nequip.utils.versions import get_current_code_versions, _TORCH_GE_2_6
+from nequip.utils.versions import get_current_code_versions
 from nequip.utils.versions.version_utils import get_version_safe
 from nequip.utils.global_state import set_global_state
 
@@ -27,6 +24,7 @@ from ._package_utils import (
     _EXTERNAL_MODULES,
     _MOCK_MODULES,
     _INTERNAL_MODULES,
+    _PACKAGING_MODES,
 )
 
 from omegaconf import OmegaConf
@@ -72,6 +70,14 @@ def main(args=None):
         help="output path to save the packaged model. NOTE: a `.nequip.zip` extension is mandatory",
         type=pathlib.Path,
     )
+    build_parser.add_argument(
+        "--mode",
+        help="packaging mode controlling which compile modes are included (default: nequip)",
+        type=str,
+        default="nequip",
+    )
+
+    subparsers.add_parser("modes", help="list available packaging modes")
 
     info_parser = subparsers.add_parser(
         "info", help="get information from a packaged model file"
@@ -95,7 +101,13 @@ def main(args=None):
 
     args = parser.parse_args(args=args)
 
-    if args.command == "info":
+    if args.command == "modes":
+        print("Available packaging modes:")
+        for name, fn in _PACKAGING_MODES.items():
+            print(f"  {name}\t{fn()}")
+        return
+
+    elif args.command == "info":
         assert str(args.pkg_path).endswith(".nequip.zip"), (
             "packed model file to inspect must end with the `.nequip.zip` extension"
         )
@@ -232,12 +244,14 @@ def main(args=None):
             # e.g. if the original package was made with torch<2.6, and we're doing the current packaging with torch>=2.6, we'll miss the `compile` model, but there's nothing we can do about it
             package_compile_modes = _get_package_metadata(imp)["available_models"]
         else:
-            if _TORCH_GE_2_6:
-                # allow everything (including compile models)
-                package_compile_modes = _COMPILE_MODE_OPTIONS.copy()
-            else:
-                # only allow eager model if not torch>=2.6
-                package_compile_modes = [_EAGER_MODEL_KEY]
+            assert args.mode in _PACKAGING_MODES, (
+                f"unknown packaging mode '{args.mode}'. "
+                f"Available modes: {list(_PACKAGING_MODES.keys())}"
+            )
+            package_compile_modes = _PACKAGING_MODES[args.mode]()
+            assert _EAGER_MODEL_KEY in package_compile_modes, (
+                f"packaging mode '{args.mode}' must include '{_EAGER_MODEL_KEY}'"
+            )
 
         # remove eager model since we already built it
         package_compile_modes.remove(_EAGER_MODEL_KEY)
