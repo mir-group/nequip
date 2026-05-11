@@ -23,7 +23,7 @@ except ModuleNotFoundError:
         "See https://nequip.readthedocs.io/en/latest/integrations/lammps/mliap.html for installation instructions."
     )
 
-from typing import List
+from typing import List, Optional
 
 
 class NequIPLAMMPSMLIAPWrapper(MLIAPUnified):
@@ -36,7 +36,7 @@ class NequIPLAMMPSMLIAPWrapper(MLIAPUnified):
         self,
         model_path: str,
         model_key: str,
-        modifiers: List[str] = [],
+        modifiers: Optional[List[str]] = None,
         compile: bool = True,
         tf32: bool = False,
         **kwargs,
@@ -55,7 +55,7 @@ class NequIPLAMMPSMLIAPWrapper(MLIAPUnified):
         self.model_filename = Path(model_path).name
 
         self.model_key = model_key
-        self.modifiers = modifiers
+        self.modifiers = [] if modifiers is None else modifiers
         self.compile = compile
         self.tf32 = tf32
         self.model = None
@@ -119,9 +119,10 @@ class NequIPLAMMPSMLIAPWrapper(MLIAPUnified):
         if "disable_ForceStressOutput" in available_modifiers:
             model = modify(model, [{"modifier": "disable_ForceStressOutput"}])
         else:
-            # very bad hack, but left for backwards compatibility
-            # TODO: remove in the future as a breaking change
-            # assumes model is `GraphModel(StressForceOutput(EnergyModel))`
+            if not hasattr(model, "model") or not hasattr(model.model, "func"):
+                raise RuntimeError(
+                    "LAMMPS MLIAP requires `disable_ForceStressOutput` or a model with `model.func` fallback."
+                )
             model.model = model.model.func
 
         # NOTE: this is a hack/workaround because modifiers like NequIP-OEQ condition modification logic around whether `torch.compile` will be called
