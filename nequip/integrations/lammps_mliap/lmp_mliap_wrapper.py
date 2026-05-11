@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 
 from nequip.data import AtomicDataDict
-from nequip.data.transforms.neighborlist import NeighborListTransform
+from nequip.data.transforms.neighborlist import NeighborListPruneTransform
 from nequip.nn import graph_model
 from nequip.model.saved_models.load_utils import load_saved_model
 from nequip.model.modify_utils import get_all_modifiers, modify
@@ -60,7 +60,7 @@ class NequIPLAMMPSMLIAPWrapper(MLIAPUnified):
         self.tf32 = tf32
         self.model = None
         self.device = None
-        self.nl = None
+        self.nl_pruner = None
 
         # to placate the interface
         self.nparams = 1
@@ -153,16 +153,16 @@ class NequIPLAMMPSMLIAPWrapper(MLIAPUnified):
         else:
             self.model = model
 
-        # instantiate NeighborListTransform for per-edge-type cutoff pruning
+        # instantiate pruning transform for per-edge-type cutoff pruning
         per_edge_type_cutoff = model.metadata.get("per_edge_type_cutoff", None)
         if per_edge_type_cutoff is not None:
-            self.nl = NeighborListTransform(
+            self.nl_pruner = NeighborListPruneTransform(
                 r_max=float(model.metadata[graph_model.R_MAX_KEY]),
                 per_edge_type_cutoff=per_edge_type_cutoff,
                 type_names=model.type_names,
             )
-            self.nl._normalizer.to(self.device)
-            # ^ important to set to correct device (typically not needed for training context since data transforms are on CPU)
+            self.nl_pruner.to(self.device)
+            # important to set to correct device (typically not needed for training context since data transforms are on CPU)
 
     def compute_forces(self, lmp_data):
         # === lazily load model ===
@@ -209,8 +209,8 @@ class NequIPLAMMPSMLIAPWrapper(MLIAPUnified):
         }
 
         # === apply per-edge-type cutoff pruning if available ===
-        if self.nl is not None:
-            nequip_data_in = self.nl._apply_per_edge_type_cutoffs(nequip_data_in)
+        if self.nl_pruner is not None:
+            nequip_data_in = self.nl_pruner(nequip_data_in)
 
         # === run model ===
         # make sure edge vectors `requires_grad`
