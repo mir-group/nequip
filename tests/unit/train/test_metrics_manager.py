@@ -218,6 +218,72 @@ class TestMetricsManager:
             metrics_dict["per_type_force_MSE"], (loss_ref_0 + loss_ref_1) / 2.0
         )
 
+    def test_per_type_coeffs(self, data):
+        pred, ref, _, _ = data
+        # first half data are type 1
+        mse_type1 = torch.square(
+            pred[AtomicDataDict.FORCE_KEY][:5] - ref[AtomicDataDict.FORCE_KEY][:5]
+        ).mean()
+        mse_type0 = torch.square(
+            pred[AtomicDataDict.FORCE_KEY][5:] - ref[AtomicDataDict.FORCE_KEY][5:]
+        ).mean()
+
+        def mm_with(weights):
+            return MetricsManager(
+                [
+                    {
+                        "field": AtomicDataDict.FORCE_KEY,
+                        "per_type": True,
+                        "per_type_coeffs": weights,
+                        "metric": MeanSquaredError(),
+                        "name": "per_type_force_MSE",
+                    }
+                ],
+                type_names=["0", "1"],
+            )
+
+        # equal weights reproduce the equal-mean per_type behavior
+        out = mm_with({"0": 1.0, "1": 1.0})(pred, ref)
+        torch.testing.assert_close(
+            out["per_type_force_MSE"], (mse_type0 + mse_type1) / 2.0
+        )
+
+        # non-equal weights produce a weighted mean
+        out = mm_with({"0": 10.0, "1": 1.0})(pred, ref)
+        torch.testing.assert_close(
+            out["per_type_force_MSE"],
+            (10.0 * mse_type0 + 1.0 * mse_type1) / 11.0,
+        )
+
+    @pytest.mark.parametrize(
+        "weights,per_type,err_type,err_match",
+        [
+            # `per_type_coeffs` set but `per_type` flag missing
+            ({"0": 1.0, "1": 1.0}, False, ValueError, "require `per_type: true`"),
+            # extra key not in type_names
+            ({"0": 1.0, "1": 1.0, "Xx": 2.0}, True, ValueError, "not in `type_names`"),
+            # missing a type
+            ({"0": 1.0}, True, ValueError, "missing"),
+            # zero is rejected (typo guard)
+            ({"0": 2.0, "1": 0.0}, True, ValueError, "must be positive"),
+            # negative is rejected
+            ({"0": -1.0, "1": 1.0}, True, ValueError, "must be positive"),
+            # not a dict
+            ([1.0, 2.0], True, TypeError, "must be a dict"),
+        ],
+    )
+    def test_per_type_coeffs_validation(self, weights, per_type, err_type, err_match):
+        spec = {
+            "field": AtomicDataDict.FORCE_KEY,
+            "per_type_coeffs": weights,
+            "metric": MeanSquaredError(),
+            "name": "per_type_force_MSE",
+        }
+        if per_type:
+            spec["per_type"] = True
+        with pytest.raises(err_type, match=err_match):
+            MetricsManager([spec], type_names=["0", "1"])
+
     def test_per_atom(self, data):
         pred, ref, pred2, ref2 = data
         mm = MetricsManager(
@@ -713,6 +779,32 @@ class TestMetricsManagerBuilders:
         MSE = torch.mean((pred[property_key] - ref[property_key]) ** 2)
         RMSE = torch.sqrt(MSE)
         return RMSE
+
+    def test_EnergyForceLoss_per_type_forces_coeffs(self, data):
+        """Verify the `per_type_forces_coeffs` kwarg is routed to the forces metric only."""
+        pred, ref, _, _ = data
+        # first half data are type 1
+        mse_type1 = torch.square(
+            pred[AtomicDataDict.FORCE_KEY][:5] - ref[AtomicDataDict.FORCE_KEY][:5]
+        ).mean()
+        mse_type0 = torch.square(
+            pred[AtomicDataDict.FORCE_KEY][5:] - ref[AtomicDataDict.FORCE_KEY][5:]
+        ).mean()
+        mm = EnergyForceLoss(
+            coeffs={
+                AtomicDataDict.TOTAL_ENERGY_KEY: 1.0,
+                AtomicDataDict.FORCE_KEY: 1.0,
+            },
+            per_atom_energy=False,
+            per_type_forces_coeffs={"0": 4.0, "1": 1.0},
+            type_names=["0", "1"],
+        )
+        out = mm(pred, ref)
+        torch.testing.assert_close(
+            out["forces_mse"], (4.0 * mse_type0 + 1.0 * mse_type1) / 5.0
+        )
+        # per-type breakdowns are also logged
+        assert "forces_mse_0" in out and "forces_mse_1" in out
 
     def test_invalid_EF_coeff_key_triggers_assert(self):
         with pytest.raises(AssertionError):

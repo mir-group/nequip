@@ -17,6 +17,7 @@ _METRICS_MANAGER_INPUT_KEYS: Final[List[str]] = [
     "name",
     "coeff",
     "per_type",
+    "per_type_coeffs",
     "ignore_nan",
 ]
 
@@ -80,6 +81,16 @@ class MetricsManager(torch.nn.ModuleDict):
         Compute separate metrics for each atom type, then average them.
         Only valid for node fields (like ``forces``).
         Requires ``type_names`` parameter.
+
+    ``per_type_coeffs`` : ``Dict[str, float]``, optional
+        Per-type coefficients for combining per-type metrics into a single scalar.
+        Note: these are loss-aggregation coefficients
+        Requires ``per_type=True``. Must contain a strictly positive coefficient
+        for every type in ``type_names`` (no zeros, no negatives, no missing keys).
+        The aggregate becomes the weighted mean
+        ``sum(c_i * metric_i) / sum(c_i)`` instead of the equal-mean default;
+        equal coefficients reproduce the default exactly.
+        Example: ``{H: 5.0, O: 1.0, Cs: 0.5}`` emphasizes H force errors relative to O and Cs.
 
     ``ignore_nan`` : ``bool``, default=False
         Handle NaN values in target data by masking them out.
@@ -219,6 +230,45 @@ class MetricsManager(torch.nn.ModuleDict):
                     ptm_list.append(metric.clone())
                 metric = ptm_list
 
+            # == per_type_coeffs ==
+            # parse user-provided dict (or None) and align to type_names ordering.
+            # all types in `type_names` must appear with a strictly positive
+            # coefficient -- there is intentionally no shortcut for "ignore
+            # species X"
+            raw_coeffs = metric_dict.get("per_type_coeffs", None)
+            if raw_coeffs is not None:
+                if not per_type:
+                    raise ValueError(
+                        f"`per_type_coeffs` provided for `{name}` but `per_type` is not True; per-type coefficients require `per_type: true`."
+                    )
+                if not isinstance(raw_coeffs, dict):
+                    raise TypeError(
+                        f"`per_type_coeffs` must be a dict mapping type name to positive float, got {type(raw_coeffs).__name__}."
+                    )
+                type_names_set = set(self.type_names)
+                provided_set = set(raw_coeffs.keys())
+                unknown = provided_set - type_names_set
+                if unknown:
+                    raise ValueError(
+                        f"`per_type_coeffs` for `{name}` contains type names {sorted(unknown)} not in `type_names` {self.type_names}."
+                    )
+                missing = type_names_set - provided_set
+                if missing:
+                    raise ValueError(
+                        f"`per_type_coeffs` for `{name}` must specify a positive coefficient for every type in `type_names`; missing: {sorted(missing)}."
+                    )
+                coeffs_by_idx: List[float] = []
+                for tn in self.type_names:
+                    c = float(raw_coeffs[tn])
+                    if c <= 0:
+                        raise ValueError(
+                            f"`per_type_coeffs` entry for `{tn}` must be positive (got {c})."
+                        )
+                    coeffs_by_idx.append(c)
+                per_type_coeffs: Optional[List[float]] = coeffs_by_idx
+            else:
+                per_type_coeffs = None
+
             # === construct dict entry ===
             self.metrics.update(
                 {
@@ -227,6 +277,7 @@ class MetricsManager(torch.nn.ModuleDict):
                         "coeff": metric_dict.get("coeff", None),
                         "ignore_nan": ignore_nan,
                         "per_type": per_type,
+                        "per_type_coeffs": per_type_coeffs,
                     }
                 }
             )
@@ -272,7 +323,9 @@ class MetricsManager(torch.nn.ModuleDict):
                 preds_field, target_field = field(preds, target)
                 if per_type:
                     metric = 0
+                    coeffs: Optional[List[float]] = metric_params["per_type_coeffs"]
                     num_contributing_types = 0
+                    coeff_sum = 0.0
                     for type_idx, type_name in enumerate(self.type_names):
                         # index out each type
                         selector = torch.eq(
@@ -301,10 +354,19 @@ class MetricsManager(torch.nn.ModuleDict):
                         # account for batches without atom type
                         assert pt_metric.numel() == 1
                         if not torch.isnan(pt_metric):
-                            metric = metric + pt_metric
-                            num_contributing_types += 1
-                    assert num_contributing_types <= len(self.type_names)
-                    metric = metric / num_contributing_types
+                            if coeffs is None:
+                                metric = metric + pt_metric
+                                num_contributing_types += 1
+                            else:
+                                c = coeffs[type_idx]
+                                metric = metric + c * pt_metric
+                                coeff_sum += c
+                    if coeffs is None:
+                        assert num_contributing_types <= len(self.type_names)
+                        metric = metric / num_contributing_types
+                    else:
+                        # weighted mean over contributing types
+                        metric = metric / coeff_sum
                 else:
                     # mask out NaNs (based on target)
                     if ignore_nan:
@@ -340,14 +402,21 @@ class MetricsManager(torch.nn.ModuleDict):
         for metric_name, metric_params in self.metrics.items():
             if metric_params["per_type"]:
                 metric = 0
+                coeffs: Optional[List[float]] = metric_params["per_type_coeffs"]
                 for type_idx, type_name in enumerate(self.type_names):
                     ps_metric = self[metric_name][type_idx].compute()
                     ps_metric_name = (
                         prefix + "_".join([metric_name, type_name]) + suffix
                     )
                     metric_dict.update({ps_metric_name: ps_metric})
-                    metric = metric + ps_metric
-                metric = metric / len(self.type_names)
+                    if coeffs is None:
+                        metric = metric + ps_metric
+                    else:
+                        metric = metric + coeffs[type_idx] * ps_metric
+                if coeffs is None:
+                    metric = metric / len(self.type_names)
+                else:
+                    metric = metric / sum(coeffs)
             else:
                 metric = self[metric_name].compute()
             metric_dict.update({prefix + metric_name + suffix: metric})
@@ -413,6 +482,7 @@ def EnergyForceLoss(
         AtomicDataDict.FORCE_KEY: 1.0,
     },
     per_atom_energy: bool = True,
+    per_type_forces_coeffs: Optional[Dict[str, float]] = None,
     type_names: Optional[List[str]] = None,
     extra_metrics: Optional[List[Dict[str, Any]]] = None,
 ):
@@ -433,12 +503,28 @@ def EnergyForceLoss(
             coeffs:
               total_energy: 1.0
               forces: 1.0
+            # Optional: per-species coefficients for the forces loss.
+            per_type_forces_coeffs:
+              H:  5.0
+              O:  1.0
+              Cs: 0.5
 
     Args:
         coeffs (Dict[str, float]): ``dict`` that stores the relative weight of energy and forces to the overall loss (default ``{'total_energy': 1.0, 'forces': 1.0}``)
         per_atom_energy (bool, optional): whether to normalize the total energy by the number of atoms (default ``True``)
+        per_type_forces_coeffs (Dict[str, float], optional): if provided, the forces MSE becomes a per-type weighted mean. See the ``per_type_coeffs`` key on :class:`MetricsManager` for the dict format and validation rules. (default ``None``)
         extra_metrics (list of dict, optional): additional metric entries appended to the wrapper's defaults
     """
+
+    forces_entry: Dict[str, Any] = {
+        "name": "forces_mse",
+        "field": AtomicDataDict.FORCE_KEY,
+        "coeff": coeffs[AtomicDataDict.FORCE_KEY],
+        "metric": MeanSquaredError(),
+    }
+    if per_type_forces_coeffs is not None:
+        forces_entry["per_type"] = True
+        forces_entry["per_type_coeffs"] = per_type_forces_coeffs
 
     metrics = [
         {
@@ -451,12 +537,7 @@ def EnergyForceLoss(
             "coeff": coeffs[AtomicDataDict.TOTAL_ENERGY_KEY],
             "metric": MeanSquaredError(),
         },
-        {
-            "name": "forces_mse",
-            "field": AtomicDataDict.FORCE_KEY,
-            "coeff": coeffs[AtomicDataDict.FORCE_KEY],
-            "metric": MeanSquaredError(),
-        },
+        forces_entry,
     ]
     return MetricsManager(
         _with_extra_metrics(metrics, extra_metrics), type_names=type_names
@@ -594,6 +675,7 @@ def EnergyForceStressLoss(
         AtomicDataDict.STRESS_KEY: 1.0,
     },
     per_atom_energy: bool = True,
+    per_type_forces_coeffs: Optional[Dict[str, float]] = None,
     type_names: Optional[List[str]] = None,
     ignore_nan: Optional[Dict[str, bool]] = None,
     extra_metrics: Optional[List[Dict[str, Any]]] = None,
@@ -616,6 +698,11 @@ def EnergyForceStressLoss(
               total_energy: 1.0
               forces: 1.0
               stress: 1.0
+            # Optional: per-species coefficients for the forces loss.
+            per_type_forces_coeffs:
+              H:  5.0
+              O:  1.0
+              Cs: 0.5
             # if not all frames have stresses, one can populate the stress labels with NaN and set ignore_nan here:
             # ignore_nan:
             #   stress: true
@@ -623,11 +710,23 @@ def EnergyForceStressLoss(
     Args:
         coeffs (Dict[str, float]): ``dict`` that stores the relative weight of energy and forces to the overall loss (default ``{'total_energy': 1.0, 'forces': 1.0, 'stress': 1.0}``)
         per_atom_energy (bool, optional): whether to normalize the total energy by the number of atoms (default ``True``)
+        per_type_forces_coeffs (Dict[str, float], optional): if provided, the forces MSE becomes a per-type weighted mean. Applies to forces only; energy and stress are unaffected. See the ``per_type_coeffs`` key on :class:`MetricsManager` for the dict format and validation rules. (default ``None``)
         ignore_nan (Dict[str, bool], optional): ``dict`` that specifies whether to ignore NaN values for each field (default: all ``False``)
         extra_metrics (list of dict, optional): additional metric entries appended to the wrapper's defaults
     """
 
     ignore_nan = {} if ignore_nan is None else ignore_nan
+    forces_entry: Dict[str, Any] = {
+        "name": "forces_mse",
+        "field": AtomicDataDict.FORCE_KEY,
+        "coeff": coeffs[AtomicDataDict.FORCE_KEY],
+        "metric": MeanSquaredError(),
+        "ignore_nan": ignore_nan.get(AtomicDataDict.FORCE_KEY, False),
+    }
+    if per_type_forces_coeffs is not None:
+        forces_entry["per_type"] = True
+        forces_entry["per_type_coeffs"] = per_type_forces_coeffs
+
     metrics = [
         {
             "name": "per_atom_energy_mse" if per_atom_energy else "total_energy_mse",
@@ -640,13 +739,7 @@ def EnergyForceStressLoss(
             "metric": MeanSquaredError(),
             "ignore_nan": ignore_nan.get(AtomicDataDict.TOTAL_ENERGY_KEY, False),
         },
-        {
-            "name": "forces_mse",
-            "field": AtomicDataDict.FORCE_KEY,
-            "coeff": coeffs[AtomicDataDict.FORCE_KEY],
-            "metric": MeanSquaredError(),
-            "ignore_nan": ignore_nan.get(AtomicDataDict.FORCE_KEY, False),
-        },
+        forces_entry,
         {
             "name": "stress_mse",
             "field": AtomicDataDict.STRESS_KEY,
