@@ -1,5 +1,6 @@
 # This file is a part of the `nequip` package. Please see LICENSE and README at the root for information on using it.
 from dataclasses import dataclass
+from math import sqrt
 import torch
 
 from e3nn.o3._irreps import Irreps
@@ -17,6 +18,7 @@ class CategoricalGraphFieldEmbedSpec:
     num_features: int
     min: int
     max: int
+    init: Optional[str] = None
 
     @classmethod
     def from_dict(cls, field_embed: Dict[str, Any]) -> "CategoricalGraphFieldEmbedSpec":
@@ -30,6 +32,7 @@ class CategoricalGraphFieldEmbedSpec:
             num_features=int(field_embed["num_features"]),
             min=int(field_embed["min"]),
             max=int(field_embed["max"]),
+            init=field_embed.get("init", None),
         )
 
 
@@ -39,17 +42,23 @@ class NodeTypeEmbed(GraphModuleMixin, torch.nn.Module):
     Args:
         type_names (List[str]): list of type names
         num_features (int): embedding dimension
+        type_embed_init (str): embedding initialization mode for atom type embeddings.
+            One of ``"uniform"``, ``"zero"``, ``"near_zero"``, or ``None`` (default, keep PyTorch behavior).
         set_features (bool): ``node_features`` will be set in addition to ``node_attrs`` if ``True`` (default)
-        categorical_graph_field_embed: list of dicts, each dict having keys ``field``, ``num_features``, ``min``, ``max``. ``field`` must correspond to a registered graph data field. The data dict for the field must be populated by an integer quantity that lies between ``min`` and ``max``.
+        categorical_graph_field_embed: list of dicts, each dict having keys ``field``, ``num_features``, ``min``, ``max``, and optional ``init``.
+            ``field`` must correspond to a registered graph data field.
+            The data dict for the field must be populated by an integer quantity that lies between ``min`` and ``max``.
     """
 
     num_types: int
     set_features: bool
+    type_embed_init: Optional[str]
 
     def __init__(
         self,
         type_names: List[str],
         num_features: int,
+        type_embed_init: Optional[str] = None,
         set_features: bool = True,
         categorical_graph_field_embed: Optional[List[Dict[str, Any]]] = None,
         irreps_in: Optional[Dict[str, Any]] = None,
@@ -60,12 +69,14 @@ class NodeTypeEmbed(GraphModuleMixin, torch.nn.Module):
         # === bookkeeping ===
         self.num_types = len(type_names)
         self.set_features = set_features
+        self.type_embed_init = type_embed_init
 
         # === type embedding module ===
         self.embed_module = torch.nn.Embedding(
             num_embeddings=self.num_types,
             embedding_dim=num_features,
         )
+        self._init_embedding(self.embed_module, init=self.type_embed_init)
 
         # === categorical graph field embedding ===
         total_features = num_features
@@ -82,15 +93,16 @@ class NodeTypeEmbed(GraphModuleMixin, torch.nn.Module):
                 assert field_embed.max >= field_embed.min, (
                     f"`max` must be >= `min` for field `{field_embed.field}`."
                 )
+                field_init = field_embed.init
 
                 # == important inits ==
+                embed_module = torch.nn.Embedding(
+                    num_embeddings=field_embed.max - field_embed.min + 1,
+                    embedding_dim=field_embed.num_features,
+                )
+                self._init_embedding(embed_module, init=field_init)
                 self.categorical_graph_field_embed_modules.update(
-                    {
-                        field_embed.field: torch.nn.Embedding(
-                            num_embeddings=field_embed.max - field_embed.min + 1,
-                            embedding_dim=field_embed.num_features,
-                        )
-                    }
+                    {field_embed.field: embed_module}
                 )
                 self.categorical_graph_field_embed_shifts.update(
                     {field_embed.field: field_embed.min}
@@ -112,6 +124,24 @@ class NodeTypeEmbed(GraphModuleMixin, torch.nn.Module):
                 AtomicDataDict.NODE_ATTRS_KEY
             ]
         self._init_irreps(irreps_in=irreps_in, irreps_out=irreps_out)
+
+    @staticmethod
+    def _init_embedding(
+        module: torch.nn.Embedding,
+        init: Optional[str],
+    ) -> None:
+        if init is None:
+            return
+        if init == "uniform":
+            torch.nn.init.uniform_(module.weight, -sqrt(3.0), sqrt(3.0))
+        elif init == "zero":
+            torch.nn.init.zeros_(module.weight)
+        elif init == "near_zero":
+            torch.nn.init.normal_(module.weight, mean=0.0, std=1e-5)
+        else:
+            raise ValueError(
+                f"unsupported embedding init mode `{init}`. supported modes: ('uniform', 'zero', 'near_zero') or None"
+            )
 
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
         # (num_atoms, 1) -> (num_atoms, num_type_features)
