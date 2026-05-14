@@ -8,6 +8,9 @@ Most recent change on the top.
 
 ## Unreleased
 
+### Added
+- per-species force loss weighting: `per_type_coeffs` key on `MetricsManager` metrics, and `per_type_forces_coeffs` kwarg on `EnergyForceLoss` and `EnergyForceStressLoss` for emphasizing some atom types over others in the forces loss (weighted-mean aggregation over per-type MSEs)
+
 ## [0.18.0]
 
 ### Added

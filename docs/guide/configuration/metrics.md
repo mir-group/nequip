@@ -105,12 +105,37 @@ trainer:
     monitor: ${monitored_metric}
 ```
 
+## Per-Species Force Loss Coefficients
+
+For systems with very heterogeneous species, it can help to emphasize the force errors on some atomic types over others. {class}`~nequip.train.EnergyForceLoss` and {class}`~nequip.train.EnergyForceStressLoss` accept an optional `per_type_forces_coeffs` dict for this purpose. These are loss-aggregation coefficients — not to be confused with model parameters.
+
+When supplied, the forces loss is computed per atom type and combined as a *weighted mean* `sum(c_i * mse_i) / sum(c_i)` instead of the default equal-mean over types. Equal coefficients reproduce the default behavior exactly.
+
+```yaml
+loss:
+  _target_: nequip.train.EnergyForceLoss
+  per_atom_energy: true
+  coeffs:
+    total_energy: 1.0
+    forces: 1.0
+  # Emphasize H force errors relative to heavier species
+  per_type_forces_coeffs:
+    H:  5.0
+    O:  1.0
+    P:  1.0
+    Cs: 0.01
+```
+
+The dict must contain a strictly positive coefficient for every type in `type_names` (no missing keys, no zeros, no negatives). To deemphasize a species, give it a small positive coefficient rather than `0`, since a force field with zero training signal on a species is rarely intended. Only the forces term is affected; per-structure terms (`total_energy`, `stress`) ignore this argument.
+
+Per-type breakdowns logged during training (e.g. `forces_mse_H`, `forces_mse_O`) are the raw per-species MSEs. The coefficients are applied only to the aggregated `forces_mse`.
+
 ## Advanced Usage: Custom MetricsManager
 
 For scenarios not covered by the simplified wrappers, you can use the full {class}`~nequip.train.MetricsManager` directly. Technical details and advanced examples are provided in the [`nequip.train.MetricsManager` API documentation](../../api/metrics.rst).
 
 Common advanced use cases include:
 - Custom field modifiers beyond {class}`~nequip.data.PerAtomModifier`
-- Per-type metrics (separate metrics for each atom type)
+- Per-type metrics (separate metrics for each atom type, optionally combined as a weighted mean via `per_type_coeffs`)
 - Custom metric types (e.g., {class}`~nequip.train.HuberLoss`, {class}`~nequip.train.StratifiedHuberForceLoss`)
 - Handling datasets with missing labels (using `ignore_nan: true`)
