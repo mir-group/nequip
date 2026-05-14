@@ -67,13 +67,13 @@ calculator = NequIPTorchSimCalc.from_compiled_model(
 )
 ```
 
-**Custom mapping:** If the model uses non-standard type names (e.g., charge states, coarse-grained types), provide an explicit mapping dict:
+**Custom mapping:** If the model uses custom type names that differ from chemical symbols, provide an explicit mapping dict:
 
 ```python
 calculator = NequIPTorchSimCalc.from_compiled_model(
     compile_path="path/to/compiled_model.nequip.pt2",
     device="cuda",
-    chemical_species_to_atom_type_map={"H": "H+", "C": "C_sp3", "O": "O-"}
+    chemical_species_to_atom_type_map={"H": "my_H", "C": "my_C", "O": "my_O"}
 )
 ```
 

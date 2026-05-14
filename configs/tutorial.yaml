@@ -24,15 +24,11 @@ num_layers: 4       # number of interaction blocks, we find 3-5 to work best
 l_max: 1            # the maximum irrep order (rotation order) for the network's features, l=1 is a good default, l=2 is more accurate but slower
 num_features: 32    # the multiplicity of the features, 32 is a good default for accurate network, if you want to be more accurate, go larger, if you want to be faster, go lower
 
-# There are two sets of atomic types to keep track of in most applications.
-# There is the conventional atomic species (e.g. C, H), and a separate `type_names` known to the model.
-# The model only knows types based on a set of zero-based indices and user-given `type_names` argument.
-# An example where this distinction is necessary include datasets with the same atomic species with different charge states:
-# we could define `chemical_species: [C, C]` and model `type_names: [C3, C4]` for +3 and +4 charge states.
-# There could also be instances such as coarse graining we only care about the model's `type_names` (no need to define chemical species).
-# Because of this distinction, these variables show up as arguments across different categories, including, data, model, metrics and even callbacks.
-# In this case, we fix both to be the same, so we define a single set of each here and use variable interpolation to retrieve them below.
-# This ensures a single location where the values are set to reduce the chances of misconfiguring runs.
+# The model operates on atom type indices rather than chemical species, so we need to specify `model_type_names`.
+# In the common case, type names correspond directly to chemical symbols (e.g. [C, H, O, Cu]) and the mapping is an identity.
+# Custom type names (e.g. "my_Cu") are possible but require an explicit `chemical_species_to_atom_type_map`.
+# `model_type_names` show up as arguments across different categories (data, model, metrics, callbacks), so we define
+# a single source of truth here and use variable interpolation to keep them consistent.
 model_type_names: [C, H, O, Cu]
 chemical_species: ${model_type_names}
 

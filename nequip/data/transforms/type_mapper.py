@@ -10,11 +10,11 @@ from typing import List, Dict, Optional
 class ChemicalSpeciesToAtomTypeMapper(torch.nn.Module):
     """Maps atomic numbers to atom types and adds the atom types to the ``AtomicDataDict``.
 
-    This transform accounts for how the atom types seen by the model can be different from the atomic species that one obtains from a conventional dataset. There could be cases where the same chemical species corresponds to multiple atom types, e.g. different charge states.
+    The model operates on abstract atom type indices rather than chemical species, so this transform bridges the gap by mapping atomic numbers to the model's type indices. In the common case, model type names correspond directly to chemical symbols (e.g. ``["H", "C", "O"]``) and the mapping is an identity. Custom type names (e.g. ``"my_Cu"`` instead of ``"Cu"``) require an explicit map.
 
     Args:
         model_type_names (List[str]): list of atom type names known by the model, e.g. ``["H", "C", "O"]``
-        chemical_species_to_atom_type_map (Dict[str, str]): mapping from chemical species to model atom type names, e.g. ``{"H": "H", "C": "C", "O": "O"}`` or ``{"C": "C3+", "C": "C4+"}`` for charge states. Not all ``model_type_names`` need to be present in the map (useful for models trained on full periodic table but simulating subset of elements). If ``None``, defaults to identity mapping, which requires that ``model_type_names`` correspond exactly to chemical species (e.g. ``["H", "C", "O"]``).
+        chemical_species_to_atom_type_map (Dict[str, str]): mapping from chemical species to model atom type names, e.g. ``{"H": "H", "C": "C", "O": "O"}`` or ``{"Cu": "my_Cu"}`` for custom type names. Not all ``model_type_names`` need to be present in the map (useful for models trained on full periodic table but simulating subset of elements). If ``None``, defaults to identity mapping, which requires that ``model_type_names`` correspond exactly to chemical species (e.g. ``["H", "C", "O"]``).
     """
 
     def __init__(
