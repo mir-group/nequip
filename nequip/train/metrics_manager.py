@@ -9,6 +9,7 @@ from .metrics import (
     MaximumAbsoluteError,
 )
 
+from collections.abc import Mapping
 from typing import Any, List, Dict, Union, Callable, Final, Optional
 
 _METRICS_MANAGER_INPUT_KEYS: Final[List[str]] = [
@@ -241,7 +242,7 @@ class MetricsManager(torch.nn.ModuleDict):
                     raise ValueError(
                         f"`per_type_coeffs` provided for `{name}` but `per_type` is not True; per-type coefficients require `per_type: true`."
                     )
-                if not isinstance(raw_coeffs, dict):
+                if not isinstance(raw_coeffs, Mapping):
                     raise TypeError(
                         f"`per_type_coeffs` must be a dict mapping type name to positive float, got {type(raw_coeffs).__name__}."
                     )
