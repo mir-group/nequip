@@ -130,6 +130,41 @@ The dict must contain a strictly positive coefficient for every type in `type_na
 
 Per-type breakdowns logged during training (e.g. `forces_mse_H`, `forces_mse_O`) are the raw per-species MSEs. The coefficients are applied only to the aggregated `forces_mse`.
 
+### Logging per-species force MAE and RMSE
+
+The loss only emits per-species MSE breakdowns (`forces_mse_H`, `forces_mse_O`, etc.). To also monitor per-species MAE and RMSE in physical units, the metrics wrapper accepts an `extra_metrics` list:
+
+```yaml
+val_metrics:
+  _target_: nequip.train.EnergyForceMetrics
+  coeffs:
+    per_atom_energy_mae: 1.0
+    forces_mae: 1.0
+  # Per-species force breakdown (observation-only; omit `coeff` so they
+  # don't enter `weighted_sum`).
+  extra_metrics:
+    - name: per_type_forces_mae
+      field: forces
+      metric:
+        _target_: nequip.train.MeanAbsoluteError
+      per_type: true
+    - name: per_type_forces_rmse
+      field: forces
+      metric:
+        _target_: nequip.train.RootMeanSquaredError
+      per_type: true
+
+# Reuse for train / test so all three log the same breakdown:
+train_metrics: ${training_module.val_metrics}
+test_metrics:  ${training_module.val_metrics}
+```
+
+This logs:
+- per-species values: `per_type_forces_mae_H`, `per_type_forces_mae_O`, `per_type_forces_mae_P`, `per_type_forces_mae_Cs`, and analogously for `_rmse`,
+- the equal-mean aggregate over species: `per_type_forces_mae` and `per_type_forces_rmse`.
+
+To include a per-species metric in the monitored `weighted_sum` (e.g. to early-stop on per-species RMSE), give the entry a non-null `coeff`. The snippet above omits `coeff`, leaving these as observation-only.
+
 ## Advanced Usage: Custom MetricsManager
 
 For scenarios not covered by the simplified wrappers, you can use the full {class}`~nequip.train.MetricsManager` directly. Technical details and advanced examples are provided in the [`nequip.train.MetricsManager` API documentation](../../api/metrics.rst).
