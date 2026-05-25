@@ -19,6 +19,10 @@ Most recent change on the top.
 ### Changed
 - train-time compilation now uses `fullgraph=False`
 
+### Fixed
+- https://github.com/mir-group/nequip/issues/592
+- LAMMPS ML-IAP with type-dependent cutoffs bug
+
 ## [0.17.1]
 
 ### Added
