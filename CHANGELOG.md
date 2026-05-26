@@ -11,6 +11,10 @@ Most recent change on the top.
 ### Added
 - per-species force loss weighting: `per_type_coeffs` key on `MetricsManager` metrics, and `per_type_forces_coeffs` kwarg on `EnergyForceLoss` and `EnergyForceStressLoss` for emphasizing some atom types over others in the forces loss (weighted-mean aggregation over per-type MSEs)
 
+### Changed
+
+- [Breaking] `MetricsManager` internal refactor: the `metrics` attribute (a `dict` of `dict`s) has been replaced by `entries` (a `dict` of `MetricEntry` dataclasses). Existing checkpoints are incompatible. Callbacks and code that accessed `loss.metrics[name]["coeff"]` must be updated to `loss.entries[name].coeff`; affected built-in callbacks: `SoftAdaptCallback`, `LossCoeffScheduler`, `LossCoeffMonitor`.
+
 ## [0.18.0]
 
 ### Added
@@ -48,7 +52,7 @@ Most recent change on the top.
 - overhauled `NonperiodicCellTransform` with improved handling
 - models compiled for training now produce full set of eager output dict entries
 - `NequIPCalculator` canonical import path is now `nequip.integrations.ase.NequIPCalculator`; `nequip.ase.NequIPCalculator` remains as a deprecated compatibility shim that emits a `FutureWarning`
-- [breaking] `NEQUIP_NL` environment variable no longer controls neighborlist backend selection. Neighborlist backend can be set explicitly via `NeighborListTransform(..., backend="...")`; default behavior is unchanged (`matscipy`).
+- [Breaking] `NEQUIP_NL` environment variable no longer controls neighborlist backend selection. Neighborlist backend can be set explicitly via `NeighborListTransform(..., backend="...")`; default behavior is unchanged (`matscipy`).
 - Added `register_neighborlist_backend` to support extensible neighborlist backend registration.
 
 ### Fixed

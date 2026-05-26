@@ -137,8 +137,8 @@ class LinearLossCoefficientScheduler(Callback):
         if current_epoch == self.start_epoch and self.captured_initial_coeffs is None:
             # lazily capture the current coefficients when we start
             self.captured_initial_coeffs = {
-                metric_name: metric_dict["coeff"]
-                for metric_name, metric_dict in pl_module.loss.metrics.items()
+                metric_name: entry.coeff
+                for metric_name, entry in pl_module.loss.entries.items()
                 if metric_name in self.final_coeffs
             }
             # sanity check that all `final_coeffs` keys are present in the metrics

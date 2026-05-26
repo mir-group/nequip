@@ -55,6 +55,6 @@ class LossCoefficientMonitor(Callback):
             self._log_coefficients(pl_module)
 
     def _log_coefficients(self, pl_module: NequIPLightningModule) -> None:
-        for metric_name, metric_dict in pl_module.loss.metrics.items():
-            if metric_dict["coeff"] is not None:
-                pl_module.log("loss_coeff/" + metric_name, metric_dict["coeff"])
+        for metric_name, entry in pl_module.loss.entries.items():
+            if entry.coeff is not None:
+                pl_module.log("loss_coeff/" + metric_name, entry.coeff)

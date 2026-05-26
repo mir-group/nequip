@@ -159,8 +159,7 @@ class ConFIGLightningModule(NequIPLightningModule):
     def _ConFIG_backwards(self, loss_dict):
         # account for loss contributions that can be `None`
         coeff_dict: Dict[str, float] = {
-            metric_name: metric_dict["coeff"]
-            for metric_name, metric_dict in self.loss.metrics.items()
+            metric_name: entry.coeff for metric_name, entry in self.loss.entries.items()
         }
         num_active_loss_components = sum(
             [coeff is not None for coeff in coeff_dict.values()]

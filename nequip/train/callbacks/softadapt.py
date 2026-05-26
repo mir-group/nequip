@@ -61,10 +61,7 @@ class SoftAdapt(Callback):
     ):
         # === sanity checks ===
         assert all(
-            [
-                metric_dict["coeff"] is not None
-                for metric_dict in pl_module.loss.metrics.values()
-            ]
+            [entry.coeff is not None for entry in pl_module.loss.entries.values()]
         ), (
             "all components of loss must have `coeff!=None` to use the SoftAdapt callback"
         )
@@ -101,7 +98,7 @@ class SoftAdapt(Callback):
             new_coeffs = {k: exp_term / softmax_denom for k, exp_term in exps.items()}
 
             new_coeffs = {
-                k: v * pl_module.loss.metrics[k]["coeff"] for k, v in new_coeffs.items()
+                k: v * pl_module.loss.entries[k].coeff for k, v in new_coeffs.items()
             }
             # ensure normalised:
             new_coeffs = {
