@@ -2,6 +2,7 @@
 import torch
 
 from nequip.data import AtomicDataDict
+from nequip.utils.aoti_metadata import NEQUIP_CUSTOM_OPS_LIBS_KEY
 from ._graph_mixin import GraphModuleMixin
 
 from typing import List, Dict, Any, Optional, Final
@@ -134,6 +135,13 @@ class GraphModel(GraphModuleMixin, torch.nn.Module):
         if PER_EDGE_TYPE_CUTOFF_KEY in contributed_keys:
             cutoff_values = [float(x) for x in out[PER_EDGE_TYPE_CUTOFF_KEY].split()]
             out[R_MAX_KEY] = str(max(cutoff_values))
+
+        # collect custom ops libs that need to be imported at AOTI load time
+        custom_ops_libs: set = set()
+        for m in self.model.modules():
+            custom_ops_libs.update(getattr(m, "_nequip_custom_ops_libs", ()))
+        if custom_ops_libs:
+            out[NEQUIP_CUSTOM_OPS_LIBS_KEY] = " ".join(sorted(custom_ops_libs))
 
         return out
 

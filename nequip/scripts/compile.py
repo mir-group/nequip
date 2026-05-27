@@ -14,7 +14,9 @@ from nequip.utils.versions import _TORCH_GE_2_10
 from nequip.utils.aoti_metadata import (
     NEQUIP_AOTI_INPUTS_KEY,
     NEQUIP_AOTI_OUTPUTS_KEY,
+    NEQUIP_CUSTOM_OPS_LIBS_KEY,
     serialize_aoti_keys,
+    embed_custom_ops_libs,
 )
 from omegaconf import OmegaConf
 import hydra
@@ -327,6 +329,12 @@ def main(args=None):
             constant_fold=args.constant_fold,
             seed=_COMPILE_SEED,
         )
+        # embed custom ops libs into the zip so they can be imported before loading
+        if NEQUIP_CUSTOM_OPS_LIBS_KEY in metadata:
+            embed_custom_ops_libs(
+                str(args.output_path),
+                set(metadata[NEQUIP_CUSTOM_OPS_LIBS_KEY].split()),
+            )
         logger.info(f"Exported model saved to {args.output_path}")
         set_workflow_state(None)
         return

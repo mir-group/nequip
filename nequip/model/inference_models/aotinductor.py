@@ -8,6 +8,7 @@ from nequip.utils.aoti_metadata import (
     NEQUIP_AOTI_INPUTS_KEY,
     NEQUIP_AOTI_OUTPUTS_KEY,
     parse_aoti_keys,
+    import_custom_ops_libs,
 )
 from nequip.nn.compile import DictInputOutputWrapper
 
@@ -73,6 +74,9 @@ def load_aotinductor_model(
     """
     # sanity checks
     check_pt2_compile_compatibility()
+
+    # import any required custom ops libraries before the C++ loader runs
+    import_custom_ops_libs(compile_path)
 
     # load compiled model
     compiled_model = torch._inductor.aoti_load_package(compile_path)

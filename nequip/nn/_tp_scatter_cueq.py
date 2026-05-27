@@ -64,6 +64,8 @@ def nequip_tp_desc(
 
 
 class CuEquivarianceTensorProductScatter(TensorProductScatter):
+    _nequip_custom_ops_libs = ("cuequivariance_torch",)
+
     def __init__(
         self,
         feature_irreps_in,

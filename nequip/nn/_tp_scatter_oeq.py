@@ -2,6 +2,8 @@ from ._tp_scatter_base import TensorProductScatter
 
 
 class OpenEquivarianceTensorProductScatter(TensorProductScatter):
+    _nequip_custom_ops_libs = ("openequivariance",)
+
     def __init__(
         self,
         feature_irreps_in,
