@@ -6,6 +6,7 @@ from nequip.model.saved_models.package import (
     _get_shared_importer,
     _get_package_metadata,
     _suppress_package_importer_exporter_warnings,
+    _cpu_deserialize_if_no_cuda,
 )
 from nequip.model.saved_models import load_saved_model
 from nequip.model.utils import _EAGER_MODEL_KEY
@@ -19,6 +20,8 @@ from nequip.utils.versions import get_current_code_versions
 from nequip.utils.versions.version_utils import get_version_safe
 from nequip.utils.global_state import set_global_state
 from nequip.utils.asserts import assert_package_extension
+from nequip.utils.dtype import test_model_output_similarity_by_dtype
+from nequip.train.lightning import _SOLE_MODEL_KEY
 
 from ._workflow_utils import set_workflow_state
 from ._package_utils import (
@@ -36,7 +39,9 @@ import yaml
 import zipfile
 import difflib
 import importlib.util
+import shutil
 import sys
+import tempfile
 
 
 # === setup logging ===
@@ -111,6 +116,25 @@ def main(args=None):
         help="local file to compare against; if omitted, auto-resolved from the installed package",
     )
 
+    update_parser = subparsers.add_parser(
+        "update",
+        help="replace files in a packaged model and verify predictions are unchanged",
+    )
+    update_parser.add_argument(
+        "input_path", type=pathlib.Path, help="path to input package file"
+    )
+    update_parser.add_argument(
+        "output_path", type=pathlib.Path, help="path to output package file"
+    )
+    update_parser.add_argument(
+        "--replace",
+        action="append",
+        default=[],
+        nargs="+",
+        metavar="ZIP_PATH",
+        help="replace a file inside the zip; optionally follow with LOCAL_FILE, otherwise auto-resolved from the installed package. May be specified multiple times.",
+    )
+
     info_parser = subparsers.add_parser(
         "info", help="get information from a packaged model file"
     )
@@ -132,6 +156,26 @@ def main(args=None):
     )
 
     args = parser.parse_args(args=args)
+
+    def _resolve_local_path(zip_path: str) -> pathlib.Path:
+        """Resolve a zip-internal path to its installed-package counterpart.
+
+        zip paths look like "<pkg_dir>/<top_level_module>/a/b/c.py";
+        strip <pkg_dir>, find <top_level_module> in the current env via importlib.
+        """
+        parts = pathlib.PurePosixPath(zip_path).parts
+        if len(parts) < 3:
+            parser.error(
+                f"cannot auto-resolve `{zip_path}`; provide a local file path explicitly"
+            )
+        top_level = parts[1]
+        spec = importlib.util.find_spec(top_level)
+        if spec is None or not spec.submodule_search_locations:
+            parser.error(
+                f"cannot auto-resolve: `{top_level}` is not an installed package; "
+                f"provide a local file path explicitly"
+            )
+        return pathlib.Path(spec.submodule_search_locations[0]).joinpath(*parts[2:])
 
     if args.command == "modes":
         print("Available packaging modes:")
@@ -158,22 +202,7 @@ def main(args=None):
         if args.local_file is not None:
             local_path = pathlib.Path(args.local_file)
         else:
-            # zip paths look like "<pkg_dir>/<top_level_module>/a/b/c.py"
-            # strip <pkg_dir>, then locate <top_level_module> in the current env
-            parts = pathlib.PurePosixPath(args.zip_path).parts
-            if len(parts) < 3:
-                parser.error(
-                    f"cannot auto-resolve `{args.zip_path}`; provide a local file path as a third argument"
-                )
-            top_level = parts[1]
-            spec = importlib.util.find_spec(top_level)
-            if spec is None or not spec.submodule_search_locations:
-                parser.error(
-                    f"cannot auto-resolve: `{top_level}` is not an installed package; "
-                    f"provide a local file path as a third argument"
-                )
-            pkg_root = pathlib.Path(spec.submodule_search_locations[0])
-            local_path = pkg_root.joinpath(*parts[2:])
+            local_path = _resolve_local_path(args.zip_path)
 
         if not local_path.exists():
             parser.error(f"local file not found: {local_path}")
@@ -205,6 +234,167 @@ def main(args=None):
             ]
         sys.stdout.writelines(diff if diff else ["(no differences)\n"])
 
+        return
+
+    elif args.command == "update":
+        assert_package_extension(args.input_path, "input package path")
+        assert_package_extension(args.output_path, "output package path")
+        assert args.input_path.resolve() != args.output_path.resolve(), (
+            "input and output paths must differ"
+        )
+
+        # parse --replace ZIP_PATH [LOCAL_FILE] pairs
+        # .py files → surgical source replacement via save_source_string
+        # other files → text resource substitution (e.g. model/config.yaml)
+        py_replacements = {}  # {module_name: (src_str, is_package)}
+        text_replacements = {}  # {(package, resource): pathlib.Path}
+        for item in args.replace:
+            if len(item) == 1:
+                zip_path = item[0]
+                local_path = _resolve_local_path(zip_path)
+            elif len(item) == 2:
+                zip_path, local_file = item
+                local_path = pathlib.Path(local_file)
+            else:
+                parser.error(
+                    f"--replace takes 1 or 2 arguments, got {len(item)}: {item}"
+                )
+            parts = pathlib.PurePosixPath(zip_path).parts
+            if len(parts) < 3:
+                parser.error(
+                    f"cannot parse zip path `{zip_path}`; expected <pkg_dir>/<package>/<resource>"
+                )
+            rel_path = "/".join(parts[1:])  # strip <pkg_dir>
+            if rel_path.endswith(".py"):
+                content = local_path.read_text(encoding="utf-8")
+                if rel_path.endswith("/__init__.py"):
+                    module_name = rel_path[: -len("/__init__.py")].replace("/", ".")
+                    is_pkg = True
+                else:
+                    module_name = rel_path[:-3].replace("/", ".")
+                    is_pkg = False
+                py_replacements[module_name] = (content, is_pkg)
+            else:
+                pkg_name, resource = parts[1], "/".join(parts[2:])
+                text_replacements[(pkg_name, resource)] = local_path
+
+        # get reference predictions from the original package
+        with _suppress_package_importer_exporter_warnings():
+            old_imp = torch.package.PackageImporter(args.input_path)
+            pkg_metadata = _get_package_metadata(old_imp)
+            with _cpu_deserialize_if_no_cuda():
+                old_example_data = old_imp.load_pickle("model", "example_data.pkl")
+                old_module_dict = old_imp.load_pickle(
+                    package="model",
+                    resource=f"{_EAGER_MODEL_KEY}_model.pkl",
+                    map_location="cpu",
+                )
+        ref_model = old_module_dict[_SOLE_MODEL_KEY]
+        ref_model.eval()
+        model_dtype = ref_model.model_dtype
+        available_models = pkg_metadata["available_models"]
+
+        # write to a tempfile so a failed verification never produces a bad output file
+        with tempfile.NamedTemporaryFile(suffix=".nequip.zip", delete=False) as tmp:
+            tmp_path = pathlib.Path(tmp.name)
+        try:
+            # re-package via PackageExporter:
+            # - unchanged Python source comes from old_imp (first in importer chain)
+            # - .py replacements are injected via save_source_string before intern resolution;
+            #   save_pickle(dependencies=True) skips modules already in the package, so
+            #   the injected source wins and intern leaves them alone
+            with _suppress_package_importer_exporter_warnings():
+                importers = (old_imp, torch.package.importer.sys_importer)
+                with torch.package.PackageExporter(tmp_path, importer=importers) as exp:
+                    exp.mock([f"{pkg}.**" for pkg in _MOCK_MODULES])
+                    exp.extern([f"{pkg}.**" for pkg in _EXTERNAL_MODULES])
+                    exp.intern([f"{pkg}.**" for pkg in _INTERNAL_MODULES])
+
+                    # inject .py replacements before pickle saving so intern won't overwrite them
+                    for module_name, (src, is_pkg) in py_replacements.items():
+                        logger.info(
+                            f"replacing {module_name.replace('.', '/')}"
+                            f"{'/__init__' if is_pkg else ''}.py"
+                        )
+                        exp.save_source_string(module_name, src, is_package=is_pkg)
+
+                    # example data: always carry over from old package
+                    exp.save_pickle(
+                        "model", "example_data.pkl", old_example_data, dependencies=True
+                    )
+
+                    # text resources: carry over from old package, substituting replacements
+                    unused_text = set(text_replacements.keys())
+                    for resource in ["config.yaml", "package_metadata.txt"]:
+                        key = ("model", resource)
+                        if key in text_replacements:
+                            content = text_replacements[key].read_text(encoding="utf-8")
+                            logger.info(
+                                f"replacing model/{resource} from {text_replacements[key]}"
+                            )
+                            unused_text.discard(key)
+                        else:
+                            content = old_imp.load_text("model", resource)
+                        exp.save_text("model", resource, content)
+
+                    if unused_text:
+                        logger.warning(
+                            "the following --replace targets were not used "
+                            "(expected model/config.yaml or model/package_metadata.txt): "
+                            + ", ".join(f"{p}/{r}" for p, r in unused_text)
+                        )
+
+                    # model pickles: load from old package and re-save (weights preserved)
+                    for compile_mode in available_models:
+                        with _cpu_deserialize_if_no_cuda():
+                            model_dict = old_imp.load_pickle(
+                                package="model",
+                                resource=f"{compile_mode}_model.pkl",
+                                map_location="cpu",
+                            )
+                        exp.save_pickle(
+                            "model",
+                            f"{compile_mode}_model.pkl",
+                            model_dict,
+                            dependencies=True,
+                        )
+
+            # verify predictions are unchanged using the original example data
+            with _suppress_package_importer_exporter_warnings():
+                new_imp = torch.package.PackageImporter(tmp_path)
+                with _cpu_deserialize_if_no_cuda():
+                    new_module_dict = new_imp.load_pickle(
+                        package="model",
+                        resource=f"{_EAGER_MODEL_KEY}_model.pkl",
+                        map_location="cpu",
+                    )
+            new_model = new_module_dict[_SOLE_MODEL_KEY]
+            new_model.eval()
+
+            def _error_msg(key, tol, err, absval, model_dtype):
+                return (
+                    f"package update verification failed for field `{key}`: "
+                    f"MaxAbsError {err:.6g} exceeds tolerance {tol} ({model_dtype} model), "
+                    f"MaxAbs value {absval:.6g}. "
+                    f"Set NEQUIP_FLOAT32_MODEL_TOL / NEQUIP_FLOAT64_MODEL_TOL to adjust."
+                )
+
+            test_model_output_similarity_by_dtype(
+                ref_model,
+                new_model,
+                old_example_data,
+                model_dtype,
+                error_message=_error_msg,
+            )
+
+            shutil.move(tmp_path, args.output_path)
+        except:
+            tmp_path.unlink(missing_ok=True)
+            raise
+
+        logger.info(
+            f"updated package saved to {args.output_path} (predictions verified)"
+        )
         return
 
     elif args.command == "info":
@@ -265,7 +455,7 @@ def main(args=None):
     elif args.command == "build":
         set_workflow_state("package")
 
-        assert_package_extension(args.output_path)
+        assert_package_extension(args.output_path, "output package path")
 
         # === handle internal and external modules ===
         overlap = set(_INTERNAL_MODULES) & set(_EXTERNAL_MODULES)
