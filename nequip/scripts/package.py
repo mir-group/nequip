@@ -14,7 +14,7 @@ from nequip.nn.model_modifier_utils import (
     is_persistent_model_modifier,
     is_private_model_modifier,
 )
-from nequip.model.modify_utils import get_all_modifiers
+from nequip.model.modify_utils import get_all_modifiers, modify
 from nequip.utils.logger import RankedLogger
 from nequip.utils.versions import get_current_code_versions
 from nequip.utils.versions.version_utils import get_version_safe
@@ -133,6 +133,25 @@ def main(args=None):
         nargs="+",
         metavar="ZIP_PATH",
         help="replace a file inside the zip; optionally follow with LOCAL_FILE, otherwise auto-resolved from the installed package. May be specified multiple times.",
+    )
+
+    modify_parser = subparsers.add_parser(
+        "modify",
+        help="apply a persistent model modifier to a packaged model",
+    )
+    modify_parser.add_argument(
+        "input_path", type=pathlib.Path, help="path to input package file"
+    )
+    modify_parser.add_argument(
+        "output_path", type=pathlib.Path, help="path to output package file"
+    )
+    modify_parser.add_argument(
+        "--modifier",
+        action="append",
+        default=[],
+        nargs="+",
+        metavar="MODIFIER_NAME",
+        help="modifier to apply; optionally follow with key=value kwargs (values are YAML-parsed). May be specified multiple times.",
     )
 
     info_parser = subparsers.add_parser(
@@ -313,7 +332,7 @@ def main(args=None):
                     # inject .py replacements before pickle saving so intern won't overwrite them
                     for module_name, (src, is_pkg) in py_replacements.items():
                         logger.info(
-                            f"replacing {module_name.replace('.', '/')}"
+                            f"Replacing {module_name.replace('.', '/')}"
                             f"{'/__init__' if is_pkg else ''}.py"
                         )
                         exp.save_source_string(module_name, src, is_package=is_pkg)
@@ -330,7 +349,7 @@ def main(args=None):
                         if key in text_replacements:
                             content = text_replacements[key].read_text(encoding="utf-8")
                             logger.info(
-                                f"replacing model/{resource} from {text_replacements[key]}"
+                                f"Replacing model/{resource} from {text_replacements[key]}"
                             )
                             unused_text.discard(key)
                         else:
@@ -339,7 +358,7 @@ def main(args=None):
 
                     if unused_text:
                         logger.warning(
-                            "the following --replace targets were not used "
+                            "The following --replace targets were not used "
                             "(expected model/config.yaml or model/package_metadata.txt): "
                             + ", ".join(f"{p}/{r}" for p, r in unused_text)
                         )
@@ -393,8 +412,99 @@ def main(args=None):
             raise
 
         logger.info(
-            f"updated package saved to {args.output_path} (predictions verified)"
+            f"Updated package saved to {args.output_path} (predictions verified)"
         )
+        return
+
+    elif args.command == "modify":
+        assert_package_extension(args.input_path, "input package path")
+        assert_package_extension(args.output_path, "output package path")
+        assert args.input_path.resolve() != args.output_path.resolve(), (
+            "input and output paths must differ"
+        )
+
+        # parse --modifier NAME [key=value ...] into modifier config dicts
+        modifiers_config = []
+        for item in args.modifier:
+            name = item[0]
+            kwargs = {}
+            for kv in item[1:]:
+                k, v = kv.split("=", 1)
+                kwargs[k] = yaml.safe_load(v)
+            modifiers_config.append({"modifier": name, **kwargs})
+
+        with _suppress_package_importer_exporter_warnings():
+            old_imp = torch.package.PackageImporter(args.input_path)
+            pkg_metadata = _get_package_metadata(old_imp)
+            with _cpu_deserialize_if_no_cuda():
+                old_example_data = old_imp.load_pickle("model", "example_data.pkl")
+                eager_dict = old_imp.load_pickle(
+                    package="model",
+                    resource=f"{_EAGER_MODEL_KEY}_model.pkl",
+                    map_location="cpu",
+                )
+
+        # validate: modifiers must be registered, persistent, and public
+        avail = get_all_modifiers(eager_dict[_SOLE_MODEL_KEY])
+        for cfg in modifiers_config:
+            name = cfg["modifier"]
+            if name not in avail:
+                persistent_public = [
+                    n
+                    for n, f in avail.items()
+                    if is_persistent_model_modifier(f)
+                    and not is_private_model_modifier(f)
+                ]
+                raise ValueError(
+                    f"`{name}` is not a registered modifier. "
+                    f"Available persistent public modifiers: {persistent_public}"
+                )
+            if not is_persistent_model_modifier(avail[name]):
+                raise ValueError(
+                    f"`{name}` is not a persistent modifier; `nequip-package modify` only applies persistent modifiers"
+                )
+            if is_private_model_modifier(avail[name]):
+                raise ValueError(f"`{name}` is a private modifier")
+
+        with tempfile.NamedTemporaryFile(suffix=".nequip.zip", delete=False) as tmp:
+            tmp_path = pathlib.Path(tmp.name)
+        try:
+            with _suppress_package_importer_exporter_warnings():
+                importers = (old_imp, torch.package.importer.sys_importer)
+                with torch.package.PackageExporter(tmp_path, importer=importers) as exp:
+                    exp.mock([f"{pkg}.**" for pkg in _MOCK_MODULES])
+                    exp.extern([f"{pkg}.**" for pkg in _EXTERNAL_MODULES])
+                    exp.intern([f"{pkg}.**" for pkg in _INTERNAL_MODULES])
+
+                    exp.save_pickle(
+                        "model", "example_data.pkl", old_example_data, dependencies=True
+                    )
+                    for resource in ["config.yaml", "package_metadata.txt"]:
+                        exp.save_text(
+                            "model", resource, old_imp.load_text("model", resource)
+                        )
+
+                    for compile_mode in pkg_metadata["available_models"]:
+                        with _cpu_deserialize_if_no_cuda():
+                            model_dict = old_imp.load_pickle(
+                                package="model",
+                                resource=f"{compile_mode}_model.pkl",
+                                map_location="cpu",
+                            )
+                        modify(model_dict, modifiers_config)
+                        exp.save_pickle(
+                            "model",
+                            f"{compile_mode}_model.pkl",
+                            model_dict,
+                            dependencies=True,
+                        )
+
+            shutil.move(tmp_path, args.output_path)
+        except:
+            tmp_path.unlink(missing_ok=True)
+            raise
+
+        logger.info(f"Modified package saved to {args.output_path}")
         return
 
     elif args.command == "info":
