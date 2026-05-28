@@ -34,6 +34,9 @@ import argparse
 import pathlib
 import yaml
 import zipfile
+import difflib
+import importlib.util
+import sys
 
 
 # === setup logging ===
@@ -90,6 +93,24 @@ def main(args=None):
         type=str,
     )
 
+    diff_parser = subparsers.add_parser(
+        "diff",
+        help="diff a file inside a packaged model against an installed or local file",
+    )
+    diff_parser.add_argument("pkg_path", type=str, help="path to package file")
+    diff_parser.add_argument(
+        "zip_path",
+        type=str,
+        help="path of the file inside the zip (as shown by `nequip-package list`)",
+    )
+    diff_parser.add_argument(
+        "local_file",
+        type=str,
+        nargs="?",
+        default=None,
+        help="local file to compare against; if omitted, auto-resolved from the installed package",
+    )
+
     info_parser = subparsers.add_parser(
         "info", help="get information from a packaged model file"
     )
@@ -124,6 +145,66 @@ def main(args=None):
             for info in sorted(zf.infolist(), key=lambda x: x.filename):
                 if not info.filename.endswith(".storage"):
                     print(f"{info.file_size:>12}  {info.filename}")
+        return
+
+    elif args.command == "diff":
+        assert_package_extension(args.pkg_path)
+
+        # read file from the zip archive
+        with zipfile.ZipFile(args.pkg_path, "r") as zf:
+            pkg_bytes = zf.read(args.zip_path)
+
+        # resolve the local counterpart to compare against
+        if args.local_file is not None:
+            local_path = pathlib.Path(args.local_file)
+        else:
+            # zip paths look like "<pkg_dir>/<top_level_module>/a/b/c.py"
+            # strip <pkg_dir>, then locate <top_level_module> in the current env
+            parts = pathlib.PurePosixPath(args.zip_path).parts
+            if len(parts) < 3:
+                parser.error(
+                    f"cannot auto-resolve `{args.zip_path}`; provide a local file path as a third argument"
+                )
+            top_level = parts[1]
+            spec = importlib.util.find_spec(top_level)
+            if spec is None or not spec.submodule_search_locations:
+                parser.error(
+                    f"cannot auto-resolve: `{top_level}` is not an installed package; "
+                    f"provide a local file path as a third argument"
+                )
+            pkg_root = pathlib.Path(spec.submodule_search_locations[0])
+            local_path = pkg_root.joinpath(*parts[2:])
+
+        if not local_path.exists():
+            parser.error(f"local file not found: {local_path}")
+
+        diff = list(
+            difflib.unified_diff(
+                pkg_bytes.decode("utf-8").splitlines(keepends=True),
+                local_path.read_text(encoding="utf-8").splitlines(keepends=True),
+                fromfile=f"{args.zip_path} (package)",
+                tofile=str(local_path),
+            )
+        )
+        # colorize when writing to a terminal: green=added, red=removed, cyan=hunk headers
+        if diff and sys.stdout.isatty():
+            _RESET, _RED, _GREEN, _CYAN = "\033[0m", "\033[31m", "\033[32m", "\033[36m"
+            diff = [
+                (
+                    _GREEN
+                    if l.startswith("+")
+                    else _RED
+                    if l.startswith("-")
+                    else _CYAN
+                    if l.startswith("@")
+                    else ""
+                )
+                + l
+                + (_RESET if l[0] in "+-@" else "")
+                for l in diff
+            ]
+        sys.stdout.writelines(diff if diff else ["(no differences)\n"])
+
         return
 
     elif args.command == "info":
