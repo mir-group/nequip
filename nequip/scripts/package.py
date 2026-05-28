@@ -32,6 +32,7 @@ import hydra
 import argparse
 import pathlib
 import yaml
+import zipfile
 
 
 # === setup logging ===
@@ -79,6 +80,15 @@ def main(args=None):
 
     subparsers.add_parser("modes", help="list available packaging modes")
 
+    list_parser = subparsers.add_parser(
+        "list", help="list files inside a packaged model file"
+    )
+    list_parser.add_argument(
+        "pkg_path",
+        help="path to package file",
+        type=str,
+    )
+
     info_parser = subparsers.add_parser(
         "info", help="get information from a packaged model file"
     )
@@ -105,6 +115,16 @@ def main(args=None):
         print("Available packaging modes:")
         for name, fn in _PACKAGING_MODES.items():
             print(f"  {name}\t{fn()}")
+        return
+
+    elif args.command == "list":
+        assert str(args.pkg_path).endswith(".nequip.zip"), (
+            "packaged model file to inspect must end with the `.nequip.zip` extension"
+        )
+        with zipfile.ZipFile(args.pkg_path, "r") as zf:
+            for info in sorted(zf.infolist(), key=lambda x: x.filename):
+                if not info.filename.endswith(".storage"):
+                    print(f"{info.file_size:>12}  {info.filename}")
         return
 
     elif args.command == "info":
