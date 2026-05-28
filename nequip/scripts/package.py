@@ -18,6 +18,7 @@ from nequip.utils.logger import RankedLogger
 from nequip.utils.versions import get_current_code_versions
 from nequip.utils.versions.version_utils import get_version_safe
 from nequip.utils.global_state import set_global_state
+from nequip.utils.asserts import assert_package_extension
 
 from ._workflow_utils import set_workflow_state
 from ._package_utils import (
@@ -118,9 +119,7 @@ def main(args=None):
         return
 
     elif args.command == "list":
-        assert str(args.pkg_path).endswith(".nequip.zip"), (
-            "packaged model file to inspect must end with the `.nequip.zip` extension"
-        )
+        assert_package_extension(args.pkg_path)
         with zipfile.ZipFile(args.pkg_path, "r") as zf:
             for info in sorted(zf.infolist(), key=lambda x: x.filename):
                 if not info.filename.endswith(".storage"):
@@ -128,9 +127,7 @@ def main(args=None):
         return
 
     elif args.command == "info":
-        assert str(args.pkg_path).endswith(".nequip.zip"), (
-            "packed model file to inspect must end with the `.nequip.zip` extension"
-        )
+        assert_package_extension(args.pkg_path)
 
         with _suppress_package_importer_exporter_warnings():
             imp = torch.package.PackageImporter(args.pkg_path)
@@ -187,9 +184,7 @@ def main(args=None):
     elif args.command == "build":
         set_workflow_state("package")
 
-        assert str(args.output_path).endswith(".nequip.zip"), (
-            "output path must end with the `.nequip.zip` extension"
-        )
+        assert_package_extension(args.output_path)
 
         # === handle internal and external modules ===
         overlap = set(_INTERNAL_MODULES) & set(_EXTERNAL_MODULES)
