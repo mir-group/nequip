@@ -91,3 +91,52 @@ class SomeNequIPNNModule:
 ```
 
 Note: `isinstance()` checks are fine when both the class definition and instance come from the same package (e.g., model modifiers checking their own module types).
+
+## Package Inspection and Maintenance
+
+### `list`, `diff`, `update`: code-level maintenance
+
+`nequip-package list` prints every file bundled in the package (source snapshots, model pickles, metadata) with their sizes. Each line has the format `{size}  {zip_path}`, where `zip_path` includes a package-name prefix derived from the archive filename:
+
+```bash
+nequip-package list model.nequip.zip
+# example output:
+#         1258  MyModel.nequip/model/config.yaml
+#     15728640  MyModel.nequip/model/eager_model.pkl
+#         4096  MyModel.nequip/nequip/nn/atomwise.py
+#            …
+```
+
+`nequip-package diff` compares a specific bundled file against its currently-installed counterpart (auto-resolved) or an explicit local path. The `zip_path` argument is taken directly from the `list` output:
+
+```bash
+# auto-resolve against installed package
+nequip-package diff model.nequip.zip \
+    MyModel.nequip/nequip/nn/atomwise.py
+
+# compare against an explicit local file
+nequip-package diff model.nequip.zip \
+    MyModel.nequip/nequip/nn/atomwise.py \
+    path/to/patched_atomwise.py
+```
+
+Output is `(no differences)` when the files are identical; otherwise a unified diff is printed (colorized on terminals).
+
+`nequip-package update` replaces one or more files and verifies that model predictions are numerically unchanged before writing the output package:
+
+```bash
+# replace with installed version
+nequip-package update model.nequip.zip updated.nequip.zip \
+    --replace MyModel.nequip/nequip/nn/atomwise.py
+
+# replace with an explicit local file
+nequip-package update model.nequip.zip updated.nequip.zip \
+    --replace MyModel.nequip/nequip/nn/atomwise.py path/to/patched_atomwise.py
+
+# replace multiple files in one pass (--replace may be repeated)
+nequip-package update model.nequip.zip updated.nequip.zip \
+    --replace MyModel.nequip/nequip/nn/atomwise.py \
+    --replace MyModel.nequip/nequip/nn/mlp.py path/to/patched_mlp.py
+```
+
+`update` is intentionally strict: if predictions differ after the replacement the update is rejected. This guards against accidentally changing model behaviour when applying what is intended to be a pure code fix. If behaviour change is the goal, use `modify` instead.

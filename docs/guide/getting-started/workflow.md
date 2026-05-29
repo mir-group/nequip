@@ -100,7 +100,7 @@ The output path MUST have the extension `.nequip.zip`.
 ```
 
 ```{tip}
-To see command line options, one can use `nequip-package -h`. There are two options `build` and `info`, so one can get more detailed information with `nequip-package build -h` and `nequip-package info -h`.
+To see command line options, one can use `nequip-package -h`. There are several subcommands: `build`, `info`, `list`, `diff`, `update`, and `modify`. More detailed help for each is available with e.g. `nequip-package build -h`.
 ```
 
 While checkpoint files are unlikely to survive breaking changes across updates to the software, the packaging infrastructure is designed to allow packaged models to remain usable as the framework is updated.
@@ -111,6 +111,36 @@ The packaged model can thus be loaded and used independently even if new and dif
 
 Packaged models can be used for both inference and fine-tuning.  Fine-tuning uses the {func}`~nequip.model.ModelFromPackage` [model loader](../../api/save_model.rst) in the config for a new `nequip-train` run to use the model from the package as the starting point. The checkpoint files produced by this kind of fine-tuning `nequip-train` run can be used as usual and support restarting training with `++ckpt_path path/to/ckpt`, further fine-tuning using {func}`~nequip.model.ModelFromCheckpoint`, `nequip-compile`, `nequip-package`, etc.
 See the [Fine-Tuning](../training-techniques/fine_tuning.md) training techniques section for further details.
+
+### Applying persistent modifiers
+
+`nequip-package modify` applies one or more persistent model modifiers to a packaged model and writes a new package. The original file is never modified. To see what modifiers are available in a package, use `nequip-package info --get-modifiers`:
+
+```bash
+nequip-package info path/to/model.nequip.zip --get-modifiers
+```
+
+Then apply a modifier with `--modifier`:
+
+```bash
+# zero-argument modifier
+nequip-package modify \
+    input.nequip.zip output.nequip.zip \
+    --modifier disable_ForceStressOutput
+
+# modifier with keyword arguments (values are YAML-parsed)
+nequip-package modify \
+    input.nequip.zip output.nequip.zip \
+    --modifier modify_PerTypeScaleShift scales="{Al: 0.5, Cu: 1.2}"
+
+# chain multiple modifiers (--modifier may be repeated)
+nequip-package modify \
+    input.nequip.zip output.nequip.zip \
+    --modifier disable_ForceStressOutput \
+    --modifier modify_PerTypeScaleShift shifts="{Al: -0.3}"
+```
+
+Only *persistent* modifiers (those that change model behavior) can be applied via `nequip-package modify`. Non-persistent (acceleration) modifiers such as `enable_OpenEquivariance` are not permitted here and must be applied at compile-time via `nequip-compile --modifiers`.
 
 ## Compilation
 
