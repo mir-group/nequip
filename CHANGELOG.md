@@ -9,6 +9,10 @@ Most recent change on the top.
 ## Unreleased
 
 ### Added
+- `nequip-package list`: list the contents (with file sizes) of a packaged model file
+- `nequip-package diff`: diff a file inside a package against its installed or a local version; useful to check for code drift between the packaged snapshot and the currently installed libraries
+- `nequip-package update`: replace specific files inside a package and verify that model predictions are unchanged; intended for applying bug-fixes or compatibility patches without retraining
+- `nequip-package modify`: apply one or more persistent model modifiers to a packaged model (e.g. adjust per-type energy scales/shifts, toggle force/stress output)
 - per-species force loss weighting: `per_type_coeffs` key on `MetricsManager` metrics, and `per_type_forces_coeffs` kwarg on `EnergyForceLoss` and `EnergyForceStressLoss` for emphasizing some atom types over others in the forces loss (weighted-mean aggregation over per-type MSEs)
 
 ### Changed
