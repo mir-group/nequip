@@ -1,0 +1,97 @@
+name: Run LAMMPS ML-IAP Tests
+
+on:
+  schedule:
+    # every Friday at 03:00 America/New_York
+    - cron: "0 3 * * 5"
+      timezone: "America/New_York"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# yamllint disable rule:line-length
+jobs:
+  run-mliap-tests:
+    runs-on: self-hosted
+    strategy:
+      matrix:
+        torch-version: ["2.10.*"]
+    container:
+      image: nvidia/cuda:12.6.3-cudnn-devel-ubuntu22.04
+      options: "--gpus all"
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Python and create venv
+        run: |
+          apt update && apt install -y python3 python3-pip python3-venv git
+          python3 -m venv /opt/venv
+          echo "/opt/venv/bin" >> $GITHUB_PATH
+      - name: Install system dependencies
+        run: |
+          apt update
+          apt install -y libopenmpi-dev --fix-missing
+          pip install cmake>=3.25
+      - name: Clear pip cache on self-hosted runner
+        run: |
+          python3 -m pip cache dir
+          python3 -m pip cache purge || true
+          rm -rf ~/.cache/pip
+      - name: Disable pip cache
+        run: |
+          echo "PIP_NO_CACHE_DIR=1" >> $GITHUB_ENV
+          echo "PIP_NO_CACHE=1" >> $GITHUB_ENV
+      - name: Configure torch cache directories
+        run: |
+          echo "TORCH_EXTENSIONS_DIR=/tmp/torch_extensions_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}" >> $GITHUB_ENV
+          echo "TORCHINDUCTOR_CACHE_DIR=/tmp/torchinductor_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}" >> $GITHUB_ENV
+          echo "TRITON_CACHE_DIR=/tmp/triton_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}" >> $GITHUB_ENV
+      - name: Install PyTorch
+        env:
+          TORCH: "${{ matrix.torch-version }}"
+        run: |
+          pip install torch==${TORCH} --upgrade
+      - name: Install ML-IAP build dependencies
+        run: |
+          pip install cython==3.0.11 cupy-cuda12x
+      - name: Install nequip and test dependencies
+        run: |
+          pip install h5py packaging vesin
+          pip install cuequivariance-torch cuequivariance-ops-torch-cu12
+          pip install openequivariance
+          pip install "lightning<2.6.0"
+          pip install --upgrade-strategy only-if-needed .
+          pip install pytest pytest-xdist[psutil]
+      - name: Fetch and build LAMMPS with ML-IAP
+        run: |
+          git clone --depth=1 https://github.com/lammps/lammps
+          cd lammps
+          cmake \
+            -B build-mliap \
+            -D CMAKE_BUILD_TYPE=Release \
+            -D CMAKE_CXX_COMPILER=$(pwd)/lib/kokkos/bin/nvcc_wrapper \
+            -D PKG_KOKKOS=ON \
+            -D Kokkos_ENABLE_CUDA=ON \
+            -D BUILD_MPI=ON \
+            -D PKG_ML-IAP=ON \
+            -D PKG_ML-SNAP=ON \
+            -D MLIAP_ENABLE_PYTHON=ON \
+            -D PKG_PYTHON=ON \
+            -D BUILD_SHARED_LIBS=ON \
+            cmake
+          cmake --build build-mliap -j$(nproc)
+          cd build-mliap
+          make install-python
+          echo "LAMMPS built at:"
+          pwd
+          ls lmp
+      - name: Run MLIAP integration tests
+        run: |
+          OMPI_ALLOW_RUN_AS_ROOT=1 \
+          OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1 \
+          LAMMPS=$(pwd)/lammps/build-mliap/lmp \
+          PYTHONHASHSEED=0 \
+          pytest tests/unit/model/test_nequip_model.py -k "test_mliap_integration" -xv
+# yamllint enable
