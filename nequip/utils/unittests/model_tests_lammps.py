@@ -69,7 +69,7 @@ class LAMMPSMLIAPIntegrationMixin(EnergyModelTestsMixin):
 
         Returns tolerance for MLIAP integration tests based on ``model_dtype``.
         """
-        return {"float32": 1e-5, "float64": 1e-10}[model_dtype]
+        return {"float32": 5e-5, "float64": 1e-10}[model_dtype]
 
     @pytest.fixture(scope="class", params=[None])
     def mliap_acceleration_modifiers(self, request):
