@@ -5,9 +5,9 @@ import tempfile
 import os
 from pathlib import Path
 
-from nequip.data import AtomicDataDict
+from nequip.data import AtomicDataDic
 from nequip.data.transforms.neighborlist import NeighborListPruneTransform
-from nequip.nn import graph_model
+from nequip.nn import graph_mode
 from nequip.model.saved_models.load_utils import load_saved_model
 from nequip.model.modify_utils import get_all_modifiers, modify
 from nequip.model.utils import _EAGER_MODEL_KEY
@@ -243,9 +243,9 @@ class NequIPLAMMPSMLIAPWrapper(MLIAPUnified):
 
         # update LAMMPS variables
         lmp_eatoms = torch.as_tensor(lmp_data.eatoms)
-        lmp_eatoms.copy_(nequip_atomic_energies)
-        lmp_data.energy = nequip_total_energy
-        lmp_data.update_pair_forces_gpu(edge_forces)
+        lmp_eatoms.copy_(nequip_atomic_energies.detach())
+        lmp_data.energy = nequip_total_energy.detach()
+        lmp_data.update_pair_forces_gpu(edge_forces.detach())
 
     def compute_descriptors(self, lmp_data):
         pass
