@@ -19,6 +19,11 @@ Most recent change on the top.
 
 - [Breaking] `MetricsManager` internal refactor: the `metrics` attribute (a `dict` of `dict`s) has been replaced by `entries` (a `dict` of `MetricEntry` dataclasses). Existing checkpoints are incompatible. Callbacks and code that accessed `loss.metrics[name]["coeff"]` must be updated to `loss.entries[name].coeff`; affected built-in callbacks: `SoftAdaptCallback`, `LossCoeffScheduler`, `LossCoeffMonitor`.
 
+### Fixed
+
+- https://github.com/mir-group/nequip/issues/601
+
+
 ## [0.18.0]
 
 ### Added
