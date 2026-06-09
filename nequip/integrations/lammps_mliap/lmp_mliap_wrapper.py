@@ -5,9 +5,9 @@ import tempfile
 import os
 from pathlib import Path
 
-from nequip.data import AtomicDataDic
+from nequip.data import AtomicDataDict
 from nequip.data.transforms.neighborlist import NeighborListPruneTransform
-from nequip.nn import graph_mode
+from nequip.nn import graph_model
 from nequip.model.saved_models.load_utils import load_saved_model
 from nequip.model.modify_utils import get_all_modifiers, modify
 from nequip.model.utils import _EAGER_MODEL_KEY
