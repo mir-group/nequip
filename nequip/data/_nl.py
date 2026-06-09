@@ -268,7 +268,7 @@ def alchemiops_batch_cell_list(
         positions=positions,
         cutoff=r_max,
         batch_idx=system_idx,
-        cell=cell,
+        cell=cell.contiguous(),
         pbc=pbc,
         return_neighbor_list=True,
     )
