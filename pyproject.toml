@@ -25,7 +25,8 @@ dependencies = [
     "hydra-core",
     "lightning>=2.0, !=2.6.2, !=2.6.3",
     "torchmetrics>=1.6.0",
-    "requests"
+    "requests",
+    "load-atoms"
 ]
 
 [project.urls]
