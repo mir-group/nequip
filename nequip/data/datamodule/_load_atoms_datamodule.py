@@ -45,9 +45,7 @@ class LoadAtomsDataModule(NequIPDataModule):
     ):
         self.dataset_id = dataset_id
         self.data_source_dir = data_source_dir or tempfile.gettempdir()
-        self._extxyz_path = os.path.join(
-            self.data_source_dir, f"{dataset_id}.extxyz"
-        )
+        self._extxyz_path = os.path.join(self.data_source_dir, f"{dataset_id}.extxyz")
 
         dataset_config = {
             "_target_": "nequip.data.dataset.ASEDataset",
@@ -96,7 +94,9 @@ class LoadAtomsDataModule(NequIPDataModule):
                 "Install it with: pip install load-atoms"
             )
 
-        logger.info(f"Downloading `{self.dataset_id}` via load-atoms to `{self.data_source_dir}`")
+        logger.info(
+            f"Downloading `{self.dataset_id}` via load-atoms to `{self.data_source_dir}`"
+        )
         dataset = load_dataset(self.dataset_id, root=self.data_source_dir)
 
         logger.info(f"Writing {len(dataset)} structures to `{self._extxyz_path}`")
