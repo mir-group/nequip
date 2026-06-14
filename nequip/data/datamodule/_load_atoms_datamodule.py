@@ -13,6 +13,8 @@ class LoadAtomsDataModule(NequIPDataModule):
     """Lightning Data Module for datasets provided by the
     `load-atoms <https://github.com/jla-gardner/load-atoms>`_ package.
 
+    Requires the ``load-atoms`` package: ``pip install load-atoms``.
+
     Any dataset available via ``load_atoms.load_dataset()`` can be used
     directly without manual downloading or format conversion.
 
