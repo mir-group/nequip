@@ -248,6 +248,7 @@ def main(config: DictConfig) -> None:
                 model=nequip_module,
                 datamodule=datamodule,
                 ckpt_path=ckpt_path,
+                weights_only=False,
             )
             ckpt_path = "best"
             logger.info("TRAIN RUN END")
@@ -258,6 +259,7 @@ def main(config: DictConfig) -> None:
                 model=nequip_module,
                 datamodule=datamodule,
                 ckpt_path=ckpt_path,
+                weights_only=False,
             )
             logger.info("VAL RUN END")
         elif run_type == "test":
@@ -267,6 +269,7 @@ def main(config: DictConfig) -> None:
                 model=nequip_module,
                 datamodule=datamodule,
                 ckpt_path=ckpt_path,
+                weights_only=False,
             )
             logger.info("TEST RUN END")
         elif run_type == "predict":
@@ -278,6 +281,7 @@ def main(config: DictConfig) -> None:
                 model=nequip_module,
                 datamodule=datamodule,
                 ckpt_path=ckpt_path,
+                weights_only=False,
             )
             logger.info("PREDICT RUN END")
         else:
