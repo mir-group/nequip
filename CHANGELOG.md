@@ -22,7 +22,7 @@ Most recent change on the top.
 ### Fixed
 
 - https://github.com/mir-group/nequip/issues/601
-
+- silent wrong forces/stress in the torch-sim integration: non-contiguous input tensors (e.g. the transposed `row_vector_cell` from `torch_sim.concatenate_states`/`BinningAutoBatcher`, or stride-0 expanded PBC) were read by AOTI models using assumed strides; all model inputs are now made contiguous
 
 ## [0.18.0]
 

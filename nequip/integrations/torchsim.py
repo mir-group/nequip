@@ -199,6 +199,14 @@ class NequIPTorchSimCalc(_IntegrationLoaderMixin, ModelInterface):
         for t in self.transforms:
             data = t(data)
 
+        # the AOTI-compiled model reads inputs by assumed (compile-time) stride and does not guard runtime strides.
+        # several torch-sim tensors are non-contiguous views (e.g. row_vector_cell = cell.mT;
+        # expanded pbc is stride-0), which would be read silently transposed/garbled,
+        # so force all model inputs contiguous.
+        data = {
+            k: (v.contiguous() if torch.is_tensor(v) else v) for k, v in data.items()
+        }
+
         # === run model ===
         out = self.model(data)
 
