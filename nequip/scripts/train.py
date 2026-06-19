@@ -192,6 +192,7 @@ def main(config: DictConfig) -> None:
             config.ckpt_path,
             num_datasets=datamodule.num_datasets,
             info_dict=info_dict,
+            weights_only=False,
         )
     else:
         # === compute dataset statistics use resolver to get dataset statistics to model config ===
