@@ -31,6 +31,24 @@ def fx_duck_shape(enabled: bool):
         torch.fx.experimental._config.use_duck_shape = init_duck_shape
 
 
+def stable_silu_backward(grad_output, self):
+    """
+    Stabilise ``silu_backward`` by avoiding ``1 / (1 + exp(-x))`` sigmoid expansion (which can overflow in double-backward for very large models).
+    Use the ``torch.sigmoid`` primitive instead.
+    """
+    sig = torch.sigmoid(self)
+    return grad_output * sig * (1 + self * (1 - sig))
+
+
+def nequip_decomp_table():
+    """Core-aten decompositions with NequIP patches (currently just modified ``silu_backward`` to avoid double-backward overflow)."""
+    table = dict(core_aten_decompositions())
+    for key in table:
+        if str(key) == "aten.silu_backward.default":
+            table[key] = stable_silu_backward
+    return table
+
+
 def nequip_make_fx(
     model: torch.nn.Module,
     data: AtomicDataDict.Type,
@@ -94,7 +112,7 @@ def _nequip_make_fx(model, inputs):
         return make_fx(
             model,
             # see below for explanation on decomposition table
-            decomposition_table=core_aten_decompositions(),
+            decomposition_table=nequip_decomp_table(),
             tracing_mode="symbolic",
             _allow_non_fake_inputs=True,
             _error_on_data_dependent_ops=True,
