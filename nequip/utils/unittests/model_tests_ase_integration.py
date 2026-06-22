@@ -28,7 +28,8 @@ class ASEIntegrationMixin(EnergyModelTestsMixin):
     """
 
     @pytest.fixture(scope="class")
-    def ase_integration_tol(self, model_dtype):
+    @classmethod
+    def ase_integration_tol(cls, model_dtype):
         """May be overridden by subclasses.
 
         Returns tolerance for ASE integration tests based on ``model_dtype``.
@@ -36,7 +37,8 @@ class ASEIntegrationMixin(EnergyModelTestsMixin):
         return {"float32": 5e-5, "float64": 1e-12}[model_dtype]
 
     @pytest.fixture(scope="class")
-    def ase_properties_to_compare(self):
+    @classmethod
+    def ase_properties_to_compare(cls):
         """May be overridden by subclasses.
 
         Return list of ASE property names to compare between saved-model and compiled-model calculators.
@@ -44,7 +46,8 @@ class ASEIntegrationMixin(EnergyModelTestsMixin):
         return ["energy", "forces"]
 
     @pytest.fixture(scope="class")
-    def ase_calculator_cls(self):
+    @classmethod
+    def ase_calculator_cls(cls):
         """May be overridden by subclasses.
 
         Return ASE calculator class used for saved-model and compiled-model loading.
@@ -54,7 +57,8 @@ class ASEIntegrationMixin(EnergyModelTestsMixin):
         return NequIPCalculator
 
     @pytest.fixture(scope="class")
-    def ase_aoti_target(self):
+    @classmethod
+    def ase_aoti_target(cls):
         """May be overridden by subclasses.
 
         Return ``nequip-compile --target`` value used for AOTI compilation.
@@ -64,7 +68,8 @@ class ASEIntegrationMixin(EnergyModelTestsMixin):
         return AOTI_ASE_TARGET
 
     @pytest.fixture(scope="class", params=[None])
-    def ase_compile_modifiers(self, request):
+    @classmethod
+    def ase_compile_modifiers(cls, request):
         """Implemented by subclasses.
 
         Returns a callable that handles model modification and constraints for
@@ -90,8 +95,9 @@ class ASEIntegrationMixin(EnergyModelTestsMixin):
         params=([] if _TORCH_GE_2_10 else ["torchscript"])
         + (["aotinductor"] if _TORCH_GE_2_6 else []),
     )
+    @classmethod
     def ase_compiled_model(
-        self,
+        cls,
         request,
         fake_model_training_session,
         device,

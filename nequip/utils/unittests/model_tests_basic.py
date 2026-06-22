@@ -52,7 +52,8 @@ class BasicModelTestsMixin:
     """
 
     @pytest.fixture(scope="class")
-    def config(self):
+    @classmethod
+    def config(cls):
         """Implemented by subclasses.
 
         Return a model configuration dict.
@@ -60,7 +61,8 @@ class BasicModelTestsMixin:
         raise NotImplementedError
 
     @pytest.fixture(scope="class")
-    def equivariance_tol(self, model_dtype):
+    @classmethod
+    def equivariance_tol(cls, model_dtype):
         """May be overriden by subclasses.
 
         Returns tolerance based on ``model_dtype``.
@@ -68,7 +70,8 @@ class BasicModelTestsMixin:
         return {"float32": 1e-3, "float64": 1e-8}[model_dtype]
 
     @pytest.fixture(scope="class")
-    def irrep_format(self) -> Literal["mul_ir", "ir_mul"]:
+    @classmethod
+    def irrep_format(cls) -> Literal["mul_ir", "ir_mul"]:
         """Irrep tensor memory layout used by the model under test."""
         return "mul_ir"
 
@@ -92,7 +95,8 @@ class BasicModelTestsMixin:
         scope="class",
         params=(["cuda", "cpu"] if torch.cuda.is_available() else ["cpu"]),
     )
-    def device(self, request):
+    @classmethod
+    def device(cls, request):
         return request.param
 
     @staticmethod
@@ -104,7 +108,8 @@ class BasicModelTestsMixin:
         return model
 
     @pytest.fixture(scope="class")
-    def model(self, config, device, model_dtype):
+    @classmethod
+    def model(cls, config, device, model_dtype):
         # === sanity check contracts with subclasses ===
         assert "model_dtype" not in config, (
             "model test subclasses should not include `model_dtype` in the configs -- the test class will handle it (looping over `float32` and `float64`)"
@@ -114,7 +119,7 @@ class BasicModelTestsMixin:
         )
         config = copy.deepcopy(config)
         config.update({"model_dtype": model_dtype})
-        model = self.make_model(config, device=device)
+        model = cls.make_model(config, device=device)
         out_fields = model.irreps_out.keys()
         # we return the config with the correct `model_dtype`
         return model, config, out_fields
@@ -131,9 +136,10 @@ class BasicModelTestsMixin:
         return float(metadata[graph_model.R_MAX_KEY])
 
     @pytest.fixture(scope="class")
-    def partial_model(self, model, device):
+    @classmethod
+    def partial_model(cls, model, device):
         _, config, _ = model
-        aux_model = self.make_model(copy.deepcopy(config), device=device)
+        aux_model = cls.make_model(copy.deepcopy(config), device=device)
         module = find_first_of_type(aux_model, ForceStressOutput)
         # skip test if force/stress module not found
         if module is None:
@@ -146,7 +152,8 @@ class BasicModelTestsMixin:
         return aux_model, out_fields
 
     @pytest.fixture(scope="class", params=["molecules", "bulk"])
-    def model_test_data(self, model, atomic_batch, diamond_carbon, device, request):
+    @classmethod
+    def model_test_data(cls, model, atomic_batch, diamond_carbon, device, request):
         if request.param == "molecules":
             test_data = atomic_batch
         elif request.param == "bulk":
@@ -159,7 +166,7 @@ class BasicModelTestsMixin:
         # cpu because we need to reconstruct the neighborlist
         test_data = {k: v.clone().detach().to("cpu") for k, v in test_data.items()}
         # reset neighborlist
-        test_data = NeighborListTransform(r_max=self._r_max_from_model(instance))(
+        test_data = NeighborListTransform(r_max=cls._r_max_from_model(instance))(
             test_data
         )
         # return the data in the device for testing
@@ -169,12 +176,14 @@ class BasicModelTestsMixin:
         scope="class",
         params=["minimal_aspirin.yaml", "minimal_toy_emt.yaml"],
     )
-    def conffile(self, request):
+    @classmethod
+    def conffile(cls, request):
         """Training config files."""
         return request.param
 
     @pytest.fixture(scope="class")
-    def train_fn(self):
+    @classmethod
+    def train_fn(cls):
         """Training session function - can be overridden by subclasses to use alternative training workflows.
 
         Default is `_training_session` which runs `nequip-train`.
@@ -239,7 +248,8 @@ class BasicModelTestsMixin:
                 config[key] = value
 
     @pytest.fixture(scope="class", params=["fresh", "package"])
-    def model_source(self, request):
+    @classmethod
+    def model_source(cls, request):
         """model source for fake_model_training_session. subclasses can override params."""
         return request.param
 
@@ -762,7 +772,8 @@ class EnergyModelTestsMixin(BasicModelTestsMixin):
                     data[AtomicDataDict.POSITIONS_KEY][iatom, idir] += epsilon
 
     @pytest.fixture(scope="class")
-    def pair_force(self, model, partial_model, device):
+    @classmethod
+    def pair_force(cls, model, partial_model, device):
         """
         Helper function to calculate forces/partial forces between a pair of atoms of specified types and separation distance.
         """

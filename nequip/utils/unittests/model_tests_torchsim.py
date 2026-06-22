@@ -165,7 +165,8 @@ class TorchSimIntegrationMixin(EnergyModelTestsMixin):
     """
 
     @pytest.fixture(scope="class")
-    def torchsim_tol(self, model_dtype):
+    @classmethod
+    def torchsim_tol(cls, model_dtype):
         """May be overriden by subclasses.
 
         Returns tolerance for torch-sim integration tests based on ``model_dtype``.
@@ -173,7 +174,8 @@ class TorchSimIntegrationMixin(EnergyModelTestsMixin):
         return {"float32": 5e-5, "float64": 1e-10}[model_dtype]
 
     @pytest.fixture(scope="class")
-    def torchsim_aoti_target(self):
+    @classmethod
+    def torchsim_aoti_target(cls):
         """May be overridden by subclasses.
 
         Return ``nequip-compile --target`` value used for AOTI compilation.
@@ -183,7 +185,8 @@ class TorchSimIntegrationMixin(EnergyModelTestsMixin):
         return AOTI_BATCH_TARGET
 
     @pytest.fixture(scope="class")
-    def torchsim_calculator_cls(self):
+    @classmethod
+    def torchsim_calculator_cls(cls):
         """May be overridden by subclasses.
 
         Return torch-sim calculator class used for compiled-model loading.
@@ -191,7 +194,8 @@ class TorchSimIntegrationMixin(EnergyModelTestsMixin):
         return NequIPTorchSimCalc
 
     @pytest.fixture(scope="class")
-    def torchsim_reference_ase_calculator_cls(self):
+    @classmethod
+    def torchsim_reference_ase_calculator_cls(cls):
         """May be overridden by subclasses.
 
         Return ASE calculator class used for saved-model reference evaluation.
@@ -199,7 +203,8 @@ class TorchSimIntegrationMixin(EnergyModelTestsMixin):
         return NequIPCalculator
 
     @pytest.fixture(scope="class")
-    def torchsim_properties_to_compare(self):
+    @classmethod
+    def torchsim_properties_to_compare(cls):
         """May be overridden by subclasses.
 
         Return property names to compare between ASE and torch-sim outputs.
@@ -240,8 +245,9 @@ class TorchSimIntegrationMixin(EnergyModelTestsMixin):
         params=([] if _TORCH_GE_2_10 else ["torchscript"])
         + (["aotinductor"] if _TORCH_GE_2_6 else []),
     )
+    @classmethod
     def torchsim_compiled_model(
-        self,
+        cls,
         request,
         fake_model_training_session,
         device,
@@ -279,7 +285,8 @@ class TorchSimIntegrationMixin(EnergyModelTestsMixin):
         return model_path, output_path, structures
 
     @pytest.fixture(scope="class", params=[None])
-    def torchsim_compile_modifiers(self, request):
+    @classmethod
+    def torchsim_compile_modifiers(cls, request):
         """Implemented by subclasses.
 
         Returns a callable that handles model modification and constraints for

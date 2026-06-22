@@ -26,7 +26,8 @@ class TrainTimeCompileMixin(EnergyModelTestsMixin):
     """
 
     @pytest.fixture(scope="class")
-    def train_time_compile_tol(self, model_dtype):
+    @classmethod
+    def train_time_compile_tol(cls, model_dtype):
         """May be overridden by subclasses.
 
         Returns tolerance for train-time compilation tests based on ``model_dtype``.
@@ -34,7 +35,8 @@ class TrainTimeCompileMixin(EnergyModelTestsMixin):
         return {"float32": 5e-5, "float64": 1e-12}[model_dtype]
 
     @pytest.fixture(scope="class", params=[None])
-    def train_time_compile_modifiers(self, request):
+    @classmethod
+    def train_time_compile_modifiers(cls, request):
         """Implemented by subclasses.
 
         Returns a callable that handles model modification and constraints for
