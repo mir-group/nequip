@@ -173,6 +173,15 @@ class NequIPLAMMPSMLIAPWrapper(MLIAPUnified):
         if lmp_data.nlocal == 0 or lmp_data.npairs <= 1:
             return
 
+        # The LAMMPS arrays read below (rij, pair_i/pair_j) are produced by Kokkos
+        # kernels on a different GPU stream than PyTorch. Without a sync here, the
+        # `torch.as_tensor(...)` reads can race those Kokkos writes, giving stale
+        # indices and an out-of-bounds GPU write during dynamics (non-deterministic;
+        # `run 0` is fine; hidden by HIP/CUDA_LAUNCH_BLOCKING=1). The input-side sync
+        # is sufficient. ~0.8% overhead on a GPU-bound workload.
+        if self.device != "cpu":
+            torch.cuda.synchronize()
+
         # === create input data ===
 
         # NOTE
