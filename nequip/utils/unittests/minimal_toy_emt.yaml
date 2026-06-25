@@ -46,6 +46,14 @@ trainer:
       monitor: val0_epoch/weighted_sum
       dirpath: ${hydra:runtime.output_dir}
       filename: best
+      save_top_k: 1
+      save_last: false
+    # separate unmonitored checkpoint so `last.ckpt` always tracks the final epoch (for
+    # restarts), independent of the monitored `best` checkpoint
+    - _target_: lightning.pytorch.callbacks.ModelCheckpoint
+      dirpath: ${hydra:runtime.output_dir}
+      filename: latest
+      save_top_k: 1
       save_last: true
     - _target_: nequip.train.callbacks.TestTimeXYZFileWriter
       out_file: ${hydra:runtime.output_dir}/test

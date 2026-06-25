@@ -23,7 +23,8 @@ class TestZBLModel(EnergyModelTestsMixin):
     """
 
     @pytest.fixture(scope="class")
-    def equivariance_tol(self, model_dtype):
+    @classmethod
+    def equivariance_tol(cls, model_dtype):
         # CI fails with at most 6e-8 errors for fp64 models for PyTorch 2.9.1
         # so fp64 tol bumped to 1e-7
         # With PyTorch 2.10.0:
@@ -41,7 +42,8 @@ class TestZBLModel(EnergyModelTestsMixin):
         return True
 
     @pytest.fixture(scope="class")
-    def config(self):
+    @classmethod
+    def config(cls):
         config = {
             "_target_": "nequip.model.ZBLPairPotential",
             "seed": 123,

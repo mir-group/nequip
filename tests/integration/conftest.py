@@ -199,7 +199,7 @@ class TrainingInvarianceBaseTest:
         current_training_module = config.training_module._target_
         if current_training_module not in self._TRAINING_MODULES_TO_TEST:
             return
-        tol = {"float32": 1e-5, "float64": 1e-8}[model_dtype]
+        tol = {"float32": 1e-6, "float64": 1e-14}[model_dtype]
         orig_max_epochs = config.trainer.max_epochs
         new_max_epochs = orig_max_epochs + 5
 

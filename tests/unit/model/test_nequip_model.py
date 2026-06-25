@@ -88,7 +88,8 @@ class TestNequIPModel(
         return False
 
     @pytest.fixture(scope="class")
-    def equivariance_tol(self, model_dtype):
+    @classmethod
+    def equivariance_tol(cls, model_dtype):
         return {"float32": 5e-5, "float64": 1e-7}[model_dtype]
 
     @pytest.fixture(
@@ -100,7 +101,8 @@ class TestNequIPModel(
         ],
         scope="class",
     )
-    def config(self, request):
+    @classmethod
+    def config(cls, request):
         config = request.param
         config = config.copy()
         return config
@@ -111,7 +113,8 @@ class TestNequIPModel(
         + (["enable_OpenEquivariance"] if _TORCH_GE_2_7 and _OEQ_INSTALLED else [])
         + (["enable_CuEquivariance"] if _CUEQ_INSTALLED else []),
     )
-    def ase_compile_modifiers(self, request):
+    @classmethod
+    def ase_compile_modifiers(cls, request):
         """Test acceleration modifiers in ASE integration compile workflows."""
         if request.param is None:
             # for base NequIP models (no modifiers), skip CPU+aotinductor for PyTorch 2.10.0
@@ -156,7 +159,8 @@ class TestNequIPModel(
         + (["enable_OpenEquivariance"] if _TORCH_GE_2_7 and _OEQ_INSTALLED else [])
         + (["enable_CuEquivariance"] if _CUEQ_INSTALLED else []),
     )
-    def torchsim_compile_modifiers(self, request):
+    @classmethod
+    def torchsim_compile_modifiers(cls, request):
         """Test acceleration modifiers in torch-sim compile workflows."""
         if request.param is None:
 
@@ -196,7 +200,8 @@ class TestNequIPModel(
         # + (["enable_CuEquivariance"] if _CUEQ_INSTALLED else []),
         # NOTE: ^ some tests fail with CuEq
     )
-    def train_time_compile_modifiers(self, request):
+    @classmethod
+    def train_time_compile_modifiers(cls, request):
         """Test acceleration modifiers in train-time compile workflows."""
         if request.param is None:
             return None
@@ -223,7 +228,8 @@ class TestNequIPModel(
         + (["enable_OpenEquivariance"] if _TORCH_GE_2_7 and _OEQ_INSTALLED else [])
         + (["enable_CuEquivariance"] if _CUEQ_INSTALLED else []),
     )
-    def mliap_acceleration_modifiers(self, request):
+    @classmethod
+    def mliap_acceleration_modifiers(cls, request):
         """Test acceleration modifiers in MLIAP workflows."""
 
         def modifier_handler(compile, model_dtype):

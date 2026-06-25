@@ -116,8 +116,6 @@ jobs:
           if [ "${{ matrix.torch-version }}" = "2.2.0" ]; then
             pip install "numpy<2" "matscipy==1.1.1"
           fi
-          # Pin lightning <2.6.0 due to test_restarts failures
-          pip install "lightning<2.6.0"
           pip install --upgrade-strategy only-if-needed .
           pip install pytest pytest-xdist[psutil]
       #- name: Clear default torch extension cache
