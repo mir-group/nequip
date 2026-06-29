@@ -14,15 +14,18 @@ Most recent change on the top.
 - `nequip-package update`: replace specific files inside a package and verify that model predictions are unchanged; intended for applying bug-fixes or compatibility patches without retraining
 - `nequip-package modify`: apply one or more persistent model modifiers to a packaged model (e.g. adjust per-type energy scales/shifts, toggle force/stress output)
 - per-species force loss weighting: `per_type_coeffs` key on `MetricsManager` metrics, and `per_type_forces_coeffs` kwarg on `EnergyForceLoss` and `EnergyForceStressLoss` for emphasizing some atom types over others in the forces loss (weighted-mean aggregation over per-type MSEs)
+- AOTI-packaged models now record the custom-op libraries their GPU kernels require (e.g. `openequivariance`) and import them automatically at load time, so packaged models with custom GPU kernels can be loaded in plain Python without first manually importing the kernel library (only applies to models packaged with this version or later; previously packaged models do not carry this metadata and still require manual import)
 
 ### Changed
 
 - [Breaking] `MetricsManager` internal refactor: the `metrics` attribute (a `dict` of `dict`s) has been replaced by `entries` (a `dict` of `MetricEntry` dataclasses). Existing checkpoints are incompatible. Callbacks and code that accessed `loss.metrics[name]["coeff"]` must be updated to `loss.entries[name].coeff`; affected built-in callbacks: `SoftAdaptCallback`, `LossCoeffScheduler`, `LossCoeffMonitor`.
+- [Breaking] minimum `lightning` requirement raised to `>=2.6` (from `>=2.0`); environments pinned to older lightning must upgrade. Checkpoint loading now passes `weights_only=False` to accommodate lightning 2.6's new `weights_only=True` default
 
 ### Fixed
 
 - https://github.com/mir-group/nequip/issues/601
 - silent wrong forces/stress in the torch-sim integration: non-contiguous input tensors (e.g. the transposed `row_vector_cell` from `torch_sim.concatenate_states`/`BinningAutoBatcher`, or stride-0 expanded PBC) were read by AOTI models using assumed strides; all model inputs are now made contiguous
+- double-backward overflow in large models: `silu_backward` is now evaluated via the `torch.sigmoid` primitive (instead of the `1/(1+exp(-x))` sigmoid expansion) through a patched AOTI decomposition table
 
 ## [0.18.0]
 
