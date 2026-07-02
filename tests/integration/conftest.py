@@ -105,7 +105,9 @@ class TrainingInvarianceBaseTest:
         training_module = hydra.utils.get_class(
             checkpoint["hyper_parameters"]["info_dict"]["training_module"]["_target_"]
         )
-        nequip_module = training_module.load_from_checkpoint(checkpoint_path)
+        nequip_module = training_module.load_from_checkpoint(
+            checkpoint_path, weights_only=False
+        )
         return nequip_module
 
     def test_batch_invariance(self, fake_model_training_session):

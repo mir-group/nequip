@@ -76,7 +76,9 @@ def ModelFromCheckpoint(checkpoint_path: str, compile_mode: str = _EAGER_MODEL_K
     )
     # ensure that model is built with correct `compile_mode`
     with override_model_compile_mode(compile_mode):
-        lightning_module = training_module.load_from_checkpoint(checkpoint_path)
+        lightning_module = training_module.load_from_checkpoint(
+            checkpoint_path, weights_only=False
+        )
 
     model = lightning_module.evaluation_model
     return model
