@@ -8,6 +8,8 @@ Most recent change on the top.
 
 ## Unreleased
 
+## [0.19.0]
+
 ### Added
 - `nequip-package list`: list the contents (with file sizes) of a packaged model file
 - `nequip-package diff`: diff a file inside a package against its installed or a local version; useful to check for code drift between the packaged snapshot and the currently installed libraries
