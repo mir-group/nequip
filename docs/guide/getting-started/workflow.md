@@ -155,6 +155,7 @@ nequip-compile \
   path/to/compiled_model.nequip.pth \
   --device [cpu|cuda] \
   --mode torchscript
+  # --modifiers enable_OpenEquivariance  # recommended GPU kernel acceleration (NequIP); use enable_CuEquivariance for Allegro
 ```
 
 To compile a model with AOTInductor:
@@ -165,6 +166,16 @@ nequip-compile \
   --device [cpu|cuda] \
   --mode aotinductor \
   --target [ase|pair_nequip|pair_allegro|...]
+  # --modifiers enable_OpenEquivariance  # recommended GPU kernel acceleration (NequIP); use enable_CuEquivariance for Allegro
+```
+
+```{important}
+We strongly recommend enabling the [GPU tensor-product kernel modifiers](../accelerations/gpu_kernel_modifiers.md) when compiling models on GPU. These greatly accelerate the model and reduce memory demand. Enable them with `nequip-compile` using the `--modifiers` flag:
+
+- **[OpenEquivariance](../accelerations/openequivariance.md)** for **NequIP** models: `--modifiers enable_OpenEquivariance`
+- **[CuEquivariance](../accelerations/cuequivariance.md)** for **Allegro** models: `--modifiers enable_CuEquivariance`
+
+For further speed-ups where appropriate (e.g. often permissible for MD simulations), [TF32 mixed-precision](../accelerations/precision.md#tf32-at-inference) can also be enabled at compile time by adding the `--tf32` flag.
 ```
 
 AOTInductor requires access to compilers like `gcc` and `nvcc` when running `nequip-compile`. Specifically, C++17 support is required, which requires `gcc` version 8 or higher (preferably >=11 where C++17 is the default). Without the proper compiler version, you may encounter errors such as `C++ compile error`, issues involving the `filesystem` standard library, or even `Segmentation fault (core dumped)`. You can check your `gcc` version with `gcc --version`, and may need to upgrade or load a specific module on your HPC system to get the required version before running `nequip-compile`.
@@ -193,7 +204,8 @@ nequip-compile \
   path/to/compiled_model.nequip.pt2 \
   --device cuda \
   --mode aotinductor \
-  --target ase
+  --target ase \
+  --modifiers enable_OpenEquivariance  # recommended GPU kernel acceleration (NequIP); use enable_CuEquivariance for Allegro
 ```
 
 The format is `nequip.net:group-name/model-name:version`, where you can find the full model ID on the model's page at [nequip.net](https://www.nequip.net/).
