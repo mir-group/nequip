@@ -23,6 +23,29 @@ class SimpleDDPStrategy(DDPStrategy):
     def configure_ddp(self) -> None:
         pass
 
+    @property
+    def restore_checkpoint_after_setup(self) -> bool:
+        """Move the model to its device *before* restoring the checkpoint.
+
+        ``OpenEquivariance`` modules can wedge if state is restored onto them
+        before the device move; move-then-restore avoids it.
+        """
+        return True
+
+    def load_checkpoint(self, checkpoint_path, weights_only=None):
+        """Load the resume checkpoint straight onto this rank's GPU, ``weights_only=False``.
+
+        ``map_location=self.root_device`` loads the entire checkpoint (model, optimizer,
+        EMA state) onto this rank's GPU, overriding the saved device index. ``weights_only``
+        is forced to ``False`` to allow the optimizer/EMA pickled state through.
+        """
+        if weights_only is None:
+            weights_only = False
+        torch.cuda.empty_cache()
+        return self.checkpoint_io.load_checkpoint(
+            checkpoint_path, map_location=self.root_device, weights_only=weights_only
+        )
+
     def post_backward(self, closure_loss: torch.Tensor) -> None:
         """
         Manual syncing of gradients after the backwards pass.
