@@ -492,3 +492,50 @@ class TorchSimIntegrationMixin(EnergyModelTestsMixin):
                 atol=torchsim_tol,
                 err_msg="Batched stresses don't match individual evaluations",
             )
+
+    @pytest.mark.skipif(not _TORCHSIM_INSTALLED, reason="torch-sim not installed")
+    def test_torchsim_batched_evaluation_varying_system_count(
+        self,
+        torchsim_compiled_model,
+        device,
+        torchsim_tol,
+        torchsim_calculator_cls,
+    ):
+        """Batched forces stay correct after a forward with a different system count but the
+        same atomic_numbers array (monatomic). Failure mode: a stale cached system count gives
+        the wrong per-system PBC, merging separate systems in the neighborlist.
+        """
+        from ase import Atoms
+
+        _, compiled_path, structures = torchsim_compiled_model
+        calc = torchsim_calculator_cls.from_compiled_model(
+            compiled_path, device=device, chemical_species_to_atom_type_map=True
+        )
+        # small monatomic periodic cell of a species the model supports: its atomic_numbers
+        # array is identical across any regrouping into systems, so the forwards below differ
+        # only in the system count -- the exact trigger for the stale-n_systems bug.
+        z = int(structures[0].get_atomic_numbers()[0])
+        s = Atoms(
+            numbers=[z, z],
+            positions=[[0, 0, 0], [1.7, 1.7, 1.7]],
+            cell=[3.4, 3.4, 3.4],
+            pbc=True,
+        )
+
+        def forces(systems):
+            state = ts.io.atoms_to_state(systems, device=device, dtype=torch.float64)
+            return calc(state)["forces"].cpu().numpy()
+
+        ref = forces([s])  # per-system reference (1 system)
+        forces(
+            [s.repeat((2, 1, 1))]
+        )  # 1-system forward, atomic_numbers == two copies of s
+        batched = forces([s, s])  # 2-system batch, same atomic_numbers array
+
+        np.testing.assert_allclose(
+            np.concatenate([ref, ref], axis=0),
+            batched,
+            rtol=torchsim_tol,
+            atol=torchsim_tol,
+            err_msg="batched forces wrong after a forward with a different system count",
+        )

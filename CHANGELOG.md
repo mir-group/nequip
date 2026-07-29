@@ -8,6 +8,10 @@ Most recent change on the top.
 
 ## Unreleased
 
+### Fixed
+
+- silent wrong forces in the torch-sim integration for batched evaluation: `NequIPTorchSimCalc` used a cached system count, so a batch reusing the previous call's atomic numbers with a different number of systems (e.g. monatomic cells) used a stale layout; the system count now comes from the input state's cell batch dimension
+
 ## [0.19.0]
 
 ### Added
