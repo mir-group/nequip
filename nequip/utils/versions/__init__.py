@@ -8,6 +8,7 @@ from .torch_versions import (
     _TORCH_GE_2_9,
     _TORCH_GE_2_10,
     _TORCH_IS_2_10_0,
+    _TORCH_IS_2_12,
     check_pt2_compile_compatibility,
 )
 
@@ -21,6 +22,7 @@ __all__ = [
     "_TORCH_GE_2_9",
     "_TORCH_GE_2_10",
     "_TORCH_IS_2_10_0",
+    "_TORCH_IS_2_12",
     "check_pt2_compile_compatibility",
     "get_current_code_versions",
 ]

@@ -31,6 +31,12 @@ _TORCH_IS_2_10_0 = packaging.version.parse(
     _TORCH_VERSION.base_version
 ) == packaging.version.parse("2.10.0")
 
+_TORCH_IS_2_12 = (
+    packaging.version.parse("2.12")
+    <= packaging.version.parse(_TORCH_VERSION.base_version)
+    < packaging.version.parse("2.13")
+)
+
 
 def check_pt2_compile_compatibility():
     assert _TORCH_GE_2_6, (
