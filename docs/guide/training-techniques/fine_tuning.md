@@ -1,8 +1,13 @@
 # Fine-Tuning
 
-Fine-tuning allows you to adapt a pretrained model to new datasets. This is useful when you have a model trained on one system and want to adapt it to a similar but different system.
+Fine-tuning allows you to adapt a pretrained model to new datasets. This is useful when you have a model trained on one system and want to adapt it to a similar but different system, and is usually far cheaper and more data-efficient than training from scratch.
 
-Pretrained models for fine-tuning can be found at [nequip.net](https://www.nequip.net/) in the [packaged file format](../getting-started/files.md#package-files).
+Pretrained models for fine-tuning can be found at [nequip.net](https://www.nequip.net/) in the [packaged file format](../getting-started/files.md#package-files), including the NequIP/Allegro [foundation potentials](../getting-started/foundation_potentials.md).
+
+```{note}
+Please cite the [NequIP foundation potentials paper](https://doi.org/10.48550/arXiv.2607.28461) (and the [NequIP infrastructure paper](https://doi.org/10.1039/D5DD00423C)) if you fine-tune or use the NequIP/Allegro [foundation potentials](../getting-started/foundation_potentials.md).
+See [References & citing](../../introduction/intro.md#references--citing) for the full citation details.
+```
 
 
 ## Loading a Packaged Model

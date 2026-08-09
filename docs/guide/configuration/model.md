@@ -10,6 +10,23 @@ model:
 ```
 To see the documentation for individual hyperparameters, look at the Python API documentation for the model builder function ({func}`~nequip.model.NequIPGNNModel` in this example).  Model builders are usually in the `.model` subpackage of `nequip` or a `nequip` extension package.
 
+## Architecture presets
+
+Rather than choosing/optimising the set of architecture hyperparameters yourself, you can use {func}`~nequip.model.PresetNequIPGNNModel`, which injects the key architecture hyperparameters (number of layers, `l_max`, `num_features`, etc.) of the correspondingly-sized NequIP [foundation potential](../getting-started/foundation_potentials.md):
+
+```yaml
+model:
+    _target_: nequip.model.PresetNequIPGNNModel
+    preset: M  # one of S, M, L, XL -- from small/fast to large/accurate
+    r_max: 6.0
+    # ... remaining hyperparameters (type_names, model_dtype, shifts/scales, ...)
+```
+
+Any preset value can be overridden by passing it explicitly. Note that the presets do not set `r_max` (the foundation potentials use 4.5 Å for `S` and 6 Å for the larger sizes).
+Note also that the presets set `parity: false`, restricting feature parities to those of the spherical harmonics, which was found to give a significant speed-up at minimal accuracy cost.
+
+The accuracy/speed trade-off across these model sizes, and the reasoning behind the hyperparameter choices, are documented in the [NequIP foundation potentials paper](https://doi.org/10.48550/arXiv.2607.28461).
+
 ## Energy-only models
 
 For energy-only datasets (without forces), set `do_derivatives=false`:

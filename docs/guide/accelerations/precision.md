@@ -8,6 +8,8 @@ Performance improvements will be most significant for architectures with large m
 Be cautious when using reduced precision during training and inference. While performance gains can be substantial, reduced precision can be detrimental for certain atomistic modeling tasks such as structure relaxations or static point calculations.
 ```
 
+The training speed-ups from TF32 and `bf16` automatic mixed precision (alone and combined with [train-time compilation](pt2_compilation.md) and the [GPU kernel modifiers](gpu_kernel_modifiers.md)), along with their effect on accuracy, are benchmarked in the [NequIP foundation potentials paper](https://doi.org/10.48550/arXiv.2607.28461).
+
 ## Lightning Precision Settings for Training
 
 PyTorch Lightning provides built-in support for various precision modes during training through the `precision` [trainer](https://lightning.ai/docs/pytorch/stable/common/trainer.html) argument, e.g.:

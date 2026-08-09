@@ -8,6 +8,9 @@ Most recent change on the top.
 
 ## Unreleased
 
+### Added
+- docs page for the NequIP [foundation potentials](https://doi.org/10.48550/arXiv.2607.28461), with links to fine-tuning, compilation and the benchmarks reported in the paper, and citation instructions (`CITATION.bib`, `README`, docs) for using them
+
 ## [0.19.0]
 
 ### Added

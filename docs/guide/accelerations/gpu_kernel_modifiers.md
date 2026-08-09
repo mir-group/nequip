@@ -1,6 +1,7 @@
 # GPU Kernel Modifiers
 
 NequIP GNN models support several GPU kernel modifiers that can significantly speed up both training and inference by replacing standard operations with optimized implementations.
+The resulting train-time and inference-time speed-ups (and reduction in GPU memory demand) are benchmarked in the [NequIP foundation potentials paper](https://doi.org/10.48550/arXiv.2607.28461).
 
 ## Available GPU Kernel Modifiers
 

@@ -37,7 +37,7 @@
 
   **Q**: Does the NequIP framework support AMD GPUs?
 
-  **A**: The NequIP framework is compatible with AMD GPUs. However, certain acceleration features, including [CuEquivariance](../accelerations/cuequivariance.md), require NVIDIA GPUs. When specifying device parameters, use `cuda` as the device identifier for both NVIDIA and AMD GPUs.
+  **A**: The NequIP framework is compatible with AMD GPUs. However, certain acceleration features, including [CuEquivariance](../accelerations/cuequivariance.md), require NVIDIA GPUs. When specifying device parameters, use `cuda` as the device identifier for both NVIDIA and AMD GPUs. For reference, multi-GPU MD scaling on AMD (MI250X) and NVIDIA (A100) hardware is benchmarked side by side in the [NequIP foundation potentials paper](https://doi.org/10.48550/arXiv.2607.28461).
 
 ## Energy-Only Training
 
