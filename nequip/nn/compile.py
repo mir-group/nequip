@@ -1,4 +1,5 @@
 # This file is a part of the `nequip` package. Please see LICENSE and README at the root for information on using it.
+import os
 import torch
 
 from nequip.data import AtomicDataDict
@@ -12,6 +13,33 @@ from nequip.utils.fx import nequip_make_fx
 from nequip.utils.dtype import dtype_to_name
 from typing import Dict, Sequence, List, Optional, Any, Final
 from torch.func import functional_call
+
+_NEQUIP_NODE_PARALLEL_COMPILE: Final[bool] = os.environ.get(
+    "NEQUIP_NODE_PARALLEL_COMPILE", ""
+).lower() in (
+    "1",
+    "true",
+    "yes",
+    "y",
+)
+
+
+def _local_rank_layout() -> tuple[int, int, int]:
+    rank = (
+        torch.distributed.get_rank()
+        if torch.distributed.is_available() and torch.distributed.is_initialized()
+        else 0
+    )
+    local_size = int(
+        os.environ.get(
+            "SLURM_NTASKS_PER_NODE",
+            torch.cuda.device_count() if torch.cuda.is_available() else 1,
+        )
+    )
+    # derived from the global rank rather than SLURM_LOCALID so that it agrees by
+    # construction with the contiguous `torch.distributed.new_subgroups` split;
+    # exactly one local rank 0 per group, whatever the task layout
+    return rank, rank % local_size, local_size
 
 
 def _list_to_dict(
@@ -129,6 +157,135 @@ class CompileGraphModel(GraphModel):
         input_keys = tuple(sorted(data.keys() & self.model_input_fields))
         return input_keys
 
+    def _distributed_warm_compile(self, fn, label: str = "first compile") -> None:
+        """One cold compile per node, then one parallel warm turn within the node.
+
+        Opt-in via ``NEQUIP_NODE_PARALLEL_COMPILE=1`` (or ``true``/``yes``/``y``);
+        off by default, where every rank compiles concurrently as usual.
+
+        Each rank still needs its own in-process ``torch.compile`` wrapper: filesystem
+        cache skips Inductor/Triton *codegen* on a cache hit; while ``make_fx`` + Dynamo
+        still run on every rank. ``LOCAL_RANK`` ``0`` on each node cold-compiles (one per
+        node, parallel across nodes) into the shared cache, then local ranks ``1..N-1``
+        compile in one parallel turn (as guaranteed cache hits).
+        """
+        if not (
+            _NEQUIP_NODE_PARALLEL_COMPILE
+            and torch.distributed.is_available()
+            and torch.distributed.is_initialized()
+        ):
+            fn()
+            return
+
+        import sys
+        import time
+
+        rank, local_rank, local_size = _local_rank_layout()
+        node_group = self._node_process_group(local_size)
+
+        t0 = time.time()
+        if local_rank == 0:
+            # one marker per node: the expensive/hang-prone cold compile is starting here
+            print(
+                f"[compile] {label}: cold compile (node warm)",
+                file=sys.stderr,
+                flush=True,
+            )
+            fn()
+            print(
+                f"[compile-timing] rank {rank} (local0) cold compile: {time.time() - t0:.1f}s",
+                file=sys.stderr,
+                flush=True,
+            )
+        # local ranks 1..N-1 must wait for local0's codegen to land in the shared cache
+        torch.distributed.barrier(group=node_group)
+        t_warm = time.time()
+        # warm ranks are cache hits (local0's codegen just landed): one parallel turn
+        if local_rank >= 1:
+            fn()
+        torch.distributed.barrier(group=node_group)
+        if local_rank == 0:
+            print(
+                f"[compile-timing] rank {rank} (local0) warm phase "
+                f"({local_size - 1} warm ranks): {time.time() - t_warm:.1f}s; "
+                f"total {time.time() - t0:.1f}s",
+                file=sys.stderr,
+                flush=True,
+            )
+
+    def _node_process_group(self, local_size: int):
+        """Cached intranode process group for per-node compile warm-up."""
+        cache_key = f"_nequip_compile_pg_{local_size}"
+        if getattr(self, cache_key, None) is None:
+            # ``new_subgroups`` raises on a world size that is not a whole number of nodes
+            setattr(self, cache_key, torch.distributed.new_subgroups(local_size)[0])
+        return getattr(self, cache_key)
+
+    def _compile_variant(
+        self,
+        data: AtomicDataDict.Type,
+        input_signature: tuple,
+        cache: dict,
+    ) -> None:
+        """Trace, compile, sanity-check, and store one cache entry for ``input_signature``."""
+        if self.weight_names is None:
+            self.weight_names = [n for n, _ in self.model.named_parameters()]
+            self.buffer_names = [n for n, _ in self.model.named_buffers()]
+
+        # == get input fields for this variant ==
+        input_fields = list(input_signature)
+
+        # == run eager model to determine output fields ==
+        eager_output = super().forward(data.copy())
+        output_fields = tuple(sorted(eager_output.keys()))
+        del eager_output
+
+        # == preprocess model and make_fx ==
+        model_to_trace = ListInputOutputStateDictWrapper(
+            model=self.model,
+            input_keys=input_fields,
+            output_keys=output_fields,
+            state_dict_keys=self.weight_names + self.buffer_names,
+        )
+
+        weights, buffers = self._get_weights_buffers()
+        fx_model = nequip_make_fx(
+            model=model_to_trace,
+            data=data,
+            fields=input_fields,
+            extra_inputs=weights + buffers,
+        )
+        del weights, buffers
+
+        # == compile exported program ==
+        # see https://pytorch.org/tutorials/intermediate/torch_export_tutorial.html#running-the-exported-program
+        # TODO: compile options
+        compiled_model = torch.compile(
+            fx_model,
+            dynamic=True,
+            fullgraph=False,
+        )
+
+        # store in cache: (compiled_model, output_fields)
+        cache[input_signature] = (compiled_model, output_fields)
+
+        # run original model and compiled model with data to sanity check
+        def compiled_forward_for_test(data_test):
+            return self._compiled_forward(
+                data_test, compiled_model, input_fields, output_fields
+            )
+
+        # only test output fields that are present in data (i.e. labels are present)
+        test_fields = sorted(set(output_fields) & data.keys())
+        test_model_output_similarity_by_dtype(
+            compiled_forward_for_test,
+            self.model,
+            {k: data[k] for k in input_fields},
+            dtype_to_name(self.model_dtype),
+            fields=test_fields,
+            error_message=_pt2_compile_error_message,
+        )
+
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
         # short-circuit if one of the batch dims is 1 (0 would be an error)
         # this is related to the 0/1 specialization problem
@@ -152,63 +309,15 @@ class CompileGraphModel(GraphModel):
 
         if input_signature not in cache:
             # get weight names and buffers (only once on first compilation)
-            if self.weight_names is None:
-                self.weight_names = [n for n, _ in self.model.named_parameters()]
-                self.buffer_names = [n for n, _ in self.model.named_buffers()]
+            if not getattr(self, "_nequip_serialized_first_compile", False):
 
-            # == get input fields for this variant ==
-            input_fields = list(input_signature)
+                def _first_compile():
+                    self._compile_variant(data, input_signature, cache)
 
-            # == run eager model to determine output fields ==
-            eager_output = super().forward(data.copy())
-            output_fields = tuple(sorted(eager_output.keys()))
-            del eager_output
-
-            # == preprocess model and make_fx ==
-            model_to_trace = ListInputOutputStateDictWrapper(
-                model=self.model,
-                input_keys=input_fields,
-                output_keys=output_fields,
-                state_dict_keys=self.weight_names + self.buffer_names,
-            )
-
-            weights, buffers = self._get_weights_buffers()
-            fx_model = nequip_make_fx(
-                model=model_to_trace,
-                data=data,
-                fields=input_fields,
-                extra_inputs=weights + buffers,
-            )
-            del weights, buffers
-
-            # == compile exported program ==
-            # see https://pytorch.org/tutorials/intermediate/torch_export_tutorial.html#running-the-exported-program
-            # TODO: compile options
-            compiled_model = torch.compile(
-                fx_model,
-                dynamic=True,
-                fullgraph=False,
-            )
-
-            # store in cache: (compiled_model, output_fields)
-            cache[input_signature] = (compiled_model, output_fields)
-
-            # run original model and compiled model with data to sanity check
-            def compiled_forward_for_test(data_test):
-                return self._compiled_forward(
-                    data_test, compiled_model, input_fields, output_fields
-                )
-
-            # only test output fields that are present in data (i.e. labels are present)
-            test_fields = sorted(set(output_fields) & data.keys())
-            test_model_output_similarity_by_dtype(
-                compiled_forward_for_test,
-                self.model,
-                {k: data[k] for k in input_fields},
-                dtype_to_name(self.model_dtype),
-                fields=test_fields,
-                error_message=_pt2_compile_error_message,
-            )
+                self._distributed_warm_compile(_first_compile)
+                self._nequip_serialized_first_compile = True
+            else:
+                self._compile_variant(data, input_signature, cache)
 
         # === run compiled model for this variant ===
         compiled_model, output_fields = cache[input_signature]

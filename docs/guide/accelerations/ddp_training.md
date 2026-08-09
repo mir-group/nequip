@@ -79,3 +79,9 @@ When using DDP, the {class}`torch.utils.data.distributed.DistributedSampler` may
 Be very careful when reporting validation or test metrics in DDP settings, as data duplication can lead to incorrect metrics. Either ensure data samples can be evenly distributed to all ranks, or perform validation/testing on a single rank.
 
 For more details on handling validation in distributed settings, see [Lightning's documentation](https://lightning.ai/docs/pytorch/stable/common/lightning_module.html#test-loop).
+
+### Node-parallel warm compile
+
+By default, every rank compiles concurrently. On large multi-node jobs whose ranks share one Inductor/Triton cache directory on a parallel filesystem, this concurrent cold codegen can crash or hang. Setting `NEQUIP_NODE_PARALLEL_COMPILE=1` (or `true`, `yes`, `y`) makes the first compile serialize per node instead: local rank 0 on each node cold-compiles into the shared cache (all nodes in parallel), then the remaining local ranks compile in one parallel turn as cache hits, keeping startup time flat with node count.
+
+This requires `SLURM_NTASKS_PER_NODE` to be set (i.e. submit with `--ntasks-per-node`). Without it the ranks-per-node count falls back to `torch.cuda.device_count()`, which is `1` under per-task GPU binding, making every rank a local rank 0 and silently restoring the default concurrent behaviour. Only the first compiled input-signature variant is serialized; any later variants compile concurrently on all ranks.
