@@ -187,9 +187,14 @@ def main(config: DictConfig) -> None:
                 ]
             }
         )
+        # Free the checkpoint's state_dict tensors now: info_dict only references the
+        # small hyper_parameters subtree, which survives the del:
+        del checkpoint
+
         # TODO: consider allowing override of compile mode when continuing interrupted runs
         nequip_module = training_module.load_from_checkpoint(
             config.ckpt_path,
+            map_location="cpu",  # never restore saved tensors to their (previous) saved GPU device
             num_datasets=datamodule.num_datasets,
             info_dict=info_dict,
             weights_only=False,
