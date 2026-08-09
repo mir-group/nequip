@@ -66,7 +66,7 @@ If you use this code in your academic work, please cite:
     > Digital Discovery, 2026, Advance Article. <br/>
     > https://doi.org/10.1039/D5DD00423C
 
- 2. The [NequIP/Allegro foundation potentials paper](https://doi.org/10.48550/arXiv.2607.28461), if you use any of the [foundation potentials](../guide/getting-started/foundation_potentials.md) (from [nequip.net](https://www.nequip.net/), [matbench-discovery](https://matbench-discovery.materialsproject.org) or otherwise):
+ 2. The [NequIP/Allegro foundation potentials paper](https://doi.org/10.48550/arXiv.2607.28461), if you use any of the [foundation potentials](https://nequip.readthedocs.io/en/latest/guide/getting-started/foundation_potentials.html) (from [nequip.net](https://www.nequip.net/), [matbench-discovery](https://matbench-discovery.materialsproject.org) or otherwise):
     > Seán R. Kavanagh, Chuin Wei Tan, Menghang Wang, Marc L. Descoteaux, Gabriel de Miranda Nascimento, Ulrik Unneberg, Laura Zichi, Francesco Libbi, Norma Rivano, Austin Glover, Vivek Bharadwaj, Anders Johansson, William C. Witt, Albert Musaelian, Boris Kozinsky. <br/>
     > "Fast and Accurate Foundation Models for Equivariant Machine-Learned Interatomic Potentials." <br/>
     > arXiv:2607.28461 (2026). <br/>

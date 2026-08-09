@@ -42,6 +42,6 @@ See the [Fine-Tuning](../training-techniques/fine_tuning.md) page for the full r
 The [architecture presets](../configuration/model.md#architecture-presets) ({func}`~nequip.model.PresetNequIPGNNModel`) reproduce the model sizes of the NequIP foundation potentials, and the accelerations documented under [Accelerations](../accelerations/index.rst) — [train-time compilation](../accelerations/pt2_compilation.md), [GPU kernel modifiers](../accelerations/gpu_kernel_modifiers.md), [mixed precision](../accelerations/precision.md), and [multi-GPU training](../accelerations/ddp_training.md) — are what make training on ultra-large datasets affordable. Their combined effect is benchmarked in the [foundation potentials paper](https://doi.org/10.48550/arXiv.2607.28461).
 
 ```{note}
-Please cite the [NequIP foundation potentials paper](https://doi.org/10.48550/arXiv.2607.28461) (and the [NequIP infrastructure paper](https://doi.org/10.1039/D5DD00423C)) if you fine-tune or use the NequIP/Allegro [foundation potentials](../getting-started/foundation_potentials.md).
+Please cite the [NequIP foundation potentials paper](https://doi.org/10.48550/arXiv.2607.28461) (and the [NequIP infrastructure paper](https://doi.org/10.1039/D5DD00423C)) if you fine-tune or use the NequIP/Allegro foundation potentials.
 See [References & citing](../../introduction/intro.md#references--citing) for the full citation details.
 ```
