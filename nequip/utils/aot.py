@@ -14,7 +14,16 @@ from .dtype import (
     _pt2_compile_error_message,
 )
 
-from typing import List, Dict, Union, Any, Optional
+from typing import List, Dict, Union, Any, Final, Optional
+
+_NEQUIP_SKIP_AOTI_MODEL_CHECK: Final[bool] = os.environ.get(
+    "NEQUIP_SKIP_AOTI_MODEL_CHECK", ""
+).lower() in (
+    "1",
+    "true",
+    "yes",
+    "y",
+)
 
 
 def aot_export_model(
@@ -86,7 +95,7 @@ def aot_export_model(
     assert out_path == output_path
 
     # === sanity check ===
-    if os.environ.get("NEQUIP_SKIP_AOTI_MODEL_CHECK", "0") != "1":
+    if not _NEQUIP_SKIP_AOTI_MODEL_CHECK:
         aot_model = DictInputOutputWrapper(
             torch._inductor.aoti_load_package(out_path),
             input_fields,
