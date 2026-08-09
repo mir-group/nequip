@@ -44,9 +44,7 @@ def stable_silu_backward(grad_output, self):
 def nequip_decomp_table():
     """Core-aten decompositions with NequIP patches (currently just modified ``silu_backward`` to avoid double-backward overflow)."""
     table = dict(core_aten_decompositions())
-    for key in table:
-        if str(key) == "aten.silu_backward.default":
-            table[key] = stable_silu_backward
+    table[torch.ops.aten.silu_backward.default] = stable_silu_backward
     return table
 
 
