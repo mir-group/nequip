@@ -99,7 +99,7 @@ jobs:
           # install CuEquivariance if CUDA is available
           if python3 -c "import torch; exit(0 if torch.cuda.is_available() else 1)"; then
             echo "Installing CuEquivariance (CUDA available)"
-            pip install cuequivariance-torch cuequivariance-ops-torch-cu12
+            pip install cuequivariance-torch==0.10.0 cuequivariance-ops-torch-cu12==0.10.0
           else
             echo "Skipping CuEquivariance installation (CUDA not available)"
           fi
