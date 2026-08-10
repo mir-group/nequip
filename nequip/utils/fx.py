@@ -6,6 +6,7 @@ from torch.fx.experimental.proxy_tensor import make_fx
 from torch._decomp import core_aten_decompositions
 
 from nequip.data import AtomicDataDict
+from .versions.torch_versions import _TORCH_IS_2_12
 import contextlib
 import difflib
 import uuid
@@ -108,26 +109,45 @@ def nequip_make_fx(
 
 
 def _nequip_make_fx(model, inputs):
-    with fx_duck_shape(False):
-        return make_fx(
+    # === why we decompose `silu_backward` (history) ===
+    # `make_fx` unfolds an `autograd.grad` (force) computation, so it traces a backward pass,
+    # and `torch.compile` later takes a *second* backward through it during training.
+    # That double-backward needs `aten::silu_backward` to itself be differentiable, which it is not at the ATen level,
+    # so from PT 2.9.1 to 2.10.0 training started failing with:
+    #   RuntimeError: derivative for aten::silu_backward is not implemented
+    # (whether it triggers depends on the double backward and whether the fx graph is decomposed,
+    #  specifically `autograd_would_have_decomposed(func, flat_args_kwargs)`:
+    #    PT 2.9.1:  https://github.com/pytorch/pytorch/blob/d38164a545b4a4e4e0cf73ce67173f70574890b6/torch/fx/experimental/proxy_tensor.py#L898
+    #    PT 2.10.0: https://github.com/pytorch/pytorch/blob/449b1768410104d3ed79d3bcfe4ba1d65c7f22c0/torch/fx/experimental/proxy_tensor.py#L1044
+    #    explanation: https://github.com/pytorch/pytorch/blob/5a48148c1ab83c1e3779283d904ba5744bbe8eb3/torch/utils/_python_dispatch.py#L811 )
+    # To overcome this, we always decompose via `nequip_decomp_table`,
+    # which rewrites `aten.silu_backward` into the double-differentiable `stable_silu_backward`
+    # (minimal testing indicated always decomposing is not a problem).
+
+    # === why single-threaded tracing on PT 2.12 ===
+    # For that decomposition to fire it must be visible on whichever thread dispatches `silu_backward`.
+    # PyTorch 2.12 regressed `make_fx`'s decomposition table from a thread-shared module global to a `contextvars.ContextVar`,
+    # which is NOT propagated to the autograd engine's backward worker threads;
+    # the force backward runs on such a thread, sees an empty table, and `aten.silu_backward` survives,
+    # resurfacing the error above at `torch.compile` time.
+    # PT 2.13 fixed it by moving the table onto the ProxyTorchDispatchMode instance
+    # (carried on the dispatch-mode TLS, which IS propagated to backward threads).
+    # Disabling autograd multithreading keeps every backward dispatch on the tracing thread where the table is visible; only 2.12.x needs it,
+    # and it is a no-op everywhere else.
+    mt_ctx = (
+        torch.autograd.set_multithreading_enabled(False)
+        if _TORCH_IS_2_12
+        else contextlib.nullcontext()
+    )
+    with mt_ctx, fx_duck_shape(False):
+        gm = make_fx(
             model,
-            # see below for explanation on decomposition table
             decomposition_table=nequip_decomp_table(),
             tracing_mode="symbolic",
             _allow_non_fake_inputs=True,
             _error_on_data_dependent_ops=True,
         )(*[i.clone() for i in inputs])
-
-    # from PT 2.9.1 to PT 2.10.0, we get errors during training such as
-    # RuntimeError: derivative for aten::silu_backward is not implemented
-    # this is because of the double backwards and whether the fx graph is decomposed.
-    # relevant lines in PT 2.9.1: https://github.com/pytorch/pytorch/blob/d38164a545b4a4e4e0cf73ce67173f70574890b6/torch/fx/experimental/proxy_tensor.py#L898
-    # PT 2.10.0: https://github.com/pytorch/pytorch/blob/449b1768410104d3ed79d3bcfe4ba1d65c7f22c0/torch/fx/experimental/proxy_tensor.py#L1044
-    # specifically autograd_would_have_decomposed(func, flat_args_kwargs)
-    # explanation: https://github.com/pytorch/pytorch/blob/5a48148c1ab83c1e3779283d904ba5744bbe8eb3/torch/utils/_python_dispatch.py#L811
-
-    # to overcome this problem, we just always decompose
-    # minimal testing indicated that it shouldn't be a problem to always decompose
+    return gm
 
 
 def highlight_code_differences(code1, code2):

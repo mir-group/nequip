@@ -183,8 +183,10 @@ class NequIPTorchSimCalc(_IntegrationLoaderMixin, ModelInterface):
             # previously, pbc is a bool
             pbc = torch.tensor([pbc] * 3, dtype=torch.bool, device=self._device)
         # after PR, pbc is already a tensor with shape [3]
+        # n_systems from the per-system cell's batch dim
+        n_systems = sim_state.cell.shape[0]
         # expand to [n_systems, 3] for batched processing
-        pbc_tensor = pbc.unsqueeze(0).expand(self.n_systems, 3)
+        pbc_tensor = pbc.unsqueeze(0).expand(n_systems, 3)
 
         data: dict[str, torch.Tensor] = {
             AtomicDataDict.POSITIONS_KEY: sim_state.positions,
@@ -217,7 +219,7 @@ class NequIPTorchSimCalc(_IntegrationLoaderMixin, ModelInterface):
         if energy is not None:
             results["energy"] = energy.view(-1).detach()
         else:
-            results["energy"] = torch.zeros(self.n_systems, device=self._device)
+            results["energy"] = torch.zeros(n_systems, device=self._device)
 
         if self.compute_forces:
             forces = out[AtomicDataDict.FORCE_KEY]
