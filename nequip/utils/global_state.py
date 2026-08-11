@@ -6,7 +6,12 @@ from lightning.pytorch import seed_everything
 import e3nn
 
 from .global_dtype import _GLOBAL_DTYPE
-from .versions.torch_versions import _TORCH_GE_2_6, _TORCH_GE_2_9, _TORCH_GE_2_10
+from .versions.torch_versions import (
+    _TORCH_GE_2_6,
+    _TORCH_GE_2_9,
+    _TORCH_GE_2_10,
+    _TORCH_GE_2_13,
+)
 
 import warnings
 import os
@@ -61,6 +66,22 @@ def get_latest_global_state(only_metadata_related=False) -> Dict:
 def global_state_initialized():
     global _GLOBAL_STATE_INITIALIZED
     return _GLOBAL_STATE_INITIALIZED
+
+
+def _sync_legacy_cudnn_tf32_flag(allow_tf32: bool) -> None:
+    """
+    Re-syncs cuDNN's legacy ``allow_tf32`` flag with the new ``fp32_precision`` API.
+
+    PyTorch >= 2.13 propagates ``torch.backends.fp32_precision`` to cuDNN, whose legacy
+    flag cannot encode ``"ieee"`` and raises on read once it does.
+    ``torch.export`` snapshots that flag unconditionally, so an out-of-sync flag breaks `nequip-compile`
+    on any machine with a CUDA-enabled build, for CPU and CUDA targets alike.
+    Setting it here leaves all ``fp32_precision`` values untouched.
+    See https://github.com/mir-group/nequip/issues/609
+    and https://github.com/pytorch/pytorch/issues/179445
+    """
+    if _TORCH_GE_2_13:
+        torch.backends.cudnn.allow_tf32 = allow_tf32
 
 
 def set_global_state(
@@ -142,6 +163,7 @@ def set_global_state(
             if _TORCH_GE_2_9:
                 # use new API for PyTorch >= 2.9
                 torch.backends.fp32_precision = "ieee"
+                _sync_legacy_cudnn_tf32_flag(False)
             else:
                 # use legacy API for PyTorch < 2.9
                 torch.backends.cuda.matmul.allow_tf32 = False
@@ -164,6 +186,8 @@ def set_global_state(
                         f"Setting the GLOBAL value for fp32_precision to {desired_precision} which is different than the previous value of {current_precision}"
                     )
                 torch.backends.fp32_precision = desired_precision
+            # unconditional, since `fp32_precision` may have been set behind our back
+            _sync_legacy_cudnn_tf32_flag(allow_tf32)
         else:
             # use legacy API for PyTorch < 2.9
             if torch.backends.cuda.matmul.allow_tf32 is not allow_tf32:

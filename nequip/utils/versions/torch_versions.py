@@ -24,6 +24,9 @@ _TORCH_GE_2_9 = packaging.version.parse(
 _TORCH_GE_2_10 = packaging.version.parse(
     _TORCH_VERSION.base_version
 ) >= packaging.version.parse("2.10")
+_TORCH_GE_2_13 = packaging.version.parse(
+    _TORCH_VERSION.base_version
+) >= packaging.version.parse("2.13")
 # used for skipping specific tests for PyTorch 2.10.0 due to known bugs
 # (specifically CPU+aotinductor compilation issues)
 # this is not GE in case future PyTorch versions resolve the issue
