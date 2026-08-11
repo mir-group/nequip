@@ -47,6 +47,11 @@ def _get_model_file_path(input_path):
                 f"Model {model_id} has a newer version available: {model_info.newer_version_id}"
             )
 
+        logger.info(
+            "Please cite this model in any resulting work -- see "
+            "https://nequip.readthedocs.io/en/latest/guide/getting-started/foundation_potentials.html"
+        )
+
         download_url = model_info.artifact.download_url
 
         # check cache first

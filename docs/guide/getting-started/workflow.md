@@ -196,7 +196,7 @@ If performing training and inference on separate machines, with possibly differe
 
 ### Compiling models from nequip.net
 
-Models from [nequip.net](https://www.nequip.net/) can be compiled directly using the `nequip.net:` syntax:
+Pretrained models from [nequip.net](https://www.nequip.net/), including the NequIP/Allegro [foundation potentials](./foundation_potentials.md), can be compiled directly using the `nequip.net:` syntax:
 
 ```bash
 nequip-compile \
@@ -215,6 +215,11 @@ The first compilation will download the model from the server, but subsequent co
 Cached files are validated using cryptographic hashes to ensure integrity.
 
 To bypass the cache for a single run, set `NEQUIP_NO_CACHE=1` (or `true`, `yes`, `y`). To re-enable caching, unset the variable or set it to any other value like `NEQUIP_NO_CACHE=0`.
+
+```{note}
+Please cite the [NequIP foundation potentials paper](https://doi.org/10.48550/arXiv.2607.28461) (and the [NequIP infrastructure paper](https://doi.org/10.1039/D5DD00423C)) if you fine-tune or use the NequIP/Allegro [foundation potentials](../getting-started/foundation_potentials.md).
+See [References & citing](../../introduction/intro.md#references--citing) for the full citation details.
+```
 
 ## Production Simulations
 

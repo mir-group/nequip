@@ -8,8 +8,10 @@ Most recent change on the top.
 
 ## Unreleased
 
-### Fixed
+### Added
+- docs page for the NequIP [foundation potentials](https://doi.org/10.48550/arXiv.2607.28461), with links to fine-tuning, compilation and the benchmarks reported in the paper, and citation instructions (`CITATION.bib`, `README`, docs) for using them
 
+### Fixed
 - train-time compile (`compile_mode: compile`) crashing on PyTorch 2.12 with `derivative for aten::silu_backward is not implemented`: 2.12 keeps `make_fx`'s decomposition table in a thread-local contextvar not seen by the autograd backward worker thread, so the `silu_backward` patch was skipped; tracing is now single-threaded on 2.12 to keep the table visible (no-op on other versions)
 - silent wrong forces in the torch-sim integration for batched evaluation: `NequIPTorchSimCalc` used a cached system count, so a batch reusing the previous call's atomic numbers with a different number of systems (e.g. monatomic cells) used a stale layout; the system count now comes from the input state's cell batch dimension
 

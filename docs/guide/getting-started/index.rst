@@ -9,3 +9,4 @@ Framework-level information for using NequIP.
    install
    workflow
    files
+   foundation_potentials

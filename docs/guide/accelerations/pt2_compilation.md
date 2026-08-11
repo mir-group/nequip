@@ -17,6 +17,7 @@ model:
 ```
 Note that `compile_mode` can only be `compile` (use [`torch.compile`](https://pytorch.org/docs/stable/generated/torch.compile.html)), or `eager` (no compilation used). If `compile_mode` is unspecified, it defaults to `eager`.
 It will take a bit of time (around a minute or more) for the model to be compiled with [`torch.compile`](https://pytorch.org/docs/stable/generated/torch.compile.html) before training proceeds, but the speed-ups are worth it.
+Training throughput with and without graph compilation (alone and combined with the [GPU kernel modifiers](gpu_kernel_modifiers.md) and [mixed precision](precision.md)) is benchmarked for NequIP and Allegro models in the [NequIP foundation potentials paper](https://doi.org/10.48550/arXiv.2607.28461).
 
 To use [`torch.compile`](https://pytorch.org/docs/stable/generated/torch.compile.html) with PyTorch>=2.8.0 installed, ensure that you are using NequIP>=0.11.1.
 

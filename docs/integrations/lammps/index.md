@@ -3,6 +3,8 @@
 [LAMMPS](https://docs.lammps.org/Manual.html) is a production-grade molecular dynamics engine.
 The NequIP framework provides two different integrations for LAMMPS.
 
+MD speeds through these interfaces — including comparison to [ASE](../ase.md), and multi-node strong/weak scaling up to 100M+ atom systems on NVIDIA and AMD GPUs — are benchmarked in the [NequIP foundation potentials paper](https://doi.org/10.48550/arXiv.2607.28461).
+
 ## `pair_nequip_allegro`
 
 The [`pair_nequip_allegro` page](pair_styles.md) provides details on using the LAMMPS plugins hosted in the [`pair_nequip_allegro` repository](https://github.com/mir-group/pair_nequip_allegro)  provides pair styles to use NequIP framework interatomic potentials directly in LAMMPS.

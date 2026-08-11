@@ -14,7 +14,7 @@ NequIP is an open-source code for building E(3)-equivariant interatomic potentia
 
  - [Installation and usage](#installation-and-usage)
  - [Tutorial](#tutorial)
- - [Pre-trained models](#pre-trained-models)
+ - [Foundation potentials & pre-trained models](#foundation-potentials--pre-trained-models)
  - [Highlighted Features](#highlighted-features)
  - [Extension Packages](#extension-packages)
  - [References & citing](#references--citing)
@@ -32,9 +32,11 @@ Installation instructions and user guides can be found in our [docs](https://neq
 
 The best way to learn how to use NequIP is through the [tutorial notebook](https://colab.research.google.com/github/mir-group/nequip-tutorial/blob/main/NequIP_Tutorial.ipynb). This will run entirely on Google Colab's cloud virtual machine; you do not need to install or run anything locally.
 
-## Pre-trained models
+## Foundation potentials & pre-trained models
 
-Pre-trained models can be found at [nequip.net](https://www.nequip.net/).
+The NequIP framework provides a family of **foundation potentials** — pre-trained, wide-purpose interatomic potentials covering most of the periodic table — which can be used directly for production simulations or fine-tuned on your own data. These are hosted at [nequip.net](https://www.nequip.net/) and described in ["Fast and Accurate Foundation Models for Equivariant Machine-Learned Interatomic Potentials"](https://doi.org/10.48550/arXiv.2607.28461).
+
+See the [foundation potentials docs](https://nequip.readthedocs.io/en/latest/guide/getting-started/foundation_potentials.html) for how to download, compile, and run them, and the [fine-tuning docs](https://nequip.readthedocs.io/en/latest/guide/training-techniques/fine_tuning.html) for adapting them to your own dataset, with the citation information below.
 
 ## Highlighted Features
 
@@ -64,19 +66,25 @@ If you use this code in your academic work, please cite:
     > Digital Discovery, 2026, Advance Article. <br/>
     > https://doi.org/10.1039/D5DD00423C
 
+ 2. The [NequIP/Allegro foundation potentials paper](https://doi.org/10.48550/arXiv.2607.28461), if you use any of the [foundation potentials](https://nequip.readthedocs.io/en/latest/guide/getting-started/foundation_potentials.html) (from [nequip.net](https://www.nequip.net/), [matbench-discovery](https://matbench-discovery.materialsproject.org) or otherwise):
+    > Seán R. Kavanagh, Chuin Wei Tan, Menghang Wang, Marc L. Descoteaux, Gabriel de Miranda Nascimento, Ulrik Unneberg, Laura Zichi, Francesco Libbi, Norma Rivano, Austin Glover, Vivek Bharadwaj, Anders Johansson, William C. Witt, Albert Musaelian, Boris Kozinsky. <br/>
+    > "Fast and Accurate Foundation Models for Equivariant Machine-Learned Interatomic Potentials." <br/>
+    > arXiv:2607.28461 (2026). <br/>
+    > https://doi.org/10.48550/arXiv.2607.28461
+
 And also consider citing:
 
- 2. The [original NequIP paper](https://www.nature.com/articles/s41467-022-29939-5)
+ 3. The [original NequIP paper](https://www.nature.com/articles/s41467-022-29939-5)
     > Simon Batzner, Albert Musaelian, Lixin Sun, Mario Geiger, Jonathan P. Mailoa, Mordechai Kornbluth, Nicola Molinari, Tess E. Smidt, and Boris Kozinsky. <br/>
     > "E(3)-equivariant graph neural networks for data-efficient and accurate interatomic potentials." <br/>
     > Nature Communications 13, no. 1 (2022): 2453
 
- 3. The [computational scaling paper](https://dl.acm.org/doi/abs/10.1145/3581784.3627041) that discusses optimized LAMMPS MD
+ 4. The [computational scaling paper](https://dl.acm.org/doi/abs/10.1145/3581784.3627041) that discusses optimized LAMMPS MD
     > Albert Musaelian, Anders Johansson, Simon Batzner, and Boris Kozinsky. <br/>
     > "Scaling the leading accuracy of deep equivariant models to biomolecular simulations of realistic size." <br/>
     > In Proceedings of the International Conference for High Performance Computing, Networking, Storage and Analysis, pp. 1-12. 2023.
 
- 4. The `e3nn` equivariant neural network package used by NequIP, through its [preprint](https://arxiv.org/abs/2207.09453) and/or [code](https://github.com/e3nn/e3nn)
+ 5. The `e3nn` equivariant neural network package used by NequIP, through its [preprint](https://arxiv.org/abs/2207.09453) and/or [code](https://github.com/e3nn/e3nn)
 
 **Extension packages like [Allegro](https://github.com/mir-group/allegro) have their own additional relevant citations.**
 

@@ -4,6 +4,10 @@
 The [Atomic Simulation Environment (ASE)](https://wiki.fysik.dtu.dk/ase/) is a popular Python package providing a framework for working with atomic data, reading and writing common formats, and running various simulations and calculations.
 NequIP provides the {class}`~nequip.integrations.ase.NequIPCalculator` for integration with ASE. See the [ASE calculator API](../api/ase.rst) for detailed documentation.
 
+```{tip}
+Molecular dynamics speeds through the ASE and [LAMMPS](lammps/index.md) interfaces are benchmarked directly against each other, over a range of system sizes and models, in the [NequIP foundation potentials paper](https://doi.org/10.48550/arXiv.2607.28461).
+```
+
 ## Creating an ASE Calculator
 
 To use a NequIP framework model with ASE, you need to follow these steps:

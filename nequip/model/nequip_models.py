@@ -73,7 +73,7 @@ def _format_nequip_gnn_preset_docstring() -> str:
     )
     return f"""Build :func:`NequIPGNNModel` from a named architecture preset.
 
-    This is a wrapper of :func:`NequIPGNNModel` that injects preset hyperparameters based on model sizes of the NequIP foundation potentials.
+    This is a wrapper of :func:`NequIPGNNModel` that injects preset hyperparameters based on model sizes of the NequIP foundation potentials, which are described in `"Fast and Accurate Foundation Models for Equivariant Machine-Learned Interatomic Potentials" <https://doi.org/10.48550/arXiv.2607.28461>`__ (see that paper for the accuracy/speed trade-off across these model sizes, and please cite it if you use the foundation potentials / presets!).
     All arguments are the same as :func:`NequIPGNNModel`, except this builder also requires ``preset`` and applies preset defaults before ``**kwargs``.
     For full argument documentation, see :func:`NequIPGNNModel`.
     Users can override the preset defaults by providing arguments for the fields to be overriden.
