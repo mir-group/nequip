@@ -89,15 +89,17 @@ jobs:
           else
             pip install vesin
           fi
-          # install torch-sim-atomistic only for latest torch version
+          # install torch-sim-atomistic and nvalchemiops only for latest torch version
+          # (nvalchemi-toolkit-ops requires torch >= 2.8)
           if [ "${{ matrix.torch-version }}" = "2.10.*" ]; then
             pip install torch-sim-atomistic
+            pip install nvalchemi-toolkit-ops==0.3.1
           fi
           #pip install schedulefree  #Disabled to reduce CI runtime; uncomment to test ScheduleFreeLightningModule
           # install CuEquivariance if CUDA is available
           if python3 -c "import torch; exit(0 if torch.cuda.is_available() else 1)"; then
             echo "Installing CuEquivariance (CUDA available)"
-            pip install cuequivariance-torch cuequivariance-ops-torch-cu12
+            pip install cuequivariance-torch==0.10.0 cuequivariance-ops-torch-cu12==0.10.0
           else
             echo "Skipping CuEquivariance installation (CUDA not available)"
           fi
