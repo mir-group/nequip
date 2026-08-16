@@ -246,14 +246,22 @@ class ForceStressOutput(GraphModuleMixin, torch.nn.Module):
                 # First dim is batch, second is vec, third is xyz
                 # Note the .abs(), since volume should always be positive
                 # det is equal to a dot (b cross c)
-                volume = torch.linalg.det(cell).abs().unsqueeze(-1)
+                volume = torch.linalg.det(cell).abs().view(num_batch, 1, 1)
 
                 # NOTE: to support batching periodic and non-periodic structures together,
-                # the data processing stage is responsible for ensuring that:
-                # 1. non-periodic systems have a finite dummy cell to prevent infs in the division below
-                # 2. stress labels for non-periodic systems are NaN and handled with `ignore_nan` in loss and metrics
-
-                stress = virial / volume.view(num_batch, 1, 1)
+                # frames with a zero-volume cell get NaN stress, which is meant to be handled
+                # with `ignore_nan` in loss and metrics (as for NaN stress labels).
+                # the denominator must never be zero, even for those frames since
+                # `torch.compile` feeds every unused output a materialized zero tangent,
+                # so a `1/0` local derivative would give `0 * inf = NaN` in the joint
+                # backward and poison every parameter gradient
+                has_volume = volume > 0
+                safe_volume = torch.where(has_volume, volume, torch.ones_like(volume))
+                stress = torch.where(
+                    has_volume,
+                    virial / safe_volume,
+                    torch.full_like(virial, float("nan")),
+                )
                 data[AtomicDataDict.CELL_KEY] = orig_cell
             else:
                 stress = self._empty  # torchscript
