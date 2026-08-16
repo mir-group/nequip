@@ -17,6 +17,8 @@ _DEFAULT_EXTERNAL_MODULES: Final[Set[str]] = {
     "triton",
     # included by e3nn.util.jit
     "io",
+    # included by nequip.nn.compile for distributed compile coordination
+    "sys",
     # included by e3nn TPs
     "opt_einsum_fx",
     "numpy",
