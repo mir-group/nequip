@@ -9,7 +9,7 @@ from nequip.utils.global_state import set_global_state
 
 from .utils import handle_chemical_species_map, basic_transforms
 from pathlib import Path
-from typing import Union, Optional, Dict
+from typing import Any, Union, Optional, Dict
 
 
 class _IntegrationLoaderMixin:
@@ -29,6 +29,7 @@ class _IntegrationLoaderMixin:
         device: Union[str, torch.device] = "cpu",
         chemical_species_to_atom_type_map: Optional[Union[Dict[str, str], bool]] = None,
         neighborlist_backend: str = DEFAULT_NEIGHBORLIST_BACKEND,
+        neighborlist_backend_kwargs: Optional[Dict[str, Any]] = None,
         **kwargs,
     ):
         """Build an integration calculator from a compiled model artifact.
@@ -38,6 +39,8 @@ class _IntegrationLoaderMixin:
             device: device where the model is loaded and evaluated.
             chemical_species_to_atom_type_map: optional chemical species mapping override.
             neighborlist_backend: neighbor list backend used by neighbor transforms.
+            neighborlist_backend_kwargs: optional backend-specific neighborlist options,
+                e.g. ``{"max_neighbors": 64}`` for the ``alchemiops`` backend.
             **kwargs: forwarded to the integration class constructor.
         """
         from nequip.model.inference_models import load_compiled_model
@@ -69,6 +72,7 @@ class _IntegrationLoaderMixin:
                 type_names,
                 chemical_species_to_atom_type_map,
                 neighborlist_backend=neighborlist_backend,
+                neighborlist_backend_kwargs=neighborlist_backend_kwargs,
             ),
             **kwargs,
         )
@@ -83,6 +87,7 @@ class _IntegrationLoaderMixin:
         model_name: str = _SOLE_MODEL_KEY,
         compile_mode: str = _EAGER_MODEL_KEY,
         neighborlist_backend: str = DEFAULT_NEIGHBORLIST_BACKEND,
+        neighborlist_backend_kwargs: Optional[Dict[str, Any]] = None,
         **kwargs,
     ):
         """Build an integration calculator from a saved NequIP model.
@@ -96,6 +101,8 @@ class _IntegrationLoaderMixin:
             compile_mode: compile mode for loading the model; supported values
                 are ``"eager"`` and ``"compile"`` (default: ``"eager"``).
             neighborlist_backend: neighbor list backend used by neighbor transforms.
+            neighborlist_backend_kwargs: optional backend-specific neighborlist options,
+                e.g. ``{"max_neighbors": 64}`` for the ``alchemiops`` backend.
             **kwargs: forwarded to the integration class constructor.
         """
         from nequip.model.saved_models.load_utils import load_saved_model
@@ -126,6 +133,7 @@ class _IntegrationLoaderMixin:
                 type_names,
                 chemical_species_to_atom_type_map,
                 neighborlist_backend=neighborlist_backend,
+                neighborlist_backend_kwargs=neighborlist_backend_kwargs,
             ),
             **kwargs,
         )

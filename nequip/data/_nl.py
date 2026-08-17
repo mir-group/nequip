@@ -1,6 +1,6 @@
 # This file is a part of the `nequip` package. Please see LICENSE and README at the root for information on using it.
 from dataclasses import dataclass
-from typing import Callable, Dict, Final, List, Optional, Union, Tuple
+from typing import Any, Callable, Dict, Final, List, Optional, Union, Tuple
 
 import numpy as np
 import packaging.version
@@ -55,7 +55,9 @@ DEFAULT_NEIGHBORLIST_BACKEND: Final[str] = NEIGHBORLIST_BACKEND_MATSCIPY
 
 @dataclass(frozen=True)
 class NeighborlistBackendSpec:
-    fn: Callable[[AtomicDataDict.Type, float], AtomicDataDict.Type]
+    # backends may accept extra keyword options, forwarded from
+    # `compute_neighborlist_(..., backend_kwargs=...)`
+    fn: Callable[..., AtomicDataDict.Type]
     supports_cpu: bool = True
     supports_cuda: bool = False
 
@@ -212,12 +214,15 @@ def _compute_neighborlist_unbatched_backend(
 def alchemiops_batch_cell_list(
     data: AtomicDataDict.Type,
     r_max: float,
+    max_neighbors: Optional[int] = None,
 ) -> AtomicDataDict.Type:
     """Compute a neighbor list using Alchemiops cell list algorithm.
 
     Args:
         data: input AtomicDataDict.
         r_max: cutoff radius.
+        max_neighbors: cap on neighbors per atom, sizing the internal neighbor matrix.
+            ``None`` (default) uses ``nvalchemiops``' estimate.
 
     Returns:
         data with neighborlist entries added in-place.
@@ -270,6 +275,7 @@ def alchemiops_batch_cell_list(
         batch_idx=system_idx,
         cell=cell.contiguous(),
         pbc=pbc,
+        max_neighbors=max_neighbors,
         return_neighbor_list=True,
     )
 
@@ -334,7 +340,7 @@ def register_neighborlist_backend(
 
     Args:
         backend (str): name for the backend.
-        fn (Callable): backend function with signature ``fn(data, r_max) -> data``.
+        fn (Callable): backend function with signature ``fn(data, r_max, **backend_kwargs) -> data``.
         supports_cpu (bool): whether the backend supports CPU execution.
         supports_cuda (bool): whether the backend supports CUDA execution.
         overwrite (bool): whether to replace an existing backend with the same name.
@@ -365,6 +371,7 @@ def compute_neighborlist_(
     data: AtomicDataDict.Type,
     r_max: float,
     backend: str = DEFAULT_NEIGHBORLIST_BACKEND,
+    backend_kwargs: Optional[Dict[str, Any]] = None,
 ) -> AtomicDataDict.Type:
     """Add a neighborlist to `data` in-place.
 
@@ -378,4 +385,6 @@ def compute_neighborlist_(
         raise ValueError(
             f"Unknown neighborlist backend = `{backend}`. Supported backends: {supported}"
         )
-    return NEIGHBORLIST_BACKEND_OPTIONS[backend].fn(data, r_max)
+    return NEIGHBORLIST_BACKEND_OPTIONS[backend].fn(
+        data, r_max, **(backend_kwargs or {})
+    )

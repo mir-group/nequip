@@ -1,6 +1,6 @@
 # This file is a part of the `nequip` package. Please see LICENSE and README at the root for information on using it.
 import warnings
-from typing import Optional, Union, Dict, List, Callable
+from typing import Any, Optional, Union, Dict, List, Callable
 
 from nequip.data._nl import DEFAULT_NEIGHBORLIST_BACKEND
 
@@ -31,6 +31,7 @@ def basic_transforms(
     type_names: List[str],
     chemical_species_to_atom_type_map: Dict[str, str],
     neighborlist_backend: str = DEFAULT_NEIGHBORLIST_BACKEND,
+    neighborlist_backend_kwargs: Optional[Dict[str, Any]] = None,
 ) -> List[Callable]:
     """Create transform list with neighborlist construction and optional per-edge-type cutoff pruning."""
     from nequip.data.transforms import (
@@ -60,11 +61,16 @@ def basic_transforms(
                 per_edge_type_cutoff=per_edge_type_cutoff,
                 type_names=type_names,
                 backend=neighborlist_backend,
+                backend_kwargs=neighborlist_backend_kwargs,
             )
         )
     else:
         transforms.append(
-            NeighborListTransform(r_max=r_max, backend=neighborlist_backend)
+            NeighborListTransform(
+                r_max=r_max,
+                backend=neighborlist_backend,
+                backend_kwargs=neighborlist_backend_kwargs,
+            )
         )
 
     return transforms

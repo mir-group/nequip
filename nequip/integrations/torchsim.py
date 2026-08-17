@@ -11,7 +11,7 @@ from nequip.data._nl import NEIGHBORLIST_BACKEND_ALCHEMIOPS
 from .mixins import _IntegrationLoaderMixin
 
 from collections.abc import Callable
-from typing import Union, List, Dict, Optional
+from typing import Any, Union, List, Dict, Optional
 from pathlib import Path
 
 
@@ -107,6 +107,7 @@ class NequIPTorchSimCalc(_IntegrationLoaderMixin, ModelInterface):
         device: Union[str, torch.device] = "cpu",
         chemical_species_to_atom_type_map: Optional[Union[Dict[str, str], bool]] = None,
         neighborlist_backend: str = NEIGHBORLIST_BACKEND_ALCHEMIOPS,
+        neighborlist_backend_kwargs: Optional[Dict[str, Any]] = None,
         **kwargs,
     ):
         return super().from_compiled_model(
@@ -114,6 +115,7 @@ class NequIPTorchSimCalc(_IntegrationLoaderMixin, ModelInterface):
             device=device,
             chemical_species_to_atom_type_map=chemical_species_to_atom_type_map,
             neighborlist_backend=neighborlist_backend,
+            neighborlist_backend_kwargs=neighborlist_backend_kwargs,
             **kwargs,
         )
 
