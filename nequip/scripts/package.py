@@ -6,7 +6,7 @@ from nequip.model.saved_models.package import (
     _get_shared_importer,
     _get_package_metadata,
     _suppress_package_importer_exporter_warnings,
-    _cpu_deserialize_if_no_cuda,
+    _cpu_deserialize_always,
 )
 from nequip.model.saved_models import load_saved_model
 from nequip.model.utils import _EAGER_MODEL_KEY
@@ -301,7 +301,7 @@ def main(args=None):
         with _suppress_package_importer_exporter_warnings():
             old_imp = torch.package.PackageImporter(args.input_path)
             pkg_metadata = _get_package_metadata(old_imp)
-            with _cpu_deserialize_if_no_cuda():
+            with _cpu_deserialize_always():
                 old_example_data = old_imp.load_pickle("model", "example_data.pkl")
                 old_module_dict = old_imp.load_pickle(
                     package="model",
@@ -365,7 +365,7 @@ def main(args=None):
 
                     # model pickles: load from old package and re-save (weights preserved)
                     for compile_mode in available_models:
-                        with _cpu_deserialize_if_no_cuda():
+                        with _cpu_deserialize_always():
                             model_dict = old_imp.load_pickle(
                                 package="model",
                                 resource=f"{compile_mode}_model.pkl",
@@ -381,7 +381,7 @@ def main(args=None):
             # verify predictions are unchanged using the original example data
             with _suppress_package_importer_exporter_warnings():
                 new_imp = torch.package.PackageImporter(tmp_path)
-                with _cpu_deserialize_if_no_cuda():
+                with _cpu_deserialize_always():
                     new_module_dict = new_imp.load_pickle(
                         package="model",
                         resource=f"{_EAGER_MODEL_KEY}_model.pkl",
@@ -436,7 +436,7 @@ def main(args=None):
         with _suppress_package_importer_exporter_warnings():
             old_imp = torch.package.PackageImporter(args.input_path)
             pkg_metadata = _get_package_metadata(old_imp)
-            with _cpu_deserialize_if_no_cuda():
+            with _cpu_deserialize_always():
                 old_example_data = old_imp.load_pickle("model", "example_data.pkl")
                 eager_dict = old_imp.load_pickle(
                     package="model",
@@ -485,7 +485,7 @@ def main(args=None):
                         )
 
                     for compile_mode in pkg_metadata["available_models"]:
-                        with _cpu_deserialize_if_no_cuda():
+                        with _cpu_deserialize_always():
                             model_dict = old_imp.load_pickle(
                                 package="model",
                                 resource=f"{compile_mode}_model.pkl",

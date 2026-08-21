@@ -26,12 +26,9 @@ logger = RankedLogger(__name__, rank_zero_only=True)
 
 
 @contextlib.contextmanager
-def _cpu_deserialize_if_no_cuda():
-    """Force CUDA-saved storages inside packaged models to load on CPU when CUDA is unavailable."""
-    if torch.cuda.is_available():
-        yield
-        return
-
+def _cpu_deserialize_always():
+    """Force storages inside nested pickles to load on CPU."""
+    # e3nn `CodeGenMixin` bakes generated `fx.GraphModule`s into opaque pickles that `map_location` cannot reach
     orig = torch.storage._load_from_bytes
 
     def _load_from_bytes_cpu(b):
@@ -148,7 +145,7 @@ def ModelFromPackage(package_path: str, compile_mode: str = _EAGER_MODEL_KEY):
             )
             compile_mode = _EAGER_MODEL_KEY
 
-        with _cpu_deserialize_if_no_cuda():
+        with _cpu_deserialize_always():
             model = imp.load_pickle(
                 package="model",
                 resource=f"{compile_mode}_model.pkl",
@@ -163,7 +160,7 @@ def data_dict_from_package(package_path: str) -> AtomicDataDict.Type:
     """Load example data from a .nequip.zip package file."""
     with _suppress_package_importer_exporter_warnings():
         imp = torch.package.PackageImporter(package_path)
-        with _cpu_deserialize_if_no_cuda():
+        with _cpu_deserialize_always():
             data = imp.load_pickle(package="model", resource="example_data.pkl")
     return data
 
