@@ -9,6 +9,7 @@ from .write_xyz import TestTimeXYZFileWriter, ValTimeXYZFileWriter
 from .wandb_watch import WandbWatch
 from .tf32_scheduler import TF32Scheduler
 from .training_stats import TrainingStatsMonitor
+from .profiler import TorchProfilerCallback
 
 __all__ = [
     "SoftAdapt",
@@ -20,4 +21,5 @@ __all__ = [
     "ValTimeXYZFileWriter",
     "WandbWatch",
     "TrainingStatsMonitor",
+    "TorchProfilerCallback",
 ]

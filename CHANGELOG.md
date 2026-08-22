@@ -10,6 +10,7 @@ Most recent change on the top.
 
 ### Added
 - docs page for the NequIP [foundation potentials](https://doi.org/10.48550/arXiv.2607.28461), with links to fine-tuning, compilation and the benchmarks reported in the paper, and citation instructions (`CITATION.bib`, `README`, docs) for using them
+- `TorchProfilerCallback` for profiling training with `torch.profiler`
 
 ### Fixed
 - https://github.com/mir-group/nequip/issues/612: `Expected all tensors to be on the same device` when loading a CUDA-built package on a CUDA-visible machine, seen as `nequip-package update` failing its own verification: e3nn's `CodeGenMixin` serializes generated `fx.GraphModule`s as opaque nested pickles whose storages carry an absolute device tag and are unreachable by `map_location`, so the Wigner-3j buffers stayed on `cuda:0` while the rest of the model loaded on CPU; the CPU-remapping context manager added for CPU-only hosts is now applied unconditionally

@@ -24,3 +24,9 @@ nequip.train.callbacks
 
 .. autoclass:: nequip.train.callbacks.TF32Scheduler
     :members:
+
+.. autoclass:: nequip.train.callbacks.TrainingStatsMonitor
+    :members:
+
+.. autoclass:: nequip.train.callbacks.TorchProfilerCallback
+    :members:
