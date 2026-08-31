@@ -8,6 +8,8 @@ Most recent change on the top.
 
 ## Unreleased
 
+## [0.19.1]
+
 ### Added
 - docs page for the NequIP [foundation potentials](https://doi.org/10.48550/arXiv.2607.28461), with links to fine-tuning, compilation and the benchmarks reported in the paper, and citation instructions (`CITATION.bib`, `README`, docs) for using them
 - `TorchProfilerCallback` for profiling training with `torch.profiler`
