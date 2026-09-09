@@ -177,7 +177,6 @@ class CompileGraphModel(GraphModel):
             fn()
             return
 
-        import sys
         import time
 
         rank, local_rank, local_size = _local_rank_layout()
@@ -188,13 +187,11 @@ class CompileGraphModel(GraphModel):
             # one marker per node: the expensive/hang-prone cold compile is starting here
             print(
                 f"[compile] {label}: cold compile (node warm)",
-                file=sys.stderr,
                 flush=True,
             )
             fn()
             print(
                 f"[compile-timing] rank {rank} (local0) cold compile: {time.time() - t0:.1f}s",
-                file=sys.stderr,
                 flush=True,
             )
         # local ranks 1..N-1 must wait for local0's codegen to land in the shared cache
@@ -209,7 +206,6 @@ class CompileGraphModel(GraphModel):
                 f"[compile-timing] rank {rank} (local0) warm phase "
                 f"({local_size - 1} warm ranks): {time.time() - t_warm:.1f}s; "
                 f"total {time.time() - t0:.1f}s",
-                file=sys.stderr,
                 flush=True,
             )
 
