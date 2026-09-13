@@ -8,6 +8,9 @@ Most recent change on the top.
 
 ## Unreleased
 
+### Fixed
+- `--inductor-configs` values were passed to `torch` as strings, so numeric options mis-compared. Values are now YAML-parsed, as for `nequip-package modify` modifier kwargs.
+
 ## [0.19.1]
 
 ### Added

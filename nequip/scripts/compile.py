@@ -51,6 +51,16 @@ def _parse_bounds_to_Dim(name: str, bounds_str: str):
         )
 
 
+def _build_inductor_configs(config_args: list[str]) -> dict:
+    """Parse ``--inductor-configs`` ``key=value`` arguments into an inductor config dict.
+
+    Values are YAML-parsed (as for ``nequip-package modify`` modifier kwargs).
+    """
+    return {  # `split("=", 1)` because a value may itself contain "="
+        k: yaml.safe_load(v) for k, v in (item.split("=", 1) for item in config_args)
+    }
+
+
 def main(args=None):
     # === parse inputs ===
     parser = argparse.ArgumentParser(
@@ -160,7 +170,7 @@ def main(args=None):
     )
     parser.add_argument(
         "--inductor-configs",
-        help="options for AOTInductor (default: {})",
+        help="options for AOTInductor as `key=value` pairs, where values are YAML-parsed, e.g. `cpp.simdlen=256` (default: {})",
         nargs="+",
         type=str,
         default=[],
@@ -296,7 +306,7 @@ def main(args=None):
         )
 
         # === inductor configs ===
-        inductor_configs = dict(item.split("=") for item in args.inductor_configs)
+        inductor_configs = _build_inductor_configs(args.inductor_configs)
 
         # torch will also error out later on but we can be pre-emptive
         assert _AOT_OUTPUT_PATH_KEY not in inductor_configs
