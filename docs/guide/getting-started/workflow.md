@@ -168,7 +168,7 @@ For further speed-ups where appropriate (e.g. often permissible for MD simulatio
 
 ```{important}
 When compiling for **CPU** (`--device cpu`), `nequip-compile` turns off Inductor's vectorized C++ codegen and emits scalar code instead, by default.
-This is typically significantly faster for model inference. To compile with vectorization instead, give your CPU's vector width with `--inductor-configs cpp.simdlen=512` (`512` for AVX-512, `256` for AVX2, `128` for ARM NEON), or set torch's own `ATEN_CPU_CAPABILITY` to an x86 ISA name (e.g. `ATEN_CPU_CAPABILITY=avx512 nequip-compile ...`). 
+This is typically significantly faster for model inference. To compile with vectorization instead, give your CPU's vector width with `--inductor-configs cpp.simdlen=512` (`512` for AVX-512, `256` for AVX2, `128` for ARM NEON), or set torch's own `ATEN_CPU_CAPABILITY` to an x86 ISA name (e.g. `ATEN_CPU_CAPABILITY=avx512 nequip-compile ...`).
 `Allegro-L` is the one NequIP/Allegro foundation model we have measured to be faster with vectorized codegen (by 1.34x), so can be worth opting in there.
 ```
 

@@ -10,7 +10,7 @@ Most recent change on the top.
 
 ### Changed
 - `nequip-compile --device cpu` now defaults to scalar C++ codegen (Inductor's `cpp.simdlen=0`) instead of vectorized codegen, which is 1.5-2x faster for NequIP and 6-11x faster for smaller Allegro models in CPU inference, and avoids the CPU AOTInductor compilation failure on PyTorch 2.10/2.11 entirely. Controllable with `ATEN_CPU_CAPABILITY=<your ISA>` or `--inductor-configs cpp.simdlen=<width>`.
-- PyTorch compatibility docs: the CPU + AOTInductor compilation failure affects both PyTorch 2.10.0 and 2.11.0 (fixed upstream in 2.12), now avoided with default NequIP scalar codegen compilation 
+- PyTorch compatibility docs: the CPU + AOTInductor compilation failure affects both PyTorch 2.10.0 and 2.11.0 (fixed upstream in 2.12), now avoided with default NequIP scalar codegen compilation.
 
 ### Fixed
 - `--inductor-configs` values were passed to `torch` as strings, so numeric options mis-compared. Values are now YAML-parsed, as for `nequip-package modify` modifier kwargs.

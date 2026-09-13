@@ -13,7 +13,10 @@ _CPU = torch.device("cpu")
     "arg,expected",
     [
         ("cpp.simdlen=256", {"cpp.simdlen": 256}),
-        ("cpp.simdlen=0", {"cpp.simdlen": 0}),   # a bare `false` left as a string would be non-empty, i.e. truthy
+        (
+            "cpp.simdlen=0",
+            {"cpp.simdlen": 0},
+        ),  # a bare `false` left as a string would be non-empty, i.e. truthy
         ("cpp.cpp_wrapper=false", {"cpp.cpp_wrapper": False}),
         ("cpp.cpp_wrapper=true", {"cpp.cpp_wrapper": True}),
         # bare strings must survive YAML parsing unchanged:
