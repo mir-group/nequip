@@ -78,6 +78,10 @@ nequip-train -cn config.yaml
   Segmentation fault (core dumped)
   ```
 
+  ```{note}
+  If this is a CPU compile on PyTorch 2.10 or 2.11 and the error mentions `decltype(...)::blendv`, check [PyTorch version compatibility](pytorch_compatibility.md) first -- it is likely that issue rather than a GCC one.
+  ```
+
   **Solution**: Use a newer GCC version.
 
   It's likely your GCC version does not support C++17. Try a GCC version >= 11 that supports C++17 by default (see [GCC C++17 status](https://gcc.gnu.org/projects/cxx-status.html#cxx17)).

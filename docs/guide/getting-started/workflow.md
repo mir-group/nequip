@@ -146,18 +146,6 @@ Only *persistent* modifiers (those that change model behavior) can be applied vi
 
 `nequip-compile` is the command used to compile a model (either from a checkpoint file or a package file) for [production simulations](#production-simulations) with our various [integrations](../../integrations/all.rst). There are two compiler modes: `torchscript` and `aotinductor`, which produce compiled model files with extensions `.nequip.pth` and `.nequip.pt2` respectively. We generally recommend the newer and faster `aotinductor`, but it requires PyTorch 2.6 or later.
 
-**Note on TorchScript deprecation:** TorchScript compilation (`--mode torchscript`) is deprecated and no longer supported in PyTorch >= 2.10 as [announced by PyTorch](https://pytorch.org/blog/pytorch-2-10-release-blog/). Please use `--mode aotinductor` instead. If you must use TorchScript, use PyTorch 2.9 or earlier.
-
-To compile a model with TorchScript (PyTorch < 2.10 only):
-```bash
-nequip-compile \
-  path/to/ckpt_file/or/package_file \
-  path/to/compiled_model.nequip.pth \
-  --device [cpu|cuda] \
-  --mode torchscript
-  # --modifiers enable_OpenEquivariance  # recommended GPU kernel acceleration (NequIP); use enable_CuEquivariance for Allegro
-```
-
 To compile a model with AOTInductor:
 ```bash
 nequip-compile \
@@ -178,6 +166,12 @@ We strongly recommend enabling the [GPU tensor-product kernel modifiers](../acce
 For further speed-ups where appropriate (e.g. often permissible for MD simulations), [TF32 mixed-precision](../accelerations/precision.md#tf32-at-inference) can also be enabled at compile time by adding the `--tf32` flag.
 ```
 
+```{important}
+When compiling for **CPU** (`--device cpu`), `nequip-compile` turns off Inductor's vectorized C++ codegen and emits scalar code instead, by default.
+This is typically significantly faster for model inference. To compile with vectorization instead, give your CPU's vector width with `--inductor-configs cpp.simdlen=512` (`512` for AVX-512, `256` for AVX2, `128` for ARM NEON), or set torch's own `ATEN_CPU_CAPABILITY` to an x86 ISA name (e.g. `ATEN_CPU_CAPABILITY=avx512 nequip-compile ...`). 
+`Allegro-L` is the one NequIP/Allegro foundation model we have measured to be faster with vectorized codegen (by 1.34x), so can be worth opting in there.
+```
+
 AOTInductor requires access to compilers like `gcc` and `nvcc` when running `nequip-compile`. Specifically, C++17 support is required, which requires `gcc` version 8 or higher (preferably >=11 where C++17 is the default). Without the proper compiler version, you may encounter errors such as `C++ compile error`, issues involving the `filesystem` standard library, or even `Segmentation fault (core dumped)`. You can check your `gcc` version with `gcc --version`, and may need to upgrade or load a specific module on your HPC system to get the required version before running `nequip-compile`.
 
 ```{important}
@@ -192,6 +186,18 @@ The `--target` flag wraps the `--input-fields` and `--output-fields` options. De
 
 ```{tip}
 If performing training and inference on separate machines, with possibly different Python, CUDA, or hardware environments, consider [packaging](#packaging) the trained model and transferring the packaged model to the inference machine and running `nequip-compile` on it there.
+```
+
+**Note on TorchScript deprecation:** TorchScript compilation (`--mode torchscript`) is deprecated and no longer supported in PyTorch >= 2.10 as [announced by PyTorch](https://pytorch.org/blog/pytorch-2-10-release-blog/). Please use `--mode aotinductor` instead. If you must use TorchScript, use PyTorch 2.9 or earlier.
+
+To compile a model with TorchScript (PyTorch < 2.10 only):
+```bash
+nequip-compile \
+  path/to/ckpt_file/or/package_file \
+  path/to/compiled_model.nequip.pth \
+  --device [cpu|cuda] \
+  --mode torchscript
+  # --modifiers enable_OpenEquivariance  # recommended GPU kernel acceleration (NequIP); use enable_CuEquivariance for Allegro
 ```
 
 ### Compiling models from nequip.net
