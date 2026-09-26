@@ -8,17 +8,26 @@ We recommend testing your workflow with your target PyTorch version before deplo
 
 ## Known Issues by PyTorch Version
 
-### PyTorch 2.10.0
+### PyTorch 2.10.0 and 2.11.0
 
 #### Issue 1: CPU + AOTInductor compilation failure
 
 **Affected Feature:** `nequip-compile --mode aotinductor --device cpu`
 
-**Status:** Known bug, may be fixed in future versions
+**Error:**
+```text
+torch._inductor.exc.InductorError: CppCompileError: C++ compile error
+```
 
-**Workaround:** Use PyTorch 2.9.1, or use `--mode torchscript`, or compile for CUDA
+Inductor's vectorized CPU codegen emits a `blendv` call on a scalar type, which no C++ compiler will accept. Larger models are more susceptible -- in our testing the `L` and `XL` [NequIP-OAM](../getting-started/foundation_potentials.md) architectures fail while `S` and `M` compile fine. Allegro models are unaffected.
+
+**Status:** Fixed in NequIP `>0.19.1` (uses scalar codegen by default (typically fastest for CPU inference), avoiding this broken path), and fixed in PyTorch 2.12 (see [pytorch#178148](https://github.com/pytorch/pytorch/pull/178148)).
+
+**Workaround:** Force scalar codegen for compilation by setting the env var: `ATEN_CPU_CAPABILITY=default`.
 
 #### Issue 2: AOTInductor runtime load failure in Python scripts
+
+**Affected Versions:** PyTorch >= 2.10
 
 **Affected Feature:** Running AOTInductor-compiled models from Python, including [ASE](../../integrations/ase.md) and [torch-sim](../../integrations/torchsim.md) integrations
 
@@ -80,7 +89,11 @@ Be aware that there are known issues when using PyTorch compilation features on 
 - Train-time compilation with `compile_mode: compile`
 
 If you plan to use compilation on CPU, carefully test your specific workflow and PyTorch version before deployment.
+
+`nequip-compile --mode aotinductor --device cpu` now defaults to scalar C++ codegen, which avoids the worst of these and is typically significantly faster -- see the [compilation docs](../getting-started/workflow.md#compilation).
 ```
+
+You may want to test different CPU compilation settings (e.g. via the `ATEN_CPU_CAPABILITY` env var), to optimise inference speed.
 
 ## Reporting Issues
 

@@ -23,6 +23,7 @@ import hydra
 
 import yaml
 import argparse
+import os
 import pathlib
 from typing import Final
 
@@ -49,6 +50,23 @@ def _parse_bounds_to_Dim(name: str, bounds_str: str):
             min=int(min_val),
             max=torch.inf if max_val == "inf" else int(max_val),
         )
+
+
+def _build_inductor_configs(config_args: list[str], device: torch.device) -> dict:
+    """Parse ``--inductor-configs`` ``key=value`` arguments into an inductor config dict.
+
+    Values are YAML-parsed (as for ``nequip-package modify`` modifier kwargs).
+
+    On CPU, vectorized codegen is additionally disabled by default -- see below.
+    """
+    configs = {  # `split("=", 1)` because a value may itself contain "="
+        k: yaml.safe_load(v) for k, v in (item.split("=", 1) for item in config_args)
+    }
+
+    if device.type == "cpu" and "ATEN_CPU_CAPABILITY" not in os.environ:
+        configs.setdefault("cpp.simdlen", 0)  # default to non-vectorized codegen
+
+    return configs
 
 
 def main(args=None):
@@ -160,7 +178,7 @@ def main(args=None):
     )
     parser.add_argument(
         "--inductor-configs",
-        help="options for AOTInductor (default: {})",
+        help="options for AOTInductor as `key=value` pairs, where values are YAML-parsed, e.g. `cpp.simdlen=256` (default: {})",
         nargs="+",
         type=str,
         default=[],
@@ -296,7 +314,7 @@ def main(args=None):
         )
 
         # === inductor configs ===
-        inductor_configs = dict(item.split("=") for item in args.inductor_configs)
+        inductor_configs = _build_inductor_configs(args.inductor_configs, device)
 
         # torch will also error out later on but we can be pre-emptive
         assert _AOT_OUTPUT_PATH_KEY not in inductor_configs
