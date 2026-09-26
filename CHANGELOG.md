@@ -8,6 +8,9 @@ Most recent change on the top.
 
 ## Unreleased
 
+### Fixed
+- dead links in the README (v0.7.0 upgrade notice pointed at a removed `docs/guide/upgrading.md`) and in the OpenMM integration docs (`openmm.org/documentation` moved to `docs.openmm.org`)
+
 ## [0.19.1]
 
 ### Added
