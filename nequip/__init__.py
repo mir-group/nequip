@@ -11,9 +11,8 @@ from .utils.versions.version_utils import get_version_safe
 # torch version checks
 torch_version = packaging.version.parse(get_version_safe(torch.__name__).split("+")[0])
 
-# only allow 2.2.* or higher, required for `lightning` and `torchmetrics` compatibility
-assert torch_version >= packaging.version.parse("2.2"), (
-    f"NequIP supports 2.2.* or later, but {torch_version} found"
+assert torch_version >= packaging.version.parse("2.3"), (
+    f"NequIP supports 2.3.* or later, but {torch_version} found"
 )
 
 # Load all installed nequip extension packages
