@@ -28,8 +28,8 @@ class XYZFileWriter(Callback):
     To incorporate original dataset fields in the ``xyz`` file to simplify analysis, users may provide
     ``output_fields_from_original_dataset``. Such fields will have the prefix ``original_dataset_`` in the ``xyz`` file.
 
-    To obtain correct chemical species information, users must provide ``chemical_species`` in an order consistent with
-    the model's ``type_names``.
+    If model outputs lack atomic numbers, provide ``chemical_symbols`` in the same
+    order as the model's ``type_names`` to obtain correct element labels in the XYZ file.
 
     To activate the option to save to a different file every epoch, users should set ``separate_file_per_epoch`` true.
 
@@ -37,7 +37,7 @@ class XYZFileWriter(Callback):
         out_file (str): path to output file (must NOT contain ``.xyz`` or ``.extxyz`` extension)
         output_fields_from_original_dataset (List[str]): values from the original dataset to save in the ``out_file``
         extra_fields (List[str]): extra fields to save in addition to ASE's default fields
-        chemical_species (List[str]): chemical species in the same order as model's ``type_names``
+        chemical_symbols (List[str], optional): chemical symbols in the same order as the model's ``type_names``; if omitted, atomic numbers in the output data are used when available
     """
 
     def __init__(
@@ -132,8 +132,8 @@ class TestTimeXYZFileWriter(XYZFileWriter):
     To incorporate original dataset fields in the ``xyz`` file to simplify analysis, users may provide
     ``output_fields_from_original_dataset``. Such fields will have the prefix ``original_dataset_`` in the ``xyz`` file.
 
-    To obtain correct chemical species information, users must provide ``chemical_species`` in an order consistent with
-    the model's ``type_names``.
+    If model outputs lack atomic numbers, provide ``chemical_symbols`` in the same
+    order as the model's ``type_names`` to obtain correct element labels in the XYZ file.
 
     To activate the option to save to a different file every epoch, users should set ``separate_file_per_epoch`` true.
 
@@ -141,7 +141,7 @@ class TestTimeXYZFileWriter(XYZFileWriter):
         out_file (str): path to output file (must NOT contain ``.xyz`` or ``.extxyz`` extension)
         output_fields_from_original_dataset (List[str]): values from the original dataset to save in the ``out_file``
         extra_fields (List[str]): extra fields to save in addition to ASE's default fields
-        chemical_species (List[str]): chemical species in the same order as model's ``type_names``
+        chemical_symbols (List[str], optional): chemical symbols in the same order as the model's ``type_names``; if omitted, atomic numbers in the output data are used when available
 
     Example usage in config to write predictions and original dataset ``total_energy`` and ``forces`` to an ``xyz`` file:
 
@@ -190,8 +190,8 @@ class ValTimeXYZFileWriter(XYZFileWriter):
     To incorporate original dataset fields in the ``xyz`` file to simplify analysis, users may provide
     ``output_fields_from_original_dataset``. Such fields will have the prefix ``original_dataset_`` in the ``xyz`` file.
 
-    To obtain correct chemical species information, users must provide ``chemical_species`` in an order consistent with
-    the model's ``type_names``.
+    If model outputs lack atomic numbers, provide ``chemical_symbols`` in the same
+    order as the model's ``type_names`` to obtain correct element labels in the XYZ file.
 
     To activate the option to save to a different file every epoch, users should set ``separate_file_per_epoch`` true.
 
@@ -199,7 +199,7 @@ class ValTimeXYZFileWriter(XYZFileWriter):
         out_file (str): path to output file (must NOT contain ``.xyz`` or ``.extxyz`` extension)
         output_fields_from_original_dataset (List[str]): values from the original dataset to save in the ``out_file``
         extra_fields (List[str]): extra fields to save in addition to ASE's default fields
-        chemical_species (List[str]): chemical species in the same order as model's ``type_names``
+        chemical_symbols (List[str], optional): chemical symbols in the same order as the model's ``type_names``; if omitted, atomic numbers in the output data are used when available
         separate_file_per_epoch (bool): if True, write outputs to a separate file per epoch (Useful for ``Train`` run types with ValTimeXYZFileWriter)
         every_n_epochs (int): if nonzero, only call on epoch multiples of this variable
 
