@@ -527,7 +527,8 @@ def test_nonperiodic_systems_cell_and_transform():
     Tests that:
     1. Edge indices are independent of cell for nonperiodic systems
     2. NonPeriodicCellTransform preserves edge vectors
-    3. Improper small cells lead to incorrect edge vectors
+    3. Edge vectors are independent of cell for nonperiodic systems, even for cells
+       smaller than the structure
     4. Periodic systems can produce different results (sanity check)
     """
     r_max = 5.0
@@ -637,8 +638,7 @@ def test_nonperiodic_systems_cell_and_transform():
     assert edges_no_cell == edges_skewed
 
     # ============================================================================
-    # test 5: NEGATIVE test - small cell produces WRONG edge vectors
-    # this demonstrates the problem that NonPeriodicCellTransform solves
+    # test 5: small cell with atoms outside it should not change edge vectors
     # ============================================================================
     data_bad = from_dict(
         {
@@ -657,12 +657,14 @@ def test_nonperiodic_systems_cell_and_transform():
         result_bad[AtomicDataDict.EDGE_INDEX_KEY],
         result_bad[AtomicDataDict.EDGE_VECTORS_KEY],
     )
-    # edge indices still match (connectivity is correct)
     assert edges_no_cell == edges_bad
-    # but edge vectors are WRONG (wrapped around cell boundaries)
-    assert not torch.allclose(vecs_no_cell, vecs_bad, rtol=1e-12, atol=1e-12), (
-        "Small cell should produce WRONG edge vectors (problem NonPeriodicCellTransform solves)"
+    torch.testing.assert_close(
+        result_bad[AtomicDataDict.EDGE_CELL_SHIFT_KEY],
+        torch.zeros_like(result_bad[AtomicDataDict.EDGE_CELL_SHIFT_KEY]),
+        rtol=0,
+        atol=0,
     )
+    torch.testing.assert_close(vecs_bad, vecs_no_cell, rtol=1e-12, atol=1e-12)
 
     # ============================================================================
     # test 6: override_cell should replace bad cell with proper one

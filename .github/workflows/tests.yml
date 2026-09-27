@@ -36,7 +36,7 @@ jobs:
     runs-on: ${{ github.event.repository.private && 'self-hosted' || 'ubuntu-latest' }}
     strategy:
       matrix:
-        torch-version: [2.2.0, 2.10.*]
+        torch-version: [2.3.0, 2.10.*]
     container:
       image: nvidia/cuda:12.6.1-cudnn-devel-ubuntu24.04
       options: ${{ github.event.repository.private && '--gpus all' || ' ' }}
@@ -82,13 +82,7 @@ jobs:
         run: |
           # install packages that aren't required dependencies but that the tests do need
           pip install h5py packaging
-          # for vesin, the following is to avoid
-          # `AttributeError: module 'torch' has no attribute 'uint64'`
-          if [ "${{ matrix.torch-version }}" = "2.2.0" ]; then
-            pip install "vesin==0.4.2"
-          else
-            pip install vesin
-          fi
+          pip install vesin
           # install torch-sim-atomistic and nvalchemiops only for latest torch version
           # (nvalchemi-toolkit-ops requires torch >= 2.8)
           if [ "${{ matrix.torch-version }}" = "2.10.*" ]; then
@@ -113,10 +107,6 @@ jobs:
             fi
           else
             echo "Skipping OpenEquivariance installation (torch < 2.7)"
-          fi
-          # Pin numpy<2 and matscipy 1.1.1 for torch 2.2 to avoid compatibility issues
-          if [ "${{ matrix.torch-version }}" = "2.2.0" ]; then
-            pip install "numpy<2" "matscipy==1.1.1"
           fi
           pip install --upgrade-strategy only-if-needed .
           pip install pytest pytest-xdist[psutil]

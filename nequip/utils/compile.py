@@ -18,14 +18,16 @@ _CONDITIONAL_TORCHSCRIPT_MODE = contextvars.ContextVar(
 def conditional_torchscript_mode(enabled: bool):
     global _CONDITIONAL_TORCHSCRIPT_MODE
     # save previous state
-    init_val_e3nn = get_optimization_defaults()["jit_script_fx"]
+    init_opt_e3nn = get_optimization_defaults()
     init_val_here = _CONDITIONAL_TORCHSCRIPT_MODE.get()
     # set mode variables
     set_optimization_defaults(jit_script_fx=enabled)
     _CONDITIONAL_TORCHSCRIPT_MODE.set(enabled)
     yield
     # restore state
-    set_optimization_defaults(jit_script_fx=init_val_e3nn)
+    # e3nn maps `jit_script_fx=True` to `jit_mode="script"`, so `jit_mode` is restored after it
+    set_optimization_defaults(jit_script_fx=init_opt_e3nn["jit_script_fx"])
+    set_optimization_defaults(jit_mode=init_opt_e3nn["jit_mode"])
     _CONDITIONAL_TORCHSCRIPT_MODE.set(init_val_here)
 
 
