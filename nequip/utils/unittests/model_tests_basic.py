@@ -191,7 +191,8 @@ class BasicModelTestsMixin:
         """
         return _training_session
 
-    def model_parameter_updates(self, model_config):
+    @classmethod
+    def model_parameter_updates(cls, model_config):
         """
         Returns dict of parameter updates to inject into model config.
 
@@ -226,7 +227,8 @@ class BasicModelTestsMixin:
 
         return updates
 
-    def _update_config_recursively(self, config, updates):
+    @classmethod
+    def _update_config_recursively(cls, config, updates):
         """
         Recursively update config with nested parameter updates.
 
@@ -241,7 +243,7 @@ class BasicModelTestsMixin:
                 parent_key, child_key = parts[0], parts[1]
                 if parent_key in config:
                     # recursively update the nested dict
-                    self._update_config_recursively(
+                    cls._update_config_recursively(
                         config[parent_key], {child_key: value}
                     )
             else:
@@ -253,7 +255,8 @@ class BasicModelTestsMixin:
         """model source for fake_model_training_session. subclasses can override params."""
         return request.param
 
-    def load_validation_structures(self, training_config, tmpdir):
+    @classmethod
+    def load_validation_structures(cls, training_config, tmpdir):
         """
         Load validation structures for testing.
 
@@ -280,16 +283,17 @@ class BasicModelTestsMixin:
     # this means we also check if we can `nequip-package` a specific model
     # this could reveal e.g. missing externs, etc
     @pytest.fixture(scope="class")
+    @classmethod
     def fake_model_training_session(
-        self, conffile, config, model_dtype, train_fn, model_source
+        cls, conffile, config, model_dtype, train_fn, model_source
     ):
         """Create a fake training session using integration test configs with injected model."""
         # make a deep copy and enforce integration config parameters
         model_config = copy.deepcopy(config)
         # get parameter updates (can be overridden by subclasses)
-        updates = self.model_parameter_updates(model_config)
+        updates = cls.model_parameter_updates(model_config)
         # update model config with necessary updates
-        self._update_config_recursively(model_config, updates)
+        cls._update_config_recursively(model_config, updates)
 
         session = train_fn(
             conffile,
@@ -300,7 +304,7 @@ class BasicModelTestsMixin:
         training_config, tmpdir, env = next(session)
 
         # load validation structures (can be overridden by subclasses)
-        structures = self.load_validation_structures(training_config, tmpdir)
+        structures = cls.load_validation_structures(training_config, tmpdir)
 
         yield training_config, tmpdir, env, model_dtype, model_source, structures
         del session
