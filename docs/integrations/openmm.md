@@ -1,7 +1,7 @@
 # OpenMM
 
 NequIP framework models can be used in [OpenMM](https://openmm.org/) through [OpenMM-ML](https://github.com/openmm/openmm-ml).
-See the [OpenMM documentation](https://openmm.org/documentation) and the upstream [OpenMM-ML user guide](https://openmm.github.io/openmm-ml/dev/userguide.html#id4) for installation and usage details.
+See the [OpenMM documentation](https://docs.openmm.org/latest/userguide/) and the upstream [OpenMM-ML user guide](https://openmm.github.io/openmm-ml/dev/userguide.html#id4) for installation and usage details.
 
 ## Current status in NequIP docs
 

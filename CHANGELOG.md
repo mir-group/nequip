@@ -16,6 +16,7 @@ Most recent change on the top.
 ### Fixed
 - e3nn modules built after any NequIP model on PyTorch >= 2.10 being compiled with the deprecated `torch.jit.script`: `conditional_torchscript_mode` restored only e3nn's legacy `jit_script_fx=True` flag on exit, which e3nn maps to `jit_mode="script"`, overriding the `"eager"` default. `jit_mode` itself is now restored
 - `--inductor-configs` values were passed to `torch` as strings, so numeric options mis-compared. Values are now YAML-parsed, as for `nequip-package modify` modifier kwargs.
+- dead links in the README (v0.7.0 upgrade notice pointed at a removed `docs/guide/upgrading.md`) and in the OpenMM integration docs (`openmm.org/documentation` moved to `docs.openmm.org`)
 
 ## [0.19.1]
 
