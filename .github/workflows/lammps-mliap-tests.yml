@@ -59,7 +59,7 @@ jobs:
       - name: Install nequip and test dependencies
         run: |
           pip install h5py packaging vesin
-          pip install cuequivariance-torch cuequivariance-ops-torch-cu12
+          pip install cuequivariance-torch==0.10.0 cuequivariance-ops-torch-cu12==0.10.0
           pip install openequivariance
           pip install "lightning<2.6.0"
           pip install --upgrade-strategy only-if-needed .
