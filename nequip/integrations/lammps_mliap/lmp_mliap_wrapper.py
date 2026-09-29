@@ -139,7 +139,8 @@ class NequIPLAMMPSMLIAPWrapper(MLIAPUnified):
         model.is_compile_graph_model = False
 
         # set device and "compile" model
-        self.device = (
+        # With non-kk mliap pair style, use this variable to send model evaluation to device.
+        self.device = os.environ.get("NEQUIP_MLIAP_DEVICE") or (
             "cuda" if "kokkos" in lmp_data.__class__.__module__.lower() else "cpu"
         )
         model = prepare_model_for_compile(model, self.device)
@@ -171,6 +172,8 @@ class NequIPLAMMPSMLIAPWrapper(MLIAPUnified):
             self._initialize_model(lmp_data)
 
         if lmp_data.nlocal == 0 or lmp_data.npairs <= 1:
+            # Must set here or risk undefined values.
+            lmp_data.energy = 0.0
             return
 
         # The LAMMPS arrays read below (rij, pair_i/pair_j) are produced by Kokkos
@@ -250,11 +253,26 @@ class NequIPLAMMPSMLIAPWrapper(MLIAPUnified):
         else:
             nequip_total_energy = nequip_data_out[AtomicDataDict.TOTAL_ENERGY_KEY]
 
-        # update LAMMPS variables
-        lmp_eatoms = torch.as_tensor(lmp_data.eatoms)
-        lmp_eatoms.copy_(nequip_atomic_energies.detach())
-        lmp_data.energy = nequip_total_energy.detach()
-        lmp_data.update_pair_forces_gpu(edge_forces.detach())
+        # update LAMMPS variables, both mliap and mliap/kk variants
+        if hasattr(lmp_data, "update_pair_forces_gpu"):
+            # Kokkos bridge: `eatoms` is a view to write in place, forces go in by data pointer
+            lmp_eatoms = torch.as_tensor(lmp_data.eatoms)
+            lmp_eatoms.copy_(nequip_atomic_energies.detach())
+            lmp_data.energy = nequip_total_energy.detach()
+            lmp_data.update_pair_forces_gpu(edge_forces.detach())
+        else:
+            # plain ML-IAP bridge: host float64 numpy in; `eatoms` is a write-only property that
+            # raises when LAMMPS did not request per-atom energies this step
+            try:
+                lmp_data.eatoms = (
+                    nequip_atomic_energies.detach().to("cpu", torch.float64).numpy()
+                )
+            except ValueError:
+                pass
+            lmp_data.energy = float(nequip_total_energy.detach())
+            lmp_data.update_pair_forces(
+                edge_forces.detach().to("cpu", torch.float64).contiguous().numpy()
+            )
 
     def compute_descriptors(self, lmp_data):
         pass
