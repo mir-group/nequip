@@ -11,7 +11,7 @@ class NeighborListTransform(torch.nn.Module):
 
     Args:
         r_max (float): cutoff radius used for nearest neighbors
-        backend (str): neighbor list backend (`"ase"`, `"matscipy"`, or `"vesin"`)
+        backend (str): neighbor list backend (`"ase"`, `"matscipy"`, `"vesin"`, or `"alchemiops"`)
         per_edge_type_cutoff (Dict): optional per-edge-type cutoffs (must be <= r_max)
         type_names (List[str]): list of atom type names
         backend_kwargs (Dict): optional backend-specific options, e.g. ``max_neighbors``
