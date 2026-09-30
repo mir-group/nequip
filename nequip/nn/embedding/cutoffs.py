@@ -7,8 +7,7 @@ class PolynomialCutoff(torch.nn.Module):
         r"""Polynomial cutoff, as proposed in DimeNet: https://arxiv.org/abs/2003.03123
 
         Args:
-            r_max (float): cutoff radius
-            p (int)      : power used in envelope function
+            p (float): power used in envelope function
         """
         super().__init__()
         assert p >= 2.0
