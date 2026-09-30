@@ -30,7 +30,7 @@ class NequIP3BPADataModule(ASEDataModule):
     There are several test datasets to choose from, including ``300K``, ``600K``, ``1200K``,
     ``dih_beta120``, ``dih_beta150``, and ``dih_beta180``. All are automatically included in the
     testing dataset in that order by default, but one can override this by providing the
-    ``test_set`` argument as a ``List`` test sets. One can provide an empty list to have no test sets.
+    ``test_sets`` argument as a ``List`` test sets. One can provide an empty list to have no test sets.
 
     It is recommended to set the isolated atom energies in the ``model``'s ``per_type_energy_shifts``.
     The following information can be found in ``iso_atoms.xyz`` in the 3BPA data zip, but is reproduced here
@@ -52,7 +52,7 @@ class NequIP3BPADataModule(ASEDataModule):
         train_val_split (List[float]/List[int]): train-validation split either in fractions ``[1, 1-f]`` or integers ``[N_train, N_val]``
         data_source_dir (str): directory to download 3BPA dataset to, or where the ``dataset_3BPA`` directory is located if already downloaded and unzipped
         train_set (str): either ``300K`` or ``mixedT``
-        test_set (List[str]): list that can contain ``300K``, ``600K``, ``1200K``, ``dih_beta120``, ``dih_beta150``, and/or ``dih_beta180``
+        test_sets (List[str]): list that can contain ``300K``, ``600K``, ``1200K``, ``dih_beta120``, ``dih_beta150``, and/or ``dih_beta180``
     """
 
     def __init__(
@@ -66,7 +66,7 @@ class NequIP3BPADataModule(ASEDataModule):
         **kwargs,
     ):
         # sanity check
-        assert train_set in ["300K" or "mixedT"]
+        assert train_set in ["300K", "mixedT"]
         assert all([tset in test_set_names for tset in test_sets])
 
         train_file_path = data_source_dir + "/dataset_3BPA/train_" + train_set + ".xyz"
