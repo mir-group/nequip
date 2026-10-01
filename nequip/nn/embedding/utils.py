@@ -36,10 +36,10 @@ def cutoff_partialdict_to_fulldict(
         full_dict[source_type] = {}
         if source_type in partial_dict:
             entry = partial_dict[source_type]
-            if isinstance(entry, float):
+            if isinstance(entry, (int, float)):
                 # uniform cutoff for this source type
                 for target_type in type_names:
-                    full_dict[source_type][target_type] = entry
+                    full_dict[source_type][target_type] = float(entry)
             else:
                 # per-target specification
                 for target_type in type_names:

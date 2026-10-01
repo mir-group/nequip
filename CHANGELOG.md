@@ -18,6 +18,7 @@ Most recent change on the top.
 - PyTorch compatibility docs: the CPU + AOTInductor compilation failure affects both PyTorch 2.10.0 and 2.11.0 (fixed upstream in 2.12), now avoided with default NequIP scalar codegen compilation.
 
 ### Fixed
+- integer per-source `per_edge_type_cutoff` values (e.g. `H: 2`) raising `TypeError`
 - e3nn modules built after any NequIP model on PyTorch >= 2.10 being compiled with the deprecated `torch.jit.script`: `conditional_torchscript_mode` restored only e3nn's legacy `jit_script_fx=True` flag on exit, which e3nn maps to `jit_mode="script"`, overriding the `"eager"` default. `jit_mode` itself is now restored
 - `--inductor-configs` values were passed to `torch` as strings, so numeric options mis-compared. Values are now YAML-parsed, as for `nequip-package modify` modifier kwargs.
 - dead links in the README (v0.7.0 upgrade notice pointed at a removed `docs/guide/upgrading.md`) and in the OpenMM integration docs (`openmm.org/documentation` moved to `docs.openmm.org`)

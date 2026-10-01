@@ -144,6 +144,17 @@ def test_single_type():
     assert full_dict == {"O": {"O": 2.0}}
 
 
+def test_integer_uniform_cutoff():
+    """Test that an integer uniform cutoff is treated like a float."""
+    type_names = ["H", "C"]
+    r_max = 4.0
+
+    # YAML parses `H: 2` as an int
+    partial_dict = {"H": 2}
+    full_dict = cutoff_partialdict_to_fulldict(partial_dict, type_names, r_max)
+    assert full_dict["H"] == {"H": 2.0, "C": 2.0}
+
+
 def test_partial_missing_targets():
     """Test that missing target types default to r_max."""
     type_names = ["H", "C", "O"]
