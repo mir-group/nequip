@@ -10,6 +10,7 @@ Most recent change on the top.
 
 ### Removed
 - [Breaking] deprecated `nequip.ase` module, including `NoseHoover`. Use `nequip.integrations.ase.NequIPCalculator`
+- [Breaking] `LennardJones` and `SimpleLennardJones` pair potentials
 
 ### Changed
 - [Breaking] `matscipy>=1.3.0` is now required, because `matscipy<1.3.0` returns nonzero cell shifts along nonperiodic directions for atoms outside the provided cell (https://github.com/libAtoms/matscipy/pull/315), giving wrong edge vectors from the default `matscipy` neighborlist backend for such nonperiodic systems. Since `matscipy>=1.3.0` requires NumPy 2, NumPy 2 and PyTorch >= 2.3 (the first release supporting NumPy 2) are now also required.
