@@ -385,6 +385,3 @@ class ZBL(GraphModuleMixin, torch.nn.Module):
             atomic_eng = atomic_eng + data[self.per_atom_energy_field]
         data[self.per_atom_energy_field] = atomic_eng
         return data
-
-
-__all__ = [LennardJones, ZBL]
