@@ -127,7 +127,7 @@ class PerTypeScaleShift(GraphModuleMixin, torch.nn.Module):
     out_field: str
     has_scales: bool
     has_shifts: bool
-    scales_trainble: bool
+    scales_trainable: bool
     shifts_trainable: bool
 
     def __init__(
