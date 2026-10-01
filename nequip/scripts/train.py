@@ -294,7 +294,7 @@ def main(config: DictConfig) -> None:
             # TODO: make sure the model is set up to perform evaluations (e.g. EMA model is tricky)
             # for now this is unsupported
             if "function" in run_type:
-                assert NotImplementedError(
+                raise NotImplementedError(
                     "`function` run type is not ready for use yet"
                 )
             instantiate(run_type["function"], training_module=nequip_module)
