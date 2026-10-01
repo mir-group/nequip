@@ -307,11 +307,11 @@ def with_batch_(data: Type) -> Type:
 
 # For autocomplete in IDEs, don't expose our various imports
 __all__ = [
-    to_,
-    detach_,
-    without_nodes,
-    is_batched,
-    num_nodes,
-    num_edges,
-    with_batch_,
-] + _keys.ALLOWED_KEYS
+    "to_",
+    "detach_",
+    "without_nodes",
+    "is_batched",
+    "num_nodes",
+    "num_edges",
+    "with_batch_",
+] + [k for k in dir(_keys) if k.endswith("_KEY")]

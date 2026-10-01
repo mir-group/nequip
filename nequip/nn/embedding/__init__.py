@@ -10,11 +10,11 @@ from ._edge import (
 from .cutoffs import PolynomialCutoff
 
 __all__ = [
-    NodeTypeEmbed,
-    AppendVectorFieldEmbed,
-    EdgeLengthNormalizer,
-    BesselEdgeLengthEncoding,
-    SphericalHarmonicEdgeAttrs,
-    AddRadialCutoffToData,
-    PolynomialCutoff,
+    "NodeTypeEmbed",
+    "AppendVectorFieldEmbed",
+    "EdgeLengthNormalizer",
+    "BesselEdgeLengthEncoding",
+    "SphericalHarmonicEdgeAttrs",
+    "AddRadialCutoffToData",
+    "PolynomialCutoff",
 ]
