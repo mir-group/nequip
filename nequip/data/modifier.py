@@ -124,17 +124,11 @@ class NumNeighbors(BaseModifier):
         super().__init__(AtomicDataDict.EDGE_INDEX_KEY)
 
     def _func(self, data: AtomicDataDict.Type) -> torch.Tensor:
-        counts = torch.unique(
+        # `minlength` gives nodes without neighbors a zero count at their own index
+        return torch.bincount(
             data[AtomicDataDict.EDGE_INDEX_KEY][0],
-            sorted=True,
-            return_counts=True,
-        )[1]
-        # in case the cutoff is small and some nodes have no neighbors,
-        # we need to pad `counts` up to the right length
-        counts = torch.nn.functional.pad(
-            counts, pad=(0, len(data[AtomicDataDict.POSITIONS_KEY]) - len(counts))
+            minlength=len(data[AtomicDataDict.POSITIONS_KEY]),
         )
-        return counts
 
     def __str__(self) -> str:
         return "num_neighbors"

@@ -261,3 +261,21 @@ class TestStatistics:
         assert "per_type_num_neighbors_mean" in stats_dict
         per_type_stats = stats_dict["per_type_num_neighbors_mean"]
         assert "C" in per_type_stats and "H" in per_type_stats
+
+
+def test_num_neighbors_with_isolated_atom():
+    """Test that an isolated atom gets zero neighbors without shifting other atoms' counts."""
+    # atom 0 (type A) is isolated, atoms 1 and 2 (type B) are bonded to each other
+    data = {
+        AtomicDataDict.POSITIONS_KEY: torch.zeros(3, 3),
+        AtomicDataDict.ATOM_TYPE_KEY: torch.tensor([0, 1, 1]),
+        AtomicDataDict.EDGE_INDEX_KEY: torch.tensor([[1, 2], [2, 1]]),
+    }
+    assert NumNeighbors()(data).tolist() == [0, 1, 1]
+
+    stats_manager = DataStatisticsManager(
+        [{"name": "nn", "field": NumNeighbors(), "per_type": True, "metric": Mean()}],
+        type_names=["A", "B"],
+    )
+    stats_dict = stats_manager.get_statistics([data])
+    assert stats_dict["nn"] == {"A": 0.0, "B": 1.0}
