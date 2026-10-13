@@ -66,7 +66,7 @@ jobs:
           pip install pytest pytest-xdist[psutil]
       - name: Fetch and build LAMMPS with ML-IAP
         run: |
-          git clone --depth=1 https://github.com/lammps/lammps
+          git clone --depth=1 --branch release https://github.com/lammps/lammps
           cd lammps
           cmake \
             -B build-mliap \
