@@ -163,16 +163,16 @@ class InteractionBlock(GraphModuleMixin, torch.nn.Module):
 
         x = data[AtomicDataDict.NODE_FEATURES_KEY]
 
+        if self.sc is not None:
+            # self-connection only needs local nodes, slicing is a no-op outside LAMMPS ML-IAP
+            sc = self.sc(
+                x[:num_local_nodes],
+                data[AtomicDataDict.NODE_ATTRS_KEY][:num_local_nodes],
+            )
+
         # truncate if not first layer
         if not self.is_first_layer:
             x = x[:num_local_nodes]
-
-        if self.sc is not None:
-            node_attrs = data[AtomicDataDict.NODE_ATTRS_KEY]
-            # truncate if not first layer
-            if not self.is_first_layer:
-                node_attrs = node_attrs[:num_local_nodes]
-            sc = self.sc(x, node_attrs)
 
         x = self.linear_1(x)
 

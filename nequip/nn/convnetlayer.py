@@ -158,13 +158,10 @@ class ConvNetLayer(GraphModuleMixin, torch.nn.Module):
         old_x = data[AtomicDataDict.NODE_FEATURES_KEY]
         # run convolution
         data = self.conv(data)
-        # do nonlinearity
-        data[AtomicDataDict.NODE_FEATURES_KEY] = self.equivariant_nonlin(
-            data[AtomicDataDict.NODE_FEATURES_KEY]
-        )
-        # do resnet
+        x = self.equivariant_nonlin(data[AtomicDataDict.NODE_FEATURES_KEY])
         if self.resnet:
-            data[AtomicDataDict.NODE_FEATURES_KEY] = (
-                old_x + data[AtomicDataDict.NODE_FEATURES_KEY]
-            )
+            # the convolution always returns local nodes only, so under LAMMPS ML-IAP
+            # `old_x` may carry extra ghost rows (first layer) that must be dropped
+            x = old_x[: x.size(0)] + x
+        data[AtomicDataDict.NODE_FEATURES_KEY] = x
         return data
