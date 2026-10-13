@@ -931,6 +931,8 @@ class EnergyModelTestsMixin(BasicModelTestsMixin):
     def test_isolated_atom_energies(self, model, device):
         """Checks that isolated atom energies provided for the per-atom shifts are restored for isolated atoms."""
         instance, config, _ = model
+        if config.get("learnable_shift", False):
+            pytest.skip("`learnable_shift=True` gives up the isolated atom limit")
         scale_shift_module = find_first_of_type(instance, PerTypeScaleShift)
 
         if scale_shift_module is not None:

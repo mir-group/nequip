@@ -70,6 +70,13 @@ minimal_config4 = dict(
     },
     **COMMON_CONFIG,
 )
+minimal_config5 = dict(
+    num_features=8,
+    num_layers=2,
+    # first-layer self-connection, which must drop ghost rows in LAMMPS ML-IAP
+    learnable_shift=True,
+    **COMMON_CONFIG,
+)
 
 
 class TestNequIPModel(
@@ -98,6 +105,7 @@ class TestNequIPModel(
             minimal_config2,
             minimal_config3,
             minimal_config4,
+            minimal_config5,
         ],
         scope="class",
     )
