@@ -21,7 +21,7 @@ torch._inductor.exc.InductorError: CppCompileError: C++ compile error
 
 Inductor's vectorized CPU codegen emits a `blendv` call on a scalar type, which no C++ compiler will accept. Larger models are more susceptible -- in our testing the `L` and `XL` [NequIP-OAM](../getting-started/foundation_potentials.md) architectures fail while `S` and `M` compile fine. Allegro models are unaffected.
 
-**Status:** Fixed in NequIP `>0.19.1` (uses scalar codegen by default (typically fastest for CPU inference), avoiding this broken path), and fixed in PyTorch 2.12 (see [pytorch#178148](https://github.com/pytorch/pytorch/pull/178148)).
+**Status:** Fixed in NequIP `>0.19.1` (uses scalar codegen by default (typically fastest for CPU inference), avoiding this broken path), and fixed in PyTorch 2.12 (see [pytorch#174648](https://github.com/pytorch/pytorch/pull/174648), the fix for [pytorch#173626](https://github.com/pytorch/pytorch/issues/173626)).
 
 **Workaround:** Force scalar codegen for compilation by setting the env var: `ATEN_CPU_CAPABILITY=default`.
 
