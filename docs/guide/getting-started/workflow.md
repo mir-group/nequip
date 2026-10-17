@@ -170,6 +170,9 @@ For further speed-ups where appropriate (e.g. often permissible for MD simulatio
 When compiling for **CPU** (`--device cpu`), `nequip-compile` turns off Inductor's vectorized C++ codegen and emits scalar code instead, by default.
 This is typically significantly faster for model inference. To compile with vectorization instead, give your CPU's vector width with `--inductor-configs cpp.simdlen=512` (`512` for AVX-512, `256` for AVX2, `128` for ARM NEON), or set torch's own `ATEN_CPU_CAPABILITY` to an x86 ISA name (e.g. `ATEN_CPU_CAPABILITY=avx512 nequip-compile ...`).
 `Allegro-L` is the one NequIP/Allegro foundation model we have measured to be faster with vectorized codegen (by 1.34x), so can be worth opting in there.
+
+AOTInductor also fixes the number of CPU threads at compile time: the compiled model's kernels always use the thread count `nequip-compile` had (`OMP_NUM_THREADS`, or otherwise torch's default), whatever `OMP_NUM_THREADS` is set to at run time (operations that fall back to PyTorch, such as matrix multiplications, still follow the run-time setting).
+So set `OMP_NUM_THREADS` when compiling to the value you will run with, e.g. `OMP_NUM_THREADS=1 nequip-compile ...` for LAMMPS runs with one MPI rank per core.
 ```
 
 AOTInductor requires access to compilers like `gcc` and `nvcc` when running `nequip-compile`. Specifically, C++17 support is required, which requires `gcc` version 8 or higher (preferably >=11 where C++17 is the default). Without the proper compiler version, you may encounter errors such as `C++ compile error`, issues involving the `filesystem` standard library, or even `Segmentation fault (core dumped)`. You can check your `gcc` version with `gcc --version`, and may need to upgrade or load a specific module on your HPC system to get the required version before running `nequip-compile`.
