@@ -8,6 +8,9 @@ import yaml
 import warnings
 import contextlib
 import io
+import os
+import functools
+import threading
 from typing import Dict, Any
 
 from nequip.data import AtomicDataDict
@@ -52,6 +55,28 @@ _PACKAGE_TIME_SHARED_IMPORTER = None
 def _get_shared_importer():
     global _PACKAGE_TIME_SHARED_IMPORTER
     return _PACKAGE_TIME_SHARED_IMPORTER
+
+
+# outside of `nequip-package`, each package file gets one importer (per version of the file)
+# an importer's copy of the packaged code is kept alive by process-wide caches (e.g. `linecache`), along with its open zip file, so a new importer per load would leak
+@functools.lru_cache(maxsize=None)
+def _cached_importer(path: str, mtime_ns: int):
+    return torch.package.PackageImporter(path)
+
+
+def _get_importer(package_path: str):
+    path = os.path.realpath(package_path)
+    return _cached_importer(path, os.stat(path).st_mtime_ns)
+
+
+# importers must not be shared across forks, as reads through the inherited zip file handle would race on its shared file offset
+if hasattr(os, "register_at_fork"):
+    os.register_at_fork(
+        after_in_parent=_cached_importer.cache_clear,
+        after_in_child=_cached_importer.cache_clear,
+    )
+# torch.package has no import locks, so models are loaded through the shared importers one at a time
+_LOAD_LOCK = threading.Lock()
 
 
 def _get_package_metadata(imp) -> Dict[str, Any]:
@@ -120,7 +145,7 @@ def ModelFromPackage(package_path: str, compile_mode: str = _EAGER_MODEL_KEY):
 
     # === load model ===
     logger.info(f"Loading model from package file: {package_path} ...")
-    with _suppress_package_importer_exporter_warnings():
+    with _LOAD_LOCK, _suppress_package_importer_exporter_warnings():
         # during `nequip-package`, we need to use the same importer for all the models for successful repackaging
         # see https://pytorch.org/docs/stable/package.html#re-export-an-imported-object
         if workflow_state == "package":
@@ -132,8 +157,8 @@ def ModelFromPackage(package_path: str, compile_mode: str = _EAGER_MODEL_KEY):
                 _PACKAGE_TIME_SHARED_IMPORTER = imp
             # if it's not `None`, it means we've previously loaded a model during `nequip-package` and should keep using the same importer
         else:
-            # if not doing `nequip-package`, we just load a new importer every time `ModelFromPackage` is called
-            imp = torch.package.PackageImporter(package_path)
+            # if not doing `nequip-package`, we reuse the same importer for each package file
+            imp = _get_importer(package_path)
 
         # do sanity checking with available models
         pkg_metadata = _get_package_metadata(imp)
@@ -146,11 +171,16 @@ def ModelFromPackage(package_path: str, compile_mode: str = _EAGER_MODEL_KEY):
             compile_mode = _EAGER_MODEL_KEY
 
         with _cpu_deserialize_always():
-            model = imp.load_pickle(
-                package="model",
-                resource=f"{compile_mode}_model.pkl",
-                map_location="cpu",
-            )
+            try:
+                model = imp.load_pickle(
+                    package="model",
+                    resource=f"{compile_mode}_model.pkl",
+                    map_location="cpu",
+                )
+            except BaseException:
+                # a failed (e.g. interrupted) load can leave half-imported modules in the importer, so it must not be reused
+                _cached_importer.cache_clear()
+                raise
 
     # NOTE: model returned is not a GraphModel object tied to the `nequip` in current Python env, but a GraphModel object from the packaged zip file
     return model
@@ -159,7 +189,7 @@ def ModelFromPackage(package_path: str, compile_mode: str = _EAGER_MODEL_KEY):
 def data_dict_from_package(package_path: str) -> AtomicDataDict.Type:
     """Load example data from a .nequip.zip package file."""
     with _suppress_package_importer_exporter_warnings():
-        imp = torch.package.PackageImporter(package_path)
+        imp = _get_importer(package_path)
         with _cpu_deserialize_always():
             data = imp.load_pickle(package="model", resource="example_data.pkl")
     return data
@@ -178,7 +208,7 @@ def ModelTypeNamesFromPackage(package_path: str):
     _check_file_exists(file_path=package_path, file_type="package")
 
     with _suppress_package_importer_exporter_warnings():
-        imp = torch.package.PackageImporter(package_path)
+        imp = _get_importer(package_path)
         pkg_metadata = _get_package_metadata(imp)
 
     atom_types_dict = pkg_metadata["atom_types"]
