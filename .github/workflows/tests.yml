@@ -87,7 +87,8 @@ jobs:
           # (nvalchemi-toolkit-ops requires torch >= 2.8)
           if [ "${{ matrix.torch-version }}" = "2.10.*" ]; then
             pip install torch-sim-atomistic
-            pip install nvalchemi-toolkit-ops==0.3.1
+            # warp-lang >= 1.18 PyPI wheels are CUDA 13 builds that need an R580+ driver
+            pip install nvalchemi-toolkit-ops==0.3.1 "warp-lang<1.18"
           fi
           #pip install schedulefree  #Disabled to reduce CI runtime; uncomment to test ScheduleFreeLightningModule
           # install CuEquivariance if CUDA is available
