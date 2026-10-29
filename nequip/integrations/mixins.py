@@ -92,6 +92,9 @@ class _IntegrationLoaderMixin:
     ):
         """Build an integration calculator from a saved NequIP model.
 
+        The model's parameters are frozen for inference, as in compiled models; call
+        ``calc.model.requires_grad_(True)`` to differentiate with respect to them.
+
         Args:
             model_path: path to the saved model.
             device: device where the model is loaded and evaluated.
@@ -113,6 +116,8 @@ class _IntegrationLoaderMixin:
             str(model_path), compile_mode=compile_mode, model_key=model_name
         )
         model.eval()
+        # as for compiled models: freeze params to reduce memory demand:
+        model.requires_grad_(False)
 
         r_max = float(model.metadata[graph_model.R_MAX_KEY])
         type_names = model.metadata[graph_model.TYPE_NAMES_KEY].split(" ")
