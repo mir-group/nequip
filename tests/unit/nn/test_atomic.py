@@ -124,14 +124,15 @@ def test_modify_per_type_scale_shift(
     else:
         assert len(trainable_params) == 0
 
-    # test that modified model produces different results when parameters are modified
+    # check that the requested entries were applied
     modified_result = modified_model(batch1)
     tol = {torch.float32: 1e-6, torch.float64: 1e-12}[model.model_dtype]
     if scales is not None or shifts is not None:
-        with pytest.raises(AssertionError):
-            torch.testing.assert_close(
-                original_result["sum"], modified_result["sum"], atol=tol, rtol=tol
-            )
+        for vname, new_vals in (("scales", scales), ("shifts", shifts)):
+            if new_vals is not None:
+                vals = getattr(shift_module, vname).reshape(-1)
+                for name, val in new_vals.items():
+                    assert vals[shift_module.type_names.index(name)].item() == val
     else:
         # when only trainable flags change, output should be the same
         torch.testing.assert_close(
