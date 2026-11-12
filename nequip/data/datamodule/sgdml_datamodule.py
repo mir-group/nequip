@@ -32,11 +32,11 @@ class sGDML_CCSD_DataModule(NequIPDataModule):
         "ethanol": "ethanol_ccsd_t",
     }
     URL_DICT = {
-        "aspirin": "http://www.quantum-machine.org/gdml/data/npz/aspirin_ccsd.zip",
-        "benzene": "http://www.quantum-machine.org/gdml/data/npz/benzene_ccsd_t.zip",
-        "malonaldehyde": "http://www.quantum-machine.org/gdml/data/npz/malonaldehyde_ccsd_t.zip",
-        "toluene": "http://www.quantum-machine.org/gdml/data/npz/toluene_ccsd_t.zip",
-        "ethanol": "http://www.quantum-machine.org/gdml/data/npz/ethanol_ccsd_t.zip",
+        "aspirin": "https://sgdml.org/secure_proxy.php?file=data/npz/aspirin_ccsd.zip",
+        "benzene": "https://sgdml.org/secure_proxy.php?file=data/npz/benzene_ccsd_t.zip",
+        "malonaldehyde": "https://sgdml.org/secure_proxy.php?file=data/npz/malonaldehyde_ccsd_t.zip",
+        "toluene": "https://sgdml.org/secure_proxy.php?file=data/npz/toluene_ccsd_t.zip",
+        "ethanol": "https://sgdml.org/secure_proxy.php?file=data/npz/ethanol_ccsd_t.zip",
     }
 
     def __init__(
@@ -108,7 +108,9 @@ class sGDML_CCSD_DataModule(NequIPDataModule):
         ):
             # download and unzip
             download_path = download_url(
-                self.URL_DICT[self.dataset], self.data_source_dir
+                self.URL_DICT[self.dataset],
+                self.data_source_dir,
+                filename=self.DATASET_MAP[self.dataset] + ".zip",
             )
             if download_path.endswith(".zip"):
                 extract_zip(download_path, self.data_source_dir)

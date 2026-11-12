@@ -47,13 +47,13 @@ class MD22DataModule(NequIPDataModule):
         "double_walled_nanotube": ["md22_double-walled_nanotube.npz", 800, 5032],
     }
     url_dict = {
-        "tetrapeptide": "http://www.quantum-machine.org/gdml/repo/datasets/md22_Ac-Ala3-NHMe.npz",
-        "dha": "http://www.quantum-machine.org/gdml/repo/datasets/md22_DHA.npz",
-        "stachyose": "http://www.quantum-machine.org/gdml/repo/datasets/md22_stachyose.npz",
-        "dna_atat": "http://www.quantum-machine.org/gdml/repo/datasets/md22_AT-AT.npz",
-        "dna_atat_cgcg": "http://www.quantum-machine.org/gdml/repo/datasets/md22_AT-AT-CG-CG.npz",
-        "buckyball_catcher": "http://www.quantum-machine.org/gdml/repo/datasets/md22_buckyball-catcher.npz",
-        "double_walled_nanotube": "http://www.quantum-machine.org/gdml/repo/datasets/md22_double-walled_nanotube.npz",
+        "tetrapeptide": "https://sgdml.org/secure_proxy.php?file=repo/datasets/md22_Ac-Ala3-NHMe.npz",
+        "dha": "https://sgdml.org/secure_proxy.php?file=repo/datasets/md22_DHA.npz",
+        "stachyose": "https://sgdml.org/secure_proxy.php?file=repo/datasets/md22_stachyose.npz",
+        "dna_atat": "https://sgdml.org/secure_proxy.php?file=repo/datasets/md22_AT-AT.npz",
+        "dna_atat_cgcg": "https://sgdml.org/secure_proxy.php?file=repo/datasets/md22_AT-AT-CG-CG.npz",
+        "buckyball_catcher": "https://sgdml.org/secure_proxy.php?file=repo/datasets/md22_buckyball-catcher.npz",
+        "double_walled_nanotube": "https://sgdml.org/secure_proxy.php?file=repo/datasets/md22_double-walled_nanotube.npz",
     }
 
     def __init__(
@@ -120,7 +120,9 @@ class MD22DataModule(NequIPDataModule):
         if not os.path.isfile(self.data_file_path):
             # download and unzip
             download_path = download_url(
-                self.url_dict[self.dataset], self.data_source_dir
+                self.url_dict[self.dataset],
+                self.data_source_dir,
+                filename=self.dataset_map[self.dataset][0],
             )
             if download_path.endswith(".zip"):
                 extract_zip(download_path, self.data_source_dir)
