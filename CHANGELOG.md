@@ -13,6 +13,7 @@ Most recent change on the top.
 - [Breaking] `LennardJones` and `SimpleLennardJones` pair potentials
 
 ### Changed
+- `sGDML_CCSD_DataModule` and `MD22DataModule` now download from the sgdml.org download links listed on the [sGDML website](https://www.sgdml.org/#datasets), instead of quantum-machine.org
 - [Breaking] `matscipy>=1.3.0` is now required, because `matscipy<1.3.0` returns nonzero cell shifts along nonperiodic directions for atoms outside the provided cell (https://github.com/libAtoms/matscipy/pull/315), giving wrong edge vectors from the default `matscipy` neighborlist backend for such nonperiodic systems. Since `matscipy>=1.3.0` requires NumPy 2, NumPy 2 and PyTorch >= 2.3 (the first release supporting NumPy 2) are now also required.
 - `nequip-compile --device cpu` now defaults to scalar C++ codegen (Inductor's `cpp.simdlen=0`) instead of vectorized codegen, which is 1.5-2x faster for NequIP and 6-11x faster for smaller Allegro models in CPU inference, and avoids the CPU AOTInductor compilation failure on PyTorch 2.10/2.11 entirely. Controllable with `ATEN_CPU_CAPABILITY=<your ISA>` or `--inductor-configs cpp.simdlen=<width>`.
 - PyTorch compatibility docs: the CPU + AOTInductor compilation failure affects both PyTorch 2.10.0 and 2.11.0 (fixed upstream in 2.12), now avoided with default NequIP scalar codegen compilation.
