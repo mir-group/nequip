@@ -8,6 +8,8 @@ Most recent change on the top.
 
 ## Unreleased
 
+## [0.19.2]
+
 ### Removed
 - [Breaking] deprecated `nequip.ase` module, including `NoseHoover`. Use `nequip.integrations.ase.NequIPCalculator`
 - [Breaking] `LennardJones` and `SimpleLennardJones` pair potentials
