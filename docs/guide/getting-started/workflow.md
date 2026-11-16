@@ -154,14 +154,14 @@ nequip-compile \
   --device [cpu|cuda] \
   --mode aotinductor \
   --target [ase|pair_nequip|pair_allegro|...]
-  # --modifiers enable_OpenEquivariance  # recommended GPU kernel acceleration (NequIP); use enable_CuEquivariance for Allegro
+  # --modifiers enable_OpenEquivariance  # recommended GPU kernel acceleration (NequIP); use enable_CuEquivarianceContracter for Allegro
 ```
 
 ```{important}
 We strongly recommend enabling the [GPU tensor-product kernel modifiers](../accelerations/gpu_kernel_modifiers.md) when compiling models on GPU. These greatly accelerate the model and reduce memory demand. Enable them with `nequip-compile` using the `--modifiers` flag:
 
 - **[OpenEquivariance](../accelerations/openequivariance.md)** for **NequIP** models: `--modifiers enable_OpenEquivariance`
-- **[CuEquivariance](../accelerations/cuequivariance.md)** for **Allegro** models: `--modifiers enable_CuEquivariance`
+- **[CuEquivariance](https://nequip.readthedocs.io/projects/allegro/en/latest/guide/cuequivariance.html)** for **Allegro** models: `--modifiers enable_CuEquivarianceContracter`
 
 For further speed-ups where appropriate (e.g. often permissible for MD simulations), [TF32 mixed-precision](../accelerations/precision.md#tf32-at-inference) can also be enabled at compile time by adding the `--tf32` flag.
 ```
@@ -200,7 +200,7 @@ nequip-compile \
   path/to/compiled_model.nequip.pth \
   --device [cpu|cuda] \
   --mode torchscript
-  # --modifiers enable_OpenEquivariance  # recommended GPU kernel acceleration (NequIP); use enable_CuEquivariance for Allegro
+  # --modifiers enable_OpenEquivariance  # recommended GPU kernel acceleration (NequIP); use enable_CuEquivarianceContracter for Allegro
 ```
 
 ### Compiling models from nequip.net
@@ -214,7 +214,7 @@ nequip-compile \
   --device cuda \
   --mode aotinductor \
   --target ase \
-  --modifiers enable_OpenEquivariance  # recommended GPU kernel acceleration (NequIP); use enable_CuEquivariance for Allegro
+  --modifiers enable_OpenEquivariance  # recommended GPU kernel acceleration (NequIP); use enable_CuEquivarianceContracter for Allegro
 ```
 
 The format is `nequip.net:group-name/model-name:version`, where you can find the full model ID on the model's page at [nequip.net](https://www.nequip.net/).
