@@ -1,11 +1,16 @@
 # This file is a part of the `nequip` package. Please see LICENSE and README at the root for information on using it.
+import os
+import shutil
 import subprocess
 import tempfile
 import zipfile
+from concurrent.futures import ThreadPoolExecutor
 
 import pytest
+import torch
 
 from conftest import _check_and_print
+from nequip.model import ModelFromPackage
 
 
 @pytest.fixture(scope="session")
@@ -132,3 +137,46 @@ def test_modify_unknown_modifier_error(package_from_training, tmp_path):
         stderr=subprocess.PIPE,
     )
     assert retcode.returncode != 0
+
+
+def test_repeated_loads_reuse_importer(package_from_training, tmp_path, monkeypatch):
+    """Repeated loads of a package share one importer, rather than leaking an importer (with its open file) per load."""
+    pkg_path, _ = package_from_training
+    # a fresh path, so that no importer is cached for it yet
+    path = str(tmp_path / "model.nequip.zip")
+    shutil.copy(pkg_path, path)
+
+    num_importers = 0
+    orig_init = torch.package.PackageImporter.__init__
+
+    def counting_init(self, *args, **kwargs):
+        nonlocal num_importers
+        num_importers += 1
+        orig_init(self, *args, **kwargs)
+
+    monkeypatch.setattr(torch.package.PackageImporter, "__init__", counting_init)
+
+    # including concurrent first loads, which must not see each other's half-imported modules
+    with ThreadPoolExecutor(4) as pool:
+        models = list(pool.map(lambda _: ModelFromPackage(path), range(4)))
+    assert num_importers == 1
+    # the loaded models must still be independent
+    params = [next(model.parameters()) for model in models]
+    assert params[0].data_ptr() != params[1].data_ptr()
+
+    # a failed load drops its importer, which may be left with half-imported modules
+    def failing_load_pickle(*args, **kwargs):
+        raise RuntimeError("load failed")
+
+    with monkeypatch.context() as m:
+        m.setattr(torch.package.PackageImporter, "load_pickle", failing_load_pickle)
+        with pytest.raises(RuntimeError, match="load failed"):
+            ModelFromPackage(path)
+    ModelFromPackage(path)
+    assert num_importers == 2
+
+    # a changed package file gets a new importer
+    stat = os.stat(path)
+    os.utime(path, ns=(stat.st_atime_ns, stat.st_mtime_ns + 10**9))
+    ModelFromPackage(path)
+    assert num_importers == 3

@@ -90,6 +90,10 @@ def modify(
         model_fn = get_method(model.pop("_target_"))
         model = model_fn(**model)
 
+    # modifiers can swap in new modules, which start in training mode, so restore the
+    # model's mode (e.g. eval mode at inference) once they have been applied
+    training = model.training
+
     def _apply_modifier(
         avail_modifiers: Dict[str, callable],
         modifier_cfg: Dict[str, Any],
@@ -128,4 +132,5 @@ def modify(
     else:
         raise RuntimeError("Unrecognized model object found.")
 
+    model.train(training)
     return model
