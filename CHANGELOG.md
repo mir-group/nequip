@@ -8,6 +8,15 @@ Most recent change on the top.
 
 ## Unreleased
 
+### Changed
+- NequIP now builds the training data sampler itself (for `torch.utils.data.DataLoader` configs without a `sampler` or `batch_sampler`), ordering each epoch from `data.seed` and the epoch number. Training data orders therefore differ from previous versions for `shuffle: true` configs and for all DDP configs
+
+### Fixed
+- model modifiers applied with `modify` to a model in eval mode left swapped-in modules in training mode (e.g. Allegro's `TritonContracter` then ran the standard contraction)
+- DDP training ignoring `data.seed` for the training data order: Lightning seeds its `DistributedSampler` from the global seed, which NequIP always sets to 123
+- resumed training runs repeating or skipping training data: the first epoch after resuming reused epoch 0's order (with DDP and `num_workers > 0`, or without DDP), and resuming from a mid-epoch checkpoint retrained the epoch's first batches instead of its remaining ones
+- every load of a package file leaking an open file handle and a few MB of memory, so that repeated loads in one process eventually failed with `Too many open files`. One `PackageImporter` is now reused per package file
+
 ## [0.19.2]
 
 ### Removed
