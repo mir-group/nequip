@@ -1,11 +1,12 @@
 # This file is a part of the `nequip` package. Please see LICENSE and README at the root for information on using it.
 import torch
+from torch.utils.data import DataLoader, DistributedSampler, IterableDataset
 from .. import AtomicDataDict
 from nequip.utils.logger import RankedLogger
 
 import lightning
 from omegaconf import OmegaConf, DictConfig, ListConfig
-from hydra.utils import instantiate
+from hydra.utils import instantiate, get_method
 import copy
 from typing import List, Dict, Any, Union, Optional
 
@@ -158,8 +159,14 @@ class NequIPDataModule(lightning.LightningDataModule):
 
     def load_state_dict(self, state_dict: Dict[str, Any]) -> None:
         """"""
-        self.train_generator_state = state_dict["train_generator_state"]
-        self.generator_state = state_dict["generator_state"]
+        # generator states must be on the CPU, but `SimpleDDPStrategy` loads checkpoints onto the GPU
+        self.train_generator_state = state_dict["train_generator_state"].cpu()
+        self.generator_state = state_dict["generator_state"].cpu()
+        # Lightning restores checkpoints after calling `setup`, so also restore the generators it has already built:
+        if hasattr(self, "train_generator"):
+            self.train_generator.set_state(self.train_generator_state)
+        if hasattr(self, "generator"):
+            self.generator.set_state(self.generator_state)
 
         for varname in ["train", "val", "test", "predict"]:
             for i in range(self.num_datasets[varname]):
@@ -273,8 +280,24 @@ class NequIPDataModule(lightning.LightningDataModule):
             return self._train_dataloader[0]
         # must only return single train dataloader for now
         # see https://lightning.ai/docs/pytorch/stable/data/iterables.html#multiple-dataloaders
+        config = self.train_dataloader_config
+        target = config["_target_"]
+        target = get_method(target) if isinstance(target, str) else target
+        # NequIP's sampler orders each epoch by `seed` (Lightning's DDP sampler uses the
+        # global seed, which NequIP fixes) and resumes wherever Lightning does
+        if (
+            self.trainer is not None
+            # other dataloaders (e.g. torchdata's stateful one) may resume themselves
+            and target is DataLoader
+            and not {"sampler", "batch_sampler"} & config.keys()
+            # Lightning doesn't add samplers for iterable datasets either
+            and not isinstance(self.train_dataset[0], IterableDataset)
+        ):
+            # `shuffle` and `sampler` are mutually exclusive
+            config = {**config, "_target_": _LazyDataLoader, "shuffle": False}
+            config["sampler"] = _ResumableSampler(self.train_dataset[0], self)
         self._train_dataloader = self._get_dloader(
-            self.train_dataset, self.train_generator, self.train_dataloader_config
+            self.train_dataset, self.train_generator, config
         )
         self._maybe_load_dataloader_state_dict(self._train_dataloader, "train")
         return self._train_dataloader[0]
@@ -379,3 +402,43 @@ class NequIPDataModule(lightning.LightningDataModule):
 def _default_collate_fn_factory() -> callable:
     """Allow `instantiate` to get the default collate_fn by calling this function."""
     return AtomicDataDict.batched_from_list
+
+
+class _ResumableSampler(DistributedSampler):
+    """``DistributedSampler`` that follows Lightning's progress while training.
+
+    It orders each epoch by ``trainer.current_epoch`` (``set_epoch`` is an epoch ahead
+    after resuming ``max_steps`` training from an epoch's end) and, when resuming, skips
+    the batches already trained in it (Lightning restarts the iterator mid-epoch, but
+    only runs the remaining batches).
+    """
+
+    def __init__(self, dataset, datamodule):
+        trainer, config = datamodule.trainer, datamodule.train_dataloader_config
+        # Lightning always shuffles training data under DDP, unless told not to add samplers:
+        kwargs = (
+            trainer._accelerator_connector.use_distributed_sampler
+            and trainer.distributed_sampler_kwargs
+        ) or dict(num_replicas=1, rank=0, shuffle=bool(config.get("shuffle")))
+        super().__init__(dataset, seed=datamodule.seed, **kwargs)
+        self.datamodule = datamodule
+        self.batch_size = config.get("batch_size", 1) or 1
+
+    def __iter__(self):
+        trainer, trained = self.datamodule.trainer, 0
+        if trainer.training:
+            self.epoch, loop = trainer.current_epoch, trainer.fit_loop
+            trained = loop.restarting and loop.epoch_loop.batch_progress.current.ready
+        return iter(list(super().__iter__())[trained * self.batch_size :])
+
+
+class _LazyDataLoader(DataLoader):
+    """``DataLoader`` whose iterators are only created at their first ``next``.
+
+    With ``num_workers > 0``, iterators draw indices when created, which Lightning does
+    before updating its restored progress when resuming
+    (https://github.com/Lightning-AI/pytorch-lightning/issues/21938).
+    """
+
+    def __iter__(self):
+        yield from super().__iter__()
