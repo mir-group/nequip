@@ -9,6 +9,7 @@ from .md22_datamodule import MD22DataModule
 from .samd23_datamodule import SAMD23DataModule
 from .water_datamodule import WaterDataModule
 from .coll_datamodule import COLLDataModule
+from ._load_atoms_datamodule import LoadAtomsDataModule
 
 __all__ = [
     "NequIPDataModule",
@@ -21,4 +22,5 @@ __all__ = [
     "SAMD23DataModule",
     "WaterDataModule",
     "COLLDataModule",
+    "LoadAtomsDataModule",
 ]
